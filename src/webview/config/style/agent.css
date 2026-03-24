@@ -304,6 +304,40 @@
     }
 }
 
+/* Memory 列表始终单列占满宽度 */
+.memory-list {
+    grid-template-columns: 1fr;
+}
+
+.memory-list .agent-card {
+    width: 100%;
+    box-sizing: border-box;
+}
+
+/* 关联文件行 */
+.memory-ref-file {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 0;
+    cursor: pointer;
+    width: fit-content;
+    color: var(--vscode-descriptionForeground);
+}
+
+.memory-ref-file:hover .memory-ref-file-name {
+    text-decoration: underline;
+}
+
+.memory-ref-file-name {
+    font-size: 12px;
+}
+
+.memory-ref-file svg {
+    flex-shrink: 0;
+    opacity: 0.7;
+}
+
 /* 头部右侧区域 */
 .section-header-right {
     display: flex;

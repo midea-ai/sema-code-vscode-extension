@@ -667,8 +667,8 @@ const PluginConfig: React.FC<PluginConfigProps> = ({ vscode }) => {
                     onClick={() => setActiveTab('installed')}
                 >
                     已安装
-                    {data.plugins.length > 0 && (
-                        <span className="plugin-tab-count">{data.plugins.length}</span>
+                    {data.plugins.filter(p => p.from === 'sema' || p.status).length > 0 && (
+                        <span className="plugin-tab-count">{data.plugins.filter(p => p.from === 'sema' || p.status).length}</span>
                     )}
                 </div>
                 <div

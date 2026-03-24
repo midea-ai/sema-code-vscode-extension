@@ -9,8 +9,9 @@ import SkillConfig from './SkillConfig';
 import AgentConfig from './AgentConfig';
 import PluginConfig from './PluginConfig';
 import CommandConfig from './CommandConfig';
+import MemoryConfig from './MemoryConfig';
 
-type PageType = 'models' | 'system' | 'mcp' | 'skill' | 'agent' | 'command' | 'plugin';
+type PageType = 'models' | 'system' | 'memory' | 'mcp' | 'skill' | 'agent' | 'command' | 'plugin';
 type ModelTabType = 'list' | 'add';
 
 interface AppProps {
@@ -64,6 +65,13 @@ const App: React.FC<AppProps> = ({ vscode }) => {
                     onClick={() => setCurrentPage('system')}
                 >
                     系统配置
+                </div>
+
+                <div
+                    className={`nav-item nav-main ${currentPage === 'memory' ? 'active' : ''}`}
+                    onClick={() => setCurrentPage('memory')}
+                >
+                    Memory
                 </div>
 
                 <div
@@ -140,6 +148,13 @@ const App: React.FC<AppProps> = ({ vscode }) => {
                 {currentPage === 'system' && (
                     <div className="page active">
                         <SystemConfig vscode={vscode} />
+                    </div>
+                )}
+
+                {/* Memory页面 */}
+                {currentPage === 'memory' && (
+                    <div className="page active">
+                        <MemoryConfig vscode={vscode} />
                     </div>
                 )}
 

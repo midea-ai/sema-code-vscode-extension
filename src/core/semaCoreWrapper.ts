@@ -44,7 +44,8 @@ import {
     SkillConfig,
     CommandConfig,
     MCPServerConfig,
-    MCPServerInfo
+    MCPServerInfo,
+    MemoryConfig
 } from 'sema-core/types';
 
 import { SystemConfigManager } from '../managers/SystemConfigManager';
@@ -948,6 +949,17 @@ export class SemaCoreWrapper {
     public updateMCPUseTools(name: string, toolNames: string[]): Promise<MCPServerInfo[]> {
         return this.semaCore.updateMCPUseTools(name, toolNames);
     }
+
+    // ===== Mem 管理相关方法 =====
+
+    public getMemoryInfo(): Promise<MemoryConfig | null> {
+        return this.semaCore.getMemoryInfo();
+    }
+
+    public refreshMemoryInfo(): Promise<MemoryConfig | null> {
+        return this.semaCore.refreshMemoryInfo();
+    }
+
 
     public dispose(): void {
         try {

@@ -88,6 +88,8 @@ export class ConfigWebviewProvider {
                 disableMCPServer:           () => this.disableMCPServer(m.name),
                 enableMCPServer:            () => this.enableMCPServer(m.name),
                 updateMCPUseTools:          () => this.updateMCPUseTools(m.name, m.toolNames),
+                loadMemoryInfo:             () => this.loadMemoryInfo(),
+                refreshMemoryInfo:          () => this.refreshMemoryInfo(),
                 openFile:              () => Promise.resolve(this.openFile(m.filePath)),
             };
             await handlers[m.command]?.();
@@ -646,6 +648,31 @@ export class ConfigWebviewProvider {
             const servers = await this.coreManager.updateMCPUseTools(name, toolNames);
             this.postMessage({ command: 'updateMCPUseToolsResult', success: true, message: '工具配置已更新', data: servers });
         });
+    }
+
+    // ─── Memory ───────────────────────────────────────────────────────────────
+
+    private async loadMemoryInfo() {
+        if (!this.panel) return;
+        try {
+            await this.ensureCoreReady();
+            const memoryInfo = await this.coreManager.getMemoryInfo();
+            // console.log('[loadMemoryInfo] data:', memoryInfo);
+            this.postMessage({ command: 'loadMemoryInfoResult', success: true, data: memoryInfo });
+        } catch (error) {
+            this.postMessage({ command: 'loadMemoryInfoResult', success: false, data: null, message: (error as Error).message });
+        }
+    }
+
+    private async refreshMemoryInfo() {
+        if (!this.panel) return;
+        try {
+            await this.ensureCoreReady();
+            const memoryInfo = await this.coreManager.refreshMemoryInfo();
+            this.postMessage({ command: 'refreshMemoryInfoResult', success: true, data: memoryInfo });
+        } catch (error) {
+            this.postMessage({ command: 'refreshMemoryInfoResult', success: false, data: null, message: (error as Error).message });
+        }
     }
 
     // ─── Utils ────────────────────────────────────────────────────────────────
