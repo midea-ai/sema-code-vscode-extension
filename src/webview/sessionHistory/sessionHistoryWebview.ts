@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { SessionHistoryManager, Session } from '../../managers/SessionHistoryManager';
+import { SessionHistoryManager } from '../../managers/SessionHistoryManager';
 
 // 定义回调函数类型
 export interface SessionHistoryCallbacks {
@@ -30,9 +30,7 @@ export class SessionHistoryWebviewProvider {
         // 如果面板已存在，则显示并更新内容
         if (this.panel) {
             this.panel.reveal(vscode.ViewColumn.One);
-            // 面板已存在时，通过消息更新内容，不需要重新获取
-            const sessions = await this.getAllSessions();
-            this.updateContent(sessions);
+            await this.refreshSessionList();
             return;
         }
 
@@ -54,16 +52,17 @@ export class SessionHistoryWebviewProvider {
         // 处理消息
         this.panel.webview.onDidReceiveMessage(async (message) => {
             switch (message.type) {
-                case 'webviewReady':
+                case 'webviewReady': {
                     // React 应用已准备好，发送会话数据
-                    const currentSessions = await this.getAllSessions();
-                    const activeSessionId = this.sessionHistoryManager.getCurrentSessionId();
+                    const { sessions: currentSessions, currentSessionId: activeSessionId } =
+                        await this.sessionHistoryManager.getSessionsWithActiveId();
                     this.panel?.webview.postMessage({
                         type: 'updateSessions',
                         sessions: currentSessions,
                         currentSessionId: activeSessionId
                     });
                     break;
+                }
                 case 'loadSession':
                     if (this.callbacks.loadSession) {
                         try {
@@ -84,9 +83,7 @@ export class SessionHistoryWebviewProvider {
                     }
 
                     await this.sessionHistoryManager.deleteSession(message.sessionId);
-                    // 刷新列表
-                    const updatedSessions = await this.getAllSessions();
-                    this.updateContent(updatedSessions);
+                    await this.refreshSessionList();
                     break;
             }
         });
@@ -101,31 +98,13 @@ export class SessionHistoryWebviewProvider {
      * 刷新会话列表（用于外部调用）
      */
     public async refreshSessionList(): Promise<void> {
-        if (this.panel) {
-            const sessions = await this.getAllSessions();
-            this.updateContent(sessions);
-        }
-    }
-
-    /**
-     * 获取所有会话（包括当前未保存的）
-     */
-    private async getAllSessions(): Promise<Session[]> {
-        return await this.sessionHistoryManager.getAllSessions();
-    }
-
-    /**
-     * 更新面板内容
-     */
-    private updateContent(sessions: Session[]) {
-        if (this.panel) {
-            const currentSessionId = this.sessionHistoryManager.getCurrentSessionId();
-            this.panel.webview.postMessage({
-                type: 'updateSessions',
-                sessions: sessions,
-                currentSessionId: currentSessionId
-            });
-        }
+        if (!this.panel) { return; }
+        const { sessions, currentSessionId } = await this.sessionHistoryManager.getSessionsWithActiveId();
+        this.panel.webview.postMessage({
+            type: 'updateSessions',
+            sessions,
+            currentSessionId
+        });
     }
 
     /**

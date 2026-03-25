@@ -10,7 +10,6 @@ export interface Session {
     updatedAt: number; // 更新时间
     content: any[]; // 消息历史数组
     projectPath: string; // 项目路径，用于区分不同项目的会话
-    jsonPath?: string; // JSON文件路径（兼容旧版本）
 }
 
 /**
@@ -42,33 +41,26 @@ export class SessionHistoryManager {
     }
 
     /**
-     * 将消息历史中所有 running 状态的 Task 改为 interrupted（返回新数组，不修改原对象）
+     * 过滤不完整的 assistant 消息，并将 running 状态的 Task 标记为 interrupted
+     * 合并两次遍历为一次，减少开销
      */
-    private markRunningTasksAsInterrupted(messages: any[]): any[] {
-        return messages.map(message => {
+    private sanitizeMessages(messages: any[]): any[] {
+        const result: any[] = [];
+        for (const message of messages) {
+            if (message.type === 'assistant') {
+                const isCompleted = message.content?.completed === true;
+                const hasContent = message.content?.content && message.content.content.length > 0;
+                if (!isCompleted && !hasContent) {
+                    continue; // 过滤掉不完整的 assistant 消息
+                }
+            }
             if (message.type === 'tool' && message.toolName === 'Task' && message.content?.status === 'running') {
-                return { ...message, content: { ...message.content, status: 'interrupted' } };
+                result.push({ ...message, content: { ...message.content, status: 'interrupted' } });
+            } else {
+                result.push(message);
             }
-            return message;
-        });
-    }
-
-    /**
-     * 过滤掉不完整的assistant消息（如thinking过程中中断产生的消息）
-     * 不完整的消息特征：type === 'assistant' && content.completed !== true && content为空
-     */
-    private filterIncompleteMessages(messages: any[]): any[] {
-        return messages.filter(message => {
-            // 保留非assistant类型的消息
-            if (message.type !== 'assistant') {
-                return true;
-            }
-            // 对于assistant类型，只过滤掉未完成且content为空的消息
-            const isCompleted = message.content?.completed === true;
-            const hasContent = message.content?.content && message.content.content.length > 0;
-            // 保留已完成的消息，或者有内容的消息
-            return isCompleted || hasContent;
-        });
+        }
+        return result;
     }
 
     /**
@@ -76,28 +68,23 @@ export class SessionHistoryManager {
      */
     public async saveSession(messageHistory?: any[]): Promise<void> {
         const sessionId = this.semaWrapper.currentSessionId;
-       // console.log(`保存会话到历史记录: ${sessionId}`)
-        let messages = messageHistory || this.semaWrapper.messageHistory || [];
-
-        // 如果内容为空，不保存
-        if (!sessionId || messages.length === 0) {
-            return;
-        }
-
-        // 过滤掉不完整的assistant消息（如thinking过程中中断产生的消息）
-        messages = this.filterIncompleteMessages(messages);
-
-        // 过滤后如果为空，不保存
-        if (messages.length === 0) {
-            return;
-        }
-
-        // 将所有 running 状态的 Task 改为 interrupted（返回新数组，不污染原始消息历史）
-        messages = this.markRunningTasksAsInterrupted(messages);
-
-        // 直接从 semaWrapper 读取标题
         const title = this.semaWrapper.title;
-        if (!title) {
+
+        // 提前检查必要字段
+        if (!sessionId || !title) {
+            return;
+        }
+
+        const rawMessages = messageHistory || this.semaWrapper.messageHistory || [];
+
+        if (rawMessages.length === 0) {
+            return;
+        }
+
+        // 过滤不完整消息 + 标记 interrupted（单次遍历）
+        const messages = this.sanitizeMessages(rawMessages);
+
+        if (messages.length === 0) {
             return;
         }
 
@@ -159,41 +146,6 @@ export class SessionHistoryManager {
     }
 
     /**
-     * 获取当前项目数据
-     */
-    private async getCurrentProjectData(): Promise<ProjectData | null> {
-        const allProjects = await this.getAllProjectsRaw();
-        return allProjects.find(p => p.projectPath === this.projectPath) || null;
-    }
-
-    /**
-     * 格式化时间显示
-     */
-    public static formatTime(timestamp: number): string {
-        const now = Date.now();
-        const diff = now - timestamp;
-        const dayInMs = 24 * 60 * 60 * 1000;
-
-        if (diff < dayInMs) {
-            return '今天';
-        } else if (diff < 2 * dayInMs) {
-            return '1天前';
-        } else if (diff < 3 * dayInMs) {
-            return '2天前';
-        } else if (diff < 4 * dayInMs) {
-            return '3天前';
-        } else {
-            const date = new Date(timestamp);
-            const year = date.getFullYear();
-            const month = String(date.getMonth() + 1).padStart(2, '0');
-            const day = String(date.getDate()).padStart(2, '0');
-            const hours = String(date.getHours()).padStart(2, '0');
-            const minutes = String(date.getMinutes()).padStart(2, '0');
-            return `${year}-${month}-${day} ${hours}:${minutes}`;
-        }
-    }
-
-    /**
      * 获取当前激活的会话ID
      */
     public getCurrentSessionId(): string | null {
@@ -204,31 +156,36 @@ export class SessionHistoryManager {
      * 获取当前项目的所有会话
      */
     public async getAllSessions(): Promise<Session[]> {
-        const projectData = await this.getCurrentProjectData();
-        const currentSessionId = this.semaWrapper.currentSessionId;
-
+        const allProjects = await this.getAllProjectsRaw();
+        const projectData = allProjects.find(p => p.projectPath === this.projectPath);
         if (!projectData) {
             return [];
         }
 
-        const sessions = projectData.sessions;
+        const currentSessionId = this.semaWrapper.currentSessionId;
+        return [...projectData.sessions].sort((a, b) => {
+            if (a.id === currentSessionId) { return -1; }
+            if (b.id === currentSessionId) { return 1; }
+            return b.updatedAt - a.updatedAt;
+        });
+    }
 
-        // 分离当前会话和其他会话
-        const currentSession = sessions.find(s => s.id === currentSessionId);
-        const otherSessions = sessions.filter(s => s.id !== currentSessionId);
-
-        // 其他会话按更新时间降序排列
-        otherSessions.sort((a, b) => b.updatedAt - a.updatedAt);
-
-        // 当前会话排在第一位，其余按更新时间排序
-        return currentSession ? [currentSession, ...otherSessions] : otherSessions;
+    /**
+     * 获取会话列表及当前激活ID（减少重复调用）
+     */
+    public async getSessionsWithActiveId(): Promise<{ sessions: Session[]; currentSessionId: string | null }> {
+        return {
+            sessions: await this.getAllSessions(),
+            currentSessionId: this.semaWrapper.currentSessionId
+        };
     }
 
     /**
      * 根据ID获取特定会话
      */
     public async getSession(sessionId: string): Promise<Session | null> {
-        const projectData = await this.getCurrentProjectData();
+        const allProjects = await this.getAllProjectsRaw();
+        const projectData = allProjects.find(p => p.projectPath === this.projectPath);
         if (!projectData) {
             return null;
         }

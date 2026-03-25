@@ -42,6 +42,7 @@ const App: React.FC<AppProps> = ({ vscode }) => {
     const [projectInputHistory, setProjectInputHistory] = useState<string[]>([]);
     const [spinnerAccumulatedSeconds, setSpinnerAccumulatedSeconds] = useState<number>(0);
     const [agentMode, setAgentMode] = useState<'Agent' | 'Plan'>('Agent');
+    const [pendingInputs, setPendingInputs] = useState<Array<{ inputId: string; content: string }>>([]);
 
     const outputContainerRef = useRef<HTMLDivElement>(null);
     const inputBoxRef = useRef<InputBoxHandle>(null);
@@ -217,6 +218,22 @@ const App: React.FC<AppProps> = ({ vscode }) => {
                         setAgentMode(message.mode);
                     }
                     break;
+                case 'inputReceived':
+                    if (message.data) {
+                        setPendingInputs(prev => [...prev, {
+                            inputId: message.data.inputId,
+                            content: message.data.originalInput || message.data.input
+                        }]);
+                    }
+                    break;
+                case 'inputProcessing':
+                    if (message.data) {
+                        setPendingInputs(prev => prev.filter(p => p.inputId !== message.data.inputId));
+                    }
+                    break;
+                case 'clearPendingInputs':
+                    setPendingInputs([]);
+                    break;
             }
         };
 
@@ -339,31 +356,23 @@ const App: React.FC<AppProps> = ({ vscode }) => {
     }, []);
 
     const handleSend = (text: string, files: SelectedFile[]) => {
-        setProcessingState('processing');
-        // 乐观更新：立即添加用户消息，不等后端响应，避免 Linux 上延迟导致 Welcome 和 UserInputBlock 无法立刻显示
-        setMessages(prev => [...prev, {
-            id: `optimistic-${Date.now()}`,
-            type: 'user',
-            content: text,
-            timestamp: Date.now()
-        }]);
         // 重置滚动状态，让新消息自动滚到底部
         userScrolledUpRef.current = false;
-        // 重置 spinner 计时
-        setSpinnerAccumulatedSeconds(0);
-        spinnerStartTimeRef.current = 0;
-        // 清空文件变更列表和 todos 列表
-        setFileChanges([]);
-        setTodos([]);
+        if (processingState !== 'processing') {
+            // 只有在非处理状态时才重置计时和清空列表
+            setSpinnerAccumulatedSeconds(0);
+            spinnerStartTimeRef.current = 0;
+            setFileChanges([]);
+            setTodos([]);
+        }
         vscode.postMessage({
             type: 'sendInput',
-            text: text, // 保持原始命令
-            files: files  // 传递完整的文件对象（包含path, name, isDirectory）
+            text: text,
+            files: files
         });
     };
 
     const handleStop = () => {
-        setProcessingState('idle');
         // 如果当前显示权限面板，将权限请求插入到消息历史中，然后隐藏它
         if (toolPermissionData) {
             vscode.postMessage({
@@ -669,6 +678,11 @@ const App: React.FC<AppProps> = ({ vscode }) => {
                         next_progress={todos.find(t => t.status === 'pending')?.content || ''}
                     />
                 )}
+                {pendingInputs.map(p => (
+                    <div key={p.inputId} className="user-input-block pending">
+                        <div className="user-input-content pending">{p.content}</div>
+                    </div>
+                ))}
                 {toolPermissionData && (
                     <PermissionDialog
                         permissionData={toolPermissionData}
@@ -705,7 +719,7 @@ const App: React.FC<AppProps> = ({ vscode }) => {
             <InputBox
                 ref={inputBoxRef}
                 vscode={vscode}
-                disabled={inputDisabled || !!toolPermissionData || !!planExitData || !!askQuestionData}
+                disabled={inputDisabled}
                 placeholder={inputPlaceholder}
                 isGenerating={processingState === 'processing'}
                 showBashPermission={!!toolPermissionData}

@@ -3,10 +3,10 @@ import React, { useState, useEffect } from 'react';
 interface Session {
     id: string;
     title: string;
-    createdAt: number; // 创建时间
-    updatedAt: number; // 更新时间
-    content: any[]; // 消息历史数组
-    projectPath: string; // 项目路径，用于区分不同项目的会话
+    createdAt: number;
+    updatedAt: number;
+    content: any[];
+    projectPath: string;
 }
 
 interface VscodeApi {
@@ -15,16 +15,11 @@ interface VscodeApi {
     setState(state: any): void;
 }
 
-declare global {
-    interface Window {
-        acquireVsCodeApi(): VscodeApi;
-    }
+interface AppProps {
+    vscode: VscodeApi;
 }
 
-// 在组件外部调用一次，避免重复调用
-const vscode = window.acquireVsCodeApi();
-
-const App: React.FC = () => {
+const App: React.FC<AppProps> = ({ vscode }) => {
     const [sessions, setSessions] = useState<Session[]>([]);
     const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
 

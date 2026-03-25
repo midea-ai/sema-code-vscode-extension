@@ -1,18 +1,11 @@
 import * as vscode from 'vscode';
+import { EXCLUDED_NAMES, EXCLUDE_GLOB } from '../utils/fileExcludePatterns';
 
 /**
  * 文件操作管理器
  * 负责处理工作区文件的搜索、打开、列表获取等操作
  */
 export class FileOperationManager {
-    private readonly IGNORED_NAMES = new Set([
-        'node_modules', '.git', 'dist', 'build', '.next', 'out', '.vscode',
-        '.DS_Store', '__pycache__', '.pytest_cache', 'venv', '.venv', '.env', '.idea'
-    ]);
-
-    private readonly IGNORED_PATTERNS =
-        '{**/node_modules/**,**/.git/**,**/dist/**,**/build/**,**/.next/**,**/out/**,**/.vscode/**,**/.DS_Store/**,**/__pycache__/**,**/.pytest_cache/**,**/venv/**,**/.venv/**,**/.env/**,**/.idea/**}';
-
     private readonly MAX_SEARCH_FILES = 80;
 
     /**
@@ -116,7 +109,7 @@ export class FileOperationManager {
             const entries = await vscode.workspace.fs.readDirectory(rootUri);
 
             const rootFiles = entries
-                .filter(([name]) => !this.IGNORED_NAMES.has(name))
+                .filter(([name]) => !EXCLUDED_NAMES.has(name))
                 .map(([name, fileType]) => ({
                     path: name,
                     isDirectory: fileType === vscode.FileType.Directory,
@@ -168,7 +161,6 @@ export class FileOperationManager {
                 .filter(editor => editor.document.uri.scheme === 'file');
 
             for (const editor of visibleEditors) {
-                // 跳过已经搜索过的活动编辑器
                 if (editor === activeEditor) {
                     continue;
                 }
@@ -186,7 +178,6 @@ export class FileOperationManager {
                 .map(tab => (tab.input as vscode.TabInputText).uri)
                 .filter(uri => uri.scheme === 'file');
 
-            // 去重并排除已搜索的可见编辑器
             const visibleUris = new Set(visibleEditors.map(e => e.document.uri.toString()));
             const uniqueTabUris = allTabFiles.filter(uri => !visibleUris.has(uri.toString()));
 
@@ -198,12 +189,9 @@ export class FileOperationManager {
                         return result;
                     }
                 } catch (error) {
-                    // 跳过无法读取的文件
                     continue;
                 }
             }
-
-            // 不搜索工作区中的其他未打开文件，只搜索已打开的文件
 
             return null;
         } catch (error) {
@@ -218,10 +206,8 @@ export class FileOperationManager {
     private searchInDocument(document: vscode.TextDocument, cleanContent: string): { path: string; startLine: number; endLine: number } | null {
         const text = document.getText();
 
-        // 查找内容在文档中的位置
         const index = text.indexOf(cleanContent);
         if (index !== -1) {
-            // 计算起始行号和结束行号
             const beforeContent = text.substring(0, index);
             const startLine = beforeContent.split('\n').length;
 
@@ -230,11 +216,7 @@ export class FileOperationManager {
 
             const relativePath = vscode.workspace.asRelativePath(document.uri, false);
 
-            return {
-                path: relativePath,
-                startLine,
-                endLine
-            };
+            return { path: relativePath, startLine, endLine };
         }
 
         return null;
@@ -250,8 +232,6 @@ export class FileOperationManager {
         }
 
         try {
-           // console.log(`[searchWorkspaceFiles] query: ${query}`);
-
             // 1. 获取所有打开的文件并过滤
             const cleanQuery = query.replace(/\/+$/, '').toLowerCase();
             const allOpenFiles = this.getOpenFiles();
@@ -262,7 +242,7 @@ export class FileOperationManager {
             // 2. 搜索工作区文件
             const files = await vscode.workspace.findFiles(
                 `**/*${query}*`,
-                this.IGNORED_PATTERNS,
+                EXCLUDE_GLOB,
                 this.MAX_SEARCH_FILES * 2
             );
 
@@ -274,7 +254,7 @@ export class FileOperationManager {
                 const relativePath = vscode.workspace.asRelativePath(file, false);
                 const fileName = relativePath.split('/').pop() || '';
 
-                if (this.IGNORED_NAMES.has(fileName)) {
+                if (EXCLUDED_NAMES.has(fileName)) {
                     continue;
                 }
 
@@ -290,12 +270,10 @@ export class FileOperationManager {
                     const dirPath = parts.slice(0, i).join('/');
                     const dirName = parts[i - 1];
 
-                    // 跳过忽略的目录或已添加的目录
-                    if (this.IGNORED_NAMES.has(dirName) || dirSet.has(dirPath)) {
+                    if (EXCLUDED_NAMES.has(dirName) || dirSet.has(dirPath)) {
                         continue;
                     }
 
-                    // 只添加路径中包含搜索词的目录
                     if (dirPath.toLowerCase().includes(cleanQuery)) {
                         dirSet.add(dirPath);
                         searchResults.push({
@@ -313,18 +291,15 @@ export class FileOperationManager {
                 .slice(0, this.MAX_SEARCH_FILES)
                 .filter(f => !openFilePaths.has(f.path));
 
-            // 5. 按深度和字母顺序排序（不区分目录和文件）
+            // 5. 按深度和字母顺序排序
             uniqueSearchResults.sort((a, b) => {
-                // 计算路径深度
                 const depthA = (a.path.match(/\//g) || []).length;
                 const depthB = (b.path.match(/\//g) || []).length;
 
-                // 先按深度排序
                 if (depthA !== depthB) {
                     return depthA - depthB;
                 }
 
-                // 同深度按字母顺序（不区分目录和文件）
                 return a.path.localeCompare(b.path);
             });
 
@@ -343,7 +318,6 @@ export class FileOperationManager {
         try {
             const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
 
-            // 判断是否为绝对路径（Unix: 以 / 开头，Windows: 以盘符开头）
             const isAbsolute = filePath.startsWith('/') || /^[a-zA-Z]:[\\/]/.test(filePath);
 
             let fileUri: vscode.Uri;
@@ -356,7 +330,6 @@ export class FileOperationManager {
                 fileUri = vscode.Uri.joinPath(workspaceFolder.uri, filePath);
             }
 
-            // 尝试获取文件状态，且只有文件（非目录）才返回 true
             const stat = await vscode.workspace.fs.stat(fileUri);
             return stat.type === vscode.FileType.File;
         } catch {

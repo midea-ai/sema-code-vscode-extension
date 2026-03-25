@@ -1,41 +1,237 @@
 import * as vscode from 'vscode';
 import * as crypto from 'crypto';
-import * as path from 'path';
+import { FileStateDiffManager } from '../../managers/FileStateDiffManager';
+import { FileOperationManager } from '../../managers/FileOperationManager';
+import { SemaCoreWrapper } from '../../core/semaCoreWrapper';
+import { transformCommandToPrompt } from '../../core/util/prompt';
 
 /**
- * ChatWebviewProvider - 为聊天界面提供 React webview
+ * ChatWebviewProvider - 管理聊天界面 Webview，直接处理所有消息
  */
 export class ChatWebviewProvider {
     private view?: vscode.WebviewView;
 
-    constructor(private readonly extensionUri: vscode.Uri) {}
+    constructor(
+        private readonly extensionUri: vscode.Uri,
+        private readonly coreManager: SemaCoreWrapper,
+        private readonly fileStateDiffManager: FileStateDiffManager,
+        private readonly fileOperationManager: FileOperationManager,
+        private readonly onOpenConfig: () => void
+    ) {}
 
     public setWebviewView(webviewView: vscode.WebviewView) {
         this.view = webviewView;
+        this.view.webview.options = {
+            enableScripts: true,
+            localResourceRoots: [this.extensionUri]
+        };
         this.view.webview.html = this.getHtmlContent(this.view.webview);
+
+        this.view.webview.onDidReceiveMessage(async (msg) => {
+            const handlers: Record<string, () => Promise<void>> = {
+                frontendReady:           () => this.onFrontendReady(),
+                sendInput:               () => this.handleUserInput(msg.text, msg.files),
+                openConfig:              () => Promise.resolve(this.onOpenConfig()),
+                interrupt:               () => this.interrupt(),
+                openFile:                () => this.fileOperationManager.openFileAtLine(msg.filePath, msg.line, msg.endLine),
+                requestWorkspaceFiles:   () => this.sendWorkspaceFiles(),
+                searchWorkspaceFiles:    () => this.searchWorkspaceFiles(msg.query || ''),
+                requestModelInfo:        () => this.sendModelInfo(),
+                switchModel:             () => this.switchModel(msg.modelName),
+                restoreFromSnapshots:    () => this.restoreFromSnapshots(msg.filePaths),
+                showFileDiff:            () => this.fileStateDiffManager.showFileDiff(msg.filePath, msg.minLine),
+                getFileChangeStats:      () => this.getFileChangeStats(msg.filePath),
+                searchContentInFiles:    () => this.searchContentInFiles(msg.content),
+                toolPermissionResponse:  () => Promise.resolve(this.handleToolPermissionResponse(msg.response)),
+                askQuestionResponse:     () => Promise.resolve(this.coreManager.respondToAskQuestion(msg.response)),
+                planExitResponse:        () => this.handlePlanExitResponse(msg.response),
+                verifyFilePath:          () => this.verifyFilePath(msg.filePath, msg.tempId, msg.originalCode, msg.lineInfo),
+                insertPermissionRequest: () => Promise.resolve(this.coreManager.insertPermissionRequestMessage(msg.permissionData)),
+                updateAgentMode:         () => this.coreManager.updateAgentMode(msg.mode),
+                requestCommands:         () => this.sendCommands(),
+            };
+            await handlers[msg.type]?.();
+        });
     }
 
-    /**
-     * 向 webview 发送消息
-     */
     public postMessage(message: any): void {
-        if (this.view) {
-            this.view.webview.postMessage(message);
+        this.view?.webview.postMessage(message);
+    }
+
+    public clearAllPanels(): void {
+        this.postMessage({ type: 'closePermissionPanel' });
+        this.postMessage({ type: 'closeAskQuestionPanel' });
+        this.postMessage({ type: 'closePlanExitPanel' });
+        this.postMessage({ type: 'clearFileChanges' });
+        this.postMessage({ type: 'clearTodos' });
+        this.postMessage({ type: 'clearPendingInputs' });
+    }
+
+    // ─── Message handlers ────────────────────────────────────────────────────
+
+    private async onFrontendReady(): Promise<void> {
+        await this.coreManager.createSession();
+        await this.checkConfiguration();
+    }
+
+    private async handleUserInput(text: string, files?: Array<any>): Promise<void> {
+        try {
+            await this.fileStateDiffManager.createSnapshot();
+
+            let content = text;
+            if (files && files.length > 0) {
+                const fileContext = files.map((file: any) =>
+                    file.startLine && file.endLine
+                        ? `@${file.path}:${file.startLine}-${file.endLine}`
+                        : `@${file.path}`
+                ).join(' ');
+                content = `${text} ${fileContext} `;
+            }
+
+            const transformedContent = transformCommandToPrompt(content);
+            if (transformedContent && transformedContent !== content) {
+                await this.coreManager.processUserInput(transformedContent, content);
+            } else {
+                await this.coreManager.processUserInput(content);
+            }
+        } catch (error) {
+            this.postMessage({
+                type: 'error',
+                message: error instanceof Error ? error.message : '处理用户输入时发生错误'
+            });
         }
     }
 
-    /**
-     * 获取 HTML 内容
-     */
+    private async interrupt(): Promise<void> {
+        try {
+            this.clearAllPanels();
+            this.coreManager.interruptSession();
+        } catch (error) {
+            console.error('Error interrupting session:', error);
+        }
+    }
+
+    private async sendWorkspaceFiles(): Promise<void> {
+        const files = await this.fileOperationManager.getWorkspaceFiles();
+        this.postMessage({
+            type: 'workspaceFiles',
+            files: files.map(item => ({ path: item.path, isDirectory: item.isDirectory, isOpen: item.isOpen }))
+        });
+    }
+
+    private async searchWorkspaceFiles(query: string): Promise<void> {
+        const files = await this.fileOperationManager.searchWorkspaceFiles(query);
+        this.postMessage({
+            type: 'workspaceFiles',
+            files: files.map(item => ({ path: item.path, isDirectory: item.isDirectory, isOpen: item.isOpen }))
+        });
+    }
+
+    private async sendModelInfo(): Promise<void> {
+        try {
+            const modelData = await this.coreManager.getModelData();
+            this.postMessage({
+                type: 'updateModelInfo',
+                modelName: modelData.modelName || '',
+                availableModels: modelData.modelList || []
+            });
+        } catch (error) {
+            this.postMessage({ type: 'error', message: `获取模型信息失败: ${error instanceof Error ? error.message : '未知错误'}` });
+        }
+    }
+
+    private async switchModel(modelName: string): Promise<void> {
+        try {
+            await this.coreManager.switchModel(modelName);
+        } catch (error) {
+            this.postMessage({ type: 'error', message: `切换模型失败: ${error instanceof Error ? error.message : '未知错误'}` });
+        }
+    }
+
+    private async restoreFromSnapshots(filePaths: string[]): Promise<void> {
+        await this.fileStateDiffManager.revertAllChanges(filePaths);
+        this.postMessage({ type: 'clearFileChanges' });
+    }
+
+    private async getFileChangeStats(filePath: string): Promise<void> {
+        if (!filePath) return;
+        try {
+            const stats = await this.fileStateDiffManager.getFileChangeStats(filePath);
+            this.postMessage({ type: 'fileChangeStats', fullPath: filePath, stats });
+        } catch (error) {
+            console.error('Failed to get file change stats:', error);
+        }
+    }
+
+    private async searchContentInFiles(content: string): Promise<void> {
+        try {
+            const result = await this.fileOperationManager.searchContentInFiles(content);
+            this.postMessage({ type: 'contentSearchResult', result });
+        } catch (error) {
+            console.error('Failed to search content in files:', error);
+            this.postMessage({ type: 'contentSearchResult', result: null });
+        }
+    }
+
+    private handleToolPermissionResponse(response: any): void {
+        this.coreManager.respondToToolPermission(response);
+    }
+
+    private async handlePlanExitResponse(response: any): Promise<void> {
+        if (response.selected === 'clearContextAndStart') {
+            this.coreManager.clearMessageHistory();
+            this.clearAllPanels();
+            this.postMessage({ type: 'resetTokenInfo' });
+        }
+        this.coreManager.respondToPlanExit(response);
+        await this.coreManager.updateAgentMode('Agent');
+        this.postMessage({ type: 'agentModeUpdate', mode: 'Agent' });
+    }
+
+    private async verifyFilePath(filePath: string, tempId: string, originalCode: string, lineInfo?: string): Promise<void> {
+        try {
+            const exists = await this.fileOperationManager.verifyFilePath(filePath);
+            this.postMessage({ type: 'filePathVerified', tempId, exists, filePath, originalCode, lineInfo });
+        } catch (error) {
+            console.error('Failed to verify file path:', error);
+            this.postMessage({ type: 'filePathVerified', tempId, exists: false, filePath, originalCode, lineInfo });
+        }
+    }
+
+    private async sendCommands(): Promise<void> {
+        try {
+            const commands = await this.coreManager.getCommandsInfo();
+            this.postMessage({ type: 'customCommandsLoaded', commands });
+        } catch (error) {
+            console.error('Error loading commands:', error);
+        }
+    }
+
+    private async checkConfiguration(): Promise<void> {
+        try {
+            const isReady = await this.coreManager.waitForReady(5000);
+            if (!isReady) {
+                console.warn('SemaCore 初始化超时，无法检查配置状态');
+                return;
+            }
+            const modelData = await this.coreManager.getModelData();
+            if (!modelData.modelList || modelData.modelList.length === 0) {
+                this.postMessage({ type: 'showModelConfigReminder', message: 'Code Agent Model 尚未配置，请先配置模型信息' });
+            }
+        } catch (error) {
+            console.error('Error checking configuration:', error);
+            vscode.window.showWarningMessage('Code Agent Model 配置检查失败，请配置模型信息', '打开配置')
+                .then(selection => { if (selection === '打开配置') this.onOpenConfig(); });
+        }
+    }
+
+    // ─── HTML ─────────────────────────────────────────────────────────────────
+
     private getHtmlContent(webview: vscode.Webview): string {
-        // 获取打包后的 JS 文件路径
         const scriptUri = webview.asWebviewUri(
             vscode.Uri.joinPath(this.extensionUri, 'dist', 'webview', 'chat.js')
         );
-
-        // 获取 nonce 用于安全策略
         const nonce = this.getNonce();
-
         return `<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
@@ -61,4 +257,3 @@ export class ChatWebviewProvider {
         return crypto.randomBytes(16).toString('hex');
     }
 }
-

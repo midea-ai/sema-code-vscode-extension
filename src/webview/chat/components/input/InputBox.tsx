@@ -369,7 +369,9 @@ const InputBox = forwardRef<InputBoxHandle, InputBoxProps>(({
     };
 
     const handleButtonClick = () => {
-        if (isGenerating || showBashPermission) {
+        if (canSend && isGenerating) {
+            handleSend();
+        } else if (isGenerating || showBashPermission) {
             handleStop();
         } else {
             handleSend();
@@ -412,7 +414,7 @@ const InputBox = forwardRef<InputBoxHandle, InputBoxProps>(({
                         if (selectedCommand) {
                             shortcutPanel.handleExecuteShortcut(
                                 selectedCommand.text,
-                                selectedCommand.send,
+                                selectedCommand.send ?? false,
                                 setInputValue,
                                 onSend,
                                 fileSelection.selectedFiles,
@@ -481,7 +483,9 @@ const InputBox = forwardRef<InputBoxHandle, InputBoxProps>(({
             }
 
             e.preventDefault();
-            if (isGenerating || showBashPermission) {
+            if (canSend && isGenerating) {
+                handleSend();
+            } else if (isGenerating || showBashPermission) {
                 handleStop();
             } else {
                 handleSend();
@@ -700,13 +704,13 @@ const InputBox = forwardRef<InputBoxHandle, InputBoxProps>(({
 
                     {/* 发送/停止按钮 */}
                     <Tooltip content={(canSend || isGenerating || showBashPermission) ?
-                        (showBashPermission ? '中断' : (isGenerating ? '中断 Ctrl+C' : '发送 Enter')) : ''}>
+                        (canSend ? '发送 Enter' : (showBashPermission ? '中断' : '中断 Ctrl+C')) : ''}>
                         <button
                             className={`send-btn ${canSend || isGenerating || showBashPermission ? 'active' : ''}`}
                             onClick={handleButtonClick}
                             disabled={!canSend && !isGenerating && !showBashPermission}
                         >
-                            {isGenerating || showBashPermission ? (
+                            {(isGenerating || showBashPermission) && !canSend ? (
                                 // 停止图标 - 空心正方形
                                 <StopIcon />
                             ) : (

@@ -185,6 +185,17 @@ code, pre, .code {
     overflow: visible;
 }
 
+/* 队列中待处理的用户输入 */
+.user-input-block.pending {
+    border-style: dashed;
+    opacity: 0.6;
+}
+
+.user-input-content.pending {
+    color: var(--vscode-foreground);
+    font-weight: 400;
+}
+
 .user-input-block.clickable {
     cursor: pointer;
 }

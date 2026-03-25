@@ -3,6 +3,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as diff from 'diff';
 import * as crypto from 'crypto';
+import { EXCLUDED_NAMES, EXCLUDE_GLOB, EXCLUDED_FILES, EXCLUDED_EXTENSIONS } from '../utils/fileExcludePatterns';
 
 // 类型定义
 interface DiffViewInfo {
@@ -31,36 +32,17 @@ interface FileSnapshot {
 export class FileStateDiffManager {
     private fileSnapshots: Map<string, FileSnapshot> = new Map();
     private activeEditorListeners: Map<string, vscode.Disposable> = new Map();
-    private workingDir: string; // 工作目录
+    private diffViewURIs: Map<string, DiffViewInfo> = new Map();
+    private workingDir: string;
 
     // 性能配置
     private static readonly MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
-    private static readonly CONCURRENT_READS = 50; // 并发读取数量
+    private static readonly CONCURRENT_READS = 50;
 
-    // 文件过滤配置 - 供其他类复用
-    public static readonly excludePattern = `**/{node_modules,.git,dist,build,.next,target,venv,.venv,env,ios,android}/**`;
-
-    public static readonly additionalExcludeDirs = [
-        'out', '.vscode', '.tmp', 'temp', 'logs', '__pycache__',
-        '.idea', '.gradle', 'gradle', '.m2', '.settings',
-        '.nuxt', '.output', '.svelte-kit', '.astro',
-        '.vuepress', '.vitepress', '.cache', '.parcel-cache',
-        'coverage', '.nyc_output', 'storybook-static',
-        '.docusaurus', '.expo', '.react-email'
-    ];
-
-    public static readonly excludeFiles = [
-        '.project', '.classpath', '.eslintcache', '.DS_Store', 'Thumbs.db'
-    ];
-
-    public static readonly excludeExts = [
-        '.jar', '.war', '.ear',
-        '.png', '.jpg', '.jpeg', '.gif', '.ico',
-        '.ttf', '.woff', '.woff2', '.eot',
-        '.pdf', '.zip', '.tar', '.gz'
-    ];
-
-    constructor(workingDir: string) {
+    constructor(
+        workingDir: string,
+        private readonly openFileAtLine: (filePath: string, line?: number) => Promise<void>
+    ) {
         this.workingDir = workingDir;
     }
 
@@ -85,12 +67,10 @@ export class FileStateDiffManager {
         const fileName = path.basename(uri.fsPath);
         const ext = path.extname(fileName).toLowerCase();
 
-        // 跳过二进制文件
-        if (FileStateDiffManager.excludeExts.includes(ext)) {
+        if (EXCLUDED_EXTENSIONS.has(ext)) {
             return true;
         }
 
-        // 跳过大文件
         if (size && size > FileStateDiffManager.MAX_FILE_SIZE) {
             return true;
         }
@@ -132,18 +112,13 @@ export class FileStateDiffManager {
      * 创建完整文件快照
      */
     public async createSnapshot(): Promise<void> {
-        // 清理所有活跃的监听器
         this.cleanupAllListeners();
-
         this.fileSnapshots.clear();
 
-        // 获取工作区所有文件
         const files = await this.getWorkspaceFiles();
 
-        // 使用批量处理控制并发
         await this.processBatch(files, async (file) => {
             try {
-                // 检查文件大小
                 const stat = await vscode.workspace.fs.stat(file);
 
                 if (this.shouldSkipFile(file, stat.size)) {
@@ -153,7 +128,6 @@ export class FileStateDiffManager {
                 const content = await fs.promises.readFile(file.fsPath, 'utf8');
                 const hash = this.generateFileHash(content);
 
-                // 对于大文件，只保存hash，不保存内容
                 const snapshot: FileSnapshot = {
                     hash,
                     size: stat.size,
@@ -165,18 +139,14 @@ export class FileStateDiffManager {
                 // 文件读取失败，跳过
             }
         });
-
-       // console.log(`新建快照: ${this.workingDir}，包含 ${this.fileSnapshots.size} 个文件`);
     }
-
 
     /**
      * 清理所有活跃的监听器
      */
     private cleanupAllListeners(): void {
-        for (const [filePath, listener] of this.activeEditorListeners.entries()) {
+        for (const listener of this.activeEditorListeners.values()) {
             listener.dispose();
-            // console.log(`[FileStateDiffManager] 已清理监听器: ${filePath}`);
         }
         this.activeEditorListeners.clear();
     }
@@ -185,10 +155,9 @@ export class FileStateDiffManager {
      * 清理所有diff视图
      */
     private cleanupAllDiffViews(): void {
-        for (const [filePath, diffView] of this.diffViewURIs.entries()) {
+        for (const diffView of this.diffViewURIs.values()) {
             diffView.disposable.dispose();
             diffView.provider.dispose();
-            // console.log(`[FileStateDiffManager] 已清理diff视图资源: ${filePath}`);
         }
         this.diffViewURIs.clear();
     }
@@ -203,29 +172,25 @@ export class FileStateDiffManager {
         const workspaceUri = vscode.Uri.file(this.workingDir);
         const pattern = new vscode.RelativePattern(workspaceUri, '**/*');
 
-
         try {
-            const uris = await vscode.workspace.findFiles(pattern, FileStateDiffManager.excludePattern, MAX_FILES * 10);
-            // 手动过滤剩余的文件
+            const uris = await vscode.workspace.findFiles(pattern, EXCLUDE_GLOB, MAX_FILES * 10);
+
             const filteredUris = uris.filter(uri => {
-                const path = uri.path;
-                const fileName = path.split('/').pop() || '';
+                const filePath = uri.path;
+                const fileName = filePath.split('/').pop() || '';
                 const ext = fileName.includes('.') ? '.' + fileName.split('.').pop() : '';
 
-                // 检查是否在排除的文件名列表中
-                if (FileStateDiffManager.excludeFiles.includes(fileName)) {
+                if (EXCLUDED_FILES.has(fileName)) {
                     return false;
                 }
 
-                // 检查是否在排除的扩展名列表中
-                if (FileStateDiffManager.excludeExts.includes(ext.toLowerCase())) {
+                if (EXCLUDED_EXTENSIONS.has(ext.toLowerCase())) {
                     return false;
                 }
 
-                // 检查路径是否包含需要排除的目录
-                const pathParts = path.split('/');
-                for (const dir of FileStateDiffManager.additionalExcludeDirs) {
-                    if (pathParts.includes(dir)) {
+                const pathParts = filePath.split('/');
+                for (const dir of pathParts) {
+                    if (EXCLUDED_NAMES.has(dir)) {
                         return false;
                     }
                 }
@@ -234,18 +199,12 @@ export class FileStateDiffManager {
             });
 
             // 按路径深度排序
-            const sortedUris = filteredUris.sort((a, b) => {
-                const depthA = a.path.split('/').length;
-                const depthB = b.path.split('/').length;
-                return depthA - depthB;
-            });
-
-            // 打印前20
-            // console.log(`按深度排序后的前20个文件:${sortedUris.slice(0, 20).map(uri => uri.fsPath)}`);
+            const sortedUris = filteredUris.sort((a, b) =>
+                a.path.split('/').length - b.path.split('/').length
+            );
 
             for (const uri of sortedUris) {
                 if (files.length >= MAX_FILES) {
-                    // console.log(`已达到MAX_FILES限制(${MAX_FILES})，停止处理更多文件`);
                     break;
                 }
 
@@ -265,27 +224,6 @@ export class FileStateDiffManager {
         return files;
     }
 
-    // 保存已打开的diff视图的URI映射关系
-    private diffViewURIs: Map<string, DiffViewInfo> = new Map();
-
-    /**
-     * 打开指定文件并定位到指定行
-     */
-    public async openFile(filePath: string, lineNumber: number = 1): Promise<void> {
-        try {
-            const fullPath = this.resolveFilePath(filePath);
-            const validLine = Math.max(1, Math.floor(lineNumber || 1));
-
-            const document = await vscode.workspace.openTextDocument(fullPath);
-            await vscode.window.showTextDocument(document, {
-                viewColumn: vscode.ViewColumn.One,
-                selection: new vscode.Range(validLine - 1, 0, validLine - 1, 0)
-            });
-        } catch (error) {
-            this.handleError(`打开文件失败: ${filePath}`, error);
-        }
-    }
-
     /**
      * 显示文件diff，如果失败或内容未变化则打开对应文件
      */
@@ -294,15 +232,11 @@ export class FileStateDiffManager {
         const defaultMinLine = isIpynbFile ? 0 : 1;
         const finalMinLine = minLine ?? defaultMinLine;
 
-       // console.log(`showFileDiff: ${filePath}, minLine: ${finalMinLine}`);
-
-        // 处理 Jupyter Notebook 文件
         if (isIpynbFile) {
             await this.openNotebookFile(filePath, finalMinLine);
             return;
         }
 
-        // 处理普通文本文件
         await this.showTextFileDiff(filePath, finalMinLine);
     }
 
@@ -319,7 +253,6 @@ export class FileStateDiffManager {
                 viewColumn: vscode.ViewColumn.Active
             });
 
-            // 定位到指定的 cell
             if (cellIndex >= 0 && cellIndex < notebookDocument.cellCount) {
                 const cellRange = new vscode.NotebookRange(cellIndex, cellIndex + 1);
                 notebookEditor.selection = cellRange;
@@ -327,7 +260,7 @@ export class FileStateDiffManager {
             }
         } catch (error) {
             console.error('以Notebook方式打开文件失败:', error);
-            await this.openFile(filePath, cellIndex);
+            await this.openFileAtLine(filePath, cellIndex);
         }
     }
 
@@ -337,38 +270,41 @@ export class FileStateDiffManager {
     private async showTextFileDiff(filePath: string, minLine: number): Promise<void> {
         try {
             const fullPath = this.resolveFilePath(filePath);
-            const { originalContent, currentContent } = await this.getFileContents(fullPath);
+            const { originalContent, currentContent } = await this.getFileContents(fullPath, 'editor');
 
-            // 如果内容未变化，直接打开文件
             if (originalContent === currentContent) {
-                await this.openFile(filePath, minLine);
+                await this.openFileAtLine(filePath, minLine);
                 return;
             }
 
-            // 创建并显示 diff 视图
             await this.createDiffView(fullPath, originalContent, currentContent, filePath, minLine);
 
         } catch (error) {
             console.error('显示diff失败:', error);
-            await this.openFile(filePath, minLine);
+            await this.openFileAtLine(filePath, minLine);
         }
     }
 
     /**
-     * 获取文件的原始内容和当前内容
+     * 获取文件的原始内容（快照）和当前内容
+     * @param source 'editor' 从 vscode 编辑器缓冲区读取（含未保存修改），'disk' 从磁盘读取
      */
-    private async getFileContents(fullPath: string): Promise<{ originalContent: string; currentContent: string }> {
-        // 获取快照内容
+    private async getFileContents(
+        fullPath: string,
+        source: 'editor' | 'disk'
+    ): Promise<{ originalContent: string; currentContent: string }> {
         const snapshot = this.fileSnapshots.get(fullPath);
         const originalContent = snapshot?.content ?? '';
 
-        // 获取当前内容
         let currentContent: string;
         try {
-            const currentUri = vscode.Uri.file(fullPath);
-            const currentDocument = await vscode.workspace.openTextDocument(currentUri);
-            currentContent = currentDocument.getText();
-        } catch (error) {
+            if (source === 'disk') {
+                currentContent = await fs.promises.readFile(fullPath, 'utf8');
+            } else {
+                const doc = await vscode.workspace.openTextDocument(vscode.Uri.file(fullPath));
+                currentContent = doc.getText();
+            }
+        } catch {
             currentContent = '';
         }
 
@@ -388,7 +324,6 @@ export class FileStateDiffManager {
         const currentUri = vscode.Uri.file(fullPath);
         const originalUri = vscode.Uri.parse(`snapshot:${fullPath}`);
 
-        // 处理现有的 diff 视图
         const existingDiffView = this.diffViewURIs.get(fullPath);
         let provider: SnapshotContentProvider;
         let disposable: vscode.Disposable;
@@ -402,10 +337,8 @@ export class FileStateDiffManager {
             disposable = vscode.workspace.registerTextDocumentContentProvider('snapshot', provider);
         }
 
-        // 保存 diff 视图信息
         this.diffViewURIs.set(fullPath, { originalUri, currentUri, disposable, provider });
 
-        // 配置并打开 diff 视图
         await this.ensureInlineDiffConfig();
         await vscode.commands.executeCommand(
             'vscode.diff',
@@ -419,7 +352,6 @@ export class FileStateDiffManager {
             }
         );
 
-        // 设置编辑器关闭监听器
         this.setupDiffViewListener(fullPath, originalUri, currentUri);
     }
 
@@ -427,13 +359,11 @@ export class FileStateDiffManager {
      * 设置 diff 视图的关闭监听器
      */
     private setupDiffViewListener(fullPath: string, originalUri: vscode.Uri, currentUri: vscode.Uri): void {
-        // 清理旧的监听器
         const existingListener = this.activeEditorListeners.get(fullPath);
         if (existingListener) {
             existingListener.dispose();
         }
 
-        // 创建新的监听器
         const disposableListener = vscode.window.onDidChangeVisibleTextEditors(editors => {
             const diffStillOpen = editors.some(editor =>
                 editor.document.uri.toString() === originalUri.toString() ||
@@ -456,11 +386,8 @@ export class FileStateDiffManager {
     private async ensureInlineDiffConfig(): Promise<void> {
         try {
             const config = vscode.workspace.getConfiguration('diffEditor');
-            const currentRenderSideBySide = config.get('renderSideBySide');
-
-            if (currentRenderSideBySide !== false) {
+            if (config.get('renderSideBySide') !== false) {
                 await config.update('renderSideBySide', false, vscode.ConfigurationTarget.Global);
-                // console.log(`[FileStateDiffManager] 已设置diffEditor.renderSideBySide为false`);
             }
         } catch (error) {
             console.warn(`[FileStateDiffManager] 设置diff配置失败:`, error);
@@ -473,19 +400,15 @@ export class FileStateDiffManager {
     private cleanupDiffView(filePath: string): void {
         const diffView = this.diffViewURIs.get(filePath);
         if (diffView) {
-            // 释放TextDocumentContentProvider
             diffView.disposable.dispose();
             diffView.provider.dispose();
             this.diffViewURIs.delete(filePath);
-            // console.log(`[FileStateDiffManager] 已清理diff视图资源: ${filePath}`);
         }
 
-        // 同时清理对应的监听器
         const listener = this.activeEditorListeners.get(filePath);
         if (listener) {
             listener.dispose();
             this.activeEditorListeners.delete(filePath);
-            // console.log(`[FileStateDiffManager] 已清理监听器: ${filePath}`);
         }
     }
 
@@ -520,7 +443,6 @@ export class FileStateDiffManager {
         const filesToDelete: string[] = [];
 
         if (filePaths && filePaths.length > 0) {
-            // 恢复指定文件
             for (const targetPath of filePaths) {
                 const fullPath = this.resolveFilePath(targetPath);
                 const snapshot = this.fileSnapshots.get(fullPath);
@@ -528,7 +450,6 @@ export class FileStateDiffManager {
                 if (snapshot?.content) {
                     filesToRevert.set(fullPath, snapshot.content);
                 } else {
-                    // 检查是否为新创建的文件
                     try {
                         await vscode.workspace.fs.stat(vscode.Uri.file(fullPath));
                         filesToDelete.push(fullPath);
@@ -538,7 +459,6 @@ export class FileStateDiffManager {
                 }
             }
         } else {
-            // 恢复所有文件
             for (const [snapPath, snapshot] of this.fileSnapshots) {
                 if (snapshot.content) {
                     filesToRevert.set(snapPath, snapshot.content);
@@ -559,7 +479,6 @@ export class FileStateDiffManager {
         let successCount = 0;
         let errorCount = 0;
 
-        // 恢复现有文件
         for (const [filePath, content] of filesToRevert) {
             try {
                 await fs.promises.writeFile(filePath, content, 'utf8');
@@ -571,7 +490,6 @@ export class FileStateDiffManager {
             }
         }
 
-        // 删除新创建的文件
         for (const filePath of filesToDelete) {
             try {
                 await vscode.workspace.fs.delete(vscode.Uri.file(filePath));
@@ -599,71 +517,25 @@ export class FileStateDiffManager {
         }
     }
 
-
     /**
      * 获取文件变更统计信息
      */
     public async getFileChangeStats(filePath: string): Promise<FileChangeStats> {
-        // console.info(`getFileChangeStats: ${filePath}`);
-
         const isIpynbFile = filePath.toLowerCase().endsWith('.ipynb');
         const defaultMinLine = isIpynbFile ? 0 : 1;
 
         try {
             const fullPath = this.resolveFilePath(filePath);
-            const { originalContent, currentContent } = await this.getFileContentsForStats(fullPath, defaultMinLine);
+            const { originalContent, currentContent } = await this.getFileContents(fullPath, 'disk');
 
-            // 如果内容相同，没有变化
             if (originalContent === currentContent) {
-               // console.log(`统计[${fullPath}] additions: 0, removals: 0, minLine: ${defaultMinLine} (内容未变化)`);
                 return { additions: 0, removals: 0, minLine: defaultMinLine };
             }
 
-            const stats = this.calculateDiffStats(originalContent, currentContent, defaultMinLine);
-           // console.log(`统计[${fullPath}] additions: ${stats.additions}, removals: ${stats.removals}, minLine: ${stats.minLine}`);
-
-            return stats;
+            return this.calculateDiffStats(originalContent, currentContent, defaultMinLine);
         } catch (error) {
             this.handleError(`获取文件变更统计失败: ${filePath}`, error);
             return { additions: 0, removals: 0, minLine: defaultMinLine };
-        }
-    }
-
-    /**
-     * 获取文件内容用于统计（处理新文件和删除文件的情况）
-     */
-    private async getFileContentsForStats(fullPath: string, defaultMinLine: number): Promise<{
-        originalContent: string;
-        currentContent: string;
-    }> {
-        // 获取快照内容
-        const snapshot = this.fileSnapshots.get(fullPath);
-        let originalContent = snapshot?.content;
-
-        if (!originalContent) {
-            // 新文件情况
-            // console.info(`新文件，没有快照: ${fullPath}`);
-            try {
-                const currentContent = await fs.promises.readFile(fullPath, 'utf8');
-                const lineCount = currentContent.split('\n').length;
-               // console.log(`统计[${fullPath}] additions: ${lineCount}, removals: 0, minLine: ${defaultMinLine} (新文件)`);
-                return { originalContent: '', currentContent };
-            } catch (error) {
-                console.error(`读取新文件失败: ${fullPath}`, error);
-                throw new Error(`无法读取文件: ${fullPath}`);
-            }
-        }
-
-        // 读取当前内容
-        try {
-            const currentContent = await fs.promises.readFile(fullPath, 'utf8');
-            return { originalContent, currentContent };
-        } catch (error) {
-            // 文件已删除情况
-            console.error(`读取当前文件失败: ${fullPath}`, error);
-            const lineCount = originalContent.split('\n').length;
-           // console.log(`统计[${fullPath}] additions: 0, removals: ${lineCount}, minLine: ${defaultMinLine} (文件已删除)`);
-            return { originalContent, currentContent: '' };
         }
     }
 
@@ -715,7 +587,6 @@ export class FileStateDiffManager {
         this.cleanupAllListeners();
         this.cleanupAllDiffViews();
         this.fileSnapshots.clear();
-        // console.log('[FileStateDiffManager] 已清理所有资源');
     }
 }
 
@@ -736,7 +607,7 @@ class SnapshotContentProvider implements vscode.TextDocumentContentProvider {
         this._onDidChange.fire(uri);
     }
 
-    provideTextDocumentContent(uri: vscode.Uri): string {
+    provideTextDocumentContent(_uri: vscode.Uri): string {
         return this.content;
     }
 

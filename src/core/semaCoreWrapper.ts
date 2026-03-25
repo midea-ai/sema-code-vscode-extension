@@ -24,7 +24,9 @@ import {
     PlanImplementData,
     FileReferenceData,
     MCPServerStatusData,
-    ToolExecutionChunkData
+    ToolExecutionChunkData,
+    InputReceivedData,
+    InputProcessingData
 } from 'sema-core/event';
 import {
     SemaCoreConfig,
@@ -66,9 +68,12 @@ export interface SemaWrapperCallbacks {
     onTodosUpdate?: (todos: TodosUpdateData) => void;
     onTopicUpdate?: (topic: TopicUpdateData) => void;
     onMCPServerStatus?: (data: MCPServerStatusData) => void;
+    onInputReceived?: (data: InputReceivedData) => void;
+    onInputProcessing?: (data: InputProcessingData) => void;
 }
 
 export interface Message {
+    id: string;
     type: 'user' | 'assistant' | 'tool' | 'system' | 'permission_request';
     content: any;
     timestamp: number;
@@ -91,6 +96,7 @@ export interface TaskMessageContent {
 export class SemaCoreWrapper {
     private semaCore: SemaCore;
     private currentState: 'idle' | 'processing' = 'idle';
+    private sessionReady: boolean = false;
     public currentSessionId: string | null = null;
     public title: string = '';
     private systemConfigManager: SystemConfigManager;
@@ -117,31 +123,20 @@ export class SemaCoreWrapper {
         this.setupEventListeners();
     }
 
+    private generateId(): string {
+        return `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+    }
 
     public async createSession(sessionId?: string): Promise<void> {
         await this.semaCore.createSession(sessionId);
     }
 
     public processUserInput(content: string, orgContent?: string): void {
-        if (this.messageHistory.length === 0) {
-            let title = orgContent ? orgContent.trim() : content.trim();
-            if (title.length > 50) {
-                title = title.substring(0, 50) + '...';
-            }
-            this.title = title || '新对话';
-        }
-
-        this.messageHistory.push({
-            type: 'user',
-            content: orgContent || content,
-            timestamp: Date.now()
-        });
-        this.sendContentUpdate();
-
         this.semaCore.processUserInput(content, orgContent);
     }
 
     public interruptSession(): void {
+        console.log('interruptSession()')
         if (this.currentState === 'processing') {
             this.semaCore.interruptSession();
         }
@@ -169,6 +164,7 @@ export class SemaCoreWrapper {
 
     private setupEventListeners(): void {
         this.setupSessionListeners();
+        this.setupInputListeners();
         this.setupMessageListeners();
         this.setupToolListeners();
         this.setupMetaListeners();
@@ -177,13 +173,16 @@ export class SemaCoreWrapper {
 
     private setupSessionListeners(): void {
         this.semaCore.on<SessionReadyData>('session:ready', (data) => {
+            // console.log('session:ready', data)
             this.currentSessionId = data.sessionId;
+            this.sessionReady = true;
             this.callbacks.onSessionReady?.(data);
         });
 
         this.semaCore.on<FileReferenceData>('file:reference', (data) => {
             if (data.references && data.references.length > 0) {
                 this.messageHistory.push({
+                    id: this.generateId(),
                     type: 'system',
                     content: {
                         type: 'file_reference',
@@ -196,8 +195,10 @@ export class SemaCoreWrapper {
         });
 
         this.semaCore.on<SessionInterruptedData & { agentId?: string }>('session:interrupted', (data) => {
+            console.log('session:interrupted', data)
             if (this.isSubAgent(data.agentId)) {
                 this.addMessageToTaskAgent(data.agentId!, {
+                    id: this.generateId(),
                     type: 'system',
                     content: { type: 'interrupted', content: data.content },
                     timestamp: Date.now()
@@ -206,12 +207,14 @@ export class SemaCoreWrapper {
             }
 
             this.currentStreamingMessage = null;
+            this.streamingToolMap.clear();
 
             if (this.messageHistory.length === 0) {
                 return;
             }
 
             this.messageHistory.push({
+                id: this.generateId(),
                 type: 'system',
                 content: { type: 'interrupted', content: data.content },
                 timestamp: Date.now()
@@ -223,6 +226,7 @@ export class SemaCoreWrapper {
             console.error('Session error:', data);
             const errorMessage = data.error?.message || 'Unknown error';
             this.messageHistory.push({
+                id: this.generateId(),
                 type: 'system',
                 content: {
                     type: 'session_error',
@@ -238,11 +242,13 @@ export class SemaCoreWrapper {
             this.clearMessageHistory();
             this.title = '新会话';
             this.messageHistory.push({
+                id: this.generateId(),
                 type: 'user',
                 content: '/clear',
                 timestamp: Date.now()
             });
             this.messageHistory.push({
+                id: this.generateId(),
                 type: 'system',
                 content: { type: 'clear', content: '(no content)' },
                 timestamp: Date.now()
@@ -252,8 +258,39 @@ export class SemaCoreWrapper {
         });
     }
 
+    private setupInputListeners(): void {
+        this.semaCore.on<InputReceivedData>('input:received', (data) => {
+            console.log('input:received', data)
+            this.callbacks.onInputReceived?.(data);
+        });
+
+        this.semaCore.on<InputProcessingData>('input:processing', (data) => {
+            console.log('input:processing', data)
+            const content = data.originalInput || data.input;
+
+            const hasUserMessages = this.messageHistory.some(m => m.type === 'user');
+            if (!hasUserMessages) {
+                let title = content.trim();
+                if (title.length > 50) {
+                    title = title.substring(0, 50) + '...';
+                }
+                this.title = title || '新对话';
+            }
+
+            this.messageHistory.push({
+                id: this.generateId(),
+                type: 'user',
+                content: content,
+                timestamp: Date.now()
+            });
+            this.sendContentUpdate();
+            this.callbacks.onInputProcessing?.(data);
+        });
+    }
+
     private setupMessageListeners(): void {
         this.semaCore.on<StateUpdateData>('state:update', (data) => {
+            console.log('state:update', data)
             this.currentState = data.state;
             this.callbacks.onStateChange?.(data.state);
         });
@@ -265,6 +302,7 @@ export class SemaCoreWrapper {
             }
 
             const newMessage: Message = {
+                id: this.generateId(),
                 type: 'assistant',
                 content: { messageType: 'text', content: '', completed: false },
                 reasoning: data.content,
@@ -287,6 +325,7 @@ export class SemaCoreWrapper {
             }
 
             const newMessage: Message = {
+                id: this.generateId(),
                 type: 'assistant',
                 content: { messageType: 'text', content: data.content, completed: false },
                 timestamp: Date.now()
@@ -304,6 +343,7 @@ export class SemaCoreWrapper {
 
             if (this.isSubAgent(data.agentId)) {
                 this.addMessageToTaskAgent(data.agentId!, {
+                    id: this.generateId(),
                     type: 'assistant',
                     content: {
                         messageType: 'text',
@@ -341,6 +381,7 @@ export class SemaCoreWrapper {
             if (!messageUpdated) {
                 console.warn('No streaming message found, creating new complete message');
                 const newMessage: Message = {
+                    id: this.generateId(),
                     type: 'assistant',
                     content: {
                         messageType: 'text',
@@ -382,6 +423,7 @@ export class SemaCoreWrapper {
                 existingMessage.content = { ...data, completed: false };
             } else {
                 const newMessage: Message = {
+                    id: this.generateId(),
                     type: 'tool',
                     content: { ...data, completed: false },
                     toolName: data.toolName,
@@ -398,6 +440,7 @@ export class SemaCoreWrapper {
         this.semaCore.on<ToolExecutionCompleteData & { agentId?: string }>('tool:execution:complete', (data) => {
             if (this.isSubAgent(data.agentId)) {
                 this.addMessageToTaskAgent(data.agentId!, {
+                    id: this.generateId(),
                     type: 'tool',
                     content: { ...data, completed: true },
                     toolName: data.toolName,
@@ -417,6 +460,7 @@ export class SemaCoreWrapper {
                 this.streamingToolMap.delete(toolId);
             } else {
                 this.messageHistory.push({
+                    id: this.generateId(),
                     type: 'tool',
                     content: { ...data, completed: true },
                     toolName: data.toolName,
@@ -430,6 +474,7 @@ export class SemaCoreWrapper {
             console.error('Tool execution error:', data);
 
             const errorMessage: Message = {
+                id: this.generateId(),
                 type: 'system',
                 content: {
                     type: 'tool_error',
@@ -473,6 +518,7 @@ export class SemaCoreWrapper {
                 : `Compacted`;
 
             this.messageHistory.push({
+                id: this.generateId(),
                 type: 'system',
                 content: { type: 'compact', content: finalContent },
                 timestamp: Date.now()
@@ -490,6 +536,7 @@ export class SemaCoreWrapper {
 
         this.semaCore.on<PlanImplementData>('plan:implement', (data) => {
             this.messageHistory.push({
+                id: this.generateId(),
                 type: 'system',
                 content: {
                     type: 'plan_implement',
@@ -525,12 +572,14 @@ export class SemaCoreWrapper {
 
     private handleTaskAgentStart(data: TaskAgentStartData): void {
         const userMessage: Message = {
+            id: this.generateId(),
             type: 'user',
             content: data.prompt,
             timestamp: Date.now()
         };
 
         const taskMessage: Message = {
+            id: this.generateId(),
             type: 'tool',
             toolName: 'Task',
             content: {
@@ -636,6 +685,7 @@ export class SemaCoreWrapper {
         this.title = '';
         this.taskAgentMap.clear();
         this.streamingToolMap.clear();
+        this.currentStreamingMessage = null;
         this.sendContentUpdate();
     }
 
@@ -730,7 +780,7 @@ export class SemaCoreWrapper {
     }
 
     public isReady(): boolean {
-        return !!this.semaCore;
+        return this.sessionReady;
     }
 
     public async waitForReady(timeout: number = 5000): Promise<boolean> {
@@ -800,6 +850,7 @@ export class SemaCoreWrapper {
 
     public insertPermissionRequestMessage(permissionData: any): void {
         const message: Message = {
+            id: this.generateId(),
             type: 'permission_request',
             content: {
                 toolName: permissionData.toolName,
@@ -967,6 +1018,7 @@ export class SemaCoreWrapper {
 
             this.messageHistory = [];
             this.currentState = 'idle';
+            this.sessionReady = false;
             this.currentSessionId = null;
             this.currentStreamingMessage = null;
             this.title = '';
