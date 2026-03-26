@@ -132,7 +132,7 @@ code, pre, .code {
     align-items: flex-start;
     padding: 8px 10px;
     margin: 5px;
-    border: 1px solid var(--vscode-input-border);
+    border: 1px solid var(--vscode-input-border, var(--vscode-contrastBorder, #555));
     border-radius: 4px;
     background-color: var(--vscode-sideBar-background);
 
@@ -187,7 +187,8 @@ code, pre, .code {
 
 /* 队列中待处理的用户输入 */
 .user-input-block.pending {
-    border-style: dashed;
+    border: 1px dashed var(--vscode-input-border);
+    border-width: 0.6px;
     opacity: 0.6;
 }
 
