@@ -22,6 +22,8 @@ interface Model {
     name?: string;
     ownedBy?: string;
     key_doc_url?: string;
+    recommended_max_tokens?: number;
+    max_tokens?: number;
 }
 
 const AddModelForm: React.FC<AddModelFormProps> = ({ onSuccess, vscode }) => {
@@ -31,6 +33,7 @@ const AddModelForm: React.FC<AddModelFormProps> = ({ onSuccess, vscode }) => {
     const [adapt, setAdapt] = useState<AdapterType>(defaultModelProvider[DEFAULT_PROVIDER].defaultAdapt ?? 'openai');
     const [modelName, setModelName] = useState('');
     const [maxTokens, setMaxTokens] = useState(String(DEFAULT_MAX_TOKENS));
+    const [selectedModelMaxTokens, setSelectedModelMaxTokens] = useState<number | null>(null);
     const [contextLength, setContextLength] = useState(String(DEFAULT_CONTEXT_LENGTH));
     const [showPassword, setShowPassword] = useState(false);
     const [isManualInput, setIsManualInput] = useState(false);
@@ -107,6 +110,11 @@ const AddModelForm: React.FC<AddModelFormProps> = ({ onSuccess, vscode }) => {
                             const preferredModel = preferredModelId ? msg.models.find((m: Model) => m.id === preferredModelId) : null;
                             const autoSelectedModel = preferredModel ? preferredModel.id : msg.models[0].id;
                             setSelectedModel(autoSelectedModel);
+                            const selectedModelData = msg.models.find((m: Model) => m.id === autoSelectedModel);
+                            if (selectedModelData?.recommended_max_tokens) {
+                                setMaxTokens(String(selectedModelData.recommended_max_tokens));
+                            }
+                            setSelectedModelMaxTokens(selectedModelData?.max_tokens ?? null);
                             vscode.postMessage({ command: 'getModelAdapter', provider, modelName: autoSelectedModel });
 
                             setTestStatus({
@@ -152,6 +160,7 @@ const AddModelForm: React.FC<AddModelFormProps> = ({ onSuccess, vscode }) => {
         setLastFetchedConfig({ baseURL: '', apiKey: '' });
         setIsManualInput(false);
         setMaxTokens(String(defaults.defaultMaxTokens ?? DEFAULT_MAX_TOKENS));
+        setSelectedModelMaxTokens(null);
         setContextLength(String(defaults.defaultContextLength ?? DEFAULT_CONTEXT_LENGTH));
         setAdapt(defaults.defaultAdapt ?? 'openai');
     };
@@ -273,6 +282,11 @@ const AddModelForm: React.FC<AddModelFormProps> = ({ onSuccess, vscode }) => {
             setSelectedModel(newModel);
             setConnectionTested(false);
             setConnectionSuccess(false);
+            const selectedModelData = availableModels.find(m => m.id === newModel);
+            if (selectedModelData?.recommended_max_tokens) {
+                setMaxTokens(String(selectedModelData.recommended_max_tokens));
+            }
+            setSelectedModelMaxTokens(selectedModelData?.max_tokens ?? null);
             vscode.postMessage({ command: 'getModelAdapter', provider, modelName: newModel });
         }
     }, [modelFilter]);
@@ -365,6 +379,11 @@ const AddModelForm: React.FC<AddModelFormProps> = ({ onSuccess, vscode }) => {
                                         setSelectedModel(e.target.value);
                                         setConnectionTested(false);
                                         setConnectionSuccess(false);
+                                        const selectedModelData = availableModels.find(m => m.id === e.target.value);
+                                        if (selectedModelData?.recommended_max_tokens) {
+                                            setMaxTokens(String(selectedModelData.recommended_max_tokens));
+                                        }
+                                        setSelectedModelMaxTokens(selectedModelData?.max_tokens ?? null);
                                         vscode.postMessage({ command: 'getModelAdapter', provider, modelName: e.target.value });
                                     }}
                                     style={{ flex: 1 }}
@@ -431,7 +450,13 @@ const AddModelForm: React.FC<AddModelFormProps> = ({ onSuccess, vscode }) => {
                         <label htmlFor="maxTokens">最大生成token数</label>
                         <select id="maxTokens" value={maxTokens} onChange={(e) => setMaxTokens(e.target.value)}>
                             {(defaults.maxTokensOptions ?? DEFAULT_MAX_TOKENS_OPTIONS).map(val => (
-                                <option key={val} value={val}>{Math.round(val / 1000)}k</option>
+                                <option
+                                    key={val}
+                                    value={val}
+                                    disabled={selectedModelMaxTokens !== null && val > selectedModelMaxTokens}
+                                >
+                                    {Math.round(val / 1000)}k
+                                </option>
                             ))}
                         </select>
                     </div>

@@ -23,13 +23,13 @@ export interface ProviderDefaults {
 }
 
 /** 全局默认的最大生成token数选项 */
-export const DEFAULT_MAX_TOKENS_OPTIONS = [4096, 8192, 16000, 32000, 64000];
+export const DEFAULT_MAX_TOKENS_OPTIONS = [4096, 8192, 16000, 32000, 64000, 128000];
 
 /** 全局默认的上下文窗口大小选项 */
 export const DEFAULT_CONTEXT_LENGTH_OPTIONS = [32000, 64000, 128000, 256000, 512000];
 
 /** 全局默认最大生成token数 */
-export const DEFAULT_MAX_TOKENS = 8192;
+export const DEFAULT_MAX_TOKENS = 16000;
 
 /** Main 任务推荐模型，为空则不显示推荐提示 */
 export const RECOMMENDED_MAIN_MODEL = 'Claude Sonnet 4.6';
