@@ -2,11 +2,14 @@ import React, { useState } from 'react';
 import { ToggleIcon } from '../../components/ui/IconButton';
 import { ToolContent } from '../../types';
 
+const MAX_VISIBLE_LINES = 4;
+
 interface PubBlockProps {
     content: ToolContent;
+    vscode?: any;
 }
 
-const PubBlock: React.FC<PubBlockProps> = React.memo(({ content }) => {
+const PubBlock: React.FC<PubBlockProps> = React.memo(({ content, vscode }) => {
     const { toolName, title, summary, content: toolContent } = content;
 
     // 构建格式化标题
@@ -36,13 +39,28 @@ const PubBlock: React.FC<PubBlockProps> = React.memo(({ content }) => {
     };
 
     const formattedContent = formatContent();
-    
+
     const contentLines = formattedContent.split('\n').filter(line => line.trim());
+
+    const totalLines = contentLines.length;
+    const visibleLines = totalLines > MAX_VISIBLE_LINES ? contentLines.slice(-MAX_VISIBLE_LINES) : contentLines;
+    const omittedCount = totalLines > MAX_VISIBLE_LINES ? totalLines - MAX_VISIBLE_LINES : 0;
 
     const [isExpanded, setIsExpanded] = useState(false);  // 默认折叠
 
     const handleToggle = () => {
         setIsExpanded(!isExpanded);
+    };
+
+    const handleViewAll = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        if (vscode) {
+            vscode.postMessage({
+                type: 'openBashOutput',
+                content: contentLines.join('\n'),
+                command: formattedTitle
+            });
+        }
     };
 
     return (
@@ -55,9 +73,12 @@ const PubBlock: React.FC<PubBlockProps> = React.memo(({ content }) => {
                     </div>
                 </div>
             </div>
-            {isExpanded && contentLines.length > 0 && (
+            {isExpanded && visibleLines.length > 0 && (
                 <div className="pub-block-content">
-                    {contentLines.join('\n')}
+                    {omittedCount > 0 && (
+                        <div className="bash-omitted-lines bash-omitted-lines-clickable" onClick={handleViewAll}>...省略了 {omittedCount} 行</div>
+                    )}
+                    {visibleLines.join('\n')}
                 </div>
             )}
         </div>

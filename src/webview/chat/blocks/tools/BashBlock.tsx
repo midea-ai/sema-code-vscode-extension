@@ -3,11 +3,14 @@ import { ToggleIcon } from '../../components/ui/IconButton';
 import BaseBashContent from '../../components/ui/BaseBashContent';
 import { ToolContent } from '../../types';
 
+const MAX_VISIBLE_LINES = 4;
+
 interface BashBlockProps {
     content: ToolContent;
+    vscode?: any;
 }
 
-const BashBlock: React.FC<BashBlockProps> = ({ content: toolContent }) => {
+const BashBlock: React.FC<BashBlockProps> = ({ content: toolContent, vscode }) => {
     // console.log('BashBlock:', JSON.stringify(toolContent));
     const [isExpanded, setIsExpanded] = useState(true);
 
@@ -59,14 +62,29 @@ const BashBlock: React.FC<BashBlockProps> = ({ content: toolContent }) => {
             outputLines = processTerminalOutput(content).filter(line => line.trim());
         }
 
-        return { command, outputLines };
+        const totalLines = outputLines.length;
+        const visibleLines = totalLines > MAX_VISIBLE_LINES ? outputLines.slice(-MAX_VISIBLE_LINES) : outputLines;
+        const omittedCount = totalLines > MAX_VISIBLE_LINES ? totalLines - MAX_VISIBLE_LINES : 0;
+
+        return { command, outputLines, visibleLines, omittedCount };
     }, [toolContent]);
 
-    const { command, outputLines } = parsedContent;
+    const { command, outputLines, visibleLines, omittedCount } = parsedContent;
     const isStreaming = toolContent.completed === false;
 
     const handleToggle = () => {
         setIsExpanded(!isExpanded);
+    };
+
+    const handleViewAll = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        if (vscode) {
+            vscode.postMessage({
+                type: 'openBashOutput',
+                content: outputLines.join('\n'),
+                command: command || ''
+            });
+        }
     };
 
     return (
@@ -85,8 +103,13 @@ const BashBlock: React.FC<BashBlockProps> = ({ content: toolContent }) => {
                     {command && (
                         <BaseBashContent command={command} />
                     )}
-                    {outputLines.length > 0 && (
-                        <pre className="bash-output">{outputLines.join('\n')}</pre>
+                    {visibleLines.length > 0 && (
+                        <>
+                            {omittedCount > 0 && (
+                                <div className="bash-omitted-lines bash-omitted-lines-clickable" onClick={handleViewAll}>...省略了 {omittedCount} 行</div>
+                            )}
+                            <pre className="bash-output">{visibleLines.join('\n')}</pre>
+                        </>
                     )}
                 </div>
             )}

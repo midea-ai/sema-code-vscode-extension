@@ -312,6 +312,21 @@ export class FileOperationManager {
     }
 
     /**
+     * 将 Bash 输出内容以虚拟文档形式在编辑器中打开
+     */
+    public async openBashOutputAsDocument(content: string, command: string): Promise<void> {
+        const docContent = command ? `# ${command}\n\n${content}` : content;
+        const document = await vscode.workspace.openTextDocument({
+            content: docContent,
+            language: 'shellscript'
+        });
+        await vscode.window.showTextDocument(document, {
+            preview: false,
+            viewColumn: vscode.ViewColumn.One
+        });
+    }
+
+    /**
      * 验证文件路径是否存在
      */
     public async verifyFilePath(filePath: string): Promise<boolean> {

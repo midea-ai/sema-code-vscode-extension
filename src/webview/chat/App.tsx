@@ -536,7 +536,7 @@ const App: React.FC<AppProps> = ({ vscode }) => {
                 return <ReadBlock key={key} content={message.content} vscode={vscode} />;
 
             case 'Bash':
-                return <BashBlock key={key} content={message.content} />;
+                return <BashBlock key={key} content={message.content} vscode={vscode} />;
 
             case 'Task':
                 return (
@@ -549,7 +549,7 @@ const App: React.FC<AppProps> = ({ vscode }) => {
                 );
 
             default:
-                return <PubBlock key={key} content={message.content} />;
+                return <PubBlock key={key} content={message.content} vscode={vscode} />;
 
         }
     }, [vscode, handleFileChange]);
