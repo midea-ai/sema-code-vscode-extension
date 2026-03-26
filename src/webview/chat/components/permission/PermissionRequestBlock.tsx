@@ -1,6 +1,6 @@
 import React from 'react';
 import PermissionContent from './PermissionContent';
-import { getPermissionTitle } from '../../utils/permissionUtils';
+import { getPermissionTitle, getResponseDot } from '../../utils/permissionUtils';
 
 interface PermissionRequestData {
     toolName: string;
@@ -30,7 +30,7 @@ const PermissionRequestBlock: React.FC<PermissionRequestBlockProps> = ({ permiss
         <div className="bash-permission-block" tabIndex={0}>
             <div className="bash-permission-header">
                 <div className="bash-permission-title">
-                    <span className="bash-permission-dot dot-red">⏺</span>
+                    <span className="bash-permission-dot dot-red">{getResponseDot()}</span>
                     <span className="bash-permission-title-text">
                         {getPermissionTitle(permissionData.toolName)}
                     </span>

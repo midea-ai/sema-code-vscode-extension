@@ -1,4 +1,5 @@
 import React from 'react';
+import { getResponseDot } from '../utils/permissionUtils';
 
 interface ToolErrorBlockProps {
     toolName: string;
@@ -14,7 +15,7 @@ const ToolErrorBlock: React.FC<ToolErrorBlockProps> = React.memo(({ toolName, ti
     return (
         <div className="tool-error-block">
             <div className="tool-error-header">
-                <span className="response-indicator tool-error-indicator">⏺</span>
+                <span className="response-indicator tool-error-indicator">{getResponseDot()}</span>
                 <span className="tool-error-name">{headerText}</span>
             </div>
             {content && (

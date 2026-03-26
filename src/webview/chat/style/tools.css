@@ -258,26 +258,12 @@
     width: 100%;
     max-width: 100%;
     box-sizing: border-box;
-}
-
-.pub-block-content pre {
-    margin: 0;
-    padding: 0;
-    background: transparent;
-    white-space: pre;
-    width: 100%;
-    max-width: 100%;
-}
-
-.pub-block-content code {
     font-size: 12px;
     line-height: 1.3;
-    display: block;
-    white-space: pre;
+    white-space: pre-wrap;
+    word-break: break-word;
     color: #808080;
-    background-color: transparent;
-    width: 100%;
-    max-width: 100%;
+    font-family: var(--vscode-editor-font-family);
 }
 
 .pub-block-content::-webkit-scrollbar,

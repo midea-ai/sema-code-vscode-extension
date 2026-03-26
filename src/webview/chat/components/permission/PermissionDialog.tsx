@@ -2,7 +2,7 @@ import React from 'react';
 import PermissionContent from './PermissionContent';
 import PermissionOptions from './PermissionOptions';
 import { ToolContent } from '../../types';
-import { isNotebookType, isMcpToolType, isSkillType, getPermissionTitle } from '../../utils/permissionUtils';
+import { isNotebookType, isMcpToolType, isSkillType, getPermissionTitle, getResponseDot } from '../../utils/permissionUtils';
 
 interface ToolPermissionRequestData extends ToolContent {
     options: {
@@ -58,7 +58,7 @@ const PermissionDialog: React.FC<PermissionDialogProps> = ({
         <div className="bash-permission-block" tabIndex={0}>
             <div className="bash-permission-header">
                 <div className="bash-permission-title">
-                    <span className="bash-permission-dot">⏺</span>
+                    <span className="bash-permission-dot">{getResponseDot()}</span>
                     <span className="bash-permission-title-text">
                         {getPermissionTitle(permissionData.toolName)}
                     </span>

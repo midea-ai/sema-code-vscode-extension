@@ -57,13 +57,7 @@ const PubBlock: React.FC<PubBlockProps> = React.memo(({ content }) => {
             </div>
             {isExpanded && contentLines.length > 0 && (
                 <div className="pub-block-content">
-                    <pre>
-                        <code>
-                            {contentLines.map((line: string, index: number) => (
-                                <div key={index}>{line}</div>
-                            ))}
-                        </code>
-                    </pre>
+                    {contentLines.join('\n')}
                 </div>
             )}
         </div>
