@@ -4,7 +4,7 @@ import * as http from 'http';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
-import { exec } from 'child_process';
+import AdmZip from 'adm-zip';
 import { defaultConfig } from './default/defaultConfig';
 import { skillHubConfig } from './default/defaultSkillHub';
 import { AgentConfig } from './types/agent';
@@ -480,11 +480,8 @@ export class ConfigWebviewProvider {
             // zip 根目录直接是文件，解压到 skillsDir/<slug>/ 下
             const destSkillDir = path.join(skillsDir, slug);
             fs.mkdirSync(destSkillDir, { recursive: true });
-            await new Promise<void>((resolve, reject) => {
-                exec(`unzip -o "${zipPath}" -d "${destSkillDir}"`, (err) => {
-                    if (err) reject(err); else resolve();
-                });
-            });
+            const zip = new AdmZip(zipPath);
+            zip.extractAllTo(destSkillDir, true);
 
             // 删除 zip
             fs.unlinkSync(zipPath);

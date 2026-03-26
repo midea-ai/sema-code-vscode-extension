@@ -114,7 +114,7 @@ export class SemaCoreWrapper {
 
         const config: SemaCoreConfig = {
             workingDir,
-            logLevel: 'warn',
+            logLevel: 'error',
             ...systemConfig,
             useTools: useTools
         };
@@ -132,11 +132,12 @@ export class SemaCoreWrapper {
     }
 
     public processUserInput(content: string, orgContent?: string): void {
+        // console.log('processUserInput()')
         this.semaCore.processUserInput(content, orgContent);
     }
 
     public interruptSession(): void {
-        console.log('interruptSession()')
+        // console.log('interruptSession()')
         if (this.currentState === 'processing') {
             this.semaCore.interruptSession();
         }
@@ -195,7 +196,7 @@ export class SemaCoreWrapper {
         });
 
         this.semaCore.on<SessionInterruptedData & { agentId?: string }>('session:interrupted', (data) => {
-            console.log('session:interrupted', data)
+            // console.log('session:interrupted', data)
             if (this.isSubAgent(data.agentId)) {
                 this.addMessageToTaskAgent(data.agentId!, {
                     id: this.generateId(),
@@ -260,12 +261,12 @@ export class SemaCoreWrapper {
 
     private setupInputListeners(): void {
         this.semaCore.on<InputReceivedData>('input:received', (data) => {
-            console.log('input:received', data)
+            // console.log('input:received', data)
             this.callbacks.onInputReceived?.(data);
         });
 
         this.semaCore.on<InputProcessingData>('input:processing', (data) => {
-            console.log('input:processing', data)
+            // console.log('input:processing', data)
             const content = data.originalInput || data.input;
 
             const hasUserMessages = this.messageHistory.some(m => m.type === 'user');
@@ -290,7 +291,7 @@ export class SemaCoreWrapper {
 
     private setupMessageListeners(): void {
         this.semaCore.on<StateUpdateData>('state:update', (data) => {
-            console.log('state:update', data)
+            // console.log('state:update', data)
             this.currentState = data.state;
             this.callbacks.onStateChange?.(data.state);
         });

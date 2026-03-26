@@ -48,4 +48,19 @@ package_platform "linux-x64" "linux" "rg" \
 package_platform "win32-x64" "win32" "rg.exe" \
   "https://github.com/BurntSushi/ripgrep/releases/download/$RG_VERSION/ripgrep-$RG_VERSION-x86_64-pc-windows-msvc.zip"
 
+echo "=== 恢复当前平台的 ripgrep 二进制 ==="
+rm -f "$BIN_DIR/rg" "$BIN_DIR/rg.exe"
+_OS=$(uname -s)
+_ARCH=$(uname -m)
+if [[ "$_OS" == "Darwin" && "$_ARCH" == "arm64" ]]; then
+  curl -sL "https://github.com/BurntSushi/ripgrep/releases/download/$RG_VERSION/ripgrep-$RG_VERSION-aarch64-apple-darwin.tar.gz" | tar xz
+  mv ripgrep-*/rg "$BIN_DIR/rg" && chmod +x "$BIN_DIR/rg" && rm -rf ripgrep-*
+elif [[ "$_OS" == "Darwin" ]]; then
+  curl -sL "https://github.com/BurntSushi/ripgrep/releases/download/$RG_VERSION/ripgrep-$RG_VERSION-x86_64-apple-darwin.tar.gz" | tar xz
+  mv ripgrep-*/rg "$BIN_DIR/rg" && chmod +x "$BIN_DIR/rg" && rm -rf ripgrep-*
+elif [[ "$_OS" == "Linux" ]]; then
+  curl -sL "https://github.com/BurntSushi/ripgrep/releases/download/$RG_VERSION/ripgrep-$RG_VERSION-x86_64-unknown-linux-musl.tar.gz" | tar xz
+  mv ripgrep-*/rg "$BIN_DIR/rg" && chmod +x "$BIN_DIR/rg" && rm -rf ripgrep-*
+fi
+
 echo "=== 全部完成，输出在 dist/ ==="
