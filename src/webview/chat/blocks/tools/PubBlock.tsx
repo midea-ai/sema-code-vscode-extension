@@ -20,6 +20,7 @@ const PubBlock: React.FC<PubBlockProps> = React.memo(({ content, vscode }) => {
 
     // 解析 MCP 工具名称格式：mcp__serviceName__toolName -> serviceName - toolName
     const parseMcpToolName = (name: string): string => {
+        if (!name) return '';
         const mcpMatch = name.match(/^mcp__(.+?)__(.+)$/);
         if (mcpMatch) {
             return `${mcpMatch[1]} - ${mcpMatch[2]}`;

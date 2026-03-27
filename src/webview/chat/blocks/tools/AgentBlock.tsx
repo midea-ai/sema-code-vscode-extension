@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { Message, VscodeApi } from '../../types';
-import TaskDetailModal from '../../components/ui/TaskDetailModal';
+import TaskDetailModal from '../../TaskDetailModal';
 
 // Task 消息内容类型
 export interface TaskMessageContent {
@@ -13,13 +13,13 @@ export interface TaskMessageContent {
     taskMessages: Message[];     // 完整消息历史（用于弹窗展示）
 }
 
-interface TaskBlockProps {
+interface AgentBlockProps {
     content: TaskMessageContent;
     vscode: VscodeApi;
     forceClose?: boolean;
 }
 
-const TaskBlock: React.FC<TaskBlockProps> = React.memo(({ content, vscode, forceClose }) => {
+const AgentBlock: React.FC<AgentBlockProps> = React.memo(({ content, vscode, forceClose }) => {
     const [isModalOpen, setIsModalOpen] = useState(false);
 
     // 当有权限请求时自动关闭详情弹窗
@@ -99,6 +99,6 @@ const TaskBlock: React.FC<TaskBlockProps> = React.memo(({ content, vscode, force
     );
 });
 
-TaskBlock.displayName = 'TaskBlock';
+AgentBlock.displayName = 'AgentBlock';
 
-export default TaskBlock;
+export default AgentBlock;

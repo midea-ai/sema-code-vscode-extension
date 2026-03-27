@@ -1,16 +1,7 @@
 import React, { useEffect, useCallback, useMemo, useRef, useState } from 'react';
-import { Message, VscodeApi } from '../../types';
-import EditBlock from '../../blocks/tools/EditBlock';
-import NotebookEditBlock from '../../blocks/tools/NotebookEditBlock';
-import ReadBlock from '../../blocks/tools/ReadBlock';
-import PubBlock from '../../blocks/tools/PubBlock';
-import BashBlock from '../../blocks/tools/BashBlock';
-import AiResponseBlock from '../../blocks/AiResponseBlock';
-import UserInputBlock from '../../blocks/UserInputBlock';
-import PermissionRequestBlock from '../permission/PermissionRequestBlock';
-import ToolErrorBlock from '../../blocks/ToolErrorBlock';
-import SupplementaryInfo from './SupplementaryInfo';
-import PlanImplementPanel from './PlanImplementPanel';
+import ReactDOM from 'react-dom';
+import { Message, VscodeApi } from './types';
+import MessageItem from './MessageItem';
 
 interface TaskDetailModalProps {
     title: string;
@@ -116,43 +107,6 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
         }
     };
 
-    // 渲染工具消息
-    const renderToolMessage = useCallback((message: Message, key: string) => {
-        switch (message.toolName) {
-            case 'Write':
-            case 'Edit':
-                return (
-                    <EditBlock
-                        key={key}
-                        content={message.content}
-                        vscode={vscode}
-                    />
-                );
-
-            case 'NotebookEdit':
-                return (
-                    <NotebookEditBlock
-                        key={key}
-                        content={message.content}
-                        vscode={vscode}
-                    />
-                );
-
-            case 'TodoWrite':
-                return null;
-
-            case 'Read':
-            case 'NotebookRead':
-                return <ReadBlock key={key} content={message.content} vscode={vscode} />;
-
-            case 'Bash':
-                return <BashBlock key={key} content={message.content} />;
-
-            default:
-                return <PubBlock key={key} content={message.content} />;
-        }
-    }, [vscode]);
-
     // 渲染消息列表
     const renderedMessages = useMemo(() => {
         if (!taskMessages || taskMessages.length === 0) {
@@ -163,68 +117,20 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
             );
         }
 
-        return taskMessages.map((message) => {
-            const key = message.id;
+        return taskMessages.map((message) => (
+            <MessageItem
+                key={message.id}
+                message={message}
+                shouldReportChange={false}
+                toolPermissionData={null}
+                vscode={vscode}
+                streamingContent={null}
+                streamingToolContent={null}
+            />
+        ));
+    }, [taskMessages, vscode]);
 
-            switch (message.type) {
-                case 'user':
-                    return (
-                        <UserInputBlock key={key} content={message.content} />
-                    );
-
-                case 'assistant':
-                    const hasContent = message.content && message.content.content && message.content.content.trim().length > 0;
-
-                    return (
-                        <React.Fragment key={key}>
-                            {hasContent && (
-                                <AiResponseBlock
-                                    content={message.content.content}
-                                    isStreaming={!message.content.completed}
-                                    vscode={vscode}
-                                />
-                            )}
-                        </React.Fragment>
-                    );
-
-                case 'tool':
-                    return renderToolMessage(message, key);
-
-                case 'permission_request':
-                    return (
-                        <PermissionRequestBlock
-                            key={key}
-                            permissionData={message.content}
-                        />
-                    );
-
-                case 'system':
-                    if (message.content.type === 'interrupted') {
-                        const USER_INTERRUPT_MESSAGE = '[Request interrupted by user]';
-                        if (message.content.content === USER_INTERRUPT_MESSAGE) {
-                            return <SupplementaryInfo key={key} items={['interrupted']} />;
-                        }
-                        return null;
-                    }
-                    else if (message.content.type === 'tool_error') {
-                        return (
-                            <ToolErrorBlock
-                                key={key}
-                                toolName={message.content.toolName || ''}
-                                title={message.content.title || ''}
-                                content={message.content.content || ''}
-                            />
-                        );
-                    }
-                    return null;
-
-                default:
-                    return null;
-            }
-        });
-    }, [taskMessages, vscode, renderToolMessage]);
-
-    return (
+    return ReactDOM.createPortal(
         <div className="task-modal-overlay" onClick={handleBackdropClick}>
             <div className="task-modal-container">
                 <div className="task-modal-header">
@@ -242,7 +148,8 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                     {renderedMessages}
                 </div>
             </div>
-        </div>
+        </div>,
+        document.body
     );
 };
 

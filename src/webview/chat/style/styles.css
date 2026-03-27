@@ -113,6 +113,13 @@ code, pre, .code {
     background-color: var(--vscode-scrollbarSlider-hoverBackground);
 }
 
+/* 消息包装层：让浏览器跳过视口外元素的 layout 和 paint，
+   contain-intrinsic-size 作为未渲染时的占位高度估算 */
+.msg-wrap {
+    content-visibility: auto;
+    contain-intrinsic-size: 0 80px;
+}
+
 .output-line {
     margin-bottom: 4px;
     white-space: pre;
@@ -233,8 +240,8 @@ code, pre, .code {
 .ai-resp-block {
     display: flex;
     margin: 8px;
-    width: calc(100% - 10px);
-    max-width: calc(100% - 10px);
+    width: calc(100% - 16px);
+    max-width: calc(100% - 16px);
     box-sizing: border-box;
 }
 

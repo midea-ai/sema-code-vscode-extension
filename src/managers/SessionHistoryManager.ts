@@ -13,23 +13,14 @@ export interface Session {
 }
 
 /**
- * 按项目存储的数据结构
- */
-interface ProjectData {
-    projectPath: string;
-    lastUpdatedAt: number; // 项目最后更新时间，用于淘汰旧项目
-    sessions: Session[];
-}
-
-/**
  * SessionHistoryManager 类 - 管理历史会话
  * 负责保存、加载、删除历史会话
- * 存储结构：按项目分组，最多保留 MAX_PROJECTS 个项目，每个项目最多 MAX_SESSIONS 条记录
+ * 存储结构：使用 workspaceState 按项目隔离，每个项目最多 MAX_SESSIONS 条记录
  */
 export class SessionHistoryManager {
-    private static readonly STORAGE_KEY = 'sema.sessionHistoryV2';
-    private static readonly MAX_SESSIONS = 50;  // 每个项目最多保留50条会话历史
-    private static readonly MAX_PROJECTS = 20;  // 最多保留20个项目
+    private static readonly STORAGE_KEY = 'sema.sessionHistory';
+    private static readonly LEGACY_STORAGE_KEY = 'sema.sessionHistoryV2';
+    private static readonly MAX_SESSIONS = 50;
     private context: vscode.ExtensionContext;
     private projectPath: string;
     private semaWrapper: any;
@@ -54,7 +45,7 @@ export class SessionHistoryManager {
                     continue; // 过滤掉不完整的 assistant 消息
                 }
             }
-            if (message.type === 'tool' && message.toolName === 'Task' && message.content?.status === 'running') {
+            if (message.type === 'tool' && message.toolName === 'Agent' && message.content?.status === 'running') {
                 result.push({ ...message, content: { ...message.content, status: 'interrupted' } });
             } else {
                 result.push(message);
@@ -64,13 +55,46 @@ export class SessionHistoryManager {
     }
 
     /**
+     * 从 globalState 旧数据迁移当前项目的会话到 workspaceState（一次性）
+     */
+    private async migrateFromGlobalStateIfNeeded(): Promise<Session[]> {
+        const oldData = this.context.globalState.get<any[]>(SessionHistoryManager.LEGACY_STORAGE_KEY, []);
+        const projectData = oldData.find((p: any) => p.projectPath === this.projectPath);
+        if (!projectData?.sessions?.length) {
+            return [];
+        }
+
+        // 迁移到 workspaceState
+        await this.context.workspaceState.update(SessionHistoryManager.STORAGE_KEY, projectData.sessions);
+
+        // 从 globalState 移除该项目
+        const remaining = oldData.filter((p: any) => p.projectPath !== this.projectPath);
+        await this.context.globalState.update(
+            SessionHistoryManager.LEGACY_STORAGE_KEY,
+            remaining.length ? remaining : undefined
+        );
+
+        return projectData.sessions;
+    }
+
+    /**
+     * 获取当前项目的所有会话（内部使用），自动处理迁移
+     */
+    private async getSessions(): Promise<Session[]> {
+        let sessions = this.context.workspaceState.get<Session[]>(SessionHistoryManager.STORAGE_KEY);
+        if (!sessions) {
+            sessions = await this.migrateFromGlobalStateIfNeeded();
+        }
+        return sessions ?? [];
+    }
+
+    /**
      * 保存会话到历史记录
      */
     public async saveSession(messageHistory?: any[]): Promise<void> {
         const sessionId = this.semaWrapper.currentSessionId;
         const title = this.semaWrapper.title;
 
-        // 提前检查必要字段
         if (!sessionId || !title) {
             return;
         }
@@ -81,7 +105,6 @@ export class SessionHistoryManager {
             return;
         }
 
-        // 过滤不完整消息 + 标记 interrupted（单次遍历）
         const messages = this.sanitizeMessages(rawMessages);
 
         if (messages.length === 0) {
@@ -89,60 +112,36 @@ export class SessionHistoryManager {
         }
 
         const now = Date.now();
-        const allProjects = await this.getAllProjectsRaw();
-
-        // 查找当前项目
-        let projectIndex = allProjects.findIndex(p => p.projectPath === this.projectPath);
-        if (projectIndex === -1) {
-            // 新项目：如果超过最大项目数，删除最旧的项目
-            if (allProjects.length >= SessionHistoryManager.MAX_PROJECTS) {
-                allProjects.sort((a, b) => a.lastUpdatedAt - b.lastUpdatedAt);
-                allProjects.splice(0, allProjects.length - SessionHistoryManager.MAX_PROJECTS + 1);
-            }
-            allProjects.push({ projectPath: this.projectPath, lastUpdatedAt: now, sessions: [] });
-            projectIndex = allProjects.length - 1;
-        }
-
-        const projectData = allProjects[projectIndex];
-        const existingIndex = projectData.sessions.findIndex(s => s.id === sessionId);
+        const sessions = await this.getSessions();
+        const existingIndex = sessions.findIndex(s => s.id === sessionId);
 
         if (existingIndex !== -1) {
             // 更新现有会话（保留创建时间）
-            projectData.sessions[existingIndex] = {
+            sessions[existingIndex] = {
                 id: sessionId,
-                title: title,
-                createdAt: projectData.sessions[existingIndex].createdAt || now,
+                title,
+                createdAt: sessions[existingIndex].createdAt || now,
                 updatedAt: now,
                 content: [...messages],
                 projectPath: this.projectPath
             };
         } else {
             // 新会话，添加到头部
-            const session: Session = {
+            sessions.unshift({
                 id: sessionId,
-                title: title,
+                title,
                 createdAt: now,
                 updatedAt: now,
                 content: [...messages],
                 projectPath: this.projectPath
-            };
-            projectData.sessions.unshift(session);
+            });
 
-            // 超过每项目最大数量，删除最旧的
-            if (projectData.sessions.length > SessionHistoryManager.MAX_SESSIONS) {
-                projectData.sessions.splice(SessionHistoryManager.MAX_SESSIONS);
+            if (sessions.length > SessionHistoryManager.MAX_SESSIONS) {
+                sessions.splice(SessionHistoryManager.MAX_SESSIONS);
             }
         }
 
-        projectData.lastUpdatedAt = now;
-        await this.context.globalState.update(SessionHistoryManager.STORAGE_KEY, allProjects);
-    }
-
-    /**
-     * 获取所有项目数据（内部使用）
-     */
-    private async getAllProjectsRaw(): Promise<ProjectData[]> {
-        return this.context.globalState.get<ProjectData[]>(SessionHistoryManager.STORAGE_KEY, []);
+        await this.context.workspaceState.update(SessionHistoryManager.STORAGE_KEY, sessions);
     }
 
     /**
@@ -156,14 +155,9 @@ export class SessionHistoryManager {
      * 获取当前项目的所有会话
      */
     public async getAllSessions(): Promise<Session[]> {
-        const allProjects = await this.getAllProjectsRaw();
-        const projectData = allProjects.find(p => p.projectPath === this.projectPath);
-        if (!projectData) {
-            return [];
-        }
-
+        const sessions = await this.getSessions();
         const currentSessionId = this.semaWrapper.currentSessionId;
-        return [...projectData.sessions].sort((a, b) => {
+        return [...sessions].sort((a, b) => {
             if (a.id === currentSessionId) { return -1; }
             if (b.id === currentSessionId) { return 1; }
             return b.updatedAt - a.updatedAt;
@@ -184,31 +178,18 @@ export class SessionHistoryManager {
      * 根据ID获取特定会话
      */
     public async getSession(sessionId: string): Promise<Session | null> {
-        const allProjects = await this.getAllProjectsRaw();
-        const projectData = allProjects.find(p => p.projectPath === this.projectPath);
-        if (!projectData) {
-            return null;
-        }
-        return projectData.sessions.find(s => s.id === sessionId) || null;
+        const sessions = await this.getSessions();
+        return sessions.find(s => s.id === sessionId) || null;
     }
 
     /**
      * 删除会话
      */
     public async deleteSession(sessionId: string): Promise<void> {
-       // console.log(`删除会话: ${sessionId}`)
-        const allProjects = await this.getAllProjectsRaw();
-        const projectIndex = allProjects.findIndex(p => p.projectPath === this.projectPath);
-        if (projectIndex === -1) {
-            return;
-        }
-
-        const projectData = allProjects[projectIndex];
-        const originalLength = projectData.sessions.length;
-        projectData.sessions = projectData.sessions.filter(s => s.id !== sessionId);
-
-        if (projectData.sessions.length < originalLength) {
-            await this.context.globalState.update(SessionHistoryManager.STORAGE_KEY, allProjects);
+        const sessions = await this.getSessions();
+        const filtered = sessions.filter(s => s.id !== sessionId);
+        if (filtered.length < sessions.length) {
+            await this.context.workspaceState.update(SessionHistoryManager.STORAGE_KEY, filtered);
         }
     }
 
@@ -216,12 +197,6 @@ export class SessionHistoryManager {
      * 清空当前项目的所有会话历史
      */
     public async clearAllSessions(): Promise<void> {
-       // console.log(`清空会话: ${this.projectPath}`)
-        const allProjects = await this.getAllProjectsRaw();
-        const filtered = allProjects.filter(p => p.projectPath !== this.projectPath);
-        await this.context.globalState.update(SessionHistoryManager.STORAGE_KEY, filtered);
+        await this.context.workspaceState.update(SessionHistoryManager.STORAGE_KEY, undefined);
     }
 }
-
-
-

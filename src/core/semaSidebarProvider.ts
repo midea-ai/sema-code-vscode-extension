@@ -55,6 +55,7 @@ export class SemaSidebarProvider implements vscode.WebviewViewProvider {
                 onInputReceived:          this.handleInputReceived,
                 onInputProcessing:        this.handleInputProcessing,
                 onToolExecutionComplete:  this.handleToolExecutionComplete,
+                onSessionCleared:         this.handleSessionCleared,
             },
             this.systemConfigManager
         );
@@ -201,6 +202,10 @@ export class SemaSidebarProvider implements vscode.WebviewViewProvider {
         if (data.toolName === 'Read') {
             this.fileStateDiffManager.addFileToSnapshotIfNew(data.title);
         }
+    };
+
+    private handleSessionCleared = (): void => {
+        this.fileStateDiffManager.createSnapshot();
     };
 
     // ─── Session management ───────────────────────────────────────────────────

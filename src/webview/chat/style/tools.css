@@ -175,11 +175,11 @@
 
 /* Pub Block 样式 - 与 Write Block 风格一致 */
 .pub-block {
-    margin: 5px;
+    margin: 8px;
     overflow: hidden;
     box-sizing: border-box;
     width: 100%;
-    max-width: calc(100% - 10px); /* 减去左右margin的空间 */
+    max-width: calc(100% - 16px); /* 减去左右margin的空间 */
 }
 
 .pub-block-header {
@@ -405,8 +405,8 @@
 /* Tool Error Block 样式 */
 .tool-error-block {
     margin: 8px;
-    width: calc(100% - 10px);
-    max-width: calc(100% - 10px); /* 减去左右margin的空间 */
+    width: calc(100% - 16px);
+    max-width: calc(100% - 16px); /* 减去左右margin的空间 */
     box-sizing: border-box;
 }
 

@@ -253,11 +253,11 @@
 
 /* Read Block 样式 */
 .read-block {
-    margin: 5px;
+    margin: 8px;
     border-radius: 3px;
     overflow: hidden;
     width: 500px;
-    max-width: calc(100% - 10px); /* 减去左右margin的空间 */
+    max-width: calc(100% - 16px); /* 减去左右margin的空间 */
 }
 
 .read-block-header {

@@ -142,4 +142,4 @@ const ProcessingSpinner: React.FC<ProcessingSpinnerProps> = ({
     );
 };
 
-export default ProcessingSpinner;
+export default React.memo(ProcessingSpinner);

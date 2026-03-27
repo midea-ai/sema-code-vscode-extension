@@ -10,46 +10,46 @@ interface BashBlockProps {
     vscode?: any;
 }
 
-const BashBlock: React.FC<BashBlockProps> = ({ content: toolContent, vscode }) => {
-    // console.log('BashBlock:', JSON.stringify(toolContent));
-    const [isExpanded, setIsExpanded] = useState(true);
+// 模拟终端 \r 行为：\r 将光标移到行首，后续字符覆盖原内容
+const processTerminalOutput = (text: string): string[] => {
+    const resultLines: string[] = [];
+    let currentLineChars: string[] = [];
+    let pos = 0;
 
-    // 模拟终端 \r 行为：\r 将光标移到行首，后续字符覆盖原内容
-    const processTerminalOutput = (text: string): string[] => {
-        const resultLines: string[] = [];
-        let currentLineChars: string[] = [];
-        let pos = 0;
-
-        for (let i = 0; i < text.length; i++) {
-            const char = text[i];
-            if (char === '\r') {
-                if (i + 1 < text.length && text[i + 1] === '\n') {
-                    // \r\n：Windows 换行
-                    resultLines.push(currentLineChars.join(''));
-                    currentLineChars = [];
-                    pos = 0;
-                    i++;
-                } else {
-                    // 单独 \r：光标回到行首，不清除内容，后续字符覆盖
-                    pos = 0;
-                }
-            } else if (char === '\n') {
+    for (let i = 0; i < text.length; i++) {
+        const char = text[i];
+        if (char === '\r') {
+            if (i + 1 < text.length && text[i + 1] === '\n') {
+                // \r\n：Windows 换行
                 resultLines.push(currentLineChars.join(''));
                 currentLineChars = [];
                 pos = 0;
+                i++;
             } else {
-                currentLineChars[pos] = char;
-                pos++;
+                // 单独 \r：光标回到行首，不清除内容，后续字符覆盖
+                pos = 0;
             }
+        } else if (char === '\n') {
+            resultLines.push(currentLineChars.join(''));
+            currentLineChars = [];
+            pos = 0;
+        } else {
+            currentLineChars[pos] = char;
+            pos++;
         }
+    }
 
-        const lastLine = currentLineChars.join('');
-        if (lastLine) {
-            resultLines.push(lastLine);
-        }
+    const lastLine = currentLineChars.join('');
+    if (lastLine) {
+        resultLines.push(lastLine);
+    }
 
-        return resultLines;
-    };
+    return resultLines;
+};
+
+const BashBlock: React.FC<BashBlockProps> = ({ content: toolContent, vscode }) => {
+    // console.log('BashBlock:', JSON.stringify(toolContent));
+    const [isExpanded, setIsExpanded] = useState(true);
 
     // 解析结构化数据
     const parsedContent = useMemo(() => {
@@ -117,4 +117,4 @@ const BashBlock: React.FC<BashBlockProps> = ({ content: toolContent, vscode }) =
     );
 };
 
-export default BashBlock;
+export default React.memo(BashBlock);

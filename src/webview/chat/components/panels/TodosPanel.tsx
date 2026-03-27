@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ToggleIcon } from '../ui/IconButton';
 
 interface TodoItem {
@@ -9,10 +9,18 @@ interface TodoItem {
 
 interface TodosPanelProps {
     todos: TodoItem[];
+    onScrollToBottom?: () => void;
 }
 
-const TodosPanel: React.FC<TodosPanelProps> = ({ todos }) => {
+const TodosPanel: React.FC<TodosPanelProps> = ({ todos, onScrollToBottom }) => {
     const [isExpanded, setIsExpanded] = useState(false);
+
+    useEffect(() => {
+        if (isExpanded && onScrollToBottom) {
+            const timer = setTimeout(onScrollToBottom, 50);
+            return () => clearTimeout(timer);
+        }
+    }, [todos.length]);
     
     if (todos.length === 0) {
         return null;

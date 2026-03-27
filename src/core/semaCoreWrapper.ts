@@ -63,7 +63,6 @@ export interface SemaWrapperCallbacks {
     onToolPermissionRequest?: (data: ToolPermissionRequestData) => void;
     onAskQuestionRequest?: (data: AskQuestionRequestData) => void;
     onPlanExitRequest?: (data: PlanExitRequestData) => void;
-    onPlanImplement?: (data: PlanImplementData) => void;
     onUsageUpdate?: (data: ConversationUsageData) => void;
     onTodosUpdate?: (todos: TodosUpdateData) => void;
     onTopicUpdate?: (topic: TopicUpdateData) => void;
@@ -71,6 +70,7 @@ export interface SemaWrapperCallbacks {
     onInputReceived?: (data: InputReceivedData) => void;
     onInputProcessing?: (data: InputProcessingData) => void;
     onToolExecutionComplete?: (data: ToolExecutionCompleteData & { agentId?: string }) => void;
+    onSessionCleared?: () => void;
 }
 
 export interface Message {
@@ -103,9 +103,11 @@ export class SemaCoreWrapper {
     private systemConfigManager: SystemConfigManager;
 
     public messageHistory: Array<Message> = [];
-    private currentStreamingMessage: Message | null = null;
-    private taskAgentMap: Map<string, Message> = new Map();
+    private streamingAssistantMap: Map<string, Message> = new Map();
+    private taskAgentMap: Map<string, { idx: number; msg: Message }> = new Map();
     private streamingToolMap: Map<string, Message> = new Map();
+    private taskAgentThrottleTimer: NodeJS.Timeout | null = null;
+    private pendingTaskUpdates: Set<string> = new Set();
 
     constructor(workingDir: string, private callbacks: SemaWrapperCallbacks, systemConfigManager: SystemConfigManager) {
         this.systemConfigManager = systemConfigManager;
@@ -183,7 +185,7 @@ export class SemaCoreWrapper {
 
         this.semaCore.on<FileReferenceData>('file:reference', (data) => {
             if (data.references && data.references.length > 0) {
-                this.messageHistory.push({
+                const msg: Message = {
                     id: this.generateId(),
                     type: 'system',
                     content: {
@@ -191,8 +193,9 @@ export class SemaCoreWrapper {
                         content: data.references.map(ref => ref.content)
                     },
                     timestamp: Date.now()
-                });
-                this.sendContentUpdate();
+                };
+                this.messageHistory.push(msg);
+                this.sendAppendMessages([msg]);
             }
         });
 
@@ -208,26 +211,28 @@ export class SemaCoreWrapper {
                 return;
             }
 
-            this.currentStreamingMessage = null;
+            this.streamingAssistantMap.clear();
             this.streamingToolMap.clear();
+            this.pendingTaskUpdates.clear();
 
             if (this.messageHistory.length === 0) {
                 return;
             }
 
-            this.messageHistory.push({
+            const interruptedMsg: Message = {
                 id: this.generateId(),
                 type: 'system',
                 content: { type: 'interrupted', content: data.content },
                 timestamp: Date.now()
-            });
-            this.sendContentUpdate();
+            };
+            this.messageHistory.push(interruptedMsg);
+            this.sendAppendMessages([interruptedMsg]);
         });
 
         this.semaCore.on<SessionErrorData>('session:error', (data) => {
             console.error('Session error:', data);
             const errorMessage = data.error?.message || 'Unknown error';
-            this.messageHistory.push({
+            const sessionErrorMsg: Message = {
                 id: this.generateId(),
                 type: 'system',
                 content: {
@@ -236,8 +241,9 @@ export class SemaCoreWrapper {
                     errorType: data.type
                 },
                 timestamp: Date.now()
-            });
-            this.sendContentUpdate();
+            };
+            this.messageHistory.push(sessionErrorMsg);
+            this.sendAppendMessages([sessionErrorMsg]);
         });
 
         this.semaCore.on<{ sessionId: string | null }>('session:cleared', (_data) => {
@@ -257,6 +263,7 @@ export class SemaCoreWrapper {
             });
             this.sendContentUpdate();
             this.callbacks.onMessageComplete?.();
+            this.callbacks.onSessionCleared?.();
         });
     }
 
@@ -279,13 +286,14 @@ export class SemaCoreWrapper {
                 this.title = title || '新对话';
             }
 
-            this.messageHistory.push({
+            const userMsg: Message = {
                 id: this.generateId(),
                 type: 'user',
                 content: content,
                 timestamp: Date.now()
-            });
-            this.sendContentUpdate();
+            };
+            this.messageHistory.push(userMsg);
+            this.sendAppendMessages([userMsg]);
             this.callbacks.onInputProcessing?.(data);
         });
     }
@@ -297,49 +305,50 @@ export class SemaCoreWrapper {
             this.callbacks.onStateChange?.(data.state);
         });
 
-        this.semaCore.on<ThinkingChunkData>('message:thinking:chunk', (data) => {
-            if (this.currentStreamingMessage && this.currentStreamingMessage.type === 'assistant') {
-                this.currentStreamingMessage.reasoning = data.content;
+        this.semaCore.on<ThinkingChunkData & { id?: string }>('message:thinking:chunk', (data) => {
+            const msgId = data.id || 'default-stream';
+            const existing = this.streamingAssistantMap.get(msgId);
+            if (existing) {
+                existing.reasoning = data.content;
+                this.sendChunkUpdate(existing.id, { reasoning: data.content });
                 return;
             }
 
             const newMessage: Message = {
-                id: this.generateId(),
+                id: msgId,
                 type: 'assistant',
                 content: { messageType: 'text', content: '', completed: false },
                 reasoning: data.content,
                 timestamp: Date.now()
             };
-            this.currentStreamingMessage = newMessage;
+            this.streamingAssistantMap.set(msgId, newMessage);
             this.messageHistory.push(newMessage);
-            this.sendContentUpdate();
+            this.sendAppendMessages([newMessage]);
         });
 
-        this.semaCore.on<TextChunkData>('message:text:chunk', (data) => {
-            if (this.currentStreamingMessage && this.currentStreamingMessage.type === 'assistant') {
-                this.currentStreamingMessage.content = {
-                    messageType: 'text',
-                    content: data.content,
-                    completed: false
-                };
-                this.sendContentUpdate();
+        this.semaCore.on<TextChunkData & { id?: string }>('message:text:chunk', (data) => {
+            const msgId = data.id || 'default-stream';
+            const existing = this.streamingAssistantMap.get(msgId);
+            if (existing) {
+                existing.content = { messageType: 'text', content: data.content, completed: false };
+                this.sendChunkUpdate(existing.id, { content: data.content });
                 return;
             }
 
             const newMessage: Message = {
-                id: this.generateId(),
+                id: msgId,
                 type: 'assistant',
                 content: { messageType: 'text', content: data.content, completed: false },
                 timestamp: Date.now()
             };
-            this.currentStreamingMessage = newMessage;
+            this.streamingAssistantMap.set(msgId, newMessage);
             this.messageHistory.push(newMessage);
-            this.sendContentUpdate();
+            this.sendAppendMessages([newMessage]);
         });
 
-        this.semaCore.on<MessageCompleteData & { agentId?: string }>('message:complete', (data) => {
+        this.semaCore.on<MessageCompleteData & { agentId?: string; id?: string }>('message:complete', (data) => {
             if (!data.content && !data.reasoning && !data.hasToolCalls) {
-                this.currentStreamingMessage = null;
+                if (data.id) this.streamingAssistantMap.delete(data.id);
                 return;
             }
 
@@ -359,30 +368,35 @@ export class SemaCoreWrapper {
                 return;
             }
 
+            const streamingMessage = data.id
+                ? this.streamingAssistantMap.get(data.id)
+                : this.streamingAssistantMap.values().next().value;
+
             let messageUpdated = false;
 
-            if (this.currentStreamingMessage && this.currentStreamingMessage.type === 'assistant') {
-                const message = this.currentStreamingMessage;
+            if (streamingMessage) {
                 if (data.content) {
-                    message.content = {
-                        messageType: message.content.messageType || 'text',
+                    streamingMessage.content = {
+                        messageType: streamingMessage.content.messageType || 'text',
                         content: data.content,
                         completed: true,
                         hasToolCalls: data.hasToolCalls,
                     };
                 } else {
-                    message.content.completed = true;
-                    message.content.hasToolCalls = data.hasToolCalls;
+                    streamingMessage.content.completed = true;
+                    streamingMessage.content.hasToolCalls = data.hasToolCalls;
                 }
                 if (data.reasoning) {
-                    message.reasoning = data.reasoning;
+                    streamingMessage.reasoning = data.reasoning;
                 }
+                if (data.id) this.streamingAssistantMap.delete(data.id);
                 messageUpdated = true;
             }
 
+            let newCompleteMessage: Message | undefined;
             if (!messageUpdated) {
                 console.warn('No streaming message found, creating new complete message');
-                const newMessage: Message = {
+                newCompleteMessage = {
                     id: this.generateId(),
                     type: 'assistant',
                     content: {
@@ -394,16 +408,21 @@ export class SemaCoreWrapper {
                     timestamp: Date.now()
                 };
                 if (data.reasoning) {
-                    newMessage.reasoning = data.reasoning;
+                    newCompleteMessage.reasoning = data.reasoning;
                 }
-                this.messageHistory.push(newMessage);
+                this.messageHistory.push(newCompleteMessage);
                 messageUpdated = true;
             }
 
-            this.currentStreamingMessage = null;
-
             if (messageUpdated) {
-                this.sendContentUpdate();
+                if (streamingMessage) {
+                    this.sendCompleteUpdate(streamingMessage.id, {
+                        content: streamingMessage.content,
+                        reasoning: streamingMessage.reasoning
+                    });
+                } else if (newCompleteMessage) {
+                    this.sendAppendMessages([newCompleteMessage]);
+                }
                 this.callbacks.onMessageComplete?.();
             }
         });
@@ -422,7 +441,9 @@ export class SemaCoreWrapper {
             const toolId = data.toolId;
             if (toolId && this.streamingToolMap.has(toolId)) {
                 const existingMessage = this.streamingToolMap.get(toolId)!;
+                // 直接 mutate，不创建新对象（前端通过 toolChunkUpdate 单独处理）
                 existingMessage.content = { ...data, completed: false };
+                this.sendToolChunkUpdate(existingMessage.id, existingMessage.content);
             } else {
                 const newMessage: Message = {
                     id: this.generateId(),
@@ -435,8 +456,8 @@ export class SemaCoreWrapper {
                 if (toolId) {
                     this.streamingToolMap.set(toolId, newMessage);
                 }
+                this.sendAppendMessages([newMessage]);
             }
-            this.sendContentUpdate();
         });
 
         this.semaCore.on<ToolExecutionCompleteData & { agentId?: string }>('tool:execution:complete', (data) => {
@@ -453,25 +474,30 @@ export class SemaCoreWrapper {
                 return;
             }
 
-            if (data.toolName === 'Task') {
+            if (data.toolName === 'Agent') {
                 return;
             }
 
             const toolId = data.toolId;
             if (toolId && this.streamingToolMap.has(toolId)) {
                 const existingMessage = this.streamingToolMap.get(toolId)!;
-                existingMessage.content = { ...data, completed: true };
+                const updatedContent = { ...data, completed: true };
+                const updatedMessage = { ...existingMessage, content: updatedContent };
+                const idx = this.messageHistory.indexOf(existingMessage);
+                if (idx >= 0) this.messageHistory[idx] = updatedMessage;
                 this.streamingToolMap.delete(toolId);
+                this.sendUpdateMessage(existingMessage.id, updatedContent);
             } else {
-                this.messageHistory.push({
+                const newToolMsg: Message = {
                     id: this.generateId(),
                     type: 'tool',
                     content: { ...data, completed: true },
                     toolName: data.toolName,
                     timestamp: Date.now()
-                });
+                };
+                this.messageHistory.push(newToolMsg);
+                this.sendAppendMessages([newToolMsg]);
             }
-            this.sendContentUpdate();
         });
 
         this.semaCore.on<ToolExecutionErrorData & { agentId?: string }>('tool:execution:error', (data) => {
@@ -496,7 +522,7 @@ export class SemaCoreWrapper {
             }
 
             this.messageHistory.push(errorMessage);
-            this.sendContentUpdate();
+            this.sendAppendMessages([errorMessage]);
         });
     }
 
@@ -521,13 +547,32 @@ export class SemaCoreWrapper {
                 ? `Compacted: ${data.errMsg}`
                 : `Compacted`;
 
-            this.messageHistory.push({
+            // 从末尾找最后一条用户消息，截断其之前的内容
+            const lastUserIdx = this.messageHistory.reduceRight(
+                (found, m, i) => (found === -1 && m.type === 'user' ? i : found), -1
+            );
+            if (lastUserIdx > 0) {
+                this.messageHistory = this.messageHistory.slice(lastUserIdx);
+                // 更新 taskAgentMap 中的索引
+                for (const [taskId, entry] of this.taskAgentMap.entries()) {
+                    const newIdx = this.messageHistory.indexOf(entry.msg);
+                    if (newIdx === -1) {
+                        this.taskAgentMap.delete(taskId);
+                    } else {
+                        entry.idx = newIdx;
+                    }
+                }
+            }
+
+            const compactMsg: Message = {
                 id: this.generateId(),
                 type: 'system',
                 content: { type: 'compact', content: finalContent },
                 timestamp: Date.now()
-            });
+            };
+            this.messageHistory.push(compactMsg);
             this.sendContentUpdate();
+            this.callbacks.onSessionCleared?.();
         });
 
         this.semaCore.on<AskQuestionRequestData>('ask:question:request', (data) => {
@@ -539,7 +584,7 @@ export class SemaCoreWrapper {
         });
 
         this.semaCore.on<PlanImplementData>('plan:implement', (data) => {
-            this.messageHistory.push({
+            const planMsg: Message = {
                 id: this.generateId(),
                 type: 'system',
                 content: {
@@ -548,8 +593,9 @@ export class SemaCoreWrapper {
                     planContent: data.planContent
                 },
                 timestamp: Date.now()
-            });
-            this.sendContentUpdate();
+            };
+            this.messageHistory.push(planMsg);
+            this.sendAppendMessages([planMsg]);
         });
 
         this.semaCore.on<MCPServerStatusData>('mcp:server:status', (data) => {
@@ -574,6 +620,45 @@ export class SemaCoreWrapper {
         });
     }
 
+    private sendChunkUpdate(messageId: string, update: { content?: string; reasoning?: string }): void {
+        this.callbacks.onMessage?.({
+            type: 'chunkUpdate',
+            id: messageId,
+            ...update
+        });
+    }
+
+    private sendCompleteUpdate(messageId: string, update: { content?: any; reasoning?: string }): void {
+        this.callbacks.onMessage?.({
+            type: 'completeUpdate',
+            id: messageId,
+            ...update
+        });
+    }
+
+    private sendToolChunkUpdate(messageId: string, toolContent: any): void {
+        this.callbacks.onMessage?.({
+            type: 'toolChunkUpdate',
+            id: messageId,
+            toolContent
+        });
+    }
+
+    private sendAppendMessages(messages: Message[]): void {
+        this.callbacks.onMessage?.({
+            type: 'appendMessages',
+            messages
+        });
+    }
+
+    private sendUpdateMessage(id: string, content: any): void {
+        this.callbacks.onMessage?.({
+            type: 'updateMessage',
+            id,
+            content
+        });
+    }
+
     private handleTaskAgentStart(data: TaskAgentStartData): void {
         const userMessage: Message = {
             id: this.generateId(),
@@ -585,7 +670,7 @@ export class SemaCoreWrapper {
         const taskMessage: Message = {
             id: this.generateId(),
             type: 'tool',
-            toolName: 'Task',
+            toolName: 'Agent',
             content: {
                 taskId: data.taskId,
                 subagent_type: data.subagent_type,
@@ -599,36 +684,49 @@ export class SemaCoreWrapper {
         };
 
         this.messageHistory.push(taskMessage);
-        this.taskAgentMap.set(data.taskId, taskMessage);
-        this.sendContentUpdate();
+        this.taskAgentMap.set(data.taskId, { idx: this.messageHistory.length - 1, msg: taskMessage });
+        this.sendAppendMessages([taskMessage]);
     }
 
     private handleTaskAgentEnd(data: TaskAgentEndData): void {
-        const taskMessage = this.taskAgentMap.get(data.taskId);
-        if (!taskMessage || taskMessage.toolName !== 'Task') {
+        const entry = this.taskAgentMap.get(data.taskId);
+        if (!entry || entry.msg.toolName !== 'Agent') {
             console.warn(`Task agent end: taskId ${data.taskId} not found`);
             return;
         }
 
-        const taskContent = taskMessage.content as TaskMessageContent;
+        const taskContent = entry.msg.content as TaskMessageContent;
         taskContent.status = data.status;
         taskContent.summary = data.content;
-
-        this.sendContentUpdate();
+        this.sendUpdateMessage(entry.msg.id, taskContent);
     }
 
     private addMessageToTaskAgent(taskId: string, message: Message): void {
-        const taskMessage = this.taskAgentMap.get(taskId);
-        if (!taskMessage || taskMessage.toolName !== 'Task') {
+        const entry = this.taskAgentMap.get(taskId);
+        if (!entry || entry.msg.toolName !== 'Agent') {
             console.warn(`addMessageToTaskAgent: taskId ${taskId} not found`);
             return;
         }
 
-        const taskContent = taskMessage.content as TaskMessageContent;
+        const taskContent = entry.msg.content as TaskMessageContent;
         taskContent.taskMessages.push(message);
         taskContent.summary = this.generateTaskSummary(taskContent);
 
-        this.sendContentUpdate();
+        // 节流：1s 内多次更新只发一次
+        this.pendingTaskUpdates.add(taskId);
+        if (!this.taskAgentThrottleTimer) {
+            this.taskAgentThrottleTimer = setTimeout(() => {
+                this.taskAgentThrottleTimer = null;
+                const taskIds = [...this.pendingTaskUpdates];
+                this.pendingTaskUpdates.clear();
+                for (const tid of taskIds) {
+                    const e = this.taskAgentMap.get(tid);
+                    if (e) {
+                        this.sendUpdateMessage(e.msg.id, e.msg.content);
+                    }
+                }
+            }, 1000);
+        }
     }
 
     /**
@@ -689,7 +787,12 @@ export class SemaCoreWrapper {
         this.title = '';
         this.taskAgentMap.clear();
         this.streamingToolMap.clear();
-        this.currentStreamingMessage = null;
+        this.streamingAssistantMap.clear();
+        this.pendingTaskUpdates.clear();
+        if (this.taskAgentThrottleTimer) {
+            clearTimeout(this.taskAgentThrottleTimer);
+            this.taskAgentThrottleTimer = null;
+        }
         this.sendContentUpdate();
     }
 
@@ -872,7 +975,7 @@ export class SemaCoreWrapper {
         }
 
         this.messageHistory.push(message);
-        this.sendContentUpdate();
+        this.sendAppendMessages([message]);
     }
 
     // ===== 插件市场管理相关方法 =====
@@ -1019,15 +1122,10 @@ export class SemaCoreWrapper {
     public dispose(): void {
         try {
             this.semaCore.dispose();
-
-            this.messageHistory = [];
+            this.clearMessageHistory();
             this.currentState = 'idle';
             this.sessionReady = false;
             this.currentSessionId = null;
-            this.currentStreamingMessage = null;
-            this.title = '';
-            this.taskAgentMap.clear();
-            this.streamingToolMap.clear();
             this.callbacks = {};
         } catch (error) {
             console.error('Error disposing SemaCoreWrapper:', error);

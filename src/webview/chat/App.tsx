@@ -1,31 +1,22 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { FileChange, TokenInfo, AppProps, SelectedFile, TodoItem, Message } from './types';
 import InputBox, { InputBoxHandle } from './components/input/InputBox';
+import MessageItem from './MessageItem';
 
-import EditBlock from './blocks/tools/EditBlock';
-import NotebookEditBlock from './blocks/tools/NotebookEditBlock';
-import ReadBlock from './blocks/tools/ReadBlock';
-import PubBlock from './blocks/tools/PubBlock';
-import BashBlock from './blocks/tools/BashBlock';
-import TaskBlock from './blocks/tools/TaskBlock';
-import ToolErrorBlock from './blocks/ToolErrorBlock';
 import FileChangesPanel from './components/panels/FileChangesPanel';
 import TodosPanel from './components/panels/TodosPanel';
-import UserInputBlock from './blocks/UserInputBlock';
-import AiResponseBlock from './blocks/AiResponseBlock';
-import ThoughtBlock from './blocks/ThoughtBlock';
 import Welcome from './components/panels/Welcome';
 import PermissionDialog from './components/permission/PermissionDialog';
 import AskQuestionDialog from './components/ui/AskQuestionDialog';
 import PlanExitDialog from './components/ui/PlanExitDialog';
-import PlanImplementPanel from './components/ui/PlanImplementPanel';
-import SupplementaryInfo from './components/ui/SupplementaryInfo';
-import PermissionRequestBlock from './components/permission/PermissionRequestBlock';
 import ProcessingSpinner from './components/ui/ProcessingSpinner';
 import ModelConfigReminder from './components/ui/ModelConfigReminder';
 
 const App: React.FC<AppProps> = ({ vscode }) => {
     const [messages, setMessages] = useState<Message[]>([]);
+    const [streamingContent, setStreamingContent] = useState<{ id: string; content?: string; reasoning?: string } | null>(null);
+    const [streamingToolContent, setStreamingToolContent] = useState<{ id: string; toolContent: any } | null>(null);
+    const messagesRef = useRef<Message[]>([]);
     const [progressMessage, setProgressMessage] = useState<string>('');
     const [tokenInfo, setTokenInfo] = useState<TokenInfo>({ useTokens: 0, maxTokens: 0, promptTokens: 0 });
     const [inputDisabled, setInputDisabled] = useState<boolean>(true);
@@ -48,6 +39,7 @@ const App: React.FC<AppProps> = ({ vscode }) => {
     const inputBoxRef = useRef<InputBoxHandle>(null);
     const userScrolledUpRef = useRef<boolean>(false);
     const spinnerStartTimeRef = useRef<number>(0);
+    const prevMessagesLenRef = useRef<number>(0);
 
     const handleFileChange = useCallback(async (change: FileChange) => {
         // console.log('app触发handleFileChange')
@@ -97,8 +89,73 @@ const App: React.FC<AppProps> = ({ vscode }) => {
             switch (message.type) {
                 case 'updateContent':
                    // console.log('updateContent:', message)
+                    messagesRef.current = (message.messages || []).slice();
                     setMessages(message.messages || []);
                     break;
+                case 'appendMessages': {
+                    const newMsgs = message.messages || [];
+                    messagesRef.current = [...messagesRef.current, ...newMsgs];
+                    setMessages([...messagesRef.current]);
+                    break;
+                }
+                case 'updateMessage': {
+                    const updateIdx = messagesRef.current.findIndex(m => m.id === message.id);
+                    if (updateIdx >= 0) {
+                        messagesRef.current[updateIdx] = { ...messagesRef.current[updateIdx], content: message.content };
+                        setMessages([...messagesRef.current]);
+                    }
+                    break;
+                }
+                case 'chunkUpdate': {
+                    const msgIndex = messagesRef.current.findIndex(m => m.id === message.id);
+                    if (msgIndex >= 0) {
+                        const msg = messagesRef.current[msgIndex];
+                        messagesRef.current[msgIndex] = {
+                            ...msg,
+                            ...(message.content !== undefined && {
+                                content: { ...msg.content, content: message.content, completed: false }
+                            }),
+                            ...(message.reasoning !== undefined && { reasoning: message.reasoning })
+                        };
+                    }
+                    setStreamingContent({ id: message.id, content: message.content, reasoning: message.reasoning });
+                    // 流式输出时主动滚动到底部（不走 useEffect）
+                    if (!userScrolledUpRef.current && outputContainerRef.current) {
+                        outputContainerRef.current.scrollTop = outputContainerRef.current.scrollHeight;
+                    }
+                    break;
+                }
+                case 'completeUpdate': {
+                    const msgIndex = messagesRef.current.findIndex(m => m.id === message.id);
+                    if (msgIndex >= 0) {
+                        const msg = messagesRef.current[msgIndex];
+                        messagesRef.current[msgIndex] = {
+                            ...msg,
+                            ...(message.content !== undefined && { content: message.content }),
+                            ...(message.reasoning !== undefined && { reasoning: message.reasoning })
+                        };
+                    }
+                    setStreamingContent(null);
+                    setMessages([...messagesRef.current]);
+                    break;
+                }
+                case 'toolChunkUpdate': {
+                    const msgIndex = messagesRef.current.findIndex(m => m.id === message.id);
+                    if (msgIndex >= 0) {
+                        const msg = messagesRef.current[msgIndex];
+                        messagesRef.current[msgIndex] = {
+                            ...msg,
+                            content: message.toolContent
+                        };
+                    }
+                    // 不调用 setMessages，通过专门的 state 触发仅 BashBlock 更新
+                    setStreamingToolContent({ id: message.id, toolContent: message.toolContent });
+                    // 自动滚动
+                    if (!userScrolledUpRef.current && outputContainerRef.current) {
+                        outputContainerRef.current.scrollTop = outputContainerRef.current.scrollHeight;
+                    }
+                    break;
+                }
                 case 'showProgress':
                     setProgressMessage(message.message);
                     break;
@@ -271,15 +328,13 @@ const App: React.FC<AppProps> = ({ vscode }) => {
 
     useEffect(() => {
         scrollToBottom();
-        // 应用代码高亮
-        if (window.hljs) {
-            outputContainerRef.current?.querySelectorAll('pre code').forEach((block) => {
-                // 只对未高亮的元素进行高亮处理，避免 "Element previously highlighted" 警告
-                if (!block.classList.contains('hljs')) {
-                    window.hljs.highlightElement(block);
-                }
+        // 只在消息数量增加时应用代码高亮，避免全量遍历
+        if (window.hljs && outputContainerRef.current && messages.length > prevMessagesLenRef.current) {
+            outputContainerRef.current.querySelectorAll('pre code:not(.hljs)').forEach((block) => {
+                window.hljs.highlightElement(block);
             });
         }
+        prevMessagesLenRef.current = messages.length;
     }, [messages]);
 
     // 当显示权限对话框时，确保对话框完全可见并应用代码高亮
@@ -496,63 +551,6 @@ const App: React.FC<AppProps> = ({ vscode }) => {
         });
     };
 
-    // 工具消息渲染函数
-    const renderToolMessage = useCallback((
-        message: Message,
-        key: string,
-        shouldReportChange: boolean,
-        forceClose?: boolean
-    ) => {
-
-        // 根据工具类型选择组件
-        switch (message.toolName) {
-            case 'Write':
-            case 'Edit':
-                return (
-                    <EditBlock
-                        key={key}
-                        content={message.content}
-                        vscode={vscode}
-                        onFileChange={shouldReportChange ? handleFileChange : undefined}
-                    />
-                );
-
-            case 'NotebookEdit':
-                return (
-                    <NotebookEditBlock
-                        key={key}
-                        content={message.content}
-                        vscode={vscode}
-                        onFileChange={shouldReportChange ? handleFileChange : undefined}
-                    />
-                );
-
-            case 'TodoWrite':
-                return;
-
-            case 'Read':
-            case 'NotebookRead':
-                return <ReadBlock key={key} content={message.content} vscode={vscode} />;
-
-            case 'Bash':
-                return <BashBlock key={key} content={message.content} vscode={vscode} />;
-
-            case 'Task':
-                return (
-                    <TaskBlock
-                        key={key}
-                        content={message.content}
-                        vscode={vscode}
-                        forceClose={forceClose}
-                    />
-                );
-
-            default:
-                return <PubBlock key={key} content={message.content} vscode={vscode} />;
-
-        }
-    }, [vscode, handleFileChange]);
-
     // 使用 useMemo 缓存渲染内容，避免不必要的重新计算
     const renderedContent = useMemo(() => {
         if (!messages || messages.length === 0) {
@@ -574,92 +572,20 @@ const App: React.FC<AppProps> = ({ vscode }) => {
             }
         }
 
-        return messages.map((message, index) => {
-            const key = message.id;
-            const shouldReportChange = index > lastUserInputIndex;
-
-            switch (message.type) {
-                case 'user':
-                    return <UserInputBlock key={key} content={message.content} />;
-                case 'assistant':
-                    // 检查是否有 reasoning（思考过程）
-                    const hasReasoning = !!(message.reasoning && message.reasoning.trim().length > 0);
-                    const hasContent = message.content && message.content.content && message.content.content.trim().length > 0;
-                    // 判断是否处于 thinking 阶段：有 reasoning 但还没有 text content 且未完成
-                    const isThinking = hasReasoning && !hasContent && !message.content.completed;
-
-                    return (
-                        <React.Fragment key={key}>
-                            {/* 渲染思考过程（如果存在） */}
-                            {hasReasoning && (
-                                <ThoughtBlock
-                                    content={message.reasoning || ''}
-                                    isThinking={isThinking}
-                                />
-                            )}
-
-                            {/* 渲染 AI 响应内容（只有当有内容时才渲染） */}
-                            {hasContent && (
-                                <AiResponseBlock
-                                    content={message.content.content}
-                                    isStreaming={!message.content.completed}
-                                    vscode={vscode}
-                                />
-                            )}
-                        </React.Fragment>
-                    );
-
-                case 'tool':
-                    return renderToolMessage(message, key, shouldReportChange, !!toolPermissionData);
-
-                case 'permission_request':
-                    return (
-                        <PermissionRequestBlock
-                            key={key}
-                            permissionData={message.content}
-                        />
-                    );
-
-                case 'system':
-                    if (message.content.type === 'interrupted') {
-                        const USER_INTERRUPT_MESSAGE = '[Request interrupted by user]';
-                        if (message.content.content === USER_INTERRUPT_MESSAGE) {
-                            return <SupplementaryInfo key={key} items={['interrupted']} />;
-                        }
-                        return null;
-                    }
-                    else if (message.content.type === 'tool_error') {
-                        return (
-                            <ToolErrorBlock
-                                key={key}
-                                toolName={message.content.toolName || ''}
-                                title={message.content.title || ''}
-                                content={message.content.content || ''}
-                            />
-                        );
-                    }
-                    else if (['compact', 'clear', 'session_error'].includes(message.content.type)) {
-                        return <SupplementaryInfo key={key} items={[message.content.content]} />
-                    }
-                    else if (message.content.type === 'file_reference') {
-                        return <SupplementaryInfo key={key} items={message.content.content || []} />
-                    }
-                    else if (message.content.type === 'plan_implement') {
-                        return (
-                            <PlanImplementPanel
-                                key={key}
-                                planFilePath={message.content.planFilePath}
-                                planContent={message.content.planContent}
-                                vscode={vscode}
-                            />
-                        );
-                    }
-
-                default:
-                    return null;
-            }
-        });
-    }, [messages, modelName, availableModels, toolPermissionData, processingState]);
+        return messages.map((message, index) => (
+            <div key={message.id} className="msg-wrap">
+                <MessageItem
+                    message={message}
+                    shouldReportChange={index > lastUserInputIndex}
+                    toolPermissionData={toolPermissionData}
+                    vscode={vscode}
+                    onFileChange={handleFileChange}
+                    streamingContent={streamingContent}
+                    streamingToolContent={streamingToolContent}
+                />
+            </div>
+        ));
+    }, [messages, modelName, availableModels, toolPermissionData, processingState, streamingContent, streamingToolContent]);
 
     return (
         <>
@@ -713,8 +639,8 @@ const App: React.FC<AppProps> = ({ vscode }) => {
                     />
                 )}
             </div>
-            <TodosPanel todos={todos} />
-            <FileChangesPanel changes={fileChanges} vscode={vscode} />
+            <TodosPanel todos={todos} onScrollToBottom={scrollToBottom} />
+            <FileChangesPanel changes={fileChanges} vscode={vscode} onScrollToBottom={scrollToBottom} />
             <InputBox
                 ref={inputBoxRef}
                 vscode={vscode}

@@ -53,4 +53,4 @@ const PermissionRequestBlock: React.FC<PermissionRequestBlockProps> = ({ permiss
     );
 };
 
-export default PermissionRequestBlock;
+export default React.memo(PermissionRequestBlock);

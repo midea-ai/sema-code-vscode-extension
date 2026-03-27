@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { VscodeApi, FileChange } from '../../types';
 import { CheckIcon, ToggleIcon, CancelCircleIcon } from '../ui/IconButton';
 import FileIcon from '../ui/FileIcon';
@@ -10,9 +10,10 @@ interface FileChangesPanelProps {
     onDiscardAll?: () => void;
     onMarkAdopted?: () => void;
     fileStateManager?: any;
+    onScrollToBottom?: () => void;
 }
 
-const FileChangesPanel: React.FC<FileChangesPanelProps> = ({ changes, vscode, onDiscardAll, onMarkAdopted, fileStateManager }) => {
+const FileChangesPanel: React.FC<FileChangesPanelProps> = ({ changes, vscode, onDiscardAll, onMarkAdopted, fileStateManager, onScrollToBottom }) => {
     const [isExpanded, setIsExpanded] = useState(true);
 
     // 按完整路径对文件进行去重，保留最新的文件变更
@@ -26,6 +27,13 @@ const FileChangesPanel: React.FC<FileChangesPanelProps> = ({ changes, vscode, on
         }
         return acc;
     }, []);
+
+    useEffect(() => {
+        if (isExpanded && onScrollToBottom) {
+            const timer = setTimeout(onScrollToBottom, 50);
+            return () => clearTimeout(timer);
+        }
+    }, [uniqueChanges.length]);
 
     if (uniqueChanges.length === 0) {
         return null;

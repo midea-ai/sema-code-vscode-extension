@@ -3,7 +3,7 @@ import * as crypto from 'crypto';
 import { FileStateDiffManager } from '../../managers/FileStateDiffManager';
 import { FileOperationManager } from '../../managers/FileOperationManager';
 import { SemaCoreWrapper } from '../../core/semaCoreWrapper';
-import { transformCommandToPrompt } from '../../core/util/prompt';
+import { transformCommandToPrompt } from '../../utils/prompt';
 
 /**
  * ChatWebviewProvider - 管理聊天界面 Webview，直接处理所有消息

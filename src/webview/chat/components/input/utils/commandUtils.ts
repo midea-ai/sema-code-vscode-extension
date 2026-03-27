@@ -1,4 +1,4 @@
-import { BUILTIN_SHORTCUT_COMMANDS, ShortcutCommand } from '../../../../../core/util/command';
+import { BUILTIN_SHORTCUT_COMMANDS, ShortcutCommand } from '../../../../../utils/command';
 import { CommandConfig } from '../../../../config/types/command';
 
 // 存储自定义命令（由后端推送更新）

@@ -25,9 +25,9 @@ interface FileChangeStats {
 }
 
 interface FileSnapshot {
-    content?: string;
     hash: string;
     size: number;
+    tempPath: string; // 快照内容写入临时文件，避免占用内存
 }
 
 /**
@@ -53,6 +53,7 @@ export class FileStateDiffManager {
     private _inlineDiffConfigured = false;
 
     private workingDir: string;
+    private tempDir: string;
 
     // 性能配置
     private static readonly MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
@@ -62,6 +63,12 @@ export class FileStateDiffManager {
         private readonly openFileAtLine: (filePath: string, line?: number) => Promise<void>
     ) {
         this.workingDir = workingDir;
+        this.tempDir = this.createTempDir();
+    }
+
+    private createTempDir(): string {
+        const os = require('os');
+        return path.join(os.tmpdir(), 'sema-snapshots', Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 7));
     }
 
     /**
@@ -113,11 +120,22 @@ export class FileStateDiffManager {
     public async createSnapshot(): Promise<void> {
         this.cleanupAllListeners();
         this.cleanupAllDiffViews();
+        await this.cleanupTempDir();
         this.fileSnapshots.clear();
+        this.tempDir = this.createTempDir();
+    }
+
+    private async cleanupTempDir(): Promise<void> {
+        try {
+            await fs.promises.rm(this.tempDir, { recursive: true, force: true });
+        } catch {
+            // ignore
+        }
     }
 
     /**
      * 懒加载：仅在首次访问时将文件加入快照
+     * 内容写入临时文件，内存中只保留 hash 和路径
      */
     public async addFileToSnapshotIfNew(filePath: string): Promise<void> {
         const fullPath = this.resolveFilePath(filePath);
@@ -130,9 +148,28 @@ export class FileStateDiffManager {
 
             const content = await fs.promises.readFile(fullPath, 'utf8');
             const hash = this.generateFileHash(content);
-            this.fileSnapshots.set(fullPath, { hash, size: stat.size, content });
+
+            await fs.promises.mkdir(this.tempDir, { recursive: true });
+            const tempFileName = crypto.createHash('md5').update(fullPath).digest('hex');
+            const tempPath = path.join(this.tempDir, tempFileName);
+            await fs.promises.writeFile(tempPath, content, 'utf8');
+
+            this.fileSnapshots.set(fullPath, { hash, size: stat.size, tempPath });
         } catch {
             // 文件不存在（新建文件场景），跳过
+        }
+    }
+
+    /**
+     * 读取快照原始内容（从临时文件）
+     */
+    private async readSnapshotContent(fullPath: string): Promise<string> {
+        const snapshot = this.fileSnapshots.get(fullPath);
+        if (!snapshot) return '';
+        try {
+            return await fs.promises.readFile(snapshot.tempPath, 'utf8');
+        } catch {
+            return '';
         }
     }
 
@@ -225,8 +262,7 @@ export class FileStateDiffManager {
         fullPath: string,
         source: 'editor' | 'disk'
     ): Promise<{ originalContent: string; currentContent: string }> {
-        const snapshot = this.fileSnapshots.get(fullPath);
-        const originalContent = snapshot?.content ?? '';
+        const originalContent = await this.readSnapshotContent(fullPath);
 
         let currentContent: string;
         try {
@@ -378,8 +414,13 @@ export class FileStateDiffManager {
                 const fullPath = this.resolveFilePath(targetPath);
                 const snapshot = this.fileSnapshots.get(fullPath);
 
-                if (snapshot?.content) {
-                    filesToRevert.set(fullPath, snapshot.content);
+                if (snapshot) {
+                    const content = await this.readSnapshotContent(fullPath);
+                    if (content) {
+                        filesToRevert.set(fullPath, content);
+                    } else {
+                        console.warn(`找不到文件或其快照: ${targetPath}`);
+                    }
                 } else {
                     try {
                         await vscode.workspace.fs.stat(vscode.Uri.file(fullPath));
@@ -390,9 +431,10 @@ export class FileStateDiffManager {
                 }
             }
         } else {
-            for (const [snapPath, snapshot] of this.fileSnapshots) {
-                if (snapshot.content) {
-                    filesToRevert.set(snapPath, snapshot.content);
+            for (const [snapPath] of this.fileSnapshots) {
+                const content = await this.readSnapshotContent(snapPath);
+                if (content) {
+                    filesToRevert.set(snapPath, content);
                 }
             }
         }
@@ -651,6 +693,8 @@ export class FileStateDiffManager {
         this.sharedPermissionDiffProviderDisposable = null;
         this.sharedPermissionDiffProvider?.dispose();
         this.sharedPermissionDiffProvider = null;
+
+        this.cleanupTempDir(); // fire-and-forget
     }
 }
 
