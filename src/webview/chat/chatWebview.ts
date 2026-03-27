@@ -64,9 +64,13 @@ export class ChatWebviewProvider {
         this.postMessage({ type: 'closePermissionPanel' });
         this.postMessage({ type: 'closeAskQuestionPanel' });
         this.postMessage({ type: 'closePlanExitPanel' });
-        this.postMessage({ type: 'clearFileChanges' });
         this.postMessage({ type: 'clearTodos' });
         this.postMessage({ type: 'clearPendingInputs' });
+    }
+
+    public clearSessionPanels(): void {
+        this.clearAllPanels();
+        this.postMessage({ type: 'clearFileChanges' });
     }
 
     // ─── Message handlers ────────────────────────────────────────────────────
@@ -78,7 +82,6 @@ export class ChatWebviewProvider {
 
     private async handleUserInput(text: string, files?: Array<any>): Promise<void> {
         try {
-            await this.fileStateDiffManager.createSnapshot();
 
             let content = text;
             if (files && files.length > 0) {

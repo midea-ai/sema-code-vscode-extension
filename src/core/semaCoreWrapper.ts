@@ -70,6 +70,7 @@ export interface SemaWrapperCallbacks {
     onMCPServerStatus?: (data: MCPServerStatusData) => void;
     onInputReceived?: (data: InputReceivedData) => void;
     onInputProcessing?: (data: InputProcessingData) => void;
+    onToolExecutionComplete?: (data: ToolExecutionCompleteData & { agentId?: string }) => void;
 }
 
 export interface Message {
@@ -439,6 +440,8 @@ export class SemaCoreWrapper {
         });
 
         this.semaCore.on<ToolExecutionCompleteData & { agentId?: string }>('tool:execution:complete', (data) => {
+            this.callbacks.onToolExecutionComplete?.(data);
+
             if (this.isSubAgent(data.agentId)) {
                 this.addMessageToTaskAgent(data.agentId!, {
                     id: this.generateId(),

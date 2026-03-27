@@ -362,7 +362,6 @@ const App: React.FC<AppProps> = ({ vscode }) => {
             // 只有在非处理状态时才重置计时和清空列表
             setSpinnerAccumulatedSeconds(0);
             spinnerStartTimeRef.current = 0;
-            setFileChanges([]);
             setTodos([]);
         }
         vscode.postMessage({

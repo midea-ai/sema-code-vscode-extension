@@ -3,7 +3,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as diff from 'diff';
 import * as crypto from 'crypto';
-import { EXCLUDED_NAMES, EXCLUDE_GLOB, EXCLUDED_FILES, EXCLUDED_EXTENSIONS } from '../utils/fileExcludePatterns';
+import { EXCLUDED_EXTENSIONS } from '../utils/fileExcludePatterns';
 
 // 权限 diff 数据类型
 interface PermissionDiffContent {
@@ -16,8 +16,6 @@ interface PermissionDiffContent {
 interface DiffViewInfo {
     originalUri: vscode.Uri;
     currentUri: vscode.Uri;
-    disposable: vscode.Disposable;
-    provider: SnapshotContentProvider;
 }
 
 interface FileChangeStats {
@@ -38,14 +36,26 @@ interface FileSnapshot {
  */
 export class FileStateDiffManager {
     private fileSnapshots: Map<string, FileSnapshot> = new Map();
-    private activeEditorListeners: Map<string, vscode.Disposable> = new Map();
     private diffViewURIs: Map<string, DiffViewInfo> = new Map();
+
+    // 共享 snapshot provider，避免多文件 diff 时 scheme 冲突（每文件注册同一 scheme 会导致内容错乱）
+    private sharedSnapshotProvider: MultiUriContentProvider | null = null;
+    private snapshotProviderDisposable: vscode.Disposable | null = null;
+
+    // permission diff provider（修复 disposable 泄漏）
     private sharedPermissionDiffProvider: MultiUriContentProvider | null = null;
+    private sharedPermissionDiffProviderDisposable: vscode.Disposable | null = null;
+
+    // 单一全局 diff 视图关闭监听器，替代 per-file 监听器，减少事件触发开销
+    private globalDiffViewListener: vscode.Disposable | null = null;
+
+    // inline diff 配置是否已写入，避免每次打开 diff 都触发配置读写
+    private _inlineDiffConfigured = false;
+
     private workingDir: string;
 
     // 性能配置
-    private static readonly MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
-    private static readonly CONCURRENT_READS = 50;
+    private static readonly MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
 
     constructor(
         workingDir: string,
@@ -87,25 +97,6 @@ export class FileStateDiffManager {
     }
 
     /**
-     * 批量处理文件，控制并发数量
-     */
-    private async processBatch<T, R>(
-        items: T[],
-        processor: (item: T) => Promise<R>,
-        batchSize: number = FileStateDiffManager.CONCURRENT_READS
-    ): Promise<R[]> {
-        const results: R[] = [];
-
-        for (let i = 0; i < items.length; i += batchSize) {
-            const batch = items.slice(i, i + batchSize);
-            const batchResults = await Promise.all(batch.map(processor));
-            results.push(...batchResults);
-        }
-
-        return results;
-    }
-
-    /**
      * 统一错误处理
      */
     private handleError(message: string, error: unknown): void {
@@ -117,119 +108,52 @@ export class FileStateDiffManager {
     }
 
     /**
-     * 创建完整文件快照
+     * 重置快照状态（清空快照和监听器）
      */
     public async createSnapshot(): Promise<void> {
         this.cleanupAllListeners();
+        this.cleanupAllDiffViews();
         this.fileSnapshots.clear();
-
-        const files = await this.getWorkspaceFiles();
-
-        await this.processBatch(files, async (file) => {
-            try {
-                const stat = await vscode.workspace.fs.stat(file);
-
-                if (this.shouldSkipFile(file, stat.size)) {
-                    return;
-                }
-
-                const content = await fs.promises.readFile(file.fsPath, 'utf8');
-                const hash = this.generateFileHash(content);
-
-                const snapshot: FileSnapshot = {
-                    hash,
-                    size: stat.size,
-                    content: stat.size <= FileStateDiffManager.MAX_FILE_SIZE ? content : undefined
-                };
-
-                this.fileSnapshots.set(file.fsPath, snapshot);
-            } catch (error) {
-                // 文件读取失败，跳过
-            }
-        });
     }
 
     /**
-     * 清理所有活跃的监听器
+     * 懒加载：仅在首次访问时将文件加入快照
      */
-    private cleanupAllListeners(): void {
-        for (const listener of this.activeEditorListeners.values()) {
-            listener.dispose();
-        }
-        this.activeEditorListeners.clear();
-    }
-
-    /**
-     * 清理所有diff视图
-     */
-    private cleanupAllDiffViews(): void {
-        for (const diffView of this.diffViewURIs.values()) {
-            diffView.disposable.dispose();
-            diffView.provider.dispose();
-        }
-        this.diffViewURIs.clear();
-    }
-
-    /**
-     * 获取工作区文件
-     */
-    private async getWorkspaceFiles(): Promise<vscode.Uri[]> {
-        const files: vscode.Uri[] = [];
-        const MAX_FILES = 5000;
-
-        const workspaceUri = vscode.Uri.file(this.workingDir);
-        const pattern = new vscode.RelativePattern(workspaceUri, '**/*');
+    public async addFileToSnapshotIfNew(filePath: string): Promise<void> {
+        const fullPath = this.resolveFilePath(filePath);
+        if (this.fileSnapshots.has(fullPath)) return;
 
         try {
-            const uris = await vscode.workspace.findFiles(pattern, EXCLUDE_GLOB, MAX_FILES * 10);
+            const fileUri = vscode.Uri.file(fullPath);
+            const stat = await vscode.workspace.fs.stat(fileUri);
+            if (this.shouldSkipFile(fileUri, stat.size)) return;
 
-            const filteredUris = uris.filter(uri => {
-                const filePath = uri.path;
-                const fileName = filePath.split('/').pop() || '';
-                const ext = fileName.includes('.') ? '.' + fileName.split('.').pop() : '';
-
-                if (EXCLUDED_FILES.has(fileName)) {
-                    return false;
-                }
-
-                if (EXCLUDED_EXTENSIONS.has(ext.toLowerCase())) {
-                    return false;
-                }
-
-                const pathParts = filePath.split('/');
-                for (const dir of pathParts) {
-                    if (EXCLUDED_NAMES.has(dir)) {
-                        return false;
-                    }
-                }
-
-                return true;
-            });
-
-            // 按路径深度排序
-            const sortedUris = filteredUris.sort((a, b) =>
-                a.path.split('/').length - b.path.split('/').length
-            );
-
-            for (const uri of sortedUris) {
-                if (files.length >= MAX_FILES) {
-                    break;
-                }
-
-                try {
-                    const stat = await vscode.workspace.fs.stat(uri);
-                    if (stat.type === vscode.FileType.File) {
-                        files.push(uri);
-                    }
-                } catch (error) {
-                    // 忽略无法访问的文件
-                }
-            }
-        } catch (error) {
-            console.warn(`搜索工作区文件时出错: ${this.workingDir}`, error);
+            const content = await fs.promises.readFile(fullPath, 'utf8');
+            const hash = this.generateFileHash(content);
+            this.fileSnapshots.set(fullPath, { hash, size: stat.size, content });
+        } catch {
+            // 文件不存在（新建文件场景），跳过
         }
+    }
 
-        return files;
+    /**
+     * 清理全局监听器
+     */
+    private cleanupAllListeners(): void {
+        this.globalDiffViewListener?.dispose();
+        this.globalDiffViewListener = null;
+    }
+
+    /**
+     * 清理所有diff视图，同步清理 sharedSnapshotProvider 中的内容
+     */
+    private cleanupAllDiffViews(): void {
+        if (this.sharedSnapshotProvider) {
+            for (const diffView of this.diffViewURIs.values()) {
+                this.sharedSnapshotProvider.removeContent(diffView.originalUri);
+            }
+        }
+        this.diffViewURIs.clear();
     }
 
     /**
@@ -321,6 +245,8 @@ export class FileStateDiffManager {
 
     /**
      * 创建并显示 diff 视图
+     * 使用共享 MultiUriContentProvider 替代 per-file SnapshotContentProvider，
+     * 避免多文件同时 diff 时同一 scheme 注册多次导致内容错乱
      */
     private async createDiffView(
         fullPath: string,
@@ -332,20 +258,13 @@ export class FileStateDiffManager {
         const currentUri = vscode.Uri.file(fullPath);
         const originalUri = vscode.Uri.parse(`snapshot:${fullPath}`);
 
-        const existingDiffView = this.diffViewURIs.get(fullPath);
-        let provider: SnapshotContentProvider;
-        let disposable: vscode.Disposable;
-
-        if (existingDiffView) {
-            provider = existingDiffView.provider;
-            provider.updateContent(originalContent, originalUri);
-            disposable = existingDiffView.disposable;
-        } else {
-            provider = new SnapshotContentProvider(originalContent);
-            disposable = vscode.workspace.registerTextDocumentContentProvider('snapshot', provider);
+        if (!this.sharedSnapshotProvider) {
+            this.sharedSnapshotProvider = new MultiUriContentProvider();
+            this.snapshotProviderDisposable = vscode.workspace.registerTextDocumentContentProvider('snapshot', this.sharedSnapshotProvider);
         }
 
-        this.diffViewURIs.set(fullPath, { originalUri, currentUri, disposable, provider });
+        this.sharedSnapshotProvider.setContent(originalUri, originalContent);
+        this.diffViewURIs.set(fullPath, { originalUri, currentUri });
 
         await this.ensureInlineDiffConfig();
         await vscode.commands.executeCommand(
@@ -360,43 +279,54 @@ export class FileStateDiffManager {
             }
         );
 
-        this.setupDiffViewListener(fullPath, originalUri, currentUri);
+        this.setupGlobalDiffViewListener();
     }
 
     /**
-     * 设置 diff 视图的关闭监听器
+     * 设置单一全局 diff 视图关闭监听器
+     * 替代原来每个文件各注册一个 onDidChangeVisibleTextEditors，
+     * 所有 diff 共享一个监听器，编辑器切换时只触发一次
      */
-    private setupDiffViewListener(fullPath: string, originalUri: vscode.Uri, currentUri: vscode.Uri): void {
-        const existingListener = this.activeEditorListeners.get(fullPath);
-        if (existingListener) {
-            existingListener.dispose();
-        }
+    private setupGlobalDiffViewListener(): void {
+        if (this.globalDiffViewListener) return;
 
-        const disposableListener = vscode.window.onDidChangeVisibleTextEditors(editors => {
-            const diffStillOpen = editors.some(editor =>
-                editor.document.uri.toString() === originalUri.toString() ||
-                editor.document.uri.toString() === currentUri.toString()
-            );
+        this.globalDiffViewListener = vscode.window.onDidChangeVisibleTextEditors(editors => {
+            const visibleUris = new Set(editors.map(e => e.document.uri.toString()));
 
-            if (!diffStillOpen) {
+            const toCleanup: string[] = [];
+            for (const [fullPath, diffView] of this.diffViewURIs) {
+                const stillOpen =
+                    visibleUris.has(diffView.originalUri.toString()) ||
+                    visibleUris.has(diffView.currentUri.toString());
+                if (!stillOpen) {
+                    toCleanup.push(fullPath);
+                }
+            }
+
+            for (const fullPath of toCleanup) {
                 this.cleanupDiffView(fullPath);
-                disposableListener.dispose();
-                this.activeEditorListeners.delete(fullPath);
+            }
+
+            // 所有 diff 都关闭后，释放监听器本身
+            if (this.diffViewURIs.size === 0) {
+                this.globalDiffViewListener?.dispose();
+                this.globalDiffViewListener = null;
             }
         });
-
-        this.activeEditorListeners.set(fullPath, disposableListener);
     }
 
     /**
      * 确保配置为内联diff模式
+     * 用 _inlineDiffConfigured 标记避免每次打开 diff 都触发一次配置读写
      */
     private async ensureInlineDiffConfig(): Promise<void> {
+        if (this._inlineDiffConfigured) return;
         try {
             const config = vscode.workspace.getConfiguration('diffEditor');
             if (config.get('renderSideBySide') !== false) {
                 await config.update('renderSideBySide', false, vscode.ConfigurationTarget.Global);
             }
+            this._inlineDiffConfigured = true;
         } catch (error) {
             console.warn(`[FileStateDiffManager] 设置diff配置失败:`, error);
         }
@@ -408,15 +338,8 @@ export class FileStateDiffManager {
     private cleanupDiffView(filePath: string): void {
         const diffView = this.diffViewURIs.get(filePath);
         if (diffView) {
-            diffView.disposable.dispose();
-            diffView.provider.dispose();
+            this.sharedSnapshotProvider?.removeContent(diffView.originalUri);
             this.diffViewURIs.delete(filePath);
-        }
-
-        const listener = this.activeEditorListeners.get(filePath);
-        if (listener) {
-            listener.dispose();
-            this.activeEditorListeners.delete(filePath);
         }
     }
 
@@ -621,7 +544,7 @@ export class FileStateDiffManager {
 
             if (!this.sharedPermissionDiffProvider) {
                 this.sharedPermissionDiffProvider = new MultiUriContentProvider();
-                vscode.workspace.registerTextDocumentContentProvider('permission-proposed', this.sharedPermissionDiffProvider);
+                this.sharedPermissionDiffProviderDisposable = vscode.workspace.registerTextDocumentContentProvider('permission-proposed', this.sharedPermissionDiffProvider);
             }
 
             this.sharedPermissionDiffProvider.setContent(proposedUri, proposedContent);
@@ -718,12 +641,22 @@ export class FileStateDiffManager {
         this.cleanupAllListeners();
         this.cleanupAllDiffViews();
         this.fileSnapshots.clear();
+
+        this.snapshotProviderDisposable?.dispose();
+        this.snapshotProviderDisposable = null;
+        this.sharedSnapshotProvider?.dispose();
+        this.sharedSnapshotProvider = null;
+
+        this.sharedPermissionDiffProviderDisposable?.dispose();
+        this.sharedPermissionDiffProviderDisposable = null;
+        this.sharedPermissionDiffProvider?.dispose();
         this.sharedPermissionDiffProvider = null;
     }
 }
 
 /**
- * 多 URI 内容提供者 - 支持按 URI 存储不同内容，用于 permission-diff scheme
+ * 多 URI 内容提供者 - 支持按 URI 存储不同内容
+ * 同时用于 snapshot scheme 和 permission-proposed scheme
  */
 class MultiUriContentProvider implements vscode.TextDocumentContentProvider {
     private contentMap: Map<string, string> = new Map();
@@ -735,33 +668,16 @@ class MultiUriContentProvider implements vscode.TextDocumentContentProvider {
         this._onDidChange.fire(uri);
     }
 
+    removeContent(uri: vscode.Uri): void {
+        this.contentMap.delete(uri.toString());
+    }
+
     provideTextDocumentContent(uri: vscode.Uri): string {
         return this.contentMap.get(uri.toString()) ?? '';
-    }
-}
-
-/**
- * 快照内容提供者 - 用于在diff视图中显示快照内容
- */
-class SnapshotContentProvider implements vscode.TextDocumentContentProvider {
-    private content: string;
-    private _onDidChange = new vscode.EventEmitter<vscode.Uri>();
-    readonly onDidChange = this._onDidChange.event;
-
-    constructor(content: string) {
-        this.content = content;
-    }
-
-    updateContent(content: string, uri: vscode.Uri): void {
-        this.content = content;
-        this._onDidChange.fire(uri);
-    }
-
-    provideTextDocumentContent(_uri: vscode.Uri): string {
-        return this.content;
     }
 
     dispose(): void {
         this._onDidChange.dispose();
+        this.contentMap.clear();
     }
 }

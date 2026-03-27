@@ -54,6 +54,7 @@ export class SemaSidebarProvider implements vscode.WebviewViewProvider {
                 onTopicUpdate:            this.handleTopicUpdate,
                 onInputReceived:          this.handleInputReceived,
                 onInputProcessing:        this.handleInputProcessing,
+                onToolExecutionComplete:  this.handleToolExecutionComplete,
             },
             this.systemConfigManager
         );
@@ -95,7 +96,7 @@ export class SemaSidebarProvider implements vscode.WebviewViewProvider {
             await this.sessionHistoryManager.saveSession();
 
             this.coreManager.clearMessageHistory();
-            this.chatWebviewProvider.clearAllPanels();
+            this.chatWebviewProvider.clearSessionPanels();
             this.chatWebviewProvider.postMessage({ type: 'resetTokenInfo' });
             this.chatWebviewProvider.postMessage({ type: 'disableInput', message: '正在初始化 CLI，请稍候...' });
 
@@ -196,6 +197,12 @@ export class SemaSidebarProvider implements vscode.WebviewViewProvider {
         this.chatWebviewProvider?.postMessage({ type: 'inputProcessing', data });
     };
 
+    private handleToolExecutionComplete = (data: any): void => {
+        if (data.toolName === 'Read') {
+            this.fileStateDiffManager.addFileToSnapshotIfNew(data.title);
+        }
+    };
+
     // ─── Session management ───────────────────────────────────────────────────
 
     private async loadHistorySession(sessionId: string): Promise<void> {
@@ -217,7 +224,7 @@ export class SemaSidebarProvider implements vscode.WebviewViewProvider {
             await this.sessionHistoryManager.saveSession();
 
             this.coreManager.clearMessageHistory();
-            this.chatWebviewProvider.clearAllPanels();
+            this.chatWebviewProvider.clearSessionPanels();
 
             if (session.content && session.content.length > 0) {
                 try {
