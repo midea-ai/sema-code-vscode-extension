@@ -2,7 +2,7 @@
   "name": "sema-vscode-extension",
   "displayName": "Sema Code",
   "description": "VSCode integration for code-agent",
-  "version": "1.0.10",
+  "version": "2.0.0",
   "icon": "imgs/icon.png",
   "publisher": "SemaCode",
   "license": "MIT",
@@ -112,6 +112,6 @@
     "adm-zip": "^0.5.16",
     "diff": "^8.0.2",
     "dompurify": "^3.3.1",
-    "sema-core": "^1.0.10"
+    "sema-core": "^1.0.11"
   }
 }
