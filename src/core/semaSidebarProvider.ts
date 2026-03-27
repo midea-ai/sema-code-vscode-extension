@@ -206,6 +206,7 @@ export class SemaSidebarProvider implements vscode.WebviewViewProvider {
 
     private handleSessionCleared = (): void => {
         this.fileStateDiffManager.createSnapshot();
+        this.chatWebviewProvider.clearSessionPanels();
     };
 
     // ─── Session management ───────────────────────────────────────────────────
