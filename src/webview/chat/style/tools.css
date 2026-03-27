@@ -404,8 +404,8 @@
 
 /* Tool Error Block 样式 */
 .tool-error-block {
-    margin: 5px;
-    width: 100%;
+    margin: 8px;
+    width: calc(100% - 10px);
     max-width: calc(100% - 10px); /* 减去左右margin的空间 */
     box-sizing: border-box;
 }

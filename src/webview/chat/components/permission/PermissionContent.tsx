@@ -195,11 +195,10 @@ const PermissionContent: React.FC<PermissionContentProps> = ({
 
         const handleFileClick = () => {
             if (vscode && fileName) {
-                const firstLine = diffContent?.patch?.[0]?.newStart ?? 1;
                 vscode.postMessage({
-                    type: 'openFile',
+                    type: 'showPermissionDiff',
                     filePath: fileName,
-                    line: firstLine
+                    diffContent: diffContent
                 });
             }
         };
@@ -211,8 +210,8 @@ const PermissionContent: React.FC<PermissionContentProps> = ({
                     <div className="file-permission-title">
                         <strong className="file-permission-action">{actionLabel}</strong>
                         <div
-                            className={`file-permission-file-left${isUpdate && vscode ? ' file-permission-file-left-clickable' : ''}`}
-                            onClick={isUpdate && vscode ? handleFileClick : undefined}
+                            className={`file-permission-file-left${vscode ? ' file-permission-file-left-clickable' : ''}`}
+                            onClick={vscode ? handleFileClick : undefined}
                         >
                             <FileIcon fileName={displayFileName} isDirectory={false} size={18} />
                             <span className="file-permission-filename">{fileName}</span>

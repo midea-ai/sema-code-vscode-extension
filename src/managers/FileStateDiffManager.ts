@@ -5,6 +5,13 @@ import * as diff from 'diff';
 import * as crypto from 'crypto';
 import { EXCLUDED_NAMES, EXCLUDE_GLOB, EXCLUDED_FILES, EXCLUDED_EXTENSIONS } from '../utils/fileExcludePatterns';
 
+// 权限 diff 数据类型
+interface PermissionDiffContent {
+    type: string;
+    patch: Array<{ oldStart: number; oldLines: number; newStart: number; newLines: number; lines: string[] }>;
+    diffText: string;
+}
+
 // 类型定义
 interface DiffViewInfo {
     originalUri: vscode.Uri;
@@ -33,6 +40,7 @@ export class FileStateDiffManager {
     private fileSnapshots: Map<string, FileSnapshot> = new Map();
     private activeEditorListeners: Map<string, vscode.Disposable> = new Map();
     private diffViewURIs: Map<string, DiffViewInfo> = new Map();
+    private sharedPermissionDiffProvider: MultiUriContentProvider | null = null;
     private workingDir: string;
 
     // 性能配置
@@ -581,12 +589,154 @@ export class FileStateDiffManager {
     }
 
     /**
+     * 显示权限申请中的 diff（inline diff 视图，有语法高亮）
+     */
+    public async showPermissionDiff(filePath: string, diffContent: PermissionDiffContent): Promise<void> {
+        try {
+            const fullPath = this.resolveFilePath(filePath);
+
+            let currentContent: string;
+            let fileExists = true;
+            try {
+                currentContent = await fs.promises.readFile(fullPath, 'utf8');
+            } catch {
+                currentContent = '';
+                fileExists = false;
+            }
+
+            // 从 patch hunks 重建 proposed 内容
+            let proposedContent: string | null;
+            if (diffContent.type === 'new') {
+                proposedContent = this.buildContentFromNewPatch(diffContent.patch);
+            } else {
+                proposedContent = this.applyPatchHunks(currentContent, diffContent.patch);
+            }
+
+            if (proposedContent === null || currentContent === proposedContent) {
+                await this.openFileAtLine(filePath, 1);
+                return;
+            }
+
+            const proposedUri = vscode.Uri.parse(`permission-proposed:${fullPath}`);
+
+            if (!this.sharedPermissionDiffProvider) {
+                this.sharedPermissionDiffProvider = new MultiUriContentProvider();
+                vscode.workspace.registerTextDocumentContentProvider('permission-proposed', this.sharedPermissionDiffProvider);
+            }
+
+            this.sharedPermissionDiffProvider.setContent(proposedUri, proposedContent);
+
+            // 文件不存在时使用虚拟空 URI 作为左侧，避免 "file not found" 错误
+            let currentUri: vscode.Uri;
+            if (fileExists) {
+                currentUri = vscode.Uri.file(fullPath);
+            } else {
+                const emptyUri = vscode.Uri.parse(`permission-proposed:empty:${fullPath}`);
+                this.sharedPermissionDiffProvider.setContent(emptyUri, '');
+                currentUri = emptyUri;
+            }
+
+            await this.ensureInlineDiffConfig();
+            const minLine = diffContent.patch?.[0]?.newStart ?? 1;
+            await vscode.commands.executeCommand(
+                'vscode.diff',
+                currentUri,
+                proposedUri,
+                path.basename(filePath),
+                {
+                    preview: false,
+                    viewColumn: vscode.ViewColumn.Active,
+                    selection: new vscode.Range(Math.max(0, minLine - 1), 0, Math.max(0, minLine - 1), 0)
+                }
+            );
+        } catch (error) {
+            console.error('显示权限diff失败:', error);
+            await this.openFileAtLine(filePath, 1);
+        }
+    }
+
+    /**
+     * 新建文件：从 patch lines 重建文件内容
+     */
+    private buildContentFromNewPatch(
+        patch: Array<{ lines: string[] }>
+    ): string {
+        return patch
+            .flatMap(hunk => hunk.lines)
+            .filter(line => !line.startsWith('-'))
+            .map(line => line.startsWith('+') ? line.slice(1) : line)
+            .join('\n');
+    }
+
+    /**
+     * 将 patch hunks 应用到当前内容，返回变更后的内容；patch 无效时返回 null
+     */
+    private applyPatchHunks(
+        currentContent: string,
+        patch: Array<{ oldStart: number; oldLines: number; newStart: number; newLines: number; lines: string[] }>
+    ): string | null {
+        const currentLines = currentContent.split('\n');
+        const resultLines: string[] = [];
+        let currentLineIndex = 0;
+
+        for (const hunk of patch) {
+            const hunkStart = hunk.oldStart - 1; // 转为 0-based
+
+            if (hunkStart < currentLineIndex || hunkStart > currentLines.length) {
+                return null; // patch 位置对不上，兜底打开文件
+            }
+
+            while (currentLineIndex < hunkStart) {
+                resultLines.push(currentLines[currentLineIndex]);
+                currentLineIndex++;
+            }
+
+            for (const line of hunk.lines) {
+                if (line.startsWith('+')) {
+                    resultLines.push(line.slice(1));
+                } else if (line.startsWith('-')) {
+                    currentLineIndex++;
+                } else {
+                    resultLines.push(line.startsWith(' ') ? line.slice(1) : line);
+                    currentLineIndex++;
+                }
+            }
+        }
+
+        while (currentLineIndex < currentLines.length) {
+            resultLines.push(currentLines[currentLineIndex]);
+            currentLineIndex++;
+        }
+
+        return resultLines.join('\n');
+    }
+
+    /**
      * 清理所有资源（在扩展停用时调用）
      */
     public dispose(): void {
         this.cleanupAllListeners();
         this.cleanupAllDiffViews();
         this.fileSnapshots.clear();
+        this.sharedPermissionDiffProvider = null;
+    }
+}
+
+/**
+ * 多 URI 内容提供者 - 支持按 URI 存储不同内容，用于 permission-diff scheme
+ */
+class MultiUriContentProvider implements vscode.TextDocumentContentProvider {
+    private contentMap: Map<string, string> = new Map();
+    private _onDidChange = new vscode.EventEmitter<vscode.Uri>();
+    readonly onDidChange = this._onDidChange.event;
+
+    setContent(uri: vscode.Uri, content: string): void {
+        this.contentMap.set(uri.toString(), content);
+        this._onDidChange.fire(uri);
+    }
+
+    provideTextDocumentContent(uri: vscode.Uri): string {
+        return this.contentMap.get(uri.toString()) ?? '';
     }
 }
 

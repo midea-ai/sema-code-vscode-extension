@@ -40,6 +40,7 @@ export class ChatWebviewProvider {
                 switchModel:             () => this.switchModel(msg.modelName),
                 restoreFromSnapshots:    () => this.restoreFromSnapshots(msg.filePaths),
                 showFileDiff:            () => this.fileStateDiffManager.showFileDiff(msg.filePath, msg.minLine),
+                showPermissionDiff:      () => this.fileStateDiffManager.showPermissionDiff(msg.filePath, msg.diffContent),
                 getFileChangeStats:      () => this.getFileChangeStats(msg.filePath),
                 searchContentInFiles:    () => this.searchContentInFiles(msg.content),
                 toolPermissionResponse:  () => Promise.resolve(this.handleToolPermissionResponse(msg.response)),
