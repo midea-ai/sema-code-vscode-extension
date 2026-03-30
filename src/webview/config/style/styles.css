@@ -48,7 +48,7 @@ body {
 
 /* 左侧导航栏 */
 .sidebar {
-    width: 110px;
+    width: 130px;
     background: var(--vscode-sideBar-background);
     border-right: 1px solid var(--vscode-panel-border);
     padding: 20px 0;
@@ -91,7 +91,7 @@ body {
     flex: 1;
     overflow-y: auto;
     padding: 20px 24px;
-    margin-left: 110px;
+    margin-left: 130px;
 }
 
 .container {

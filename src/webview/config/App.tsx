@@ -9,7 +9,7 @@ import SkillConfig from './SkillConfig';
 import AgentConfig from './AgentConfig';
 import PluginConfig from './PluginConfig';
 import CommandConfig from './CommandConfig';
-import MemoryConfig from './MemoryConfig';
+import RuleMemoryConfig from './RuleMemoryConfig';
 
 type PageType = 'models' | 'system' | 'memory' | 'mcp' | 'skill' | 'agent' | 'command' | 'plugin';
 type ModelTabType = 'list' | 'add';
@@ -71,7 +71,7 @@ const App: React.FC<AppProps> = ({ vscode }) => {
                     className={`nav-item nav-main ${currentPage === 'memory' ? 'active' : ''}`}
                     onClick={() => setCurrentPage('memory')}
                 >
-                    Memory
+                    Rule & Memory
                 </div>
 
                 <div
@@ -154,7 +154,7 @@ const App: React.FC<AppProps> = ({ vscode }) => {
                 {/* Memory页面 */}
                 {currentPage === 'memory' && (
                     <div className="page active">
-                        <MemoryConfig vscode={vscode} />
+                        <RuleMemoryConfig vscode={vscode} />
                     </div>
                 )}
 

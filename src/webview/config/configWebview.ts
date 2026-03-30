@@ -90,6 +90,8 @@ export class ConfigWebviewProvider {
                 updateMCPUseTools:          () => this.updateMCPUseTools(m.name, m.toolNames),
                 loadMemoryInfo:             () => this.loadMemoryInfo(),
                 refreshMemoryInfo:          () => this.refreshMemoryInfo(),
+                loadRuleInfo:               () => this.loadRuleInfo(),
+                refreshRuleInfo:            () => this.refreshRuleInfo(),
                 openFile:              () => Promise.resolve(this.openFile(m.filePath)),
             };
             await handlers[m.command]?.();
@@ -669,6 +671,31 @@ export class ConfigWebviewProvider {
             this.postMessage({ command: 'refreshMemoryInfoResult', success: true, data: memoryInfo });
         } catch (error) {
             this.postMessage({ command: 'refreshMemoryInfoResult', success: false, data: null, message: (error as Error).message });
+        }
+    }
+
+    // ─── Rule ───────────────────────────────────────────────────────────────
+
+    private async loadRuleInfo() {
+        if (!this.panel) return;
+        try {
+            await this.ensureCoreReady();
+            const ruleInfo = await this.coreManager.getRuleInfo();
+            // console.log('[loadRuleInfo] data:', ruleInfo);
+            this.postMessage({ command: 'loadRuleInfoResult', success: true, data: ruleInfo });
+        } catch (error) {
+            this.postMessage({ command: 'loadRuleInfoResult', success: false, data: null, message: (error as Error).message });
+        }
+    }
+
+    private async refreshRuleInfo() {
+        if (!this.panel) return;
+        try {
+            await this.ensureCoreReady();
+            const ruleInfo = await this.coreManager.refreshRuleInfo();
+            this.postMessage({ command: 'refreshRuleInfoResult', success: true, data: ruleInfo });
+        } catch (error) {
+            this.postMessage({ command: 'refreshRuleInfoResult', success: false, data: null, message: (error as Error).message });
         }
     }
 

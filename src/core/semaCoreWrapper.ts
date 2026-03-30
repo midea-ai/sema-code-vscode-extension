@@ -47,7 +47,8 @@ import {
     CommandConfig,
     MCPServerConfig,
     MCPServerInfo,
-    MemoryConfig
+    MemoryConfig,
+    RuleConfig
 } from 'sema-core/types';
 
 import { SystemConfigManager } from '../managers/SystemConfigManager';
@@ -1116,6 +1117,16 @@ export class SemaCoreWrapper {
 
     public refreshMemoryInfo(): Promise<MemoryConfig | null> {
         return this.semaCore.refreshMemoryInfo();
+    }
+
+    // ===== Rule 管理相关方法 =====
+
+    public getRuleInfo(): Promise<RuleConfig | null> {
+        return this.semaCore.getRuleInfo();
+    }
+
+    public refreshRuleInfo(): Promise<RuleConfig | null> {
+        return this.semaCore.refreshRuleInfo();
     }
 
 
