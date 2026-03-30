@@ -414,10 +414,9 @@ const App: React.FC<AppProps> = ({ vscode }) => {
         // 重置滚动状态，让新消息自动滚到底部
         userScrolledUpRef.current = false;
         if (processingState !== 'processing') {
-            // 只有在非处理状态时才重置计时和清空列表
+            // 只有在非处理状态时才重置计时
             setSpinnerAccumulatedSeconds(0);
             spinnerStartTimeRef.current = 0;
-            setTodos([]);
         }
         vscode.postMessage({
             type: 'sendInput',

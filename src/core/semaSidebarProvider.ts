@@ -140,6 +140,16 @@ export class SemaSidebarProvider implements vscode.WebviewViewProvider {
             if (data.usage) {
                 this.chatWebviewProvider.postMessage({ type: 'updateTokenInfo', tokenInfo: data.usage });
             }
+
+            if (Array.isArray(data.todos) && data.todos.length > 0) {
+                this.chatWebviewProvider.postMessage({ type: 'todosUpdate', todos: data.todos });
+            }
+
+            if (data.readFileTimestamps && typeof data.readFileTimestamps === 'object') {
+                for (const filePath of Object.keys(data.readFileTimestamps)) {
+                    await this.fileStateDiffManager.addFileToSnapshotIfNew(filePath);
+                }
+            }
         } catch (error) {
             console.error('Error handling session ready:', error);
             this.chatWebviewProvider.postMessage({ type: 'enableInput' });
