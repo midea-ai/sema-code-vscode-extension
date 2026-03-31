@@ -212,6 +212,11 @@ export class SemaCoreWrapper {
                 return;
             }
 
+            // 中断时 finalize 流式消息，确保 webview 结束流式状态并保留已输出内容
+            for (const [, msg] of this.streamingAssistantMap) {
+                msg.content.completed = true;
+                this.sendCompleteUpdate(msg.id, { content: msg.content, reasoning: msg.reasoning });
+            }
             this.streamingAssistantMap.clear();
             this.streamingToolMap.clear();
             this.pendingTaskUpdates.clear();
@@ -306,12 +311,13 @@ export class SemaCoreWrapper {
             this.callbacks.onStateChange?.(data.state);
         });
 
-        this.semaCore.on<ThinkingChunkData & { id?: string }>('message:thinking:chunk', (data) => {
+        this.semaCore.on<ThinkingChunkData & { id?: string; delta?: string }>('message:thinking:chunk', (data) => {
             const msgId = data.id || 'default-stream';
+            const delta = data.delta ?? '';
             const existing = this.streamingAssistantMap.get(msgId);
             if (existing) {
-                existing.reasoning = data.content;
-                this.sendChunkUpdate(existing.id, { reasoning: data.content });
+                existing.reasoning = (existing.reasoning || '') + delta;
+                this.sendChunkUpdate(existing.id, { reasoningDelta: delta });
                 return;
             }
 
@@ -319,7 +325,7 @@ export class SemaCoreWrapper {
                 id: msgId,
                 type: 'assistant',
                 content: { messageType: 'text', content: '', completed: false },
-                reasoning: data.content,
+                reasoning: delta,
                 timestamp: Date.now()
             };
             this.streamingAssistantMap.set(msgId, newMessage);
@@ -327,19 +333,19 @@ export class SemaCoreWrapper {
             this.sendAppendMessages([newMessage]);
         });
 
-        this.semaCore.on<TextChunkData & { id?: string }>('message:text:chunk', (data) => {
+        this.semaCore.on<TextChunkData>('message:text:chunk', (data) => {
             const msgId = data.id || 'default-stream';
             const existing = this.streamingAssistantMap.get(msgId);
             if (existing) {
-                existing.content = { messageType: 'text', content: data.content, completed: false };
-                this.sendChunkUpdate(existing.id, { content: data.content });
+                existing.content.content = (existing.content.content || '') + data.delta;
+                this.sendChunkUpdate(existing.id, { contentDelta: data.delta });
                 return;
             }
 
             const newMessage: Message = {
                 id: msgId,
                 type: 'assistant',
-                content: { messageType: 'text', content: data.content, completed: false },
+                content: { messageType: 'text', content: data.delta, completed: false },
                 timestamp: Date.now()
             };
             this.streamingAssistantMap.set(msgId, newMessage);
@@ -443,9 +449,10 @@ export class SemaCoreWrapper {
             if (toolId && this.streamingToolMap.has(toolId)) {
                 const existingMessage = this.streamingToolMap.get(toolId)!;
                 // content 字段为增量，需累加到已有内容上
-                const accumulatedContent = (existingMessage.content.content || '') + (data.content || '');
+                const delta = typeof data.content === 'string' ? data.content : '';
+                const accumulatedContent = (existingMessage.content.content || '') + delta;
                 existingMessage.content = { ...data, content: accumulatedContent, completed: false };
-                this.sendToolChunkUpdate(existingMessage.id, existingMessage.content);
+                this.sendToolChunkUpdate(existingMessage.id, delta);
             } else {
                 const newMessage: Message = {
                     id: this.generateId(),
@@ -622,7 +629,7 @@ export class SemaCoreWrapper {
         });
     }
 
-    private sendChunkUpdate(messageId: string, update: { content?: string; reasoning?: string }): void {
+    private sendChunkUpdate(messageId: string, update: { contentDelta?: string; reasoningDelta?: string }): void {
         this.callbacks.onMessage?.({
             type: 'chunkUpdate',
             id: messageId,
@@ -638,11 +645,11 @@ export class SemaCoreWrapper {
         });
     }
 
-    private sendToolChunkUpdate(messageId: string, toolContent: any): void {
+    private sendToolChunkUpdate(messageId: string, contentDelta: string): void {
         this.callbacks.onMessage?.({
             type: 'toolChunkUpdate',
             id: messageId,
-            toolContent
+            contentDelta
         });
     }
 

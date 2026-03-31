@@ -1,21 +1,27 @@
 // 简化的 AiResponseBlock - 只支持基本Markdown功能
-import React, { useEffect, useRef, useMemo } from 'react';
+import React, { useEffect, useRef, useState, useMemo } from 'react';
 import { renderMarkdownToHtml, hasMarkdownFormatting } from '../utils/markdown';
 import { getResponseDot } from '../utils/permissionUtils';
+import { streamingStore } from '../utils/StreamingStore';
 import '../utils/markdown.css';
 
 interface AiResponseBlockProps {
     content: string;
+    messageId: string;
     isStreaming?: boolean;
     vscode?: any;
 }
 
 const AiResponseBlock: React.FC<AiResponseBlockProps> = React.memo(({
     content,
+    messageId,
     isStreaming = false,
     vscode
 }) => {
     const contentRef = useRef<HTMLDivElement>(null);
+    // 流式累积文本（ref 存最新值，state 驱动渲染）
+    const streamBufferRef = useRef<string>('');
+    const [streamContent, setStreamContent] = useState<string>('');
 
     // 合并文件路径验证和点击事件监听，只依赖 vscode
     useEffect(() => {
@@ -85,17 +91,39 @@ const AiResponseBlock: React.FC<AiResponseBlockProps> = React.memo(({
         };
     }, [vscode]);
 
-    const trimmedContent = (content || '').replace(/^\n+|\n+$/g, '');
+    // 流式模式：订阅 streamingStore，累积 delta 到 buffer，分段触发 markdown 渲染
+    useEffect(() => {
+        if (!isStreaming) {
+            // 流式结束时重置 buffer
+            streamBufferRef.current = '';
+            setStreamContent('');
+            return;
+        }
+        streamBufferRef.current = '';
+        setStreamContent('');
+
+        const unsub = streamingStore.subscribeText(messageId, (data) => {
+            if (data.contentDelta) {
+                streamBufferRef.current += data.contentDelta;
+                setStreamContent(streamBufferRef.current);
+            }
+        });
+        return unsub;
+    }, [isStreaming, messageId]);
+
+    // 决定当前要渲染的文本：流式阶段用累积的 streamContent，否则用 props.content
+    const displayText = isStreaming ? streamContent : (content || '');
+    const trimmedContent = displayText.replace(/^\n+|\n+$/g, '');
     const needsMarkdown = hasMarkdownFormatting(trimmedContent);
 
-    // 缓存 markdown 渲染结果，避免重复计算
     const htmlContent = useMemo(() => {
         if (!needsMarkdown || !trimmedContent) return null;
-        return renderMarkdownToHtml(trimmedContent, vscode);
-    }, [trimmedContent, vscode, needsMarkdown]);
+        // 流式阶段不传 vscode，避免对未完成内容发起文件路径验证请求
+        return renderMarkdownToHtml(trimmedContent, isStreaming ? undefined : vscode);
+    }, [trimmedContent, vscode, needsMarkdown, isStreaming]);
 
     // 如果内容为空且不在流式输出状态，不渲染任何内容
-    if (!content && !isStreaming) {
+    if (!trimmedContent && !isStreaming) {
         return null;
     }
 
@@ -109,17 +137,21 @@ const AiResponseBlock: React.FC<AiResponseBlockProps> = React.memo(({
                         dangerouslySetInnerHTML={{ __html: htmlContent! }}
                     />
                 ) : (
-                    <span>{trimmedContent}</span>
+                    <span style={{ whiteSpace: 'pre-wrap' }}>{trimmedContent}</span>
                 )}
-                {/* {isStreaming && <span className="streaming-cursor">▋</span>} */}
             </div>
         </div>
     );
 }, (prev, next) => {
-    if (prev.isStreaming === false && next.isStreaming === false) {
-        return prev.content === next.content;
+    // streaming 状态变化时必须重渲染
+    if (prev.isStreaming !== next.isStreaming) return false;
+    // 非流式：比较 content
+    if (!next.isStreaming) {
+        return prev.content === next.content
+            && prev.messageId === next.messageId;
     }
-    return prev.content === next.content && prev.isStreaming === next.isStreaming;
+    // 流式中：由内部 state 驱动渲染，props 不变则跳过
+    return prev.messageId === next.messageId;
 });
 
 AiResponseBlock.displayName = 'AiResponseBlock';

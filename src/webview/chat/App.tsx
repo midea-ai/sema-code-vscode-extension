@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { FileChange, TokenInfo, AppProps, SelectedFile, TodoItem, Message } from './types';
+import { streamingStore } from './utils/StreamingStore';
 import InputBox, { InputBoxHandle } from './components/input/InputBox';
 import MessageItem from './MessageItem';
 
@@ -14,8 +15,10 @@ import ModelConfigReminder from './components/ui/ModelConfigReminder';
 
 const App: React.FC<AppProps> = ({ vscode }) => {
     const [messages, setMessages] = useState<Message[]>([]);
-    const [streamingContent, setStreamingContent] = useState<{ id: string; content?: string; reasoning?: string } | null>(null);
-    const [streamingToolContent, setStreamingToolContent] = useState<{ id: string; toolContent: any } | null>(null);
+    const [streamingAssistantId, setStreamingAssistantId] = useState<string | null>(null);
+    const [streamingToolId, setStreamingToolId] = useState<string | null>(null);
+    const streamingAssistantIdRef = useRef<string | null>(null);
+    const streamingToolIdRef = useRef<string | null>(null);
     const messagesRef = useRef<Message[]>([]);
     const [progressMessage, setProgressMessage] = useState<string>('');
     const [tokenInfo, setTokenInfo] = useState<TokenInfo>({ useTokens: 0, maxTokens: 0, promptTokens: 0 });
@@ -89,6 +92,7 @@ const App: React.FC<AppProps> = ({ vscode }) => {
             switch (message.type) {
                 case 'updateContent':
                    // console.log('updateContent:', message)
+                    streamingStore.clear();
                     messagesRef.current = (message.messages || []).slice();
                     setMessages(message.messages || []);
                     break;
@@ -104,23 +108,20 @@ const App: React.FC<AppProps> = ({ vscode }) => {
                         messagesRef.current[updateIdx] = { ...messagesRef.current[updateIdx], content: message.content };
                         setMessages([...messagesRef.current]);
                     }
-                    setStreamingToolContent(prev => prev?.id === message.id ? null : prev);
+                    if (streamingToolIdRef.current === message.id) {
+                        streamingToolIdRef.current = null;
+                        setStreamingToolId(null);
+                    }
                     break;
                 }
                 case 'chunkUpdate': {
-                    const msgIndex = messagesRef.current.findIndex(m => m.id === message.id);
-                    if (msgIndex >= 0) {
-                        const msg = messagesRef.current[msgIndex];
-                        messagesRef.current[msgIndex] = {
-                            ...msg,
-                            ...(message.content !== undefined && {
-                                content: { ...msg.content, content: message.content, completed: false }
-                            }),
-                            ...(message.reasoning !== undefined && { reasoning: message.reasoning })
-                        };
+                    // 只转发 delta 到 streamingStore，组件自行累积；completeUpdate 时设置最终内容
+                    streamingStore.emitText(message.id, { contentDelta: message.contentDelta, reasoningDelta: message.reasoningDelta });
+                    // 只在有 contentDelta 时才标记 streaming，避免 thinking 阶段提前渲染 AiResponseBlock
+                    if (message.contentDelta !== undefined && streamingAssistantIdRef.current !== message.id) {
+                        streamingAssistantIdRef.current = message.id;
+                        setStreamingAssistantId(message.id);
                     }
-                    setStreamingContent({ id: message.id, content: message.content, reasoning: message.reasoning });
-                    // 流式输出时主动滚动到底部（不走 useEffect）
                     if (!userScrolledUpRef.current && outputContainerRef.current) {
                         outputContainerRef.current.scrollTop = outputContainerRef.current.scrollHeight;
                     }
@@ -136,22 +137,18 @@ const App: React.FC<AppProps> = ({ vscode }) => {
                             ...(message.reasoning !== undefined && { reasoning: message.reasoning })
                         };
                     }
-                    setStreamingContent(null);
+                    streamingAssistantIdRef.current = null;
+                    setStreamingAssistantId(null);
                     setMessages([...messagesRef.current]);
                     break;
                 }
                 case 'toolChunkUpdate': {
-                    const msgIndex = messagesRef.current.findIndex(m => m.id === message.id);
-                    if (msgIndex >= 0) {
-                        const msg = messagesRef.current[msgIndex];
-                        messagesRef.current[msgIndex] = {
-                            ...msg,
-                            content: message.toolContent
-                        };
+                    // 只转发 delta 到 streamingStore，组件自行累积；updateMessage 时设置最终内容
+                    streamingStore.emitTool(message.id, message.contentDelta || '');
+                    if (streamingToolIdRef.current !== message.id) {
+                        streamingToolIdRef.current = message.id;
+                        setStreamingToolId(message.id);
                     }
-                    // 不调用 setMessages，通过专门的 state 触发仅 BashBlock 更新
-                    setStreamingToolContent({ id: message.id, toolContent: message.toolContent });
-                    // 自动滚动
                     if (!userScrolledUpRef.current && outputContainerRef.current) {
                         outputContainerRef.current.scrollTop = outputContainerRef.current.scrollHeight;
                     }
@@ -580,12 +577,12 @@ const App: React.FC<AppProps> = ({ vscode }) => {
                     toolPermissionData={toolPermissionData}
                     vscode={vscode}
                     onFileChange={handleFileChange}
-                    streamingContent={streamingContent}
-                    streamingToolContent={streamingToolContent}
+                    streamingAssistantId={streamingAssistantId}
+                    streamingToolId={streamingToolId}
                 />
             </div>
         ));
-    }, [messages, modelName, availableModels, toolPermissionData, processingState, streamingContent, streamingToolContent]);
+    }, [messages, modelName, availableModels, toolPermissionData, processingState, streamingAssistantId, streamingToolId]);
 
     return (
         <>

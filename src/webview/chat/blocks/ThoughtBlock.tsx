@@ -1,17 +1,43 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { ToggleIcon } from '../components/ui/IconButton';
+import { streamingStore } from '../utils/StreamingStore';
 
 interface ThoughtBlockProps {
     content: string;  // thinking 内容
+    messageId: string;
     isThinking: boolean;  // 是否正在 thinking 阶段
 }
 
 const ThoughtBlock: React.FC<ThoughtBlockProps> = React.memo(({
     content,
+    messageId,
     isThinking
 }) => {
     // 默认折叠状态
     const [isExpanded, setIsExpanded] = useState(false);
+    const streamReasoningRef = useRef('');
+    const [streamReasoning, setStreamReasoning] = useState<string | undefined>(undefined);
+
+    useEffect(() => {
+        const unsub = streamingStore.subscribeText(messageId, (data) => {
+            if (data.reasoningDelta !== undefined) {
+                streamReasoningRef.current += data.reasoningDelta;
+                setStreamReasoning(streamReasoningRef.current);
+            }
+        });
+        return () => {
+            unsub();
+            streamReasoningRef.current = '';
+        };
+    }, [messageId]);
+
+    // 思考结束时清除流式状态，回归 props 内容
+    useEffect(() => {
+        if (!isThinking) {
+            streamReasoningRef.current = '';
+            setStreamReasoning(undefined);
+        }
+    }, [isThinking]);
 
     const handleToggle = () => {
         setIsExpanded(!isExpanded);
@@ -32,19 +58,19 @@ const ThoughtBlock: React.FC<ThoughtBlockProps> = React.memo(({
                     </div>
                 </div>
             </div>
-            {isExpanded && content && (
+            {isExpanded && (streamReasoning ?? content) && (
                 <div className="thought-block-content">
                     <div className="thought-content">
-                        {content}
+                        {streamReasoning ?? content}
                     </div>
                 </div>
             )}
         </div>
     );
 }, (prevProps, nextProps) => {
-    // 当 isThinking 状态变化或内容变化时重新渲染
     return prevProps.isThinking === nextProps.isThinking &&
-           prevProps.content === nextProps.content;
+           prevProps.content === nextProps.content &&
+           prevProps.messageId === nextProps.messageId;
 });
 
 ThoughtBlock.displayName = 'ThoughtBlock';

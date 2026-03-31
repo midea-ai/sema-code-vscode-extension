@@ -20,8 +20,8 @@ interface MessageItemProps {
     toolPermissionData: any;
     vscode: any;
     onFileChange?: (change: FileChange) => void;
-    streamingContent?: { id: string; content?: string; reasoning?: string } | null;
-    streamingToolContent?: { id: string; toolContent: any } | null;
+    streamingAssistantId?: string | null;
+    streamingToolId?: string | null;
 }
 
 const MessageItem: React.FC<MessageItemProps> = React.memo(({
@@ -30,8 +30,7 @@ const MessageItem: React.FC<MessageItemProps> = React.memo(({
     toolPermissionData,
     vscode,
     onFileChange,
-    streamingContent,
-    streamingToolContent
+    streamingAssistantId,
 }) => {
     const renderToolContent = () => {
         switch (message.toolName) {
@@ -57,11 +56,8 @@ const MessageItem: React.FC<MessageItemProps> = React.memo(({
             case 'Read':
             case 'NotebookRead':
                 return <ReadBlock content={message.content} vscode={vscode} />;
-            case 'Bash': {
-                const isToolStreaming = streamingToolContent?.id === message.id;
-                const displayContent = isToolStreaming ? streamingToolContent!.toolContent : message.content;
-                return <BashBlock content={displayContent} vscode={vscode} />;
-            }
+            case 'Bash':
+                return <BashBlock content={message.content} messageId={message.id} vscode={vscode} />;
             case 'Agent':
                 return (
                     <AgentBlock
@@ -80,17 +76,14 @@ const MessageItem: React.FC<MessageItemProps> = React.memo(({
             return <UserInputBlock content={message.content} />;
 
         case 'assistant': {
-            const isCurrentlyStreaming = streamingContent?.id === message.id;
-            const displayContent = isCurrentlyStreaming
-                ? (streamingContent!.content ?? message.content?.content)
-                : message.content?.content;
-            const displayReasoning = isCurrentlyStreaming
-                ? (streamingContent!.reasoning ?? message.reasoning)
-                : message.reasoning;
+            const isCurrentlyStreaming = streamingAssistantId === message.id;
+            const displayContent = message.content?.content;
+            const displayReasoning = message.reasoning;
 
             const hasReasoning = !!(displayReasoning && displayReasoning.trim().length > 0);
-            const hasContent = !!(displayContent && displayContent.trim().length > 0);
-            const isCompleted = !isCurrentlyStreaming && !!message.content?.completed;
+            const isCompleted = !!message.content?.completed;
+            // 流式中即使 content 暂时为空也需要渲染 AiResponseBlock（等待 store 推送内容）
+            const hasContent = isCurrentlyStreaming || !!(displayContent && displayContent.trim().length > 0);
             const isThinking = hasReasoning && !hasContent && !isCompleted;
 
             return (
@@ -98,13 +91,15 @@ const MessageItem: React.FC<MessageItemProps> = React.memo(({
                     {hasReasoning && (
                         <ThoughtBlock
                             content={displayReasoning || ''}
+                            messageId={message.id}
                             isThinking={isThinking}
                         />
                     )}
                     {hasContent && (
                         <AiResponseBlock
-                            content={displayContent!}
-                            isStreaming={isCurrentlyStreaming || !message.content?.completed}
+                            content={displayContent || ''}
+                            messageId={message.id}
+                            isStreaming={isCurrentlyStreaming || !isCompleted}
                             vscode={vscode}
                         />
                     )}
@@ -160,25 +155,25 @@ const MessageItem: React.FC<MessageItemProps> = React.memo(({
         && prev.shouldReportChange === next.shouldReportChange
         && prev.toolPermissionData === next.toolPermissionData;
 
-    // 判断 streamingContent 是否与本条消息相关
-    const prevStreamingIsForThis = prev.streamingContent?.id === prev.message.id;
-    const nextStreamingIsForThis = next.streamingContent?.id === next.message.id;
+    const prevStreamingIsForThis =
+        prev.streamingAssistantId === prev.message.id ||
+        prev.streamingToolId === prev.message.id;
+    const nextStreamingIsForThis =
+        next.streamingAssistantId === next.message.id ||
+        next.streamingToolId === next.message.id;
 
-    // 判断 streamingToolContent 是否与本条消息相关
-    const prevToolStreamingIsForThis = prev.streamingToolContent?.id === prev.message.id;
-    const nextToolStreamingIsForThis = next.streamingToolContent?.id === next.message.id;
-
-    // 与本条消息无关时，忽略 streaming 变化，避免无关消息重渲染
-    if (!prevStreamingIsForThis && !nextStreamingIsForThis
-        && !prevToolStreamingIsForThis && !nextToolStreamingIsForThis) {
+    // 与本条消息无关：忽略 streaming 变化
+    if (!prevStreamingIsForThis && !nextStreamingIsForThis) {
         return baseEqual;
     }
 
-    // 与本条消息相关时，额外比较流式内容
-    return baseEqual
-        && prev.streamingContent?.content === next.streamingContent?.content
-        && prev.streamingContent?.reasoning === next.streamingContent?.reasoning
-        && prev.streamingToolContent?.toolContent === next.streamingToolContent?.toolContent;
+    // streaming 开始或结束（状态发生切换）：强制重渲染
+    if (prevStreamingIsForThis !== nextStreamingIsForThis) {
+        return false;
+    }
+
+    // 本条消息正在 streaming 中：内容由 store 推送，无需通过 props 重渲染
+    return baseEqual;
 });
 
 MessageItem.displayName = 'MessageItem';

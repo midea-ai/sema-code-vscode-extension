@@ -170,4 +170,7 @@ function checkAndSetDefaultWorkspace() {
 
 export function deactivate() {
     // console.log('Sema VSCode Extension is now deactivated!');
+    if (sidebarProvider) {
+        sidebarProvider.dispose();
+    }
 }
