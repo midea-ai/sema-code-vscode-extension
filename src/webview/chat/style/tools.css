@@ -98,6 +98,11 @@
     max-width: 100%;
 }
 
+.bash-command code::before {
+    content: '$ ';
+    color: #a855f7;
+}
+
 .bash-command code {
     font-size: 12px;
     line-height: 1.3;

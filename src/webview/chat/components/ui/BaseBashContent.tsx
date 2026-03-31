@@ -13,7 +13,7 @@ const BaseBashContent: React.FC<BaseBashContentProps> = ({
 }) => {
     return (
         <div className={className} style={style}>
-            <pre><code>$ {command}</code></pre>
+            <pre><code className="language-bash">{command}</code></pre>
         </div>
     );
 };

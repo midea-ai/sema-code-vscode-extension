@@ -1,12 +1,42 @@
 import * as vscode from 'vscode';
 import { EXCLUDED_NAMES, EXCLUDE_GLOB } from '../utils/fileExcludePatterns';
 
+class BashOutputProvider implements vscode.TextDocumentContentProvider {
+    static readonly scheme = 'sema-bash-output';
+
+    private _contentMap = new Map<string, string>();
+    private _onDidChange = new vscode.EventEmitter<vscode.Uri>();
+    readonly onDidChange = this._onDidChange.event;
+
+    static uriForId(toolId: string): vscode.Uri {
+        return vscode.Uri.parse(`${BashOutputProvider.scheme}://output/${encodeURIComponent(toolId)}`);
+    }
+
+    update(uri: vscode.Uri, content: string): void {
+        this._contentMap.set(uri.toString(), content);
+        this._onDidChange.fire(uri);
+    }
+
+    provideTextDocumentContent(uri: vscode.Uri): string {
+        return this._contentMap.get(uri.toString()) ?? '';
+    }
+}
+
 /**
  * 文件操作管理器
  * 负责处理工作区文件的搜索、打开、列表获取等操作
  */
 export class FileOperationManager {
     private readonly MAX_SEARCH_FILES = 80;
+    private readonly bashOutputProvider: BashOutputProvider;
+
+    constructor() {
+        this.bashOutputProvider = new BashOutputProvider();
+        vscode.workspace.registerTextDocumentContentProvider(
+            BashOutputProvider.scheme,
+            this.bashOutputProvider
+        );
+    }
 
     /**
      * 打开文件并跳转到指定行，如果有结束行则设置选区
@@ -312,14 +342,14 @@ export class FileOperationManager {
     }
 
     /**
-     * 将 Bash 输出内容以虚拟文档形式在编辑器中打开
+     * 将 Bash 输出内容以虚拟文档形式在编辑器中打开，相同 toolId 复用同一 tab
      */
-    public async openBashOutputAsDocument(content: string, command: string): Promise<void> {
+    public async openBashOutputAsDocument(content: string, command: string, toolId?: string): Promise<void> {
         const docContent = command ? `# ${command}\n\n${content}` : content;
-        const document = await vscode.workspace.openTextDocument({
-            content: docContent,
-            language: 'shellscript'
-        });
+        const key = toolId || command || 'bash-output';
+        const uri = BashOutputProvider.uriForId(key);
+        this.bashOutputProvider.update(uri, docContent);
+        const document = await vscode.workspace.openTextDocument(uri);
         await vscode.window.showTextDocument(document, {
             preview: false,
             viewColumn: vscode.ViewColumn.One

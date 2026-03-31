@@ -85,6 +85,7 @@ export interface DiffContent {
 }
 
 export interface ToolContent {
+    toolId?: string;
     toolName: string;
     title: string;
     summary?: string;

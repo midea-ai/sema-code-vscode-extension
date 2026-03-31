@@ -104,6 +104,7 @@ const App: React.FC<AppProps> = ({ vscode }) => {
                         messagesRef.current[updateIdx] = { ...messagesRef.current[updateIdx], content: message.content };
                         setMessages([...messagesRef.current]);
                     }
+                    setStreamingToolContent(prev => prev?.id === message.id ? null : prev);
                     break;
                 }
                 case 'chunkUpdate': {

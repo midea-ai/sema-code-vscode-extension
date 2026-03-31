@@ -59,7 +59,8 @@ const PubBlock: React.FC<PubBlockProps> = React.memo(({ content, vscode }) => {
             vscode.postMessage({
                 type: 'openBashOutput',
                 content: contentLines.join('\n'),
-                command: formattedTitle
+                command: formattedTitle,
+                toolId: content.toolId || ''
             });
         }
     };

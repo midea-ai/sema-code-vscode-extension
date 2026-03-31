@@ -82,7 +82,8 @@ const BashBlock: React.FC<BashBlockProps> = ({ content: toolContent, vscode }) =
             vscode.postMessage({
                 type: 'openBashOutput',
                 content: outputLines.join('\n'),
-                command: command || ''
+                command: command || '',
+                toolId: toolContent.toolId || ''
             });
         }
     };

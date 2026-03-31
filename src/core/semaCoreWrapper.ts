@@ -442,8 +442,9 @@ export class SemaCoreWrapper {
             const toolId = data.toolId;
             if (toolId && this.streamingToolMap.has(toolId)) {
                 const existingMessage = this.streamingToolMap.get(toolId)!;
-                // 直接 mutate，不创建新对象（前端通过 toolChunkUpdate 单独处理）
-                existingMessage.content = { ...data, completed: false };
+                // content 字段为增量，需累加到已有内容上
+                const accumulatedContent = (existingMessage.content.content || '') + (data.content || '');
+                existingMessage.content = { ...data, content: accumulatedContent, completed: false };
                 this.sendToolChunkUpdate(existingMessage.id, existingMessage.content);
             } else {
                 const newMessage: Message = {

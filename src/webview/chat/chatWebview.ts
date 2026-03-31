@@ -50,7 +50,7 @@ export class ChatWebviewProvider {
                 insertPermissionRequest: () => Promise.resolve(this.coreManager.insertPermissionRequestMessage(msg.permissionData)),
                 updateAgentMode:         () => this.coreManager.updateAgentMode(msg.mode),
                 requestCommands:         () => this.sendCommands(),
-                openBashOutput:          () => this.fileOperationManager.openBashOutputAsDocument(msg.content, msg.command),
+                openBashOutput:          () => this.fileOperationManager.openBashOutputAsDocument(msg.content, msg.command, msg.toolId),
             };
             await handlers[msg.type]?.();
         });
