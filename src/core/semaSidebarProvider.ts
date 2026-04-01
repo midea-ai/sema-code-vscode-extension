@@ -43,18 +43,13 @@ export class SemaSidebarProvider implements vscode.WebviewViewProvider {
             {
                 onSessionReady:           this.handleSessionReady,
                 onMessage:                this.handleMessage,
-                onMessageComplete:        this.handleMessageComplete,
                 onModelUpdate:            this.handleModelUpdate,
                 onStateChange:            this.handleStateChange,
-                onToolPermissionRequest:  this.handleToolPermissionRequest,
-                onAskQuestionRequest:     this.handleAskQuestionRequest,
-                onPlanExitRequest:        this.handlePlanExitRequest,
-                onUsageUpdate:            this.handleUsageUpdate,
-                onTodosUpdate:            this.handleTodosUpdate,
                 onTopicUpdate:            this.handleTopicUpdate,
-                onInputReceived:          this.handleInputReceived,
-                onInputProcessing:        this.handleInputProcessing,
                 onToolExecutionComplete:  this.handleToolExecutionComplete,
+                onTaskStart:              this.handleTaskStart,
+                onTaskEnd:                this.handleTaskEnd,
+                onTaskUpdate:             this.handleTaskUpdate,
                 onSessionCleared:         this.handleSessionCleared,
             },
             this.systemConfigManager
@@ -65,7 +60,7 @@ export class SemaSidebarProvider implements vscode.WebviewViewProvider {
             this.coreManager,
             this.fileStateDiffManager,
             this.fileOperationManager,
-            () => this.openConfigPanel()
+            (page?: string) => this.openConfigPanel(page)
         );
 
         this.sessionHistoryManager = new SessionHistoryManager(context, this.workingDir, this.coreManager);
@@ -120,8 +115,8 @@ export class SemaSidebarProvider implements vscode.WebviewViewProvider {
         }
     }
 
-    public openConfigPanel() {
-        this.configWebviewProvider.show(this.context.extensionUri);
+    public openConfigPanel(page?: string) {
+        this.configWebviewProvider.show(this.context.extensionUri, page);
     }
 
     // ─── Core event handlers ──────────────────────────────────────────────────
@@ -160,10 +155,6 @@ export class SemaSidebarProvider implements vscode.WebviewViewProvider {
         this.chatWebviewProvider?.postMessage(msg);
     };
 
-    private handleMessageComplete = (): void => {
-        // 由 handleStateChange('idle') 统一触发保存，避免重复
-    };
-
     private handleModelUpdate = (data: any): void => {
         this.chatWebviewProvider.postMessage({ type: 'modelUpdate', data });
         this.configWebviewProvider.refreshConfigPage();
@@ -176,42 +167,29 @@ export class SemaSidebarProvider implements vscode.WebviewViewProvider {
         }
     };
 
-    private handleToolPermissionRequest = (data: any): void => {
-        this.chatWebviewProvider.postMessage({ type: 'toolPermissionRequest', data });
-    };
-
-    private handleAskQuestionRequest = (data: any): void => {
-        this.chatWebviewProvider.postMessage({ type: 'askQuestionRequest', data });
-    };
-
-    private handlePlanExitRequest = (data: any): void => {
-        this.chatWebviewProvider.postMessage({ type: 'planExitRequest', data });
-    };
-
-    private handleUsageUpdate = (data: any): void => {
-        this.chatWebviewProvider.postMessage({ type: 'updateTokenInfo', tokenInfo: data.usage });
-    };
-
-    private handleTodosUpdate = (todos: any): void => {
-        this.chatWebviewProvider.postMessage({ type: 'todosUpdate', todos });
-    };
-
     private handleTopicUpdate = (_topic: any): void => {
         this.debouncedSaveSession();
-    };
-
-    private handleInputReceived = (data: any): void => {
-        this.chatWebviewProvider?.postMessage({ type: 'inputReceived', data });
-    };
-
-    private handleInputProcessing = (data: any): void => {
-        this.chatWebviewProvider?.postMessage({ type: 'inputProcessing', data });
     };
 
     private handleToolExecutionComplete = (data: any): void => {
         if (data.toolName === 'Read') {
             this.fileStateDiffManager.addFileToSnapshotIfNew(data.title);
         }
+    };
+
+    private handleTaskStart = (data: any): void => {
+        this.configWebviewProvider.pushTaskStart(data);
+        this.chatWebviewProvider.postMessage({ type: 'taskStart', data });
+    };
+
+    private handleTaskEnd = (data: any): void => {
+        this.configWebviewProvider.pushTaskEnd(data);
+        this.chatWebviewProvider.postMessage({ type: 'taskEnd', data });
+    };
+
+    private handleTaskUpdate = (data: any): void => {
+        this.configWebviewProvider.pushTaskUpdate(data);
+        this.chatWebviewProvider.postMessage({ type: 'taskUpdate', data });
     };
 
     private handleSessionCleared = (): void => {

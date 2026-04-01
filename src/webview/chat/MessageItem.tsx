@@ -5,6 +5,7 @@ import NotebookEditBlock from './blocks/tools/NotebookEditBlock';
 import ReadBlock from './blocks/tools/ReadBlock';
 import PubBlock from './blocks/tools/PubBlock';
 import BashBlock from './blocks/tools/BashBlock';
+import TaskOutputBlock from './blocks/tools/TaskOutputBlock';
 import AgentBlock from './blocks/tools/AgentBlock';
 import ToolErrorBlock from './blocks/ToolErrorBlock';
 import UserInputBlock from './blocks/UserInputBlock';
@@ -58,6 +59,8 @@ const MessageItem: React.FC<MessageItemProps> = React.memo(({
                 return <ReadBlock content={message.content} vscode={vscode} />;
             case 'Bash':
                 return <BashBlock content={message.content} messageId={message.id} vscode={vscode} />;
+            case 'TaskOutput':
+                return <TaskOutputBlock content={message.content} messageId={message.id} vscode={vscode} />;
             case 'Agent':
                 return (
                     <AgentBlock

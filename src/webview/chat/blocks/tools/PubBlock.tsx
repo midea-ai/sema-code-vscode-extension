@@ -29,7 +29,7 @@ const PubBlock: React.FC<PubBlockProps> = React.memo(({ content, vscode }) => {
     };
 
     const toolValue = toolNameMap[toolName as keyof typeof toolNameMap] || parseMcpToolName(toolName);
-    const formattedTitle = toolName === 'AskUserQuestion' ? 'User Response' : `${toolValue}(${title})`;
+    const formattedTitle = toolName === 'AskUserQuestion' ? 'User Response' : `${toolValue} (${title})`;
 
     // 处理内容格式
     const formatContent = () => {
@@ -47,7 +47,9 @@ const PubBlock: React.FC<PubBlockProps> = React.memo(({ content, vscode }) => {
     const visibleLines = totalLines > MAX_VISIBLE_LINES ? contentLines.slice(-MAX_VISIBLE_LINES) : contentLines;
     const omittedCount = totalLines > MAX_VISIBLE_LINES ? totalLines - MAX_VISIBLE_LINES : 0;
 
-    const [isExpanded, setIsExpanded] = useState(false);  // 默认折叠
+    // 默认展开的工具列表
+    const DEFAULT_EXPANDED_TOOLS = ['TaskStop'];
+    const [isExpanded, setIsExpanded] = useState(DEFAULT_EXPANDED_TOOLS.includes(toolName));
 
     const handleToggle = () => {
         setIsExpanded(!isExpanded);

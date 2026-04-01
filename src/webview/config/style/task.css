@@ -1,0 +1,134 @@
+/* Background Task 配置页面样式 */
+@import './agent.css';
+
+/* Task 行 */
+.agent-config .task-row {
+    display: flex;
+    flex-wrap: nowrap;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 10px;
+    cursor: pointer;
+    border-radius: 4px;
+    background: var(--vscode-list-activeSelectionBackground);
+    color: var(--vscode-foreground);
+    font-size: 12px;
+    line-height: 20px;
+    overflow: hidden;
+    grid-template-columns: none;
+    border: 1px solid transparent;
+}
+
+.agent-config .task-row.selected {
+    border-color: var(--vscode-focusBorder);
+}
+
+.task-row-command {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-family: var(--vscode-editor-font-family, monospace);
+}
+
+.task-status-tag {
+    margin-right: 4px;
+}
+
+.task-status-tag.running { color: #4eabff; }
+.task-status-tag.completed { color: #89d185; }
+.task-status-tag.failed { color: #f48771; }
+.task-status-tag.stopped { color: #cca700; }
+
+/* 选中状态下保留状态标签颜色 */
+
+.task-kill-btn {
+    flex: none;
+    width: 36px;
+    background: none;
+    border: none;
+    border-radius: 3px;
+    cursor: pointer;
+    padding: 2px 6px;
+    color: #b07ce8;
+    font-size: 11px;
+    line-height: 18px;
+    white-space: nowrap;
+    text-align: center;
+    transition: background 0.15s;
+}
+
+.task-kill-btn:hover {
+    background: rgba(176, 124, 232, 0.2);
+}
+
+/* Detail 面板 */
+.task-detail-panel {
+    margin-bottom: 20px;
+    border: 1px solid var(--vscode-panel-border);
+    border-radius: 8px;
+    overflow: hidden;
+    background: var(--vscode-sideBar-background);
+}
+
+.task-detail-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--vscode-panel-border);
+}
+
+.task-detail-title {
+    font-weight: 600;
+    font-size: 13px;
+}
+
+/* Bash detail */
+.task-detail-info {
+    padding: 12px 14px;
+    font-size: 12px;
+    line-height: 1.8;
+}
+
+.task-detail-command-row {
+    display: flex;
+    gap: 4px;
+}
+
+.task-detail-command-row strong {
+    flex-shrink: 0;
+}
+
+.task-detail-command-value {
+    font-family: var(--vscode-editor-font-family, monospace);
+    word-break: break-all;
+}
+
+.task-detail-output-section {
+    padding: 0 14px 14px;
+}
+
+.task-detail-output-label {
+    margin-bottom: 6px;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.task-detail-output {
+    margin: 0;
+    padding: 10px;
+    font-size: 12px;
+    line-height: 1.5;
+    font-family: var(--vscode-editor-font-family, monospace);
+    max-height: 360px;
+    overflow-y: auto;
+    white-space: pre-wrap;
+    word-break: break-all;
+    color: var(--vscode-editor-foreground);
+    background: var(--vscode-editor-background);
+    border: 1px solid var(--vscode-panel-border);
+    border-radius: 4px;
+}
+

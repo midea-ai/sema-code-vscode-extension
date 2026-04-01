@@ -124,8 +124,6 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                 shouldReportChange={false}
                 toolPermissionData={null}
                 vscode={vscode}
-                streamingContent={null}
-                streamingToolContent={null}
             />
         ));
     }, [taskMessages, vscode]);

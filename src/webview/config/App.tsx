@@ -10,8 +10,9 @@ import AgentConfig from './AgentConfig';
 import PluginConfig from './PluginConfig';
 import CommandConfig from './CommandConfig';
 import RuleMemoryConfig from './RuleMemoryConfig';
+import BackgroundTaskConfig from './BackgroundTaskConfig';
 
-type PageType = 'models' | 'system' | 'memory' | 'mcp' | 'skill' | 'agent' | 'command' | 'plugin';
+type PageType = 'models' | 'system' | 'memory' | 'mcp' | 'skill' | 'agent' | 'command' | 'plugin' | 'task';
 type ModelTabType = 'list' | 'add';
 
 interface AppProps {
@@ -35,6 +36,11 @@ const App: React.FC<AppProps> = ({ vscode }) => {
                     if (message.showAddPage) {
                         setCurrentPage('models');
                         setModelTab('add');
+                    }
+                    break;
+                case 'navigateTo':
+                    if (message.page) {
+                        setCurrentPage(message.page as PageType);
                     }
                     break;
             }
@@ -65,6 +71,13 @@ const App: React.FC<AppProps> = ({ vscode }) => {
                     onClick={() => setCurrentPage('system')}
                 >
                     系统配置
+                </div>
+
+                <div
+                    className={`nav-item nav-main ${currentPage === 'task' ? 'active' : ''}`}
+                    onClick={() => setCurrentPage('task')}
+                >
+                    后台任务管理
                 </div>
 
                 <div
@@ -190,6 +203,13 @@ const App: React.FC<AppProps> = ({ vscode }) => {
                 {currentPage === 'plugin' && (
                     <div className="page active">
                         <PluginConfig vscode={vscode} />
+                    </div>
+                )}
+
+                {/* 后台任务页面 */}
+                {currentPage === 'task' && (
+                    <div className="page active">
+                        <BackgroundTaskConfig vscode={vscode} />
                     </div>
                 )}
             </div>

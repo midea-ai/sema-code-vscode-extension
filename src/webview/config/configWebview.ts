@@ -14,14 +14,18 @@ export class ConfigWebviewProvider {
     private panel?: vscode.WebviewPanel;
     private coreManager: any;
     private mcpStatusHandler?: (data: any) => void;
+    private taskWatcherMap: Map<string, () => void> = new Map();
+    private pendingPage?: string;
 
     constructor(coreManager: any) {
         this.coreManager = coreManager;
     }
 
-    public show(extensionUri: vscode.Uri) {
+    public show(extensionUri: vscode.Uri, page?: string) {
+        this.pendingPage = page;
         if (this.panel) {
             this.panel.reveal(vscode.ViewColumn.One);
+            this.navigateTo(page || 'models');
             return;
         }
 
@@ -36,7 +40,7 @@ export class ConfigWebviewProvider {
         this.mcpStatusHandler = (data: any) => {
             this.postMessage({ command: 'mcpServerStatusUpdate', data });
         };
-        this.coreManager.on('mcp:server:status', this.mcpStatusHandler);
+        this.coreManager.getSemaCore().on('mcp:server:status', this.mcpStatusHandler);
 
         this.panel.webview.onDidReceiveMessage(async (msg) => {
             const m = msg;
@@ -92,16 +96,24 @@ export class ConfigWebviewProvider {
                 refreshMemoryInfo:          () => this.refreshMemoryInfo(),
                 loadRuleInfo:               () => this.loadRuleInfo(),
                 refreshRuleInfo:            () => this.refreshRuleInfo(),
-                openFile:              () => Promise.resolve(this.openFile(m.filePath)),
+                loadTaskList:               () => this.loadTaskList(),
+                watchTask:                  () => this.watchTask(m.taskId),
+                unwatchTask:                () => Promise.resolve(this.unwatchTask(m.taskId)),
+                stopTask:                   () => this.stopTask(m.taskId),
+                openFile:                   () => Promise.resolve(this.openFile(m.filePath)),
             };
             await handlers[m.command]?.();
         });
 
         this.panel.onDidDispose(() => {
             if (this.mcpStatusHandler) {
-                this.coreManager.off('mcp:server:status', this.mcpStatusHandler);
+                this.coreManager.getSemaCore().off('mcp:server:status', this.mcpStatusHandler);
                 this.mcpStatusHandler = undefined;
             }
+            for (const unwatch of this.taskWatcherMap.values()) {
+                unwatch();
+            }
+            this.taskWatcherMap.clear();
             this.panel = undefined;
         });
         this.loadConfig();
@@ -167,6 +179,10 @@ export class ConfigWebviewProvider {
             this.postMessage({ command: 'loadConfig', data: modelData, showAddPage: !modelData?.modelList?.length });
         } catch {
             this.postMessage({ command: 'loadConfig', data: null, showAddPage: true });
+        }
+        if (this.pendingPage) {
+            this.navigateTo(this.pendingPage);
+            this.pendingPage = undefined;
         }
     }
 
@@ -697,6 +713,64 @@ export class ConfigWebviewProvider {
         } catch (error) {
             this.postMessage({ command: 'refreshRuleInfoResult', success: false, data: null, message: (error as Error).message });
         }
+    }
+
+    // ─── Task (后台任务) ──────────────────────────────────────────────────────
+
+    private async loadTaskList() {
+        if (!this.panel) return;
+        try {
+            await this.ensureCoreReady();
+            const list = this.coreManager.getTaskList();
+            this.postMessage({ command: 'loadTaskListResult', success: true, data: list });
+        } catch (error) {
+            this.postMessage({ command: 'loadTaskListResult', success: false, data: [], message: (error as Error).message });
+        }
+    }
+
+    public pushTaskStart(data: any) {
+        this.postMessage({ command: 'taskStart', data });
+    }
+
+    public pushTaskEnd(data: any) {
+        this.postMessage({ command: 'taskEnd', data });
+    }
+
+    public pushTaskUpdate(data: any) {
+        this.postMessage({ command: 'taskUpdate', data });
+    }
+
+    public navigateTo(page: string) {
+        this.postMessage({ command: 'navigateTo', page });
+    }
+
+    private async watchTask(taskId: string) {
+        if (this.taskWatcherMap.has(taskId)) return;
+        try {
+            await this.ensureCoreReady();
+            const unwatch = this.coreManager.watchTask(taskId, (delta: string) => {
+                this.postMessage({ command: 'taskDelta', taskId, delta });
+            });
+            this.taskWatcherMap.set(taskId, unwatch);
+        } catch (error) {
+            this.postMessage({ command: 'watchTaskError', taskId, message: (error as Error).message });
+        }
+    }
+
+    private unwatchTask(taskId: string) {
+        const unwatch = this.taskWatcherMap.get(taskId);
+        if (unwatch) {
+            unwatch();
+            this.taskWatcherMap.delete(taskId);
+        }
+    }
+
+    private async stopTask(taskId: string) {
+        await this.execute('stopTaskResult', '停止任务', async () => {
+            this.coreManager.stopTask(taskId);
+            this.unwatchTask(taskId);
+            this.postMessage({ command: 'stopTaskResult', success: true, taskId });
+        });
     }
 
     // ─── Utils ────────────────────────────────────────────────────────────────

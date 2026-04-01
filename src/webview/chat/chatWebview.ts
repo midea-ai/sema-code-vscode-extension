@@ -16,8 +16,10 @@ export class ChatWebviewProvider {
         private readonly coreManager: SemaCoreWrapper,
         private readonly fileStateDiffManager: FileStateDiffManager,
         private readonly fileOperationManager: FileOperationManager,
-        private readonly onOpenConfig: () => void
+        private readonly onOpenConfig: (page?: string) => void
     ) {}
+
+    private listenersRegistered = false;
 
     public setWebviewView(webviewView: vscode.WebviewView) {
         this.view = webviewView;
@@ -27,11 +29,16 @@ export class ChatWebviewProvider {
         };
         this.view.webview.html = this.getHtmlContent(this.view.webview);
 
+        if (!this.listenersRegistered) {
+            this.setupEventListeners();
+            this.listenersRegistered = true;
+        }
+
         this.view.webview.onDidReceiveMessage(async (msg) => {
             const handlers: Record<string, () => Promise<void>> = {
                 frontendReady:           () => this.onFrontendReady(),
                 sendInput:               () => this.handleUserInput(msg.text, msg.files),
-                openConfig:              () => Promise.resolve(this.onOpenConfig()),
+                openConfig:              () => Promise.resolve(this.onOpenConfig(msg.page)),
                 interrupt:               () => this.interrupt(),
                 openFile:                () => this.fileOperationManager.openFileAtLine(msg.filePath, msg.line, msg.endLine),
                 requestWorkspaceFiles:   () => this.sendWorkspaceFiles(),
@@ -71,6 +78,32 @@ export class ChatWebviewProvider {
     public clearSessionPanels(): void {
         this.clearAllPanels();
         this.postMessage({ type: 'clearFileChanges' });
+    }
+
+    // ─── Direct semaCore event listeners ─────────────────────────────────────
+
+    private setupEventListeners(): void {
+        this.coreManager.getSemaCore().on('tool:permission:request', (data: any) => {
+            this.postMessage({ type: 'toolPermissionRequest', data });
+        });
+        this.coreManager.getSemaCore().on('ask:question:request', (data: any) => {
+            this.postMessage({ type: 'askQuestionRequest', data });
+        });
+        this.coreManager.getSemaCore().on('plan:exit:request', (data: any) => {
+            this.postMessage({ type: 'planExitRequest', data });
+        });
+        this.coreManager.getSemaCore().on('conversation:usage', (data: any) => {
+            this.postMessage({ type: 'updateTokenInfo', tokenInfo: data.usage });
+        });
+        this.coreManager.getSemaCore().on('todos:update', (data: any) => {
+            this.postMessage({ type: 'todosUpdate', todos: data });
+        });
+        this.coreManager.getSemaCore().on('input:received', (data: any) => {
+            this.postMessage({ type: 'inputReceived', data });
+        });
+        this.coreManager.getSemaCore().on('input:processing', (data: any) => {
+            this.postMessage({ type: 'inputProcessing', data });
+        });
     }
 
     // ─── Message handlers ────────────────────────────────────────────────────

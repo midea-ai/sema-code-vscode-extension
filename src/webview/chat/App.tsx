@@ -37,6 +37,7 @@ const App: React.FC<AppProps> = ({ vscode }) => {
     const [spinnerAccumulatedSeconds, setSpinnerAccumulatedSeconds] = useState<number>(0);
     const [agentMode, setAgentMode] = useState<'Agent' | 'Plan'>('Agent');
     const [pendingInputs, setPendingInputs] = useState<Array<{ inputId: string; content: string }>>([]);
+    const [runningTasks, setRunningTasks] = useState<Map<string, { taskId: string; filepath: string; type: string; startTime: number }>>(new Map());
 
     const outputContainerRef = useRef<HTMLDivElement>(null);
     const inputBoxRef = useRef<InputBoxHandle>(null);
@@ -288,6 +289,29 @@ const App: React.FC<AppProps> = ({ vscode }) => {
                     break;
                 case 'clearPendingInputs':
                     setPendingInputs([]);
+                    break;
+                case 'taskStart':
+                    if (message.data) {
+                        setRunningTasks(prev => {
+                            const next = new Map(prev);
+                            next.set(message.data.taskId, {
+                                taskId: message.data.taskId,
+                                filepath: message.data.filepath,
+                                type: message.data.type,
+                                startTime: Date.now(),
+                            });
+                            return next;
+                        });
+                    }
+                    break;
+                case 'taskEnd':
+                    if (message.data) {
+                        setRunningTasks(prev => {
+                            const next = new Map(prev);
+                            next.delete(message.data.taskId);
+                            return next;
+                        });
+                    }
                     break;
             }
         };
@@ -600,6 +624,30 @@ const App: React.FC<AppProps> = ({ vscode }) => {
                         next_progress={todos.find(t => t.status === 'pending')?.content || ''}
                     />
                 )}
+                {runningTasks.size > 0 && (() => {
+                    const tasks = Array.from(runningTasks.values());
+                    const bashCount = tasks.filter(t => t.type === 'Bash').length;
+                    const agentCount = tasks.filter(t => t.type === 'Agent').length;
+                    let label: string;
+                    if (bashCount > 0 && agentCount > 0) {
+                        label = `${tasks.length} background tasks`;
+                    } else if (agentCount > 0) {
+                        label = `${agentCount} background agent${agentCount > 1 ? 's' : ''}`;
+                    } else {
+                        label = `${bashCount} background bash${bashCount > 1 ? 'es' : ''}`;
+                    }
+                    return (
+                        <div
+                            className="running-tasks-bar"
+                            onClick={() => {
+                                vscode.postMessage({ type: 'openConfig', page: 'task' });
+                            }}
+                        >
+                            <span className="running-task-dot" />
+                            <span className="running-task-label">{label}</span>
+                        </div>
+                    );
+                })()}
                 {pendingInputs.map(p => (
                     <div key={p.inputId} className="user-input-block pending">
                         <div className="user-input-content pending">{p.content}</div>

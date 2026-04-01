@@ -204,6 +204,42 @@ code, pre, .code {
     font-weight: 400;
 }
 
+/* 后台任务运行状态条 */
+.running-tasks-bar {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 16px;
+    font-size: 12px;
+    color: var(--vscode-descriptionForeground);
+    cursor: pointer;
+    transition: background 0.15s;
+    border-radius: 4px;
+}
+
+.running-tasks-bar:hover {
+    background: var(--vscode-list-hoverBackground);
+    color: var(--vscode-foreground);
+}
+
+.running-task-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #4eabff;
+    flex-shrink: 0;
+    animation: task-dot-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes task-dot-pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+}
+
+.running-task-label {
+    white-space: nowrap;
+}
+
 .user-input-block.clickable {
     cursor: pointer;
 }

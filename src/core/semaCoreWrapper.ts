@@ -7,26 +7,22 @@ import {
     SessionReadyData,
     SessionErrorData,
     SessionInterruptedData,
-    ToolPermissionRequestData,
     ToolPermissionResponse,
     ToolExecutionCompleteData,
     ToolExecutionErrorData,
-    TodosUpdateData,
     TopicUpdateData,
-    ConversationUsageData,
     CompactExecData,
     TaskAgentStartData,
     TaskAgentEndData,
-    AskQuestionRequestData,
     AskQuestionResponseData,
-    PlanExitRequestData,
     PlanExitResponseData,
     PlanImplementData,
     FileReferenceData,
-    MCPServerStatusData,
     ToolExecutionChunkData,
-    InputReceivedData,
-    InputProcessingData
+    InputProcessingData,
+    TaskStartData,
+    TaskUpdateData,
+    TaskEndData
 } from 'sema-core/event';
 import {
     SemaCoreConfig,
@@ -48,7 +44,8 @@ import {
     MCPServerConfig,
     MCPServerInfo,
     MemoryConfig,
-    RuleConfig
+    RuleConfig,
+    TaskListItem
 } from 'sema-core/types';
 
 import { SystemConfigManager } from '../managers/SystemConfigManager';
@@ -60,17 +57,11 @@ export interface SemaWrapperCallbacks {
     onStateChange?: (state: 'idle' | 'processing') => void;
 
     onMessage?: (message: any) => void;
-    onMessageComplete?: () => void;
-    onToolPermissionRequest?: (data: ToolPermissionRequestData) => void;
-    onAskQuestionRequest?: (data: AskQuestionRequestData) => void;
-    onPlanExitRequest?: (data: PlanExitRequestData) => void;
-    onUsageUpdate?: (data: ConversationUsageData) => void;
-    onTodosUpdate?: (todos: TodosUpdateData) => void;
     onTopicUpdate?: (topic: TopicUpdateData) => void;
-    onMCPServerStatus?: (data: MCPServerStatusData) => void;
-    onInputReceived?: (data: InputReceivedData) => void;
-    onInputProcessing?: (data: InputProcessingData) => void;
     onToolExecutionComplete?: (data: ToolExecutionCompleteData & { agentId?: string }) => void;
+    onTaskStart?: (data: TaskStartData) => void;
+    onTaskEnd?: (data: TaskEndData) => void;
+    onTaskUpdate?: (data: TaskUpdateData) => void;
     onSessionCleared?: () => void;
 }
 
@@ -136,12 +127,10 @@ export class SemaCoreWrapper {
     }
 
     public processUserInput(content: string, orgContent?: string): void {
-        // console.log('processUserInput()')
         this.semaCore.processUserInput(content, orgContent);
     }
 
     public interruptSession(): void {
-        // console.log('interruptSession()')
         if (this.currentState === 'processing') {
             this.semaCore.interruptSession();
         }
@@ -174,11 +163,11 @@ export class SemaCoreWrapper {
         this.setupToolListeners();
         this.setupMetaListeners();
         this.setupTaskAgentListeners();
+        this.setupTaskListeners();
     }
 
     private setupSessionListeners(): void {
         this.semaCore.on<SessionReadyData>('session:ready', (data) => {
-            // console.log('session:ready', data)
             this.currentSessionId = data.sessionId;
             this.sessionReady = true;
             this.callbacks.onSessionReady?.(data);
@@ -201,7 +190,6 @@ export class SemaCoreWrapper {
         });
 
         this.semaCore.on<SessionInterruptedData & { agentId?: string }>('session:interrupted', (data) => {
-            // console.log('session:interrupted', data)
             if (this.isSubAgent(data.agentId)) {
                 this.addMessageToTaskAgent(data.agentId!, {
                     id: this.generateId(),
@@ -268,19 +256,12 @@ export class SemaCoreWrapper {
                 timestamp: Date.now()
             });
             this.sendContentUpdate();
-            this.callbacks.onMessageComplete?.();
             this.callbacks.onSessionCleared?.();
         });
     }
 
     private setupInputListeners(): void {
-        this.semaCore.on<InputReceivedData>('input:received', (data) => {
-            // console.log('input:received', data)
-            this.callbacks.onInputReceived?.(data);
-        });
-
         this.semaCore.on<InputProcessingData>('input:processing', (data) => {
-            // console.log('input:processing', data)
             const content = data.originalInput || data.input;
 
             const hasUserMessages = this.messageHistory.some(m => m.type === 'user');
@@ -300,13 +281,11 @@ export class SemaCoreWrapper {
             };
             this.messageHistory.push(userMsg);
             this.sendAppendMessages([userMsg]);
-            this.callbacks.onInputProcessing?.(data);
         });
     }
 
     private setupMessageListeners(): void {
         this.semaCore.on<StateUpdateData>('state:update', (data) => {
-            // console.log('state:update', data)
             this.currentState = data.state;
             this.callbacks.onStateChange?.(data.state);
         });
@@ -430,16 +409,11 @@ export class SemaCoreWrapper {
                 } else if (newCompleteMessage) {
                     this.sendAppendMessages([newCompleteMessage]);
                 }
-                this.callbacks.onMessageComplete?.();
             }
         });
     }
 
     private setupToolListeners(): void {
-        this.semaCore.on<ToolPermissionRequestData>('tool:permission:request', (data) => {
-            this.callbacks.onToolPermissionRequest?.(data);
-        });
-
         this.semaCore.on<ToolExecutionChunkData & { agentId?: string }>('tool:execution:chunk', (data) => {
             if (this.isSubAgent(data.agentId)) {
                 return;
@@ -536,19 +510,11 @@ export class SemaCoreWrapper {
     }
 
     private setupMetaListeners(): void {
-        this.semaCore.on<TodosUpdateData>('todos:update', (data) => {
-            this.callbacks.onTodosUpdate?.(data);
-        });
-
         this.semaCore.on<TopicUpdateData>('topic:update', (data) => {
             if (data.title && data.title.trim() && this.title !== data.title) {
                 this.title = data.title;
                 this.callbacks.onTopicUpdate?.(data);
             }
-        });
-
-        this.semaCore.on<ConversationUsageData>('conversation:usage', (data) => {
-            this.callbacks.onUsageUpdate?.(data);
         });
 
         this.semaCore.on<CompactExecData>('compact:exec', (data) => {
@@ -584,14 +550,6 @@ export class SemaCoreWrapper {
             this.callbacks.onSessionCleared?.();
         });
 
-        this.semaCore.on<AskQuestionRequestData>('ask:question:request', (data) => {
-            this.callbacks.onAskQuestionRequest?.(data);
-        });
-
-        this.semaCore.on<PlanExitRequestData>('plan:exit:request', (data) => {
-            this.callbacks.onPlanExitRequest?.(data);
-        });
-
         this.semaCore.on<PlanImplementData>('plan:implement', (data) => {
             const planMsg: Message = {
                 id: this.generateId(),
@@ -607,8 +565,19 @@ export class SemaCoreWrapper {
             this.sendAppendMessages([planMsg]);
         });
 
-        this.semaCore.on<MCPServerStatusData>('mcp:server:status', (data) => {
-            this.callbacks.onMCPServerStatus?.(data);
+    }
+
+    private setupTaskListeners(): void {
+        this.semaCore.on<TaskStartData>('task:start', (data) => {
+            this.callbacks.onTaskStart?.(data);
+        });
+
+        this.semaCore.on<TaskEndData>('task:end', (data) => {
+            this.callbacks.onTaskEnd?.(data);
+        });
+
+        this.semaCore.on<TaskUpdateData>('task:update', (data) => {
+            this.callbacks.onTaskUpdate?.(data);
         });
     }
 
@@ -922,23 +891,6 @@ export class SemaCoreWrapper {
         });
     }
 
-    // ===== 事件管理方法 =====
-
-    public on<T>(event: string, listener: (data: T) => void): this {
-        this.semaCore.on(event, listener);
-        return this;
-    }
-
-    public once<T>(event: string, listener: (data: T) => void): this {
-        this.semaCore.once(event, listener);
-        return this;
-    }
-
-    public off<T>(event: string, listener: (data: T) => void): this {
-        this.semaCore.off(event, listener);
-        return this;
-    }
-
     public getSemaCore(): SemaCore {
         return this.semaCore;
     }
@@ -1115,6 +1067,20 @@ export class SemaCoreWrapper {
 
     public updateMCPUseTools(name: string, toolNames: string[]): Promise<MCPServerInfo[]> {
         return this.semaCore.updateMCPUseTools(name, toolNames);
+    }
+
+    // ===== Task 管理相关方法 =====
+
+    public watchTask(taskId: string, onDelta: (delta: string) => void): () => void {
+        return this.semaCore.watchTask(taskId, onDelta);
+    }
+
+    public stopTask(taskId: string): void {
+        this.semaCore.stopTask(taskId);
+    }
+
+    public getTaskList(): TaskListItem[] {
+        return this.semaCore.getTaskList();
     }
 
     // ===== Mem 管理相关方法 =====
