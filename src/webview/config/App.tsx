@@ -77,7 +77,7 @@ const App: React.FC<AppProps> = ({ vscode }) => {
                     className={`nav-item nav-main ${currentPage === 'task' ? 'active' : ''}`}
                     onClick={() => setCurrentPage('task')}
                 >
-                    后台任务管理
+                    后台任务
                 </div>
 
                 <div

@@ -100,6 +100,7 @@ export class ConfigWebviewProvider {
                 watchTask:                  () => this.watchTask(m.taskId),
                 unwatchTask:                () => Promise.resolve(this.unwatchTask(m.taskId)),
                 stopTask:                   () => this.stopTask(m.taskId),
+                openAgentDetail:            () => Promise.resolve(this.openAgentDetail(m.taskId)),
                 openFile:                   () => Promise.resolve(this.openFile(m.filePath)),
             };
             await handlers[m.command]?.();
@@ -736,10 +737,6 @@ export class ConfigWebviewProvider {
         this.postMessage({ command: 'taskEnd', data });
     }
 
-    public pushTaskUpdate(data: any) {
-        this.postMessage({ command: 'taskUpdate', data });
-    }
-
     public navigateTo(page: string) {
         this.postMessage({ command: 'navigateTo', page });
     }
@@ -774,6 +771,10 @@ export class ConfigWebviewProvider {
     }
 
     // ─── Utils ────────────────────────────────────────────────────────────────
+
+    private openAgentDetail(taskId: string): void {
+        this.coreManager.openAgentDetail(taskId);
+    }
 
     private openFile(filePath: string) {
         if (!filePath) return;

@@ -29,20 +29,25 @@ const App: React.FC<AppProps> = ({ vscode }) => {
     const [todos, setTodos] = useState<TodoItem[]>([]);
     const [modelName, setModelName] = useState<string>('');
     const [availableModels, setAvailableModels] = useState<string[]>([]);
-    const [toolPermissionData, setToolPermissionData] = useState<any>(null);
-    const [askQuestionData, setAskQuestionData] = useState<any>(null);
-    const [planExitData, setPlanExitData] = useState<any>(null);
+    type DialogQueueItem =
+        | { type: 'permission';  data: any; isBackground: boolean }
+        | { type: 'askQuestion'; data: any; isBackground: boolean }
+        | { type: 'planExit';    data: any; isBackground: boolean };
+    const [dialogQueue, setDialogQueue] = useState<DialogQueueItem[]>([]);
+    const activeDialog = dialogQueue[0] ?? null;
     const [modelConfigReminder, setModelConfigReminder] = useState<string>('');
     const [projectInputHistory, setProjectInputHistory] = useState<string[]>([]);
     const [spinnerAccumulatedSeconds, setSpinnerAccumulatedSeconds] = useState<number>(0);
     const [agentMode, setAgentMode] = useState<'Agent' | 'Plan'>('Agent');
     const [pendingInputs, setPendingInputs] = useState<Array<{ inputId: string; content: string }>>([]);
     const [runningTasks, setRunningTasks] = useState<Map<string, { taskId: string; filepath: string; type: string; startTime: number }>>(new Map());
+    const [openAgentTaskId, setOpenAgentTaskId] = useState<string | null>(null);
 
     const outputContainerRef = useRef<HTMLDivElement>(null);
     const inputBoxRef = useRef<InputBoxHandle>(null);
     const userScrolledUpRef = useRef<boolean>(false);
     const spinnerStartTimeRef = useRef<number>(0);
+    const runningTasksRef = useRef(runningTasks);
     const prevMessagesLenRef = useRef<number>(0);
 
     const handleFileChange = useCallback(async (change: FileChange) => {
@@ -224,34 +229,31 @@ const App: React.FC<AppProps> = ({ vscode }) => {
                     }
                     break;
                 case 'toolPermissionRequest':
-                    // 处理工具权限请求（如果是bash工具，显示权限对话框）
                     if (message.data) {
-                        setToolPermissionData(message.data);
+                        setOpenAgentTaskId(null);
+                        setDialogQueue(prev => [...prev, { type: 'permission', data: message.data, isBackground: runningTasksRef.current.has(message.data.agentId) }]);
                     }
                     break;
                 case 'closePermissionPanel':
-                    // 关闭权限申请面板
-                    setToolPermissionData(null);
+                    setDialogQueue(prev => prev.filter(d => d.type !== 'permission'));
                     break;
                 case 'askQuestionRequest':
-                    // 处理问答请求
                     if (message.data) {
-                        setAskQuestionData(message.data);
+                        setOpenAgentTaskId(null);
+                        setDialogQueue(prev => [...prev, { type: 'askQuestion', data: message.data, isBackground: runningTasksRef.current.has(message.data.agentId) }]);
                     }
                     break;
                 case 'closeAskQuestionPanel':
-                    // 关闭问答面板
-                    setAskQuestionData(null);
+                    setDialogQueue(prev => prev.filter(d => d.type !== 'askQuestion'));
                     break;
                 case 'planExitRequest':
-                    // 处理退出Plan模式请求
                     if (message.data) {
-                        setPlanExitData(message.data);
+                        setOpenAgentTaskId(null);
+                        setDialogQueue(prev => [...prev, { type: 'planExit', data: message.data, isBackground: false }]);
                     }
                     break;
                 case 'closePlanExitPanel':
-                    // 关闭退出Plan模式面板
-                    setPlanExitData(null);
+                    setDialogQueue(prev => prev.filter(d => d.type !== 'planExit'));
                     break;
                 case 'showModelConfigReminder':
                     // 显示模型配置提醒
@@ -313,6 +315,11 @@ const App: React.FC<AppProps> = ({ vscode }) => {
                         });
                     }
                     break;
+                case 'openAgentDetail':
+                    if (message.taskId) {
+                        setOpenAgentTaskId(message.taskId);
+                    }
+                    break;
             }
         };
 
@@ -333,8 +340,11 @@ const App: React.FC<AppProps> = ({ vscode }) => {
         };
     }, []);
 
+    // 保持 runningTasksRef 与 state 同步，供 handleMessage 闭包读取
+    useEffect(() => { runningTasksRef.current = runningTasks; }, [runningTasks]);
+
     // 只有 spinner 真正可见时才累计计时，隐藏时暂停
-    const isSpinnerVisible = processingState === 'processing' && !progressMessage && !toolPermissionData && !askQuestionData && !planExitData;
+    const isSpinnerVisible = processingState === 'processing' && !progressMessage && !activeDialog;
 
     useEffect(() => {
         if (isSpinnerVisible) {
@@ -359,16 +369,13 @@ const App: React.FC<AppProps> = ({ vscode }) => {
         prevMessagesLenRef.current = messages.length;
     }, [messages]);
 
-    // 当显示权限对话框时，确保对话框完全可见并应用代码高亮
+    // 当弹窗切换时滚动到底部，权限对话框还需应用代码高亮
     useEffect(() => {
-        if (toolPermissionData && outputContainerRef.current) {
-            // 延迟一小段时间确保DOM已更新
+        if (activeDialog && outputContainerRef.current) {
             setTimeout(() => {
                 if (outputContainerRef.current) {
                     outputContainerRef.current.scrollTop = outputContainerRef.current.scrollHeight;
-
-                    // 应用代码高亮到权限对话框中的代码块
-                    if (window.hljs) {
+                    if (activeDialog.type === 'permission' && window.hljs) {
                         outputContainerRef.current.querySelectorAll('pre code').forEach((block) => {
                             if (!block.classList.contains('hljs')) {
                                 window.hljs.highlightElement(block);
@@ -378,29 +385,7 @@ const App: React.FC<AppProps> = ({ vscode }) => {
                 }
             }, 50);
         }
-    }, [toolPermissionData]);
-
-    // 当显示问答对话框时，确保对话框完全可见
-    useEffect(() => {
-        if (askQuestionData && outputContainerRef.current) {
-            setTimeout(() => {
-                if (outputContainerRef.current) {
-                    outputContainerRef.current.scrollTop = outputContainerRef.current.scrollHeight;
-                }
-            }, 50);
-        }
-    }, [askQuestionData]);
-
-    // 当显示退出Plan模式对话框时，确保对话框完全可见
-    useEffect(() => {
-        if (planExitData && outputContainerRef.current) {
-            setTimeout(() => {
-                if (outputContainerRef.current) {
-                    outputContainerRef.current.scrollTop = outputContainerRef.current.scrollHeight;
-                }
-            }, 50);
-        }
-    }, [planExitData]);
+    }, [activeDialog]);
 
     const isUserAtBottom = (): boolean => {
         if (!outputContainerRef.current) return true;
@@ -448,28 +433,31 @@ const App: React.FC<AppProps> = ({ vscode }) => {
     };
 
     const handleStop = () => {
-        // 如果当前显示权限面板，将权限请求插入到消息历史中，然后隐藏它
-        if (toolPermissionData) {
-            vscode.postMessage({
-                type: 'insertPermissionRequest',
-                permissionData: {
-                    agentId: toolPermissionData?.agentId || '',
-                    toolName: toolPermissionData?.toolName || 'Unknown',
-                    title: toolPermissionData?.title || '',
-                    content: toolPermissionData?.content || '',
-                    action: 'interrupted'
+        setDialogQueue(prev => {
+            const active = prev[0] ?? null;
+
+            // 当前是前台弹窗：插入记录后丢弃，后台弹窗继续保留
+            if (active && !active.isBackground) {
+                if (active.type === 'permission') {
+                    vscode.postMessage({
+                        type: 'insertPermissionRequest',
+                        permissionData: {
+                            agentId: active.data?.agentId || '',
+                            toolName: active.data?.toolName || 'Unknown',
+                            title: active.data?.title || '',
+                            content: active.data?.content || '',
+                            action: 'interrupted'
+                        }
+                    });
                 }
-            });
-            setToolPermissionData(null);
-        }
-        // 如果当前显示问答面板，关闭它
-        if (askQuestionData) {
-            setAskQuestionData(null);
-        }
-        // 如果当前显示退出Plan模式面板，关闭它
-        if (planExitData) {
-            setPlanExitData(null);
-        }
+                // 丢弃前台弹窗，保留所有后台弹窗
+                return prev.filter(d => d.isBackground);
+            }
+
+            // 当前是后台弹窗或队列为空：不变（后台弹窗需要用户单独操作）
+            return prev;
+        });
+
         vscode.postMessage({
             type: 'interrupt'
         });
@@ -481,36 +469,33 @@ const App: React.FC<AppProps> = ({ vscode }) => {
     };
 
     const handleBashPermission = (action: string) => {
-        // console.log(`bashPermission触发: ${action}`);
+        const permData = activeDialog?.data;
 
         // 如果用户拒绝，将权限请求插入到消息历史中
         if (action !== 'agree' && action !== 'allow') {
             vscode.postMessage({
                 type: 'insertPermissionRequest',
                 permissionData: {
-                    agentId: toolPermissionData?.agentId || '',
-                    toolName: toolPermissionData?.toolName || 'Unknown',
-                    title: toolPermissionData?.title || '',
-                    content: toolPermissionData?.content || '',
+                    agentId: permData?.agentId || '',
+                    toolName: permData?.toolName || 'Unknown',
+                    title: permData?.title || '',
+                    content: permData?.content || '',
                     action: 'refuse',
                     refuseMessage: action !== 'refuse' ? action : undefined
                 }
             });
         }
 
-        // 隐藏权限对话框
-        setToolPermissionData(null);
-
-        // 构建工具权限响应对象，使用后端期望的格式
-        const toolPermissionResponse = {
-            toolName: toolPermissionData?.toolName || 'Bash',
-            selected: action  // 直接使用 action 值：'agree'、'allow' 或 'refuse'
-        };
+        // 出队，显示下一个弹窗
+        setDialogQueue(prev => prev.slice(1));
 
         // 发送工具权限响应给后端
         vscode.postMessage({
             type: 'toolPermissionResponse',
-            response: toolPermissionResponse
+            response: {
+                toolName: permData?.toolName || 'Bash',
+                selected: action
+            }
         });
 
         // 拒绝后聚焦于输入框
@@ -541,32 +526,30 @@ const App: React.FC<AppProps> = ({ vscode }) => {
     };
 
     const handleAskQuestionSubmit = (answers: Record<string, string>) => {
-        // console.log('Ask question submit:', answers);
+        const askData = activeDialog?.data;
 
-        // 隐藏问答对话框
-        setAskQuestionData(null);
+        // 出队，显示下一个弹窗
+        setDialogQueue(prev => prev.slice(1));
 
-        // 发送问答响应给后端
         vscode.postMessage({
             type: 'askQuestionResponse',
             response: {
-                agentId: askQuestionData?.agentId || '',
+                agentId: askData?.agentId || '',
                 answers: answers
             }
         });
     };
 
     const handlePlanExitSubmit = (selected: 'startEditing' | 'clearContextAndStart') => {
-        // console.log('Plan exit submit:', selected);
+        const exitData = activeDialog?.data;
 
-        // 隐藏退出Plan模式对话框
-        setPlanExitData(null);
+        // 出队，显示下一个弹窗
+        setDialogQueue(prev => prev.slice(1));
 
-        // 发送退出Plan模式响应给后端
         vscode.postMessage({
             type: 'planExitResponse',
             response: {
-                agentId: planExitData?.agentId || '',
+                agentId: exitData?.agentId || '',
                 selected: selected
             }
         });
@@ -598,15 +581,17 @@ const App: React.FC<AppProps> = ({ vscode }) => {
                 <MessageItem
                     message={message}
                     shouldReportChange={index > lastUserInputIndex}
-                    toolPermissionData={toolPermissionData}
+                    toolPermissionData={activeDialog}
                     vscode={vscode}
                     onFileChange={handleFileChange}
                     streamingAssistantId={streamingAssistantId}
                     streamingToolId={streamingToolId}
+                    openAgentTaskId={activeDialog ? null : openAgentTaskId}
+                    onAgentModalClose={() => setOpenAgentTaskId(null)}
                 />
             </div>
         ));
-    }, [messages, modelName, availableModels, toolPermissionData, processingState, streamingAssistantId, streamingToolId]);
+    }, [messages, modelName, availableModels, activeDialog, processingState, streamingAssistantId, streamingToolId, openAgentTaskId]);
 
     return (
         <>
@@ -653,24 +638,24 @@ const App: React.FC<AppProps> = ({ vscode }) => {
                         <div className="user-input-content pending">{p.content}</div>
                     </div>
                 ))}
-                {toolPermissionData && (
+                {activeDialog?.type === 'permission' && (
                     <PermissionDialog
-                        permissionData={toolPermissionData}
+                        permissionData={activeDialog.data}
                         onPermissionSelect={handleBashPermission}
                         onCancel={handleStop}
                         vscode={vscode}
                     />
                 )}
-                {askQuestionData && (
+                {activeDialog?.type === 'askQuestion' && (
                     <AskQuestionDialog
-                        data={askQuestionData}
+                        data={activeDialog.data}
                         onSubmit={handleAskQuestionSubmit}
                         onCancel={handleStop}
                     />
                 )}
-                {planExitData && (
+                {activeDialog?.type === 'planExit' && (
                     <PlanExitDialog
-                        data={planExitData}
+                        data={activeDialog.data}
                         onSubmit={handlePlanExitSubmit}
                         onCancel={handleStop}
                         vscode={vscode}
@@ -692,7 +677,7 @@ const App: React.FC<AppProps> = ({ vscode }) => {
                 disabled={inputDisabled}
                 placeholder={inputPlaceholder}
                 isGenerating={processingState === 'processing'}
-                showBashPermission={!!toolPermissionData}
+                showBashPermission={!!activeDialog}
                 onSend={handleSend}
                 onStop={handleStop}
                 tokenInfo={tokenInfo}

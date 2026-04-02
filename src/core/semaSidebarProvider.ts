@@ -49,8 +49,10 @@ export class SemaSidebarProvider implements vscode.WebviewViewProvider {
                 onToolExecutionComplete:  this.handleToolExecutionComplete,
                 onTaskStart:              this.handleTaskStart,
                 onTaskEnd:                this.handleTaskEnd,
-                onTaskUpdate:             this.handleTaskUpdate,
                 onSessionCleared:         this.handleSessionCleared,
+                onOpenAgentDetail:        (taskId: string) => {
+                    this.chatWebviewProvider.postMessage({ type: 'openAgentDetail', taskId });
+                },
             },
             this.systemConfigManager
         );
@@ -185,11 +187,6 @@ export class SemaSidebarProvider implements vscode.WebviewViewProvider {
     private handleTaskEnd = (data: any): void => {
         this.configWebviewProvider.pushTaskEnd(data);
         this.chatWebviewProvider.postMessage({ type: 'taskEnd', data });
-    };
-
-    private handleTaskUpdate = (data: any): void => {
-        this.configWebviewProvider.pushTaskUpdate(data);
-        this.chatWebviewProvider.postMessage({ type: 'taskUpdate', data });
     };
 
     private handleSessionCleared = (): void => {

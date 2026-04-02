@@ -240,6 +240,27 @@ code, pre, .code {
     white-space: nowrap;
 }
 
+.task-end-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    display: inline-block;
+    margin-top: 4px;
+}
+
+.task-end-dot--completed {
+    background: #4ec9a0;
+}
+
+.task-end-dot--failed {
+    background: #f48771;
+}
+
+.task-end-dot--stopped {
+    background: #cca700;
+}
+
 .user-input-block.clickable {
     cursor: pointer;
 }

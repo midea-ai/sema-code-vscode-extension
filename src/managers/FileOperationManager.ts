@@ -354,6 +354,7 @@ export class FileOperationManager {
             preview: false,
             viewColumn: vscode.ViewColumn.One
         });
+        await vscode.commands.executeCommand('workbench.action.files.setActiveEditorReadonlyInSession');
     }
 
     /**

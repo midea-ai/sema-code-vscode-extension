@@ -106,19 +106,6 @@ const BackgroundTaskConfig: React.FC<BackgroundTaskConfigProps> = ({ vscode }) =
                         return next;
                     });
                     break;
-                case 'taskUpdate':
-                    setTasks(prev => {
-                        const next = new Map(prev);
-                        const existing = next.get(msg.data.taskId);
-                        if (existing) {
-                            next.set(msg.data.taskId, {
-                                ...existing,
-                                status: msg.data.status,
-                            });
-                        }
-                        return next;
-                    });
-                    break;
                 case 'taskDelta':
                     if (msg.taskId === watchingRef.current) {
                         setTaskOutput(prev => prev + msg.delta);
@@ -173,9 +160,12 @@ const BackgroundTaskConfig: React.FC<BackgroundTaskConfigProps> = ({ vscode }) =
             watchingRef.current = null;
         }
         if (selectedTaskId) {
-            setTaskOutput('');
-            vscode.postMessage({ command: 'watchTask', taskId: selectedTaskId });
-            watchingRef.current = selectedTaskId;
+            const task = tasks.get(selectedTaskId);
+            if (task?.type === 'Bash') {
+                setTaskOutput('');
+                vscode.postMessage({ command: 'watchTask', taskId: selectedTaskId });
+                watchingRef.current = selectedTaskId;
+            }
         }
         return () => {
             if (watchingRef.current) {
@@ -264,7 +254,7 @@ const BackgroundTaskConfig: React.FC<BackgroundTaskConfigProps> = ({ vscode }) =
     const renderAgentDetail = (task: TaskItem) => (
         <div>
             <div className="task-detail-header">
-                <span className="task-detail-title">Explore &gt; {task.filepath}</span>
+                <span className="task-detail-title">{task.filepath}</span>
                 <button
                     className="mcp-icon-btn"
                     title="Close"
@@ -273,7 +263,24 @@ const BackgroundTaskConfig: React.FC<BackgroundTaskConfigProps> = ({ vscode }) =
                     <CloseIcon />
                 </button>
             </div>
-            {/* Agent detail content - TBD */}
+            <div className="task-detail-info">
+                <div><strong>Status:</strong> <span className={`task-status-text ${task.status}`}>{STATUS_LABELS[task.status]}</span></div>
+                <div><strong>Runtime:</strong> {formatRuntime(task.startTime, task.endTime)}</div>
+                {task.summary && (
+                    <div className="task-detail-command-row">
+                        <strong>Summary:</strong>
+                        <span className="task-detail-command-value">{task.summary}</span>
+                    </div>
+                )}
+            </div>
+            <div style={{ marginTop: 16, padding: '0 14px 14px' }}>
+                <button
+                    className="task-view-detail-btn"
+                    onClick={() => vscode.postMessage({ command: 'openAgentDetail', taskId: task.taskId })}
+                >
+                    查看任务详情
+                </button>
+            </div>
         </div>
     );
 

@@ -21,7 +21,6 @@ import {
     ToolExecutionChunkData,
     InputProcessingData,
     TaskStartData,
-    TaskUpdateData,
     TaskEndData
 } from 'sema-core/event';
 import {
@@ -61,8 +60,8 @@ export interface SemaWrapperCallbacks {
     onToolExecutionComplete?: (data: ToolExecutionCompleteData & { agentId?: string }) => void;
     onTaskStart?: (data: TaskStartData) => void;
     onTaskEnd?: (data: TaskEndData) => void;
-    onTaskUpdate?: (data: TaskUpdateData) => void;
     onSessionCleared?: () => void;
+    onOpenAgentDetail?: (taskId: string) => void;
 }
 
 export interface Message {
@@ -574,10 +573,21 @@ export class SemaCoreWrapper {
 
         this.semaCore.on<TaskEndData>('task:end', (data) => {
             this.callbacks.onTaskEnd?.(data);
-        });
 
-        this.semaCore.on<TaskUpdateData>('task:update', (data) => {
-            this.callbacks.onTaskUpdate?.(data);
+            if (data.summary) {
+                const taskEndMessage: Message = {
+                    id: this.generateId(),
+                    type: 'system',
+                    content: {
+                        type: 'task_end',
+                        status: data.status,
+                        summary: data.summary,
+                    },
+                    timestamp: Date.now()
+                };
+                this.messageHistory.push(taskEndMessage);
+                this.sendAppendMessages([taskEndMessage]);
+            }
         });
     }
 
@@ -690,7 +700,7 @@ export class SemaCoreWrapper {
         taskContent.taskMessages.push(message);
         taskContent.summary = this.generateTaskSummary(taskContent);
 
-        // 节流：1s 内多次更新只发一次
+        // 节流：3s 内多次更新只发一次
         this.pendingTaskUpdates.add(taskId);
         if (!this.taskAgentThrottleTimer) {
             this.taskAgentThrottleTimer = setTimeout(() => {
@@ -703,7 +713,7 @@ export class SemaCoreWrapper {
                         this.sendUpdateMessage(e.msg.id, e.msg.content);
                     }
                 }
-            }, 1000);
+            }, 3000);
         }
     }
 
@@ -1077,6 +1087,10 @@ export class SemaCoreWrapper {
 
     public stopTask(taskId: string): void {
         this.semaCore.stopTask(taskId);
+    }
+
+    public openAgentDetail(taskId: string): void {
+        this.callbacks.onOpenAgentDetail?.(taskId);
     }
 
     public getTaskList(): TaskListItem[] {

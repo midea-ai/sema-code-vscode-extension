@@ -17,9 +17,11 @@ interface AgentBlockProps {
     content: TaskMessageContent;
     vscode: VscodeApi;
     forceClose?: boolean;
+    externalOpen?: boolean;
+    onExternalClose?: () => void;
 }
 
-const AgentBlock: React.FC<AgentBlockProps> = React.memo(({ content, vscode, forceClose }) => {
+const AgentBlock: React.FC<AgentBlockProps> = React.memo(({ content, vscode, forceClose, externalOpen, onExternalClose }) => {
     const [isModalOpen, setIsModalOpen] = useState(false);
 
     // 当有权限请求时自动关闭详情弹窗
@@ -28,6 +30,13 @@ const AgentBlock: React.FC<AgentBlockProps> = React.memo(({ content, vscode, for
             setIsModalOpen(false);
         }
     }, [forceClose]);
+
+    // 外部触发打开
+    useEffect(() => {
+        if (externalOpen && !isModalOpen) {
+            setIsModalOpen(true);
+        }
+    }, [externalOpen]);
 
     const { subagent_type, description, status, summary, taskMessages } = content;
 
@@ -62,7 +71,8 @@ const AgentBlock: React.FC<AgentBlockProps> = React.memo(({ content, vscode, for
 
     const handleCloseModal = useCallback(() => {
         setIsModalOpen(false);
-    }, []);
+        onExternalClose?.();
+    }, [onExternalClose]);
 
     return (
         <>

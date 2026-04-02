@@ -14,6 +14,7 @@ import ThoughtBlock from './blocks/ThoughtBlock';
 import PermissionRequestBlock from './components/permission/PermissionRequestBlock';
 import SupplementaryInfo from './components/ui/SupplementaryInfo';
 import PlanImplementPanel from './components/ui/PlanImplementPanel';
+import TaskEndBlock from './blocks/TaskEndBlock';
 
 interface MessageItemProps {
     message: Message;
@@ -23,6 +24,8 @@ interface MessageItemProps {
     onFileChange?: (change: FileChange) => void;
     streamingAssistantId?: string | null;
     streamingToolId?: string | null;
+    openAgentTaskId?: string | null;
+    onAgentModalClose?: () => void;
 }
 
 const MessageItem: React.FC<MessageItemProps> = React.memo(({
@@ -32,6 +35,8 @@ const MessageItem: React.FC<MessageItemProps> = React.memo(({
     vscode,
     onFileChange,
     streamingAssistantId,
+    openAgentTaskId,
+    onAgentModalClose,
 }) => {
     const renderToolContent = () => {
         switch (message.toolName) {
@@ -67,6 +72,8 @@ const MessageItem: React.FC<MessageItemProps> = React.memo(({
                         content={message.content}
                         vscode={vscode}
                         forceClose={!!toolPermissionData}
+                        externalOpen={openAgentTaskId === message.content?.taskId}
+                        onExternalClose={onAgentModalClose}
                     />
                 );
             default:
@@ -147,6 +154,13 @@ const MessageItem: React.FC<MessageItemProps> = React.memo(({
                         vscode={vscode}
                     />
                 );
+            } else if (message.content.type === 'task_end') {
+                return (
+                    <TaskEndBlock
+                        status={message.content.status}
+                        summary={message.content.summary}
+                    />
+                );
             }
             return null;
 
@@ -156,7 +170,8 @@ const MessageItem: React.FC<MessageItemProps> = React.memo(({
 }, (prev, next) => {
     const baseEqual = prev.message === next.message
         && prev.shouldReportChange === next.shouldReportChange
-        && prev.toolPermissionData === next.toolPermissionData;
+        && prev.toolPermissionData === next.toolPermissionData
+        && prev.openAgentTaskId === next.openAgentTaskId;
 
     const prevStreamingIsForThis =
         prev.streamingAssistantId === prev.message.id ||
