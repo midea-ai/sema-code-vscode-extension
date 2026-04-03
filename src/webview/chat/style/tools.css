@@ -369,22 +369,19 @@
 }
 
 .thought-content {
-    font-size: 12px;
+    font-size: 11px;
     color: var(--vscode-descriptionForeground);
     white-space: pre-wrap;
     word-wrap: break-word;
     word-break: break-word;
     overflow-wrap: break-word;
     line-height: 1.4;
-    font-size: 11px;
+    width: 100%;
+    max-width: 100%;
+    max-height: calc(1.4em * 5);
+    overflow-y: auto;
 }
 
-.thought-content-clamped {
-    display: -webkit-box;
-    -webkit-line-clamp: 4;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
-}
 
 .thought-block-content::-webkit-scrollbar,
 .thought-content::-webkit-scrollbar {
