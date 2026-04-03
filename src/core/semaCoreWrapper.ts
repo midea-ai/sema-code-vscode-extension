@@ -130,25 +130,7 @@ export class SemaCoreWrapper {
     }
 
     public interruptSession(): void {
-        if (this.currentState === 'processing') {
-            this.semaCore.interruptSession();
-        }
-    }
-
-    public async interruptAndWait(timeout: number = 2000): Promise<boolean> {
-        if (this.currentState !== 'processing') {
-            return true;
-        }
-
         this.semaCore.interruptSession();
-
-        const isIdle = await this.waitForIdle(timeout);
-        if (!isIdle) {
-            return false;
-        }
-
-        await new Promise(resolve => setTimeout(resolve, 300));
-        return true;
     }
 
     private isSubAgent(agentId?: string): boolean {
@@ -666,7 +648,8 @@ export class SemaCoreWrapper {
                 prompt: data.prompt,
                 status: 'running',
                 summary: data.prompt,
-                taskMessages: [userMessage]
+                taskMessages: [userMessage],
+                run_in_background: data.run_in_background
             } as TaskMessageContent,
             timestamp: Date.now()
         };
@@ -846,32 +829,6 @@ export class SemaCoreWrapper {
 
     public getCurrentState(): 'idle' | 'processing' {
         return this.currentState;
-    }
-
-    public waitForIdle(timeout: number = 5000): Promise<boolean> {
-        return new Promise((resolve) => {
-            if (this.currentState === 'idle') {
-                resolve(true);
-                return;
-            }
-
-            let timeoutId: NodeJS.Timeout;
-
-            const stateHandler = (data: { state: 'idle' | 'processing' }) => {
-                if (data.state === 'idle') {
-                    clearTimeout(timeoutId);
-                    this.semaCore.off('state:update', stateHandler);
-                    resolve(true);
-                }
-            };
-
-            this.semaCore.on('state:update', stateHandler);
-
-            timeoutId = setTimeout(() => {
-                this.semaCore.off('state:update', stateHandler);
-                resolve(false);
-            }, timeout);
-        });
     }
 
     public isReady(): boolean {
@@ -1087,6 +1044,10 @@ export class SemaCoreWrapper {
 
     public stopTask(taskId: string): void {
         this.semaCore.stopTask(taskId);
+    }
+
+    public stopAllTasks(): number {
+        return this.semaCore.stopAllTasks();
     }
 
     public openAgentDetail(taskId: string): void {

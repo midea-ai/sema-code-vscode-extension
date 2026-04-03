@@ -17,7 +17,7 @@ export class ChatWebviewProvider {
         private readonly fileStateDiffManager: FileStateDiffManager,
         private readonly fileOperationManager: FileOperationManager,
         private readonly onOpenConfig: (page?: string) => void
-    ) {}
+    ) { }
 
     private listenersRegistered = false;
 
@@ -36,28 +36,28 @@ export class ChatWebviewProvider {
 
         this.view.webview.onDidReceiveMessage(async (msg) => {
             const handlers: Record<string, () => Promise<void>> = {
-                frontendReady:           () => this.onFrontendReady(),
-                sendInput:               () => this.handleUserInput(msg.text, msg.files),
-                openConfig:              () => Promise.resolve(this.onOpenConfig(msg.page)),
-                interrupt:               () => this.interrupt(),
-                openFile:                () => this.fileOperationManager.openFileAtLine(msg.filePath, msg.line, msg.endLine),
-                requestWorkspaceFiles:   () => this.sendWorkspaceFiles(),
-                searchWorkspaceFiles:    () => this.searchWorkspaceFiles(msg.query || ''),
-                requestModelInfo:        () => this.sendModelInfo(),
-                switchModel:             () => this.switchModel(msg.modelName),
-                restoreFromSnapshots:    () => this.restoreFromSnapshots(msg.filePaths),
-                showFileDiff:            () => this.fileStateDiffManager.showFileDiff(msg.filePath, msg.minLine),
-                showPermissionDiff:      () => this.fileStateDiffManager.showPermissionDiff(msg.filePath, msg.diffContent),
-                getFileChangeStats:      () => this.getFileChangeStats(msg.filePath),
-                searchContentInFiles:    () => this.searchContentInFiles(msg.content),
-                toolPermissionResponse:  () => Promise.resolve(this.handleToolPermissionResponse(msg.response)),
-                askQuestionResponse:     () => Promise.resolve(this.coreManager.respondToAskQuestion(msg.response)),
-                planExitResponse:        () => this.handlePlanExitResponse(msg.response),
-                verifyFilePath:          () => this.verifyFilePath(msg.filePath, msg.tempId, msg.originalCode, msg.lineInfo),
+                frontendReady: () => this.onFrontendReady(),
+                sendInput: () => this.handleUserInput(msg.text, msg.files),
+                openConfig: () => Promise.resolve(this.onOpenConfig(msg.page)),
+                interrupt: () => this.interrupt(),
+                openFile: () => this.fileOperationManager.openFileAtLine(msg.filePath, msg.line, msg.endLine),
+                requestWorkspaceFiles: () => this.sendWorkspaceFiles(),
+                searchWorkspaceFiles: () => this.searchWorkspaceFiles(msg.query || ''),
+                requestModelInfo: () => this.sendModelInfo(),
+                switchModel: () => this.switchModel(msg.modelName),
+                restoreFromSnapshots: () => this.restoreFromSnapshots(msg.filePaths),
+                showFileDiff: () => this.fileStateDiffManager.showFileDiff(msg.filePath, msg.minLine),
+                showPermissionDiff: () => this.fileStateDiffManager.showPermissionDiff(msg.filePath, msg.diffContent),
+                getFileChangeStats: () => this.getFileChangeStats(msg.filePath),
+                searchContentInFiles: () => this.searchContentInFiles(msg.content),
+                toolPermissionResponse: () => Promise.resolve(this.handleToolPermissionResponse(msg.response)),
+                askQuestionResponse: () => Promise.resolve(this.coreManager.respondToAskQuestion(msg.response)),
+                planExitResponse: () => this.handlePlanExitResponse(msg.response),
+                verifyFilePath: () => this.verifyFilePath(msg.filePath, msg.tempId, msg.originalCode, msg.lineInfo),
                 insertPermissionRequest: () => Promise.resolve(this.coreManager.insertPermissionRequestMessage(msg.permissionData)),
-                updateAgentMode:         () => this.coreManager.updateAgentMode(msg.mode),
-                requestCommands:         () => this.sendCommands(),
-                openBashOutput:          () => this.fileOperationManager.openBashOutputAsDocument(msg.content, msg.command, msg.toolId),
+                updateAgentMode: () => this.coreManager.updateAgentMode(msg.mode),
+                requestCommands: () => this.sendCommands(),
+                openBashOutput: () => this.fileOperationManager.openBashOutputAsDocument(msg.content, msg.command, msg.toolId),
             };
             await handlers[msg.type]?.();
         });
@@ -67,16 +67,12 @@ export class ChatWebviewProvider {
         this.view?.webview.postMessage(message);
     }
 
-    public clearAllPanels(): void {
+    public clearSessionPanels(): void {
         this.postMessage({ type: 'closePermissionPanel' });
         this.postMessage({ type: 'closeAskQuestionPanel' });
         this.postMessage({ type: 'closePlanExitPanel' });
-        this.postMessage({ type: 'clearTodos' });
         this.postMessage({ type: 'clearPendingInputs' });
-    }
-
-    public clearSessionPanels(): void {
-        this.clearAllPanels();
+        this.postMessage({ type: 'clearTodos' });
         this.postMessage({ type: 'clearFileChanges' });
     }
 
@@ -142,8 +138,12 @@ export class ChatWebviewProvider {
 
     private async interrupt(): Promise<void> {
         try {
-            this.clearAllPanels();
+            this.postMessage({ type: 'closePermissionPanel' });
+            this.postMessage({ type: 'closeAskQuestionPanel' });
+            this.postMessage({ type: 'closePlanExitPanel' });
+            this.postMessage({ type: 'clearPendingInputs' });
             this.coreManager.interruptSession();
+            this.coreManager.stopAllTasks();
         } catch (error) {
             console.error('Error interrupting session:', error);
         }
@@ -218,7 +218,13 @@ export class ChatWebviewProvider {
     private async handlePlanExitResponse(response: any): Promise<void> {
         if (response.selected === 'clearContextAndStart') {
             this.coreManager.clearMessageHistory();
-            this.clearAllPanels();
+
+            this.postMessage({ type: 'closePermissionPanel' });
+            this.postMessage({ type: 'closeAskQuestionPanel' });
+            this.postMessage({ type: 'closePlanExitPanel' });
+            this.postMessage({ type: 'clearPendingInputs' });
+            this.postMessage({ type: 'clearTodos' });
+
             this.postMessage({ type: 'resetTokenInfo' });
         }
         this.coreManager.respondToPlanExit(response);

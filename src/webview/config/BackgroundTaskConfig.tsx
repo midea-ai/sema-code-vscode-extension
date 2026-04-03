@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { CloseIcon } from './utils/svgIcons';
 import { VscodeApi } from './types';
 import './style/task.css';
@@ -8,7 +8,7 @@ interface BackgroundTaskConfigProps {
 }
 
 type TaskType = 'Bash' | 'Agent';
-type TaskStatus = 'running' | 'completed' | 'failed' | 'stopped';
+type TaskStatus = 'running' | 'completed' | 'failed' | 'killed';
 
 interface TaskItem {
     taskId: string;
@@ -20,28 +20,92 @@ interface TaskItem {
     endTime?: number;
     exitCode?: number;
     summary?: string;
+    agentType?: string;
 }
 
 const STATUS_LABELS: Record<TaskStatus, string> = {
     running: 'Running',
     completed: 'Completed',
     failed: 'Failed',
-    stopped: 'Stopped',
+    killed: 'Killed',
+};
+
+const formatRuntime = (start: number, end?: number) => {
+    const dur = Math.round(((end || Date.now()) - start) / 1000);
+    if (dur < 60) return `${dur}s`;
+    const m = Math.floor(dur / 60);
+    const s = dur % 60;
+    if (m < 60) return `${m}min${s > 0 ? s + 's' : ''}`;
+    const h = Math.floor(m / 60);
+    return `${h}h${m % 60}min`;
+};
+
+const formatStartTime = (start: number) => {
+    const now = Date.now();
+    const diff = now - start;
+    const DAY = 24 * 60 * 60 * 1000;
+    if (diff >= DAY) {
+        const days = Math.floor(diff / DAY);
+        return `${days}天前`;
+    }
+    const d = new Date(start);
+    const hh = String(d.getHours()).padStart(2, '0');
+    const mm = String(d.getMinutes()).padStart(2, '0');
+    return `${hh}:${mm}`;
+};
+
+const RuntimeText: React.FC<{ start: number; end?: number; status: TaskStatus }> = ({ start, end, status }) => {
+    const [, setTick] = useState(0);
+    useEffect(() => {
+        if (status !== 'running') return;
+        const timer = setInterval(() => setTick(t => t + 1), 1000);
+        return () => clearInterval(timer);
+    }, [status]);
+    return <>{formatRuntime(start, end)}</>;
+};
+
+const BashOutputPanel: React.FC<{ taskId: string; status: TaskStatus; vscode: VscodeApi }> = ({ taskId, status, vscode }) => {
+    const [output, setOutput] = useState('');
+    const outputRef = useRef<HTMLPreElement>(null);
+
+    useEffect(() => {
+        setOutput('');
+        vscode.postMessage({ command: 'watchTask', taskId });
+
+        const handleMessage = (event: MessageEvent) => {
+            const msg = event.data;
+            if (msg.command === 'taskDelta' && msg.taskId === taskId) {
+                setOutput(prev => prev + msg.delta);
+            }
+        };
+        window.addEventListener('message', handleMessage);
+
+        return () => {
+            window.removeEventListener('message', handleMessage);
+            vscode.postMessage({ command: 'unwatchTask', taskId });
+        };
+    }, [taskId, vscode]);
+
+    useEffect(() => {
+        if (outputRef.current) {
+            outputRef.current.scrollTop = outputRef.current.scrollHeight;
+        }
+    }, [output]);
+
+    return (
+        <div className="task-detail-output-section">
+            <div className="task-detail-output-label">Output:</div>
+            <pre ref={outputRef} className="task-detail-output">
+                {output || (status === 'running' ? 'Waiting for output...' : 'No output')}
+            </pre>
+        </div>
+    );
 };
 
 const BackgroundTaskConfig: React.FC<BackgroundTaskConfigProps> = ({ vscode }) => {
     const [tasks, setTasks] = useState<Map<string, TaskItem>>(new Map());
     const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
-    const [taskOutput, setTaskOutput] = useState<string>('');
-    const outputRef = useRef<HTMLPreElement>(null);
-    const watchingRef = useRef<string | null>(null);
     const autoOpenAppliedRef = useRef<Set<string>>(new Set());
-
-    const scrollToBottom = useCallback(() => {
-        if (outputRef.current) {
-            outputRef.current.scrollTop = outputRef.current.scrollHeight;
-        }
-    }, []);
 
     useEffect(() => {
         const handleMessage = (event: MessageEvent) => {
@@ -58,7 +122,9 @@ const BackgroundTaskConfig: React.FC<BackgroundTaskConfigProps> = ({ vscode }) =
                                     command: item.command,
                                     type: item.type === 'Agent' ? 'Agent' : 'Bash',
                                     status: item.status || 'running',
-                                    startTime: Date.now(),
+                                    startTime: item.startTime || Date.now(),
+                                    endTime: item.endTime,
+                                    agentType: item.agentType,
                                 });
                             }
                             return next;
@@ -74,7 +140,8 @@ const BackgroundTaskConfig: React.FC<BackgroundTaskConfigProps> = ({ vscode }) =
                             command: msg.data.command,
                             type: msg.data.type || 'Bash',
                             status: msg.data.status || 'running',
-                            startTime: Date.now(),
+                            startTime: msg.data.startTime || Date.now(),
+                            agentType: msg.data.agentType,
                         });
                         return next;
                     });
@@ -87,7 +154,7 @@ const BackgroundTaskConfig: React.FC<BackgroundTaskConfigProps> = ({ vscode }) =
                             next.set(msg.data.taskId, {
                                 ...existing,
                                 status: msg.data.status || 'completed',
-                                endTime: Date.now(),
+                                endTime: msg.data.endTime || Date.now(),
                                 exitCode: msg.data.exitCode,
                                 summary: msg.data.summary,
                             });
@@ -97,8 +164,8 @@ const BackgroundTaskConfig: React.FC<BackgroundTaskConfigProps> = ({ vscode }) =
                                 filepath: msg.data.filepath,
                                 type: msg.data.type || 'Bash',
                                 status: msg.data.status || 'completed',
-                                startTime: Date.now(),
-                                endTime: Date.now(),
+                                startTime: msg.data.startTime || Date.now(),
+                                endTime: msg.data.endTime || Date.now(),
                                 exitCode: msg.data.exitCode,
                                 summary: msg.data.summary,
                             });
@@ -106,18 +173,13 @@ const BackgroundTaskConfig: React.FC<BackgroundTaskConfigProps> = ({ vscode }) =
                         return next;
                     });
                     break;
-                case 'taskDelta':
-                    if (msg.taskId === watchingRef.current) {
-                        setTaskOutput(prev => prev + msg.delta);
-                    }
-                    break;
                 case 'stopTaskResult':
                     if (msg.success) {
                         setTasks(prev => {
                             const next = new Map(prev);
                             const existing = next.get(msg.taskId);
                             if (existing) {
-                                next.set(msg.taskId, { ...existing, status: 'stopped', endTime: Date.now() });
+                                next.set(msg.taskId, { ...existing, status: 'killed', endTime: msg.endTime || Date.now() });
                             }
                             return next;
                         });
@@ -136,11 +198,6 @@ const BackgroundTaskConfig: React.FC<BackgroundTaskConfigProps> = ({ vscode }) =
         return () => window.removeEventListener('message', handleMessage);
     }, []);
 
-    // Auto-scroll on new output
-    useEffect(() => {
-        scrollToBottom();
-    }, [taskOutput, scrollToBottom]);
-
     // Auto-open detail when only 1 task total
     useEffect(() => {
         const allTasks = Array.from(tasks.values());
@@ -152,28 +209,6 @@ const BackgroundTaskConfig: React.FC<BackgroundTaskConfigProps> = ({ vscode }) =
             }
         }
     }, [tasks, selectedTaskId]);
-
-    // Watch/unwatch on selection change
-    useEffect(() => {
-        if (watchingRef.current) {
-            vscode.postMessage({ command: 'unwatchTask', taskId: watchingRef.current });
-            watchingRef.current = null;
-        }
-        if (selectedTaskId) {
-            const task = tasks.get(selectedTaskId);
-            if (task?.type === 'Bash') {
-                setTaskOutput('');
-                vscode.postMessage({ command: 'watchTask', taskId: selectedTaskId });
-                watchingRef.current = selectedTaskId;
-            }
-        }
-        return () => {
-            if (watchingRef.current) {
-                vscode.postMessage({ command: 'unwatchTask', taskId: watchingRef.current });
-                watchingRef.current = null;
-            }
-        };
-    }, [selectedTaskId, vscode]);
 
     const handleStopTask = (taskId: string) => {
         vscode.postMessage({ command: 'stopTask', taskId });
@@ -188,14 +223,11 @@ const BackgroundTaskConfig: React.FC<BackgroundTaskConfigProps> = ({ vscode }) =
     const agentTasks = allTasks.filter(t => t.type === 'Agent');
     const selectedTask = selectedTaskId ? tasks.get(selectedTaskId) : null;
 
-    const formatRuntime = (start: number, end?: number) => {
-        const dur = Math.round(((end || Date.now()) - start) / 1000);
-        if (dur < 60) return `${dur}s`;
-        const m = Math.floor(dur / 60);
-        const s = dur % 60;
-        if (m < 60) return `${m}min${s > 0 ? s + 's' : ''}`;
-        const h = Math.floor(m / 60);
-        return `${h}h${m % 60}min`;
+    const getTaskDisplayName = (task: TaskItem) => {
+        if (task.type === 'Agent' && task.agentType) {
+            return `${task.agentType} > ${task.command || task.filepath}`;
+        }
+        return task.command || task.filepath;
     };
 
     const renderTaskRow = (task: TaskItem) => {
@@ -207,8 +239,9 @@ const BackgroundTaskConfig: React.FC<BackgroundTaskConfigProps> = ({ vscode }) =
                 onClick={() => setSelectedTaskId(task.taskId)}
             >
                 <span className="task-row-command">
+                    <span className="task-time-tag">[{formatStartTime(task.startTime)}]</span>
                     <span className={`task-status-tag ${task.status}`}>[{STATUS_LABELS[task.status]}]</span>
-                    {task.command || task.filepath}
+                    {getTaskDisplayName(task)}
                 </span>
                 {task.status === 'running' && (
                     <button
@@ -235,26 +268,25 @@ const BackgroundTaskConfig: React.FC<BackgroundTaskConfigProps> = ({ vscode }) =
                 </button>
             </div>
             <div className="task-detail-info">
+                <div><strong>TaskID:</strong> {task.taskId}</div>
                 <div><strong>Status:</strong> <span className={`task-status-text ${task.status}`}>{STATUS_LABELS[task.status]}</span></div>
-                <div><strong>Runtime:</strong> {formatRuntime(task.startTime, task.endTime)}</div>
+                <div><strong>Runtime:</strong> <RuntimeText start={task.startTime} end={task.endTime} status={task.status} /></div>
+                {task.status !== 'running' && task.endTime && (
+                    <div><strong>End:</strong> {new Date(task.endTime).toLocaleTimeString()}</div>
+                )}
                 <div className="task-detail-command-row">
                     <strong>Command:</strong>
                     <span className="task-detail-command-value">{task.command || task.filepath}</span>
                 </div>
             </div>
-            <div className="task-detail-output-section">
-                <div className="task-detail-output-label">Output:</div>
-                <pre ref={outputRef} className="task-detail-output">
-                    {taskOutput || (task.status === 'running' ? 'Waiting for output...' : 'No output')}
-                </pre>
-            </div>
+            <BashOutputPanel taskId={task.taskId} status={task.status} vscode={vscode} />
         </div>
     );
 
     const renderAgentDetail = (task: TaskItem) => (
         <div>
             <div className="task-detail-header">
-                <span className="task-detail-title">{task.filepath}</span>
+                <span className="task-detail-title">{getTaskDisplayName(task)}</span>
                 <button
                     className="mcp-icon-btn"
                     title="Close"
@@ -264,13 +296,11 @@ const BackgroundTaskConfig: React.FC<BackgroundTaskConfigProps> = ({ vscode }) =
                 </button>
             </div>
             <div className="task-detail-info">
+                <div><strong>TaskID:</strong> {task.taskId}</div>
                 <div><strong>Status:</strong> <span className={`task-status-text ${task.status}`}>{STATUS_LABELS[task.status]}</span></div>
-                <div><strong>Runtime:</strong> {formatRuntime(task.startTime, task.endTime)}</div>
-                {task.summary && (
-                    <div className="task-detail-command-row">
-                        <strong>Summary:</strong>
-                        <span className="task-detail-command-value">{task.summary}</span>
-                    </div>
+                <div><strong>Runtime:</strong> <RuntimeText start={task.startTime} end={task.endTime} status={task.status} /></div>
+                {task.status !== 'running' && task.endTime && (
+                    <div><strong>End:</strong> {new Date(task.endTime).toLocaleTimeString()}</div>
                 )}
             </div>
             <div style={{ marginTop: 16, padding: '0 14px 14px' }}>
@@ -278,7 +308,7 @@ const BackgroundTaskConfig: React.FC<BackgroundTaskConfigProps> = ({ vscode }) =
                     className="task-view-detail-btn"
                     onClick={() => vscode.postMessage({ command: 'openAgentDetail', taskId: task.taskId })}
                 >
-                    查看任务详情
+                    任务详情
                 </button>
             </div>
         </div>

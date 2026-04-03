@@ -433,36 +433,26 @@ const App: React.FC<AppProps> = ({ vscode }) => {
     };
 
     const handleStop = () => {
-        setDialogQueue(prev => {
-            const active = prev[0] ?? null;
-
-            // 当前是前台弹窗：插入记录后丢弃，后台弹窗继续保留
-            if (active && !active.isBackground) {
-                if (active.type === 'permission') {
-                    vscode.postMessage({
-                        type: 'insertPermissionRequest',
-                        permissionData: {
-                            agentId: active.data?.agentId || '',
-                            toolName: active.data?.toolName || 'Unknown',
-                            title: active.data?.title || '',
-                            content: active.data?.content || '',
-                            action: 'interrupted'
-                        }
-                    });
-                }
-                // 丢弃前台弹窗，保留所有后台弹窗
-                return prev.filter(d => d.isBackground);
+        // 为队列中所有前台权限弹窗插入"已中断"记录到消息历史
+        for (const item of dialogQueue) {
+            if (!item.isBackground && item.type === 'permission') {
+                vscode.postMessage({
+                    type: 'insertPermissionRequest',
+                    permissionData: {
+                        agentId: item.data?.agentId || '',
+                        toolName: item.data?.toolName || 'Unknown',
+                        title: item.data?.title || '',
+                        content: item.data?.content || '',
+                        action: 'interrupted'
+                    }
+                });
             }
+        }
 
-            // 当前是后台弹窗或队列为空：不变（后台弹窗需要用户单独操作）
-            return prev;
-        });
+        // 中断前台 + 停掉所有后台任务，后端统一处理
+        vscode.postMessage({ type: 'interrupt' });
 
-        vscode.postMessage({
-            type: 'interrupt'
-        });
-
-        // 中断后聚焦于输入框
+        // 中断后聚焦输入框
         setTimeout(() => {
             inputBoxRef.current?.focus();
         }, 50);
@@ -493,6 +483,7 @@ const App: React.FC<AppProps> = ({ vscode }) => {
         vscode.postMessage({
             type: 'toolPermissionResponse',
             response: {
+                toolId: permData?.toolId || '',
                 toolName: permData?.toolName || 'Bash',
                 selected: action
             }

@@ -11,6 +11,7 @@ export interface TaskMessageContent {
     status: 'running' | 'completed' | 'failed' | 'interrupted';
     summary: string;             // 实时结果摘要
     taskMessages: Message[];     // 完整消息历史（用于弹窗展示）
+    run_in_background?: boolean; // 是否后台运行
 }
 
 interface AgentBlockProps {
@@ -38,7 +39,7 @@ const AgentBlock: React.FC<AgentBlockProps> = React.memo(({ content, vscode, for
         }
     }, [externalOpen]);
 
-    const { subagent_type, description, status, summary, taskMessages } = content;
+    const { subagent_type, description, status, summary, taskMessages, run_in_background } = content;
 
     // 构建标题
     const title = `${subagent_type}(${description})`;
@@ -80,6 +81,7 @@ const AgentBlock: React.FC<AgentBlockProps> = React.memo(({ content, vscode, for
                 <div className="task-block-header">
                     <div className="task-block-title">
                         {getStatusIcon()}
+                        {run_in_background && <span className="task-background-tag">后台</span>}
                         <span className="task-title-text">{title}</span>
                     </div>
                     <button

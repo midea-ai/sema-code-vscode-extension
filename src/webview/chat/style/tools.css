@@ -308,8 +308,8 @@
 /* Thought Block 样式 */
 .thought-block {
     margin: 5px;
-    width: 100%;
-    max-width: 100%;
+    width: calc(100% - 10px); 
+    max-width: calc(100% - 10px); 
     box-sizing: border-box;
 }
 
@@ -354,14 +354,6 @@
     display: block;
 }
 
-.thought-timer {
-    font-size: 11px;
-    color: var(--vscode-descriptionForeground);
-    opacity: 0.8;
-    flex-shrink: 0;
-    margin-left: 4px;
-}
-
 .thinking-disabled {
     cursor: default;
 }
@@ -384,10 +376,14 @@
     word-break: break-word;
     overflow-wrap: break-word;
     line-height: 1.4;
-    width: 100%;
-    max-width: 100%;
-    max-height: calc(1.4em * 5);
-    overflow-y: auto;
+    font-size: 11px;
+}
+
+.thought-content-clamped {
+    display: -webkit-box;
+    -webkit-line-clamp: 4;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
 }
 
 .thought-block-content::-webkit-scrollbar,
@@ -496,6 +492,17 @@
     gap: 6px;
     flex: 1;
     min-width: 0;
+}
+
+.task-background-tag {
+    font-size: 10px;
+    padding: 1px 5px;
+    border-radius: 3px;
+    background: var(--vscode-badge-background);
+    color: var(--vscode-badge-foreground);
+    opacity: 0.6;
+    flex-shrink: 0;
+    line-height: 1.4;
 }
 
 .task-status-icon {
@@ -659,6 +666,8 @@
     overflow-y: auto;
     padding: 12px 14px;
     min-height: 200px;
+    font-size: 12px;
+    line-height: 1.6;
 }
 
 .task-modal-content::-webkit-scrollbar {

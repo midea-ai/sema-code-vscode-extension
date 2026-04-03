@@ -200,7 +200,7 @@ const AddMarketplaceModal: React.FC<{
     isAdding?: boolean;
 }> = ({ onClose, onAdd, isAdding }) => {
     const [sourceType, setSourceType] = useState<'github' | 'directory'>('github');
-    const [value, setValue] = useState('');
+    const [value, setValue] = useState(sourceType === 'github' ? DEFAULT_GITHUB_REPO : '');
     const [error, setError] = useState<string | null>(null);
 
     const handleAdd = () => {
@@ -226,7 +226,7 @@ const AddMarketplaceModal: React.FC<{
                     <div className="plugin-source-tabs">
                         <button
                             className={`plugin-source-tab ${sourceType === 'github' ? 'active' : ''}`}
-                            onClick={() => { setSourceType('github'); setValue(''); setError(null); }}
+                            onClick={() => { setSourceType('github'); setValue(DEFAULT_GITHUB_REPO); setError(null); }}
                         >
                             GitHub 仓库
                         </button>
@@ -241,7 +241,7 @@ const AddMarketplaceModal: React.FC<{
                         <input
                             className="plugin-source-input"
                             type="text"
-                            placeholder={sourceType === 'github' ? '例如：anthropics/claude-code' : '例如：/Users/name/my-plugins'}
+                            placeholder={sourceType === 'github' ? '例如：anthropics/claude-plugins-official' : '例如：/Users/name/my-plugins'}
                             value={value}
                             onChange={(e) => { setValue(e.target.value); setError(null); }}
                         />
@@ -264,6 +264,7 @@ const AddMarketplaceModal: React.FC<{
     );
 };
 
+const DEFAULT_GITHUB_REPO = 'anthropics/claude-plugins-official';
 const PAGE_SIZE = 10;
 
 // 市场区块 - 展示可用插件

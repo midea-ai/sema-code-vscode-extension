@@ -32,6 +32,11 @@
     font-family: var(--vscode-editor-font-family, monospace);
 }
 
+.task-time-tag {
+    color: var(--vscode-descriptionForeground, #888);
+    margin-right: 2px;
+}
+
 .task-status-tag {
     margin-right: 4px;
 }
@@ -46,7 +51,7 @@
 .task-kill-btn {
     flex: none;
     width: 36px;
-    background: none;
+    background: rgba(176, 124, 232, 0.2);
     border: none;
     border-radius: 3px;
     cursor: pointer;
@@ -60,7 +65,7 @@
 }
 
 .task-kill-btn:hover {
-    background: rgba(176, 124, 232, 0.2);
+    background: rgba(176, 124, 232, 0.35);
 }
 
 /* Detail 面板 */

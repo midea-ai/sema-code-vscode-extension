@@ -118,13 +118,14 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
         }
 
         return taskMessages.map((message) => (
-            <MessageItem
-                key={message.id}
-                message={message}
-                shouldReportChange={false}
-                toolPermissionData={null}
-                vscode={vscode}
-            />
+            <div key={message.id} className="msg-wrap">
+                <MessageItem
+                    message={message}
+                    shouldReportChange={false}
+                    toolPermissionData={null}
+                    vscode={vscode}
+                />
+            </div>
         ));
     }, [taskMessages, vscode]);
 

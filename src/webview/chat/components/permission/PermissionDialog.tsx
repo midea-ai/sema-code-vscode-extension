@@ -5,6 +5,7 @@ import { ToolContent } from '../../types';
 import { isNotebookType, isMcpToolType, isSkillType, getPermissionTitle, getResponseDot } from '../../utils/permissionUtils';
 
 interface ToolPermissionRequestData extends ToolContent {
+    agentId?: string;
     options: {
         agree: string;
         allow?: string;
@@ -60,7 +61,9 @@ const PermissionDialog: React.FC<PermissionDialogProps> = ({
                 <div className="bash-permission-title">
                     <span className="bash-permission-dot">{getResponseDot()}</span>
                     <span className="bash-permission-title-text">
-                        {getPermissionTitle(permissionData.toolName)}
+                        {permissionData.agentId && permissionData.agentId !== 'main' && (
+                            <span className="bash-permission-agent-id">[{permissionData.agentId.slice(0, 4)}]</span>
+                        )}{getPermissionTitle(permissionData.toolName)}
                     </span>
                     <span className="bash-permission-status">Pending</span>
                 </div>

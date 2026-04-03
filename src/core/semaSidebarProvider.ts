@@ -83,13 +83,6 @@ export class SemaSidebarProvider implements vscode.WebviewViewProvider {
 
     public async newSession() {
         try {
-            if (this.coreManager.getCurrentState() === 'processing') {
-                const completed = await this.coreManager.interruptAndWait();
-                if (!completed) {
-                    console.warn('[NewSession] 等待中断完成超时，继续创建新会话');
-                }
-            }
-
             clearTimeout(this.saveSessionTimer);
             await this.sessionHistoryManager.saveSession();
 
@@ -202,13 +195,6 @@ export class SemaSidebarProvider implements vscode.WebviewViewProvider {
             if (!session) {
                 vscode.window.showErrorMessage('会话不存在或已被删除');
                 return;
-            }
-
-            if (this.coreManager.getCurrentState() === 'processing') {
-                const completed = await this.coreManager.interruptAndWait();
-                if (!completed) {
-                    console.warn('[LoadSession] 等待中断完成超时，继续加载会话');
-                }
             }
 
             clearTimeout(this.saveSessionTimer);
