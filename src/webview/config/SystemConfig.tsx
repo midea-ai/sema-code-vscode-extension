@@ -18,6 +18,7 @@ interface SystemConfigData {
     customRules?: string;
     enableLLMCache?: boolean;
     enableClaudeCodeCompat?: boolean;
+    disableBackgroundTasks?: boolean;
 }
 
 const SystemConfig: React.FC<SystemConfigProps> = ({ vscode }) => {
@@ -190,6 +191,21 @@ const SystemConfig: React.FC<SystemConfigProps> = ({ vscode }) => {
                             />
                             <span className="checkmark"></span>
                             兼容ClaudeCode生态
+                        </label>
+                    </div>
+                </div>
+
+                {/* 后台任务控制 */}
+                <div className="form-row">
+                    <div className="form-group">
+                        <label className="checkbox-label" title="启用后将禁止Bash后台运行、Agent后台执行、超时转后台等功能">
+                            <input
+                                type="checkbox"
+                                checked={config.disableBackgroundTasks || false}
+                                onChange={(e) => handleChange('disableBackgroundTasks', e.target.checked)}
+                            />
+                            <span className="checkmark"></span>
+                            禁止后台任务
                         </label>
                     </div>
                 </div>

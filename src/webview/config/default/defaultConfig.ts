@@ -13,5 +13,6 @@ export const defaultConfig = {
     customRules: "- 中文回答",
     enableLLMCache: false,
     enableClaudeCodeCompat: true,
+    disableBackgroundTasks: false,
     useTools: null  // null 表示使用所有工具，string[] 表示只使用指定工具
 };
