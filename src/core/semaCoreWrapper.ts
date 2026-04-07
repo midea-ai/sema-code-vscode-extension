@@ -21,7 +21,8 @@ import {
     ToolExecutionChunkData,
     InputProcessingData,
     TaskStartData,
-    TaskEndData
+    TaskEndData,
+    TaskTransferData
 } from 'sema-core/event';
 import {
     SemaCoreConfig,
@@ -83,6 +84,7 @@ export interface TaskMessageContent {
     status: 'running' | 'completed' | 'failed' | 'interrupted';
     summary: string;
     taskMessages: Message[];
+    run_in_background?: boolean;
 }
 
 export class SemaCoreWrapper {
@@ -551,6 +553,12 @@ export class SemaCoreWrapper {
     private setupTaskListeners(): void {
         this.semaCore.on<TaskStartData>('task:start', (data) => {
             this.callbacks.onTaskStart?.(data);
+        });
+
+        this.semaCore.on<{ taskId: string; from: string; to: string }>('task:transfer', (data) => {
+            if (data.to === 'background') {
+                this.callbacks.onTaskStart?.({ taskId: data.taskId, filepath: '', type: 'Agent' } as TaskStartData);
+            }
         });
 
         this.semaCore.on<TaskEndData>('task:end', (data) => {
@@ -1040,6 +1048,19 @@ export class SemaCoreWrapper {
 
     public watchTask(taskId: string, onDelta: (delta: string) => void): () => void {
         return this.semaCore.watchTask(taskId, onDelta);
+    }
+
+    public transferAgentToBackground(taskId: string): boolean {
+        const result = this.semaCore.transferAgentToBackground(taskId);
+        if (result) {
+            const entry = this.taskAgentMap.get(taskId);
+            if (entry) {
+                const taskContent = entry.msg.content as TaskMessageContent;
+                taskContent.run_in_background = true;
+                this.sendUpdateMessage(entry.msg.id, taskContent);
+            }
+        }
+        return result;
     }
 
     public stopTask(taskId: string): void {

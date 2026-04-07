@@ -84,6 +84,16 @@ const AgentBlock: React.FC<AgentBlockProps> = React.memo(({ content, vscode, for
                         {run_in_background && <span className="task-background-tag">后台</span>}
                         <span className="task-title-text">{title}</span>
                     </div>
+                    {status === 'running' && !run_in_background && (
+                        <button
+                            className="task-detail-btn"
+                            onClick={() => {
+                                vscode.postMessage({ type: 'transferAgentToBackground', taskId: content.taskId });
+                            }}
+                        >
+                            转后台
+                        </button>
+                    )}
                     <button
                         className="task-detail-btn"
                         onClick={handleOpenModal}

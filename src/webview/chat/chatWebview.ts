@@ -58,6 +58,7 @@ export class ChatWebviewProvider {
                 updateAgentMode: () => this.coreManager.updateAgentMode(msg.mode),
                 requestCommands: () => this.sendCommands(),
                 openBashOutput: () => this.fileOperationManager.openBashOutputAsDocument(msg.content, msg.command, msg.toolId),
+                transferAgentToBackground: async () => { this.coreManager.transferAgentToBackground(msg.taskId); },
             };
             await handlers[msg.type]?.();
         });
