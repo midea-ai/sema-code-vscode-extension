@@ -26,5 +26,9 @@ export const BUILTIN_SHORTCUT_COMMANDS: ShortcutCommand[] = [
     {
         text: "knowledge",
         desc: "生成项目知识库文档"
+    },
+    {
+        text: "btw",
+        desc: "顺便问一下"
     }
 ];

@@ -103,7 +103,6 @@ const MessageItem: React.FC<MessageItemProps> = React.memo(({
                             content={displayReasoning || ''}
                             messageId={message.id}
                             isThinking={isThinking}
-                            vscode={vscode}
                         />
                     )}
                     {hasContent && (

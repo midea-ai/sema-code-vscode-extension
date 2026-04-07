@@ -10,6 +10,7 @@ import Welcome from './components/panels/Welcome';
 import PermissionDialog from './components/permission/PermissionDialog';
 import AskQuestionDialog from './components/ui/AskQuestionDialog';
 import PlanExitDialog from './components/ui/PlanExitDialog';
+import BtwDialog from './components/ui/BtwDialog';
 import ProcessingSpinner from './components/ui/ProcessingSpinner';
 import ModelConfigReminder from './components/ui/ModelConfigReminder';
 
@@ -32,7 +33,8 @@ const App: React.FC<AppProps> = ({ vscode }) => {
     type DialogQueueItem =
         | { type: 'permission';  data: any; isBackground: boolean }
         | { type: 'askQuestion'; data: any; isBackground: boolean }
-        | { type: 'planExit';    data: any; isBackground: boolean };
+        | { type: 'planExit';    data: any; isBackground: boolean }
+        | { type: 'btw';         data: { question: string; content: string }; isBackground: false };
     const [dialogQueue, setDialogQueue] = useState<DialogQueueItem[]>([]);
     const activeDialog = dialogQueue[0] ?? null;
     const [modelConfigReminder, setModelConfigReminder] = useState<string>('');
@@ -313,6 +315,11 @@ const App: React.FC<AppProps> = ({ vscode }) => {
                             next.delete(message.data.taskId);
                             return next;
                         });
+                    }
+                    break;
+                case 'btwResponse':
+                    if (message.data) {
+                        setDialogQueue(prev => [{ type: 'btw', data: message.data, isBackground: false as const }, ...prev]);
                     }
                     break;
                 case 'openAgentDetail':
@@ -629,6 +636,12 @@ const App: React.FC<AppProps> = ({ vscode }) => {
                         <div className="user-input-content pending">{p.content}</div>
                     </div>
                 ))}
+                {activeDialog?.type === 'btw' && (
+                    <BtwDialog
+                        data={activeDialog.data}
+                        onClose={() => setDialogQueue(prev => prev.slice(1))}
+                    />
+                )}
                 {activeDialog?.type === 'permission' && (
                     <PermissionDialog
                         permissionData={activeDialog.data}
