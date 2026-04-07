@@ -34,6 +34,8 @@ const PermissionDialog: React.FC<PermissionDialogProps> = ({
     const getDescriptionText = () => {
         if (permissionData.toolName === 'Bash') {
             return 'Do you want to proceed?';
+        } else if (permissionData.toolName === 'WebFetch') {
+            return 'Do you want to fetch content from this URL?';
         } else if (isSkillType(permissionData.toolName)) {
             return 'Do you want to proceed?';
         } else if (isMcpToolType(permissionData.toolName)) {
