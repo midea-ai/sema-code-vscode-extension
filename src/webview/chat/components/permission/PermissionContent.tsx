@@ -189,7 +189,9 @@ const PermissionContent: React.FC<PermissionContentProps> = ({
             }
         }
 
-        const diffContent = content as DiffContent;
+        const diffContent = typeof content === 'string'
+            ? stringToDiffContent(content)
+            : content as DiffContent;
         const isUpdate = toolName === 'Edit' || (diffContent && diffContent.type === 'diff');
         const actionLabel = isUpdate ? 'Update File' : 'Create File';
 
