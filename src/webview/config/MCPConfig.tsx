@@ -5,7 +5,7 @@ import { ExpandArrowIcon, RefreshIcon, EditIcon, TrashIcon, CloseIcon, GearIcon,
 import { defaultMCPMarketInfos, MCPMarketInfo } from './default/defaultMCPMarket';
 import { inlineSvgIcons } from './mcpIcon';
 import { initialBgColors, hashString } from './utils/iconUtils';
-import './style/agent.css';
+import './style/section.css';
 import './style/mcp.css';
 
 
@@ -104,16 +104,16 @@ const MCPServerCard: React.FC<{
     const enabledToolCount = tools.filter(tool => isToolEnabled(tool.name)).length;
 
     return (
-        <div className="agent-card mcp-server-item">
-            <div className="agent-header mcp-server-header" onClick={() => setExpanded(!expanded)} style={{ cursor: 'pointer' }}>
+        <div className="section-card mcp-server-item">
+            <div className="section-card-header mcp-server-header" onClick={() => setExpanded(!expanded)} style={{ cursor: 'pointer' }}>
                 <button
-                    className={`mcp-expand-btn ${expanded ? 'expanded' : ''}`}
+                    className={`section-expand-btn ${expanded ? 'expanded' : ''}`}
                     onClick={(e) => { e.stopPropagation(); setExpanded(!expanded); }}
                 >
                     <ExpandArrowIcon />
                 </button>
                 <MCPNameIcon name={server.config.name} />
-                <span className="agent-name">{server.config.name}</span>
+                <span className="section-card-name">{server.config.name}</span>
                 <span
                     className="mcp-status-dot"
                     style={{ backgroundColor: statusColors[statusKey] || statusColors.disconnected }}
@@ -126,9 +126,9 @@ const MCPServerCard: React.FC<{
                 {scope === 'external' && ((server.config as any)?.from || (server as any)?.from) && (
                     <span className="readonly-tab">{(server.config as any)?.from || (server as any)?.from}</span>
                 )}
-                <div className="agent-card-actions" onClick={(e) => e.stopPropagation()}>
+                <div className="section-card-actions" onClick={(e) => e.stopPropagation()}>
                     <button
-                        className="mcp-icon-btn"
+                        className="section-icon-btn"
                         onClick={() => onReconnect(server.config.name)}
                         title={server.status !== true ? '服务未生效，无法重连' : '重新连接'}
                         disabled={server.status !== true}
@@ -137,7 +137,7 @@ const MCPServerCard: React.FC<{
                     </button>
                     {canEdit && (
                         <button
-                            className="mcp-icon-btn"
+                            className="section-icon-btn"
                             onClick={() => onEdit(server, scope)}
                             title="编辑配置"
                         >
@@ -146,7 +146,7 @@ const MCPServerCard: React.FC<{
                     )}
                     {canDelete && (
                         <button
-                            className="mcp-icon-btn mcp-icon-btn-danger"
+                            className="section-icon-btn section-icon-btn-danger"
                             onClick={() => onDelete(server, scope)}
                             title="删除"
                         >
@@ -154,13 +154,13 @@ const MCPServerCard: React.FC<{
                         </button>
                     )}
                     {canToggle && (
-                        <label className="mcp-switch">
+                        <label className="section-switch">
                             <input
                                 type="checkbox"
                                 checked={server.status !== false}
                                 onChange={(e) => onToggle(server, scope, e.target.checked)}
                             />
-                            <span className="mcp-switch-slider"></span>
+                            <span className="section-switch-slider"></span>
                         </label>
                     )}
                 </div>
@@ -207,18 +207,18 @@ const SystemToolsCard: React.FC<{
     const toolCount = tools.length;
 
     return (
-        <div className="agent-card mcp-server-item">
-            <div className="agent-header mcp-server-header" onClick={() => setExpanded(!expanded)} style={{ cursor: 'pointer' }}>
+        <div className="section-card mcp-server-item">
+            <div className="section-card-header mcp-server-header" onClick={() => setExpanded(!expanded)} style={{ cursor: 'pointer' }}>
                 <button
-                    className={`mcp-expand-btn ${expanded ? 'expanded' : ''}`}
+                    className={`section-expand-btn ${expanded ? 'expanded' : ''}`}
                     onClick={(e) => { e.stopPropagation(); setExpanded(!expanded); }}
                 >
                     <ExpandArrowIcon />
                 </button>
-                <div className="agent-icon mcp-builtin-icon">
+                <div className="section-card-icon mcp-builtin-icon">
                     <GearIcon />
                 </div>
-                <span className="agent-name">内置工具</span>
+                <span className="section-card-name">内置工具</span>
                 <span className="readonly-tab">只读</span>
                 <span
                     className="mcp-status-dot"
@@ -345,13 +345,13 @@ const MCPEditModal: React.FC<{
     };
 
     return (
-        <div className="mcp-modal-overlay" onClick={onClose}>
-            <div className="mcp-modal" onClick={(e) => e.stopPropagation()}>
-                <div className="mcp-modal-header">
+        <div className="section-modal-overlay" onClick={onClose}>
+            <div className="section-modal" onClick={(e) => e.stopPropagation()}>
+                <div className="section-modal-header">
                     <span>编辑 MCP 配置 - {server.config.name}</span>
-                    <button className="mcp-modal-close" onClick={onClose}><CloseIcon /></button>
+                    <button className="section-modal-close" onClick={onClose}><CloseIcon /></button>
                 </div>
-                <div className="mcp-modal-body">
+                <div className="section-modal-body">
                     {showNpxHint && (
                         <div className="mcp-npx-hint">
                             <span className="mcp-npx-hint-text">本地需要 npx 环境</span>
@@ -371,11 +371,11 @@ const MCPEditModal: React.FC<{
                         onChange={(e) => { setJsonText(e.target.value); setError(null); }}
                         spellCheck={false}
                     />
-                    {error && <div className="mcp-edit-error">{error}</div>}
+                    {error && <div className="section-edit-error">{error}</div>}
                 </div>
-                <div className="mcp-modal-footer">
-                    <button className="mcp-btn secondary" onClick={onClose} disabled={isSaving}>取消</button>
-                    <button className={`mcp-btn primary ${isSaving ? 'btn-loading' : ''}`} onClick={handleSave} disabled={isSaving}>
+                <div className="section-modal-footer">
+                    <button className="section-btn secondary" onClick={onClose} disabled={isSaving}>取消</button>
+                    <button className={`section-btn primary ${isSaving ? 'btn-loading' : ''}`} onClick={handleSave} disabled={isSaving}>
                         {isSaving && <span className="spinner" />}
                         {isSaving ? '保存中...' : '确定'}
                     </button>
@@ -444,11 +444,11 @@ const MCPMarketCard: React.FC<{
                 </div>
                 <div className="mcp-market-card-right">
                     {isInstalled ? (
-                        <span className="mcp-installed-badge">已安装</span>
+                        <span className="section-installed-badge">已安装</span>
                     ) : (
-                        <div className="mcp-install-btns">
-                            <button className="mcp-btn secondary small" onClick={() => onInstall(item, 'project')} title="安装到当前项目">项目添加</button>
-                            <button className="mcp-btn primary small" onClick={() => onInstall(item, 'user')} title="安装到用户全局">全局添加</button>
+                        <div className="section-install-btns">
+                            <button className="section-btn secondary small" onClick={() => onInstall(item, 'project')} title="安装到当前项目">项目添加</button>
+                            <button className="section-btn primary small" onClick={() => onInstall(item, 'user')} title="安装到用户全局">全局添加</button>
                         </div>
                     )}
                 </div>
@@ -459,7 +459,7 @@ const MCPMarketCard: React.FC<{
                 ))}
             </div>
             <div className="mcp-market-card-footer">
-                <button className={`mcp-expand-btn ${expanded ? 'expanded' : ''}`} onClick={() => setExpanded(!expanded)}>
+                <button className={`section-expand-btn ${expanded ? 'expanded' : ''}`} onClick={() => setExpanded(!expanded)}>
                     <ExpandArrowIcon />
                     <span>{item.tools.length} Tools</span>
                 </button>
@@ -709,7 +709,7 @@ const MCPConfig: React.FC<MCPConfigProps> = ({ vscode }) => {
                     onClick={() => setActiveTab('installed')}
                 >
                     已安装
-                    {totalToolCount > 0 && <span className="plugin-tab-count">{totalToolCount}</span>}
+                    {totalToolCount > 0 && <span className="section-tab-count">{totalToolCount}</span>}
                 </div>
                 <div
                     className={`tab-item ${activeTab === 'market' ? 'active' : ''}`}
@@ -717,10 +717,10 @@ const MCPConfig: React.FC<MCPConfigProps> = ({ vscode }) => {
                 >
                     MCP 市场
                 </div>
-                <div className="plugin-tab-actions">
+                <div className="section-tab-actions">
                     {activeTab === 'installed' && (
                         <button
-                            className={`mcp-icon-btn ${isRefreshing ? 'btn-loading' : ''}`}
+                            className={`section-icon-btn ${isRefreshing ? 'btn-loading' : ''}`}
                             onClick={handleRefresh}
                             title="刷新 MCP"
                             disabled={isRefreshing}
@@ -735,9 +735,9 @@ const MCPConfig: React.FC<MCPConfigProps> = ({ vscode }) => {
             <div className="tab-content">
                 {activeTab === 'installed' ? (
                     loading ? (
-                        <div className="agent-loading">加载中...</div>
+                        <div className="section-loading">加载中...</div>
                     ) : (
-                        <div className="agent-sections">
+                        <div className="section-groups">
                             {totalToolCount > MAX_TOOL_COUNT && (
                                 <div className="mcp-tool-warning">
                                     <div className="mcp-tool-warning-icon"><WarningCircleIcon /></div>
@@ -754,7 +754,7 @@ const MCPConfig: React.FC<MCPConfigProps> = ({ vscode }) => {
                             {systemTools.length > 0 && (() => {
                                 const isCollapsed = collapsedSections.has('system');
                                 return (
-                                    <div className="agent-section section-system">
+                                    <div className="section-group section-system">
                                         <div
                                             className="section-group-title section-group-title-collapsible"
                                             style={{ cursor: 'pointer', userSelect: 'none' }}
@@ -764,7 +764,7 @@ const MCPConfig: React.FC<MCPConfigProps> = ({ vscode }) => {
                                             <span className={`section-collapse-arrow ${isCollapsed ? 'collapsed' : ''}`} />
                                         </div>
                                         {!isCollapsed && (
-                                            <div className="agent-list mcp-server-list">
+                                            <div className="section-list mcp-server-list">
                                                 <SystemToolsCard tools={systemTools} onToolToggle={handleSystemToolToggle} />
                                             </div>
                                         )}
@@ -781,7 +781,7 @@ const MCPConfig: React.FC<MCPConfigProps> = ({ vscode }) => {
                                 const pathHint = GROUP_PATHS[scope];
 
                                 return (
-                                    <div key={scope} className={`agent-section section-${scope}`}>
+                                    <div key={scope} className={`section-group section-${scope}`}>
                                         <div
                                             className="section-group-title section-group-title-collapsible"
                                             style={{ cursor: 'pointer', userSelect: 'none' }}
@@ -792,7 +792,7 @@ const MCPConfig: React.FC<MCPConfigProps> = ({ vscode }) => {
                                             <span className={`section-collapse-arrow ${isCollapsed ? 'collapsed' : ''}`} />
                                         </div>
                                         {!isCollapsed && (
-                                            <div className="agent-list mcp-server-list">
+                                            <div className="section-list mcp-server-list">
                                                 {scopeServers.length === 0 ? (
                                                     <div className="section-empty">暂无 MCP 服务</div>
                                                 ) : (
@@ -822,10 +822,10 @@ const MCPConfig: React.FC<MCPConfigProps> = ({ vscode }) => {
                     )
                 ) : (
                     <div className="mcp-market">
-                        <div className="mcp-search-box">
+                        <div className="section-search-box">
                             <input
                                 type="text"
-                                className="mcp-search-input"
+                                className="section-search-input"
                                 placeholder="搜索 MCP 服务..."
                                 value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}

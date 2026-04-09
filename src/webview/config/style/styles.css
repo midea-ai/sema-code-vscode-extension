@@ -1,3 +1,5 @@
+@import './token.css';
+
 * {
     margin: 0;
     padding: 0;
@@ -135,9 +137,9 @@ body {
     border-spacing: 0;
     background: var(--vscode-sideBar-background);
     border: 1px solid var(--vscode-panel-border);
-    border-radius: 8px;
+    border-radius: var(--s-radius-lg);
     overflow: hidden;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    box-shadow: var(--s-card-shadow);
 }
 
 .model-table thead {
@@ -221,21 +223,21 @@ body {
 /* 任务配置 */
 .task-config {
     margin-top: 40px;
-    padding: 24px;
-    background: var(--vscode-sideBar-background);
-    border: 1px solid var(--vscode-panel-border);
-    border-radius: 8px;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    padding: var(--s-gap-xl);
+    background: var(--s-card-bg);
+    border: 1px solid var(--s-card-border);
+    border-radius: var(--s-radius-lg);
+    box-shadow: var(--s-card-shadow);
 }
 
 .confirm-task-btn {
     padding: 11px 24px;
-    background: var(--vscode-button-background);
-    color: var(--vscode-button-foreground);
+    background: var(--s-btn-secondary-bg);
+    color: var(--s-btn-secondary-fg);
     border: none;
-    border-radius: 6px;
+    border-radius: var(--s-radius-md);
     cursor: pointer;
-    font-size: 13px;
+    font-size: var(--s-font-md);
     font-weight: 600;
     transition: all 0.2s ease;
     box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
@@ -243,7 +245,7 @@ body {
 }
 
 .confirm-task-btn:hover:not(:disabled) {
-    background: var(--vscode-button-hoverBackground);
+    background: var(--s-btn-secondary-hover-bg);
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
     transform: translateY(-1px);
 }
@@ -256,7 +258,6 @@ body {
 .confirm-task-btn:disabled {
     opacity: 0.5;
     cursor: not-allowed;
-    background: var(--vscode-button-secondaryBackground);
 }
 
 .task-row {
@@ -294,11 +295,11 @@ body {
 
 /* 表单样式 */
 .form-card {
-    background: var(--vscode-sideBar-background);
-    border: 1px solid var(--vscode-panel-border);
-    border-radius: 8px;
+    background: var(--s-card-bg);
+    border: 1px solid var(--s-card-border);
+    border-radius: var(--s-radius-lg);
     padding: 32px;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    box-shadow: var(--s-card-shadow);
 }
 
 .form-group {
@@ -319,8 +320,8 @@ input, select {
     background: var(--vscode-input-background);
     color: var(--vscode-input-foreground);
     border: 1px solid var(--vscode-input-border);
-    border-radius: 6px;
-    font-size: 13px;
+    border-radius: var(--s-radius-md);
+    font-size: var(--s-font-md);
     transition: all 0.2s ease;
 }
 
@@ -387,12 +388,21 @@ button[type="submit"]:active, button[type="button"]:active {
 }
 
 button[type="button"].secondary {
-    background: var(--vscode-button-secondaryBackground);
-    color: var(--vscode-button-secondaryForeground);
+    background: var(--s-btn-secondary-bg);
+    color: var(--s-btn-secondary-fg);
 }
 
 button[type="button"].secondary:hover {
-    background: var(--vscode-button-secondaryHoverBackground);
+    background: var(--s-btn-secondary-hover-bg);
+}
+
+button.reset-btn {
+    background: var(--s-btn-secondary-bg);
+    color: var(--s-btn-secondary-fg);
+}
+
+button.reset-btn:hover {
+    background: var(--s-btn-secondary-hover-bg);
 }
 
 button:disabled {
@@ -449,26 +459,26 @@ button.small {
 }
 
 .test-status.testing {
-    background: rgba(100, 150, 200, 0.12);
-    border: 1px solid rgba(100, 150, 200, 0.3);
-    border-left: 3px solid #6496c8;
-    color: #6496c8;
+    background: var(--s-color-testing-bg);
+    border: 1px solid var(--s-color-testing-border);
+    border-left: 3px solid var(--s-color-testing);
+    color: var(--s-color-testing);
     display: flex;
 }
 
 .test-status.success {
-    background: rgba(72, 187, 120, 0.12);
-    border: 1px solid rgba(72, 187, 120, 0.3);
-    border-left: 3px solid #48bb78;
-    color: #48bb78;
+    background: var(--s-color-ok-bg);
+    border: 1px solid var(--s-color-ok-border);
+    border-left: 3px solid var(--s-color-ok);
+    color: var(--s-color-ok);
     display: flex;
 }
 
 .test-status.error {
-    background: rgba(245, 101, 101, 0.12);
-    border: 1px solid rgba(245, 101, 101, 0.3);
-    border-left: 3px solid #f56565;
-    color: #f56565;
+    background: var(--s-color-err-bg);
+    border: 1px solid var(--s-color-err-border);
+    border-left: 3px solid var(--s-color-err);
+    color: var(--s-color-err);
     display: flex;
 }
 
@@ -494,17 +504,17 @@ button.small {
 }
 
 .message.success {
-    background: rgba(72, 187, 120, 0.12);
-    border: 1px solid rgba(72, 187, 120, 0.3);
-    border-left: 3px solid #48bb78;
-    color: #48bb78;
+    background: var(--s-color-ok-bg);
+    border: 1px solid var(--s-color-ok-border);
+    border-left: 3px solid var(--s-color-ok);
+    color: var(--s-color-ok);
 }
 
 .message.error {
-    background: rgba(245, 101, 101, 0.12);
-    border: 1px solid rgba(245, 101, 101, 0.3);
-    border-left: 3px solid #f56565;
-    color: #f56565;
+    background: var(--s-color-err-bg);
+    border: 1px solid var(--s-color-err-border);
+    border-left: 3px solid var(--s-color-err);
+    color: var(--s-color-err);
 }
 
 .input-group {
@@ -594,11 +604,6 @@ button.small {
         padding: 20px;
     }
 
-    .breadcrumb-item {
-        padding: 8px 16px;
-        font-size: 13px;
-    }
-
     .main-content {
         padding: 20px;
     }
@@ -647,8 +652,8 @@ textarea {
     background: var(--vscode-input-background);
     color: var(--vscode-input-foreground);
     border: 1px solid var(--vscode-input-border);
-    border-radius: 6px;
-    font-size: 13px;
+    border-radius: var(--s-radius-md);
+    font-size: var(--s-font-md);
     line-height: 1.4;
     resize: vertical;
     min-height: 60px;
@@ -732,28 +737,12 @@ textarea:focus {
 }
 
 .task-main {
-    background: rgba(255, 186, 73, 0.2);
-    color: #ffba49;
+    background: var(--s-badge-main-bg);
+    color: var(--s-badge-main-color);
 }
 
 .task-quick {
-    background: rgba(149, 117, 255, 0.2);
-    color: #9575ff;
+    background: var(--s-badge-quick-bg);
+    color: var(--s-badge-quick-color);
 }
 
-/* Curl命令样式 */
-.curl-command {
-    margin-top: 12px;
-    padding: 12px;
-    background: var(--vscode-textCodeBlock-background);
-    border: 1px solid var(--vscode-panel-border);
-    border-radius: 4px;
-    font-family: var(--vscode-editor-font-family), monospace;
-    font-size: 12px;
-    color: var(--vscode-foreground);
-    white-space: pre-wrap;
-    word-break: break-all;
-    overflow-x: auto;
-    max-height: 200px;
-    overflow-y: auto;
-}

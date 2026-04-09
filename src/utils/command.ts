@@ -24,10 +24,6 @@ export const BUILTIN_SHORTCUT_COMMANDS: ShortcutCommand[] = [
         send: true  // 设置为true 点击后直接发送不给输入
     },
     {
-        text: "knowledge",
-        desc: "生成项目知识库文档"
-    },
-    {
         text: "btw",
         desc: "顺便问一下"
     }

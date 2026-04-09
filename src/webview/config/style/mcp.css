@@ -1,23 +1,13 @@
-/* MCP 配置页面样式 - 复用 agent.css 样式 */
+/* MCP 配置页面样式 - MCP 专用样式 */
 
 /* MCP 服务列表 - 使用纵向布局 */
-.mcp-server-list.agent-list {
+.mcp-server-list.section-list {
     grid-template-columns: 1fr;
 }
 
-/* MCP 服务项 */
-.mcp-server-item {
-    overflow: hidden;
-    padding: 0;
-}
+/* MCP 服务项 — 继承 section-card 统一样式 */
 
-.mcp-server-header.agent-header {
-    margin-bottom: 0;
-    padding: 10px 14px;
-    gap: 8px;
-}
-
-/* MCP 名称图标 - 圆形背景 + 首字母 */
+/* MCP 名称图标 — 复用 .section-card-icon 圆形样式 */
 .mcp-name-icon {
     display: flex;
     align-items: center;
@@ -26,7 +16,7 @@
     height: 28px;
     border-radius: 50%;
     color: #fff;
-    font-size: 14px;
+    font-size: var(--s-font-lg);
     font-weight: 600;
     flex-shrink: 0;
 }
@@ -35,62 +25,19 @@
 .mcp-server-actions {
     display: flex;
     align-items: center;
-    gap: 4px;
+    gap: var(--s-gap-xs);
     margin-left: auto;
 }
 
-.mcp-empty {
-    text-align: center;
-    padding: 20px;
-    color: var(--vscode-descriptionForeground);
-    font-size: 13px;
-    font-style: italic;
-    background: var(--vscode-sideBar-background);
-    border: 1px solid var(--vscode-panel-border);
-    border-radius: 8px;
-    opacity: 0.7;
-}
-
-/* 展开按钮 */
-.mcp-expand-btn {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 20px;
-    height: 20px;
-    padding: 0;
-    border: none;
-    background: transparent;
-    color: var(--vscode-foreground);
-    cursor: pointer;
-    opacity: 0.6;
-    transition: all 0.2s ease;
-    border-radius: 4px;
-    flex-shrink: 0;
-}
-
-.mcp-expand-btn:hover {
-    opacity: 1;
-    background: var(--vscode-list-hoverBackground);
-}
-
-.mcp-expand-btn svg {
-    transition: transform 0.2s ease;
-}
-
-.mcp-expand-btn.expanded svg {
-    transform: rotate(90deg);
-}
-
 /* 内置工具图标 - 与 MCP 名称图标对齐 */
-.mcp-builtin-icon.agent-icon {
+.mcp-builtin-icon.section-card-icon {
     color: var(--vscode-foreground);
     width: 28px;
     height: 28px;
     border-radius: 50%;
 }
 
-.mcp-builtin-icon.agent-icon svg {
+.mcp-builtin-icon.section-card-icon svg {
     width: 16px;
     height: 16px;
 }
@@ -111,109 +58,17 @@
     width: 16px;
     height: 16px;
     border-radius: 50%;
-    background: rgba(239, 68, 68, 0.15);
-    color: #ef4444;
+    background: var(--s-color-danger-bg);
+    color: var(--s-color-danger);
     font-size: 11px;
     font-weight: bold;
     cursor: help;
 }
 
-/* 图标按钮 */
-.mcp-icon-btn {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 28px;
-    height: 28px;
-    padding: 0;
-    border: none;
-    background: transparent;
-    color: var(--vscode-foreground);
-    cursor: pointer;
-    opacity: 0.6;
-    transition: all 0.2s ease;
-    border-radius: 4px;
-    flex-shrink: 0;
-}
-
-.mcp-icon-btn svg {
-    display: block;
-}
-
-.mcp-icon-btn:hover:not(:disabled) {
-    opacity: 1;
-    background: var(--vscode-list-hoverBackground);
-}
-
-.mcp-icon-btn:disabled {
-    opacity: 0.3;
-    cursor: not-allowed;
-}
-
-.mcp-icon-btn-danger:hover {
-    color: #ef4444;
-    background: rgba(239, 68, 68, 0.1);
-}
-
-/* 开关样式 - 修复垂直对齐问题 */
-.mcp-switch {
-    position: relative;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 36px;
-    height: 28px;
-    flex-shrink: 0;
-    margin-left: 4px;
-}
-
-.mcp-switch input {
-    position: absolute;
-    opacity: 0;
-    width: 0;
-    height: 0;
-    pointer-events: none;
-}
-
-.mcp-switch-slider {
-    position: relative;
-    cursor: pointer;
-    width: 36px;
-    height: 20px;
-    background-color: var(--vscode-input-background);
-    border: 1px solid var(--vscode-input-border);
-    border-radius: 10px;
-    transition: background-color 0.2s, border-color 0.2s;
-}
-
-.mcp-switch-slider:before {
-    position: absolute;
-    content: "";
-    height: 14px;
-    width: 14px;
-    left: 2px;
-    top: 2px;
-    background-color: var(--vscode-foreground);
-    border-radius: 50%;
-    transition: 0.2s;
-    opacity: 0.6;
-}
-
-.mcp-switch input:checked + .mcp-switch-slider {
-    background-color: var(--vscode-button-background);
-    border-color: var(--vscode-button-background);
-}
-
-.mcp-switch input:checked + .mcp-switch-slider:before {
-    transform: translateX(16px);
-    background-color: var(--vscode-button-foreground);
-    opacity: 1;
-}
-
 /* 工具列表区域 */
 .mcp-server-tools {
-    border-top: 1px solid var(--vscode-panel-border);
-    padding: 12px 16px;
+    border-top: 1px solid var(--s-card-border);
+    padding: var(--s-gap-md) 14px;
     background: var(--vscode-editor-background);
 }
 
@@ -269,70 +124,7 @@
     padding: 8px 0;
 }
 
-/* 弹窗样式 */
-.mcp-modal-overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: rgba(0, 0, 0, 0.5);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 1000;
-}
-
-.mcp-modal {
-    background: var(--vscode-editor-background);
-    border: 1px solid var(--vscode-panel-border);
-    border-radius: 8px;
-    width: 90%;
-    max-width: 600px;
-    max-height: 80vh;
-    display: flex;
-    flex-direction: column;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
-}
-
-.mcp-modal-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 16px 20px;
-    border-bottom: 1px solid var(--vscode-panel-border);
-    font-size: 14px;
-    font-weight: 600;
-    color: var(--vscode-foreground);
-}
-
-.mcp-modal-close {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 24px;
-    height: 24px;
-    padding: 0;
-    border: none;
-    background: transparent;
-    color: var(--vscode-foreground);
-    cursor: pointer;
-    opacity: 0.6;
-    border-radius: 4px;
-    transition: all 0.2s ease;
-}
-
-.mcp-modal-close:hover {
-    opacity: 1;
-    background: var(--vscode-list-hoverBackground);
-}
-
-.mcp-modal-body {
-    flex: 1;
-    padding: 20px;
-    overflow: auto;
-}
-
+/* JSON 编辑器 */
 .mcp-json-editor {
     width: 100%;
     min-height: 300px;
@@ -340,7 +132,7 @@
     background: var(--vscode-input-background);
     color: var(--vscode-input-foreground);
     border: 1px solid var(--vscode-input-border);
-    border-radius: 6px;
+    border-radius: var(--s-radius-md);
     font-family: var(--vscode-editor-font-family);
     font-size: 13px;
     line-height: 1.5;
@@ -353,31 +145,21 @@
     box-shadow: 0 0 0 3px rgba(14, 99, 156, 0.1);
 }
 
-.mcp-edit-error {
-    margin-top: 8px;
-    padding: 8px 12px;
-    background: rgba(239, 68, 68, 0.1);
-    border: 1px solid rgba(239, 68, 68, 0.3);
-    border-radius: 4px;
-    color: #ef4444;
-    font-size: 12px;
-}
-
 /* NPX 环境提示 */
 .mcp-npx-hint {
     display: flex;
     align-items: center;
-    gap: 8px;
-    margin-bottom: 12px;
-    padding: 8px 12px;
-    background: rgba(245, 158, 11, 0.1);
-    border: 1px solid rgba(245, 158, 11, 0.3);
-    border-radius: 4px;
-    font-size: 12px;
+    gap: var(--s-gap-sm);
+    margin-bottom: var(--s-gap-md);
+    padding: var(--s-gap-sm) var(--s-gap-md);
+    background: var(--s-color-warning-bg);
+    border: 1px solid var(--s-color-warning-border);
+    border-radius: var(--s-radius-sm);
+    font-size: var(--s-font-base);
 }
 
 .mcp-npx-hint-text {
-    color: #f59e0b;
+    color: var(--s-color-warning);
 }
 
 .mcp-npx-hint-link {
@@ -393,12 +175,12 @@
 
 /* 必须字段提示 */
 .mcp-require-hint {
-    margin-bottom: 12px;
-    padding: 8px 12px;
+    margin-bottom: var(--s-gap-md);
+    padding: var(--s-gap-sm) var(--s-gap-md);
     background: var(--vscode-editor-background);
-    border: 1px solid var(--vscode-panel-border);
-    border-radius: 4px;
-    font-size: 12px;
+    border: 1px solid var(--s-card-border);
+    border-radius: var(--s-radius-sm);
+    font-size: var(--s-font-base);
     color: var(--vscode-foreground);
     line-height: 1.6;
 }
@@ -417,73 +199,11 @@
     color: var(--vscode-descriptionForeground);
 }
 
-.mcp-modal-footer {
-    display: flex;
-    justify-content: flex-end;
-    gap: 12px;
-    padding: 16px 20px;
-    border-top: 1px solid var(--vscode-panel-border);
-}
-
-/* 按钮样式 */
-.mcp-btn {
-    padding: 8px 20px;
-    border: none;
-    border-radius: 4px;
-    font-size: 13px;
-    font-weight: 500;
-    cursor: pointer;
-    transition: all 0.2s ease;
-}
-
-.mcp-btn.primary {
-    background: var(--vscode-button-background);
-    color: var(--vscode-button-foreground);
-}
-
-.mcp-btn.primary:hover {
-    background: var(--vscode-button-hoverBackground);
-}
-
-.mcp-btn.secondary {
-    background: var(--vscode-button-secondaryBackground);
-    color: var(--vscode-button-secondaryForeground);
-}
-
-.mcp-btn.secondary:hover {
-    background: var(--vscode-button-secondaryHoverBackground);
-}
-
 /* MCP 市场页面 */
 .mcp-market {
     display: flex;
     flex-direction: column;
     gap: 16px;
-}
-
-/* 搜索框 */
-.mcp-search-box {
-    position: relative;
-}
-
-.mcp-search-input {
-    width: 100%;
-    padding: 10px 12px;
-    background: var(--vscode-input-background);
-    color: var(--vscode-input-foreground);
-    border: 1px solid var(--vscode-input-border);
-    border-radius: 6px;
-    font-size: 13px;
-    outline: none;
-    box-sizing: border-box;
-}
-
-.mcp-search-input:focus {
-    border-color: var(--vscode-focusBorder);
-}
-
-.mcp-search-input::placeholder {
-    color: var(--vscode-input-placeholderForeground);
 }
 
 /* 市场列表 */
@@ -495,10 +215,10 @@
 
 /* 市场卡片 */
 .mcp-market-card {
-    background: var(--vscode-sideBar-background);
-    border: 1px solid var(--vscode-panel-border);
-    border-radius: 8px;
-    padding: 14px 16px;
+    background: var(--s-card-bg);
+    border: 1px solid var(--s-card-border);
+    border-radius: var(--s-radius-lg);
+    padding: 14px var(--s-gap-lg);
 }
 
 .mcp-market-card-header {
@@ -576,7 +296,7 @@
     display: flex;
     align-items: center;
     gap: 6px;
-    font-size: 14px;
+    font-size: var(--s-font-lg);
     font-weight: 600;
     color: var(--vscode-foreground);
     margin-bottom: 4px;
@@ -609,28 +329,6 @@
     flex-shrink: 0;
 }
 
-/* 安装按钮组 */
-.mcp-install-btns {
-    display: flex;
-    gap: 6px;
-}
-
-.mcp-btn.small {
-    padding: 4px 10px;
-    font-size: 12px;
-}
-
-/* 已安装标签 */
-.mcp-installed-badge {
-    display: inline-block;
-    padding: 4px 10px;
-    background: rgba(16, 185, 129, 0.15);
-    color: #10b981;
-    border-radius: 4px;
-    font-size: 12px;
-    font-weight: 500;
-}
-
 /* 标签区域 */
 .mcp-market-card-tags {
     display: flex;
@@ -645,8 +343,8 @@
     padding: 1px 6px;
     background: var(--vscode-badge-background);
     color: var(--vscode-badge-foreground);
-    border-radius: 8px;
-    font-size: 10px;
+    border-radius: var(--s-radius-lg);
+    font-size: var(--s-font-xs);
     flex-shrink: 0;
     white-space: nowrap;
     opacity: 0.7;
@@ -659,10 +357,10 @@
     align-items: center;
     margin-top: 10px;
     padding-top: 10px;
-    border-top: 1px solid var(--vscode-panel-border);
+    border-top: 1px solid var(--s-card-border);
 }
 
-.mcp-market-card-footer .mcp-expand-btn {
+.mcp-market-card-footer .section-expand-btn {
     display: flex;
     align-items: center;
     gap: 6px;
@@ -672,7 +370,7 @@
     white-space: nowrap;
 }
 
-.mcp-market-card-footer .mcp-expand-btn span {
+.mcp-market-card-footer .section-expand-btn span {
     color: inherit;
 }
 
@@ -718,25 +416,25 @@
     display: inline-block;
     padding: 3px 8px;
     background: var(--vscode-editor-background);
-    border: 1px solid var(--vscode-panel-border);
-    border-radius: 4px;
-    font-size: 11px;
+    border: 1px solid var(--s-card-border);
+    border-radius: var(--s-radius-sm);
+    font-size: var(--s-font-sm);
     color: var(--vscode-foreground);
 }
 
 /* 工具数量过多警告 */
 .mcp-tool-warning {
     display: flex;
-    gap: 12px;
-    padding: 12px 14px;
-    background: rgba(245, 158, 11, 0.1);
-    border: 1px solid rgba(245, 158, 11, 0.3);
-    border-radius: 8px;
+    gap: var(--s-gap-md);
+    padding: var(--s-gap-md) 14px;
+    background: var(--s-color-warning-bg);
+    border: 1px solid var(--s-color-warning-border);
+    border-radius: var(--s-radius-lg);
 }
 
 .mcp-tool-warning-icon {
     flex-shrink: 0;
-    color: #f59e0b;
+    color: var(--s-color-warning);
     margin-top: 2px;
 }
 
@@ -746,9 +444,9 @@
 }
 
 .mcp-tool-warning-title {
-    font-size: 13px;
+    font-size: var(--s-font-md);
     font-weight: 600;
-    color: #f59e0b;
+    color: var(--s-color-warning);
     margin-bottom: 4px;
 }
 
@@ -760,7 +458,7 @@
 }
 
 /* 禁用的开关样式 */
-.mcp-switch-disabled .mcp-switch-slider {
+.mcp-switch-disabled .section-switch-slider {
     cursor: not-allowed;
     opacity: 0.6;
 }
@@ -769,7 +467,7 @@
 .mcp-tool-item-with-switch {
     display: flex;
     align-items: center;
-    padding-right: 8px;
+    padding-right: 0;
 }
 
 .mcp-tool-item-with-switch .mcp-tool-desc {
@@ -786,6 +484,7 @@
     width: 28px;
     height: 16px;
     flex-shrink: 0;
+    margin: 0;
 }
 
 .mcp-tool-switch input {
@@ -833,13 +532,6 @@
 }
 
 /* 响应式调整 */
-@media (max-width: 600px) {
-    .mcp-modal {
-        width: 95%;
-        max-height: 90vh;
-    }
-}
-
 @media (max-width: 400px) {
     .mcp-market-card-tags {
         display: none;

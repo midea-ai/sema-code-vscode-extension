@@ -24,7 +24,7 @@ import {
 
 } from './types/plugin';
 import './style/plugin.css';
-import './style/agent.css';
+import './style/section.css';
 
 interface PluginConfigProps {
     vscode: VscodeApi;
@@ -106,16 +106,16 @@ const InstalledPluginCard: React.FC<{
     const displayName = `${plugin.name}@${plugin.marketplace}`;
 
     return (
-        <div className="agent-card plugin-card">
-            <div className="agent-header plugin-card-header" onClick={() => setExpanded(!expanded)} style={{ cursor: 'pointer' }}>
+        <div className="section-card plugin-card">
+            <div className="section-card-header plugin-card-header" onClick={() => setExpanded(!expanded)} style={{ cursor: 'pointer' }}>
                 <button
-                    className={`mcp-expand-btn ${expanded ? 'expanded' : ''}`}
+                    className={`section-expand-btn ${expanded ? 'expanded' : ''}`}
                     onClick={(e) => { e.stopPropagation(); setExpanded(!expanded); }}
                 >
                     <ExpandArrowIcon />
                 </button>
                 <PluginNameIcon name={plugin.name} />
-                <span className="agent-name">{displayName}</span>
+                <span className="section-card-name">{displayName}</span>
                 {isReadonly && (
                     <>
                         <span className="readonly-tab">只读</span>
@@ -125,7 +125,7 @@ const InstalledPluginCard: React.FC<{
                 {!isReadonly && (
                     <div className="plugin-card-actions" onClick={(e) => e.stopPropagation()}>
                         <button
-                            className={`mcp-icon-btn mcp-icon-btn-danger ${isUninstalling ? 'btn-loading' : ''}`}
+                            className={`section-icon-btn section-icon-btn-danger ${isUninstalling ? 'btn-loading' : ''}`}
                             onClick={() => onUninstall(plugin)}
                             title="卸载"
                             disabled={isUninstalling}
@@ -136,13 +136,13 @@ const InstalledPluginCard: React.FC<{
                                 <TrashIcon />
                             )}
                         </button>
-                        <label className="mcp-switch">
+                        <label className="section-switch">
                             <input
                                 type="checkbox"
                                 checked={plugin.status}
                                 onChange={(e) => e.target.checked ? onEnable(plugin) : onDisable(plugin)}
                             />
-                            <span className="mcp-switch-slider"></span>
+                            <span className="section-switch-slider"></span>
                         </label>
                     </div>
                 )}
@@ -214,15 +214,15 @@ const AddMarketplaceModal: React.FC<{
     };
 
     return (
-        <div className="mcp-modal-overlay" onClick={onClose}>
-            <div className="mcp-modal" onClick={(e) => e.stopPropagation()}>
-                <div className="mcp-modal-header">
+        <div className="section-modal-overlay" onClick={onClose}>
+            <div className="section-modal" onClick={(e) => e.stopPropagation()}>
+                <div className="section-modal-header">
                     <span>添加插件市场</span>
-                    <button className="mcp-modal-close" onClick={onClose}>
+                    <button className="section-modal-close" onClick={onClose}>
                         <CloseIcon />
                     </button>
                 </div>
-                <div className="mcp-modal-body">
+                <div className="section-modal-body">
                     <div className="plugin-source-tabs">
                         <button
                             className={`plugin-source-tab ${sourceType === 'github' ? 'active' : ''}`}
@@ -246,12 +246,12 @@ const AddMarketplaceModal: React.FC<{
                             onChange={(e) => { setValue(e.target.value); setError(null); }}
                         />
                     </div>
-                    {error && <div className="mcp-edit-error">{error}</div>}
+                    {error && <div className="section-edit-error">{error}</div>}
                 </div>
-                <div className="mcp-modal-footer">
-                    <button className="mcp-btn secondary" onClick={onClose} disabled={isAdding}>取消</button>
+                <div className="section-modal-footer">
+                    <button className="section-btn secondary" onClick={onClose} disabled={isAdding}>取消</button>
                     <button
-                        className={`mcp-btn primary ${isAdding ? 'btn-loading' : ''}`}
+                        className={`section-btn primary ${isAdding ? 'btn-loading' : ''}`}
                         onClick={handleAdd}
                         disabled={isAdding}
                     >
@@ -326,10 +326,10 @@ const MarketplaceSection: React.FC<{
         : (marketplace.source.path || '本地目录');
 
     return (
-        <div className="agent-section plugin-marketplace-section">
+        <div className="section-group plugin-marketplace-section">
             <div className="plugin-marketplace-header" onClick={() => setExpanded(!expanded)} style={{ cursor: 'pointer' }}>
                 <button
-                    className={`mcp-expand-btn ${expanded ? 'expanded' : ''}`}
+                    className={`section-expand-btn ${expanded ? 'expanded' : ''}`}
                     onClick={(e) => { e.stopPropagation(); setExpanded(!expanded); }}
                 >
                     <ExpandArrowIcon />
@@ -369,7 +369,7 @@ const MarketplaceSection: React.FC<{
                     <div className="plugin-marketplace-actions" onClick={(e) => e.stopPropagation()}>
                         {marketplace.source.source !== 'directory' && (
                             <button
-                                className={`mcp-icon-btn ${isUpdating ? 'btn-loading' : ''}`}
+                                className={`section-icon-btn ${isUpdating ? 'btn-loading' : ''}`}
                                 onClick={() => onUpdate(marketplace.name)}
                                 title="git pull"
                                 disabled={isUpdating || isRemoving}
@@ -382,7 +382,7 @@ const MarketplaceSection: React.FC<{
                             </button>
                         )}
                         <button
-                            className={`mcp-icon-btn mcp-icon-btn-danger ${isRemoving ? 'btn-loading' : ''}`}
+                            className={`section-icon-btn section-icon-btn-danger ${isRemoving ? 'btn-loading' : ''}`}
                             onClick={() => onRemove(marketplace.name)}
                             title="移除市场"
                             disabled={isRemoving || isUpdating}
@@ -399,7 +399,7 @@ const MarketplaceSection: React.FC<{
             {expanded && (
                 <div className="plugin-available-list">
                     {filteredAvailable.length === 0 ? (
-                        <div className="mcp-empty">{search ? '没有匹配的插件' : '暂无可用插件'}</div>
+                        <div className="section-empty">{search ? '没有匹配的插件' : '暂无可用插件'}</div>
                     ) : (
                         <>
                             {pagedPlugins.map((plugin, index) => {
@@ -422,11 +422,11 @@ const MarketplaceSection: React.FC<{
                                         </div>
                                         <div className="plugin-available-right">
                                             {isInstalled ? (
-                                                <span className="mcp-installed-badge">已安装</span>
+                                                <span className="section-installed-badge">已安装</span>
                                             ) : !isReadonly ? (
-                                                <div className="mcp-install-btns">
+                                                <div className="section-install-btns">
                                                     <button
-                                                        className={`mcp-btn secondary small ${isInstalling ? 'btn-loading' : ''}`}
+                                                        className={`section-btn secondary small ${isInstalling ? 'btn-loading' : ''}`}
                                                         onClick={() => onInstall(plugin, marketplace, 'project')}
                                                         title="安装到当前项目"
                                                         disabled={isInstalling}
@@ -435,7 +435,7 @@ const MarketplaceSection: React.FC<{
                                                         项目安装
                                                     </button>
                                                     <button
-                                                        className={`mcp-btn primary small ${isInstalling ? 'btn-loading' : ''}`}
+                                                        className={`section-btn primary small ${isInstalling ? 'btn-loading' : ''}`}
                                                         onClick={() => onInstall(plugin, marketplace, 'user')}
                                                         title="安装到用户全局"
                                                         disabled={isInstalling}
@@ -669,7 +669,7 @@ const PluginConfig: React.FC<PluginConfigProps> = ({ vscode }) => {
                 >
                     已安装
                     {data.plugins.filter(p => p.from === 'sema' || p.status).length > 0 && (
-                        <span className="plugin-tab-count">{data.plugins.filter(p => p.from === 'sema' || p.status).length}</span>
+                        <span className="section-tab-count">{data.plugins.filter(p => p.from === 'sema' || p.status).length}</span>
                     )}
                 </div>
                 <div
@@ -678,16 +678,16 @@ const PluginConfig: React.FC<PluginConfigProps> = ({ vscode }) => {
                 >
                     插件市场
                 </div>
-                <div className="plugin-tab-actions">
+                <div className="section-tab-actions">
                     <button
-                        className="mcp-btn primary small"
+                        className="section-btn primary small"
                         onClick={() => setShowAddModal(true)}
                     >
                         <PlusIcon />
                         添加市场
                     </button>
                     <button
-                        className={`mcp-icon-btn ${isRefreshing ? 'btn-loading' : ''}`}
+                        className={`section-icon-btn ${isRefreshing ? 'btn-loading' : ''}`}
                         onClick={handleRefresh}
                         title="reload Plugins"
                         disabled={isRefreshing}
@@ -705,9 +705,9 @@ const PluginConfig: React.FC<PluginConfigProps> = ({ vscode }) => {
             <div className="tab-content">
                 {activeTab === 'installed' ? (
                     loading ? (
-                        <div className="agent-loading">加载中...</div>
+                        <div className="section-loading">加载中...</div>
                     ) : (
-                        <div className="agent-sections">
+                        <div className="section-groups">
                             {[...SCOPE_ORDER, 'other'].map(scope => {
                                 const sectionPlugins = groupedPlugins[scope] || [];
                                 if (scope === 'other' && sectionPlugins.length === 0) return null;
@@ -718,7 +718,7 @@ const PluginConfig: React.FC<PluginConfigProps> = ({ vscode }) => {
                                     return next;
                                 });
                                 return (
-                                    <div key={scope} className={`agent-section section-${scope}`}>
+                                    <div key={scope} className={`section-group section-${scope}`}>
                                         <div className="section-group-title section-group-title-collapsible" style={{ cursor: 'pointer', userSelect: 'none' }} onClick={toggleCollapse}>
                                             {SCOPE_SECTION_TITLES[scope]}
                                             <span className={`section-collapse-arrow ${isCollapsed ? 'collapsed' : ''}`} />
@@ -728,7 +728,7 @@ const PluginConfig: React.FC<PluginConfigProps> = ({ vscode }) => {
                                                 暂无 Plugin
                                             </div>
                                         ) : (
-                                            <div className="agent-list plugin-list">
+                                            <div className="section-list plugin-list">
                                                 {sectionPlugins.map((plugin, index) => (
                                                     <InstalledPluginCard
                                                         key={`${plugin.marketplace}-${plugin.name}-${index}`}
@@ -751,10 +751,10 @@ const PluginConfig: React.FC<PluginConfigProps> = ({ vscode }) => {
                 ) : (
                     <div className="plugin-market">
                         {!loading && data.marketplaces.length > 0 && (
-                            <div className="mcp-search-box">
+                            <div className="section-search-box">
                                 <input
                                     type="text"
-                                    className="mcp-search-input"
+                                    className="section-search-input"
                                     placeholder="搜索插件名称、描述或作者..."
                                     value={marketSearch}
                                     onChange={(e) => setMarketSearch(e.target.value)}
@@ -762,14 +762,14 @@ const PluginConfig: React.FC<PluginConfigProps> = ({ vscode }) => {
                             </div>
                         )}
                         {loading ? (
-                            <div className="agent-loading">加载中...</div>
+                            <div className="section-loading">加载中...</div>
                         ) : data.marketplaces.length === 0 ? (
                             <div className="plugin-empty-state">
                                 <CartIcon />
                                 <p>暂无插件市场，请先添加</p>
                             </div>
                         ) : (
-                            <div className="agent-sections">
+                            <div className="section-groups">
                                 {sortedMarketplaces.map((marketplace, index) => (
                                     <MarketplaceSection
                                         key={`${marketplace.name}-${index}`}

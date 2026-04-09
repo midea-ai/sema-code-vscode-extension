@@ -1,33 +1,23 @@
 /* 插件配置页面样式 */
 
-.mcp-btn.danger {
-    background-color: #ef4444;
+.section-btn.danger {
+    background-color: var(--s-color-danger);
     color: #fff;
     border: none;
 }
 
-.mcp-btn.danger:hover {
-    background-color: #dc2626;
+.section-btn.danger:hover {
+    background-color: var(--s-color-danger-hover);
 }
 
 /* 已安装插件列表 - 纵向单列布局 */
-.plugin-list.agent-list {
+.plugin-list.section-list {
     grid-template-columns: 1fr;
 }
 
-/* 插件卡片 - 参考市场区块布局，卡片本身不设 padding */
-.plugin-card {
-    overflow: hidden;
-    padding: 0;
-}
+/* 插件卡片 — 继承 section-card 统一样式，无需额外 override */
 
-.plugin-card-header.agent-header {
-    margin-bottom: 0;
-    padding: 10px 14px;
-    gap: 8px;
-}
-
-/* 插件名称图标 - 圆形背景 + 首字母 */
+/* 插件名称图标 — 复用 .section-card-icon 圆形样式 */
 .plugin-name-icon {
     display: flex;
     align-items: center;
@@ -36,30 +26,8 @@
     height: 28px;
     border-radius: 50%;
     color: #fff;
-    font-size: 14px;
+    font-size: var(--s-font-lg);
     font-weight: 600;
-    flex-shrink: 0;
-}
-
-/* 插件版本 */
-.plugin-version {
-    font-size: 11px;
-    color: var(--vscode-descriptionForeground);
-    background: var(--vscode-badge-background);
-    padding: 1px 6px;
-    border-radius: 4px;
-    flex-shrink: 0;
-    opacity: 0.8;
-}
-
-/* 插件作用域标签 */
-.plugin-scope-badge {
-    display: inline-flex;
-    align-items: center;
-    padding: 1px 7px;
-    border-radius: 4px;
-    font-size: 11px;
-    font-weight: 500;
     flex-shrink: 0;
 }
 
@@ -67,34 +35,34 @@
 .plugin-card-actions {
     display: flex;
     align-items: center;
-    gap: 4px;
+    gap: var(--s-gap-xs);
     margin-left: auto;
 }
 
 /* 展开详情区域 */
 .plugin-detail {
-    border-top: 1px solid var(--vscode-panel-border);
-    padding: 10px 14px;
+    border-top: 1px solid var(--s-card-border);
+    padding: var(--s-card-header-padding);
     background: var(--vscode-editor-background);
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: var(--s-gap-sm);
 }
 
 /* meta 与 components 之间加大间距 */
 .plugin-detail .plugin-meta + .plugin-components {
-    margin-top: 8px;
+    margin-top: var(--s-gap-sm);
 }
 
 /* 描述 & 作者 */
 .plugin-meta {
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: var(--s-gap-xs);
 }
 
 .plugin-description {
-    font-size: 12px;
+    font-size: var(--s-font-base);
     color: var(--vscode-foreground);
     line-height: 1.5;
     margin: 0;
@@ -105,20 +73,8 @@
     display: inline;
 }
 
-.description-toggle {
-    display: inline;
-    margin-left: 4px;
-    color: var(--vscode-textLink-foreground);
-    cursor: pointer;
-    font-size: 12px;
-}
-
-.description-toggle:hover {
-    text-decoration: underline;
-}
-
 .plugin-author {
-    font-size: 11px;
+    font-size: var(--s-font-sm);
     color: var(--vscode-descriptionForeground);
 }
 
@@ -126,8 +82,8 @@
 .plugin-source-info {
     display: flex;
     align-items: center;
-    gap: 4px;
-    font-size: 12px;
+    gap: var(--s-gap-xs);
+    font-size: var(--s-font-base);
 }
 
 .plugin-source-label {
@@ -143,7 +99,7 @@
 
 /* 版本行 */
 .plugin-version-row {
-    font-size: 11px;
+    font-size: var(--s-font-sm);
     color: var(--vscode-descriptionForeground);
     opacity: 0.8;
 }
@@ -158,12 +114,12 @@
 .plugin-component-group {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: var(--s-gap-sm);
     flex-wrap: wrap;
 }
 
 .plugin-component-label {
-    font-size: 11px;
+    font-size: var(--s-font-sm);
     font-weight: 700;
     color: var(--vscode-descriptionForeground);
     flex-shrink: 0;
@@ -172,15 +128,15 @@
 .plugin-component-badges {
     display: flex;
     flex-wrap: wrap;
-    gap: 4px;
+    gap: var(--s-gap-xs);
 }
 
 .plugin-badge {
-    font-size: 10px;
+    font-size: var(--s-font-xs);
     padding: 2px 6px;
     background: var(--vscode-badge-background);
     color: var(--vscode-badge-foreground);
-    border-radius: 4px;
+    border-radius: var(--s-radius-sm);
     opacity: 0.7;
 }
 
@@ -196,11 +152,11 @@
 }
 
 .plugin-badge-more {
-    font-size: 10px;
+    font-size: var(--s-font-xs);
     padding: 2px 6px;
-    background: var(--vscode-button-secondaryBackground);
-    color: var(--vscode-button-secondaryForeground);
-    border-radius: 4px;
+    background: var(--s-btn-secondary-bg);
+    color: var(--s-btn-secondary-fg);
+    border-radius: var(--s-radius-sm);
     cursor: pointer;
     opacity: 1;
     transition: opacity 0.2s ease;
@@ -208,22 +164,6 @@
 
 .plugin-badge-more:hover {
     opacity: 0.8;
-}
-
-/* Tab 数量角标 */
-.plugin-tab-count {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    min-width: 18px;
-    height: 18px;
-    padding: 0 5px;
-    background: var(--vscode-badge-background);
-    color: var(--vscode-badge-foreground);
-    border-radius: 9px;
-    font-size: 10px;
-    font-weight: 600;
-    margin-left: 4px;
 }
 
 /* 空状态 */
@@ -242,21 +182,6 @@
     margin: 0;
 }
 
-/* Tab 导航右侧操作区 */
-.plugin-tab-actions {
-    margin-left: auto;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 0 12px;
-}
-
-.plugin-tab-actions .mcp-btn {
-    display: inline-flex;
-    align-items: center;
-    gap: 5px;
-}
-
 /* ============ 插件市场 Tab ============ */
 
 .plugin-market {
@@ -267,9 +192,9 @@
 
 /* 市场区块 */
 .plugin-marketplace-section {
-    background: var(--vscode-sideBar-background);
-    border: 1px solid var(--vscode-panel-border);
-    border-radius: 8px;
+    background: var(--s-card-bg);
+    border: 1px solid var(--s-card-border);
+    border-radius: var(--s-radius-lg);
     overflow: hidden;
     gap: 0;
 }
@@ -278,9 +203,9 @@
 .plugin-marketplace-header {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: var(--s-gap-sm);
     padding: 12px 14px;
-    background: var(--vscode-sideBar-background);
+    background: var(--s-card-bg);
 }
 
 /* 市场名称与来源 */
@@ -305,18 +230,6 @@
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-}
-
-.readonly-tab {
-    font-size: 10px;
-    font-weight: 500;
-    padding: 1px 6px;
-    border-radius: 4px;
-    background: rgba(128, 128, 128, 0.12);
-    color: var(--vscode-descriptionForeground);
-    border: 1px solid var(--vscode-panel-border);
-    flex-shrink: 0;
-    white-space: nowrap;
 }
 
 .plugin-marketplace-source {
@@ -364,8 +277,8 @@
 
 /* 可用插件列表 */
 .plugin-available-list {
-    border-top: 1px solid var(--vscode-panel-border);
-    padding: 8px 12px;
+    border-top: 1px solid var(--s-card-border);
+    padding: var(--s-gap-sm) var(--s-gap-md);
     background: var(--vscode-editor-background);
     display: flex;
     flex-direction: column;
@@ -377,9 +290,9 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 12px;
-    padding: 8px 6px;
-    border-radius: 6px;
+    gap: var(--s-gap-md);
+    padding: var(--s-gap-sm) 6px;
+    border-radius: var(--s-radius-md);
     transition: background 0.15s ease;
 }
 
@@ -430,12 +343,12 @@
 }
 
 /* 安装按钮与已安装标签缩小 */
-.mcp-install-btns .mcp-btn.small {
+.section-install-btns .section-btn.small {
     padding: 2px 8px;
     font-size: 11px;
 }
 
-.plugin-available-right .mcp-installed-badge {
+.plugin-available-right .section-installed-badge {
     padding: 2px 8px;
     font-size: 11px;
 }
@@ -489,8 +402,8 @@
     background: var(--vscode-input-background);
     color: var(--vscode-input-foreground);
     border: 1px solid var(--vscode-input-border);
-    border-radius: 6px;
-    font-size: 13px;
+    border-radius: var(--s-radius-md);
+    font-size: var(--s-font-md);
     outline: none;
     box-sizing: border-box;
     transition: border-color 0.2s;
@@ -511,9 +424,9 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 8px;
-    padding: 8px 0 4px;
-    border-top: 1px solid var(--vscode-panel-border);
+    gap: var(--s-gap-sm);
+    padding: var(--s-gap-sm) 0 var(--s-gap-xs);
+    border-top: 1px solid var(--s-card-border);
     margin-top: 4px;
 }
 
@@ -523,8 +436,8 @@
     justify-content: center;
     width: 26px;
     height: 26px;
-    border: 1px solid var(--vscode-panel-border);
-    border-radius: 4px;
+    border: 1px solid var(--s-card-border);
+    border-radius: var(--s-radius-sm);
     background: transparent;
     color: var(--vscode-foreground);
     cursor: pointer;

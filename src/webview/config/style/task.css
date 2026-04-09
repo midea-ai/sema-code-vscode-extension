@@ -41,22 +41,22 @@
     margin-right: 4px;
 }
 
-.task-status-tag.running { color: #4eabff; }
-.task-status-tag.completed { color: #89d185; }
-.task-status-tag.failed { color: #f48771; }
-.task-status-tag.stopped { color: #cca700; }
+.task-status-tag.running { color: var(--s-color-running); }
+.task-status-tag.completed { color: var(--s-color-completed); }
+.task-status-tag.failed { color: var(--s-color-failed); }
+.task-status-tag.stopped { color: var(--s-color-stopped); }
 
 /* 选中状态下保留状态标签颜色 */
 
 .task-kill-btn {
     flex: none;
     width: 36px;
-    background: rgba(176, 124, 232, 0.2);
+    background: var(--s-badge-kill-bg);
     border: none;
     border-radius: 3px;
     cursor: pointer;
     padding: 2px 6px;
-    color: #b07ce8;
+    color: var(--s-badge-kill-color);
     font-size: 11px;
     line-height: 18px;
     white-space: nowrap;
@@ -65,24 +65,24 @@
 }
 
 .task-kill-btn:hover {
-    background: rgba(176, 124, 232, 0.35);
+    background: var(--s-badge-kill-hover-bg);
 }
 
 /* Detail 面板 */
 .task-detail-panel {
     margin-bottom: 20px;
-    border: 1px solid var(--vscode-panel-border);
-    border-radius: 8px;
+    border: 1px solid var(--s-card-border);
+    border-radius: var(--s-radius-lg);
     overflow: hidden;
-    background: var(--vscode-sideBar-background);
+    background: var(--s-card-bg);
 }
 
 .task-detail-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 10px 14px;
-    border-bottom: 1px solid var(--vscode-panel-border);
+    padding: var(--s-card-header-padding);
+    border-bottom: 1px solid var(--s-card-border);
 }
 
 .task-detail-title {
@@ -124,7 +124,7 @@
 .task-detail-output {
     margin: 0;
     padding: 10px;
-    font-size: 12px;
+    font-size: var(--s-font-base);
     line-height: 1.5;
     font-family: var(--vscode-editor-font-family, monospace);
     max-height: 360px;
@@ -133,8 +133,8 @@
     word-break: break-all;
     color: var(--vscode-editor-foreground);
     background: var(--vscode-editor-background);
-    border: 1px solid var(--vscode-panel-border);
-    border-radius: 4px;
+    border: 1px solid var(--s-card-border);
+    border-radius: var(--s-radius-sm);
 }
 
 .task-view-detail-btn {
@@ -142,9 +142,9 @@
     background: var(--vscode-button-background);
     color: var(--vscode-button-foreground);
     border: none;
-    border-radius: 4px;
+    border-radius: var(--s-radius-sm);
     cursor: pointer;
-    font-size: 13px;
+    font-size: var(--s-font-md);
 }
 
 .task-view-detail-btn:hover {

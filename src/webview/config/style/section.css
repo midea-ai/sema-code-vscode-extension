@@ -1,0 +1,513 @@
+/* 通用分组 & 卡片基础样式 —— Agent / Skill / MCP / Plugin 共用 */
+
+/* 加载状态 */
+.section-loading {
+    text-align: center;
+    padding: 40px;
+    color: var(--vscode-descriptionForeground);
+    font-size: 13px;
+}
+
+/* ===== 分组区域 ===== */
+.section-groups {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-gap-xl);
+}
+
+.section-group {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-gap-md);
+}
+
+.section-group-title {
+    display: flex;
+    align-items: center;
+    gap: var(--s-gap-sm);
+    font-size: var(--s-font-lg);
+    font-weight: 600;
+    color: var(--vscode-foreground);
+    margin-bottom: var(--s-gap-md);
+    padding-bottom: var(--s-gap-sm);
+    border-bottom: 1px solid var(--s-card-border);
+}
+
+.section-collapse-arrow {
+    display: inline-block;
+    width: 0;
+    height: 0;
+    border-left: 4px solid transparent;
+    border-right: 4px solid transparent;
+    border-top: 5px solid var(--vscode-descriptionForeground);
+    opacity: 0;
+    transition: opacity 0.15s, transform 0.15s;
+    transform: rotate(0deg);
+    flex-shrink: 0;
+}
+
+.section-collapse-arrow.collapsed {
+    transform: rotate(-90deg);
+}
+
+.section-group-title-collapsible:hover .section-collapse-arrow {
+    opacity: 1;
+}
+
+.section-group-count {
+    font-size: 12px;
+    font-weight: 400;
+    color: var(--vscode-descriptionForeground);
+}
+
+/* 分组内空状态 */
+.section-empty {
+    text-align: center;
+    padding: 20px;
+    color: var(--vscode-descriptionForeground);
+    font-size: var(--s-font-md);
+    font-style: italic;
+    background: var(--s-card-bg);
+    border: 1px solid var(--s-card-border);
+    border-radius: var(--s-radius-lg);
+    opacity: 0.7;
+}
+
+/* ===== 列表网格 ===== */
+.section-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: var(--s-gap-lg);
+}
+
+@media (max-width: 768px) {
+    .section-list {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* ===== 卡片基础 ===== */
+.section-card {
+    background: var(--s-card-bg);
+    border: 1px solid var(--s-card-border);
+    border-radius: var(--s-radius-lg);
+    padding: 0;
+    overflow: hidden;
+    transition: all 0.2s ease;
+}
+
+.section-card:hover {
+    border-color: var(--vscode-focusBorder);
+    box-shadow: var(--s-card-hover-shadow);
+}
+
+.section-card-header {
+    display: flex;
+    align-items: center;
+    gap: var(--s-gap-sm);
+    padding: var(--s-card-header-padding);
+    margin-bottom: 0;
+}
+
+.section-card-icon {
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    color: #fff;
+    flex-shrink: 0;
+    font-size: var(--s-font-md);
+    font-weight: 600;
+}
+
+.section-card-name-group {
+    display: flex;
+    align-items: center;
+    gap: var(--s-gap-xs);
+    flex: 1;
+    min-width: 0;
+}
+
+.section-card-name {
+    font-size: var(--s-font-lg);
+    font-weight: 600;
+    color: var(--vscode-foreground);
+    word-break: break-word;
+}
+
+.section-card-name-link:hover {
+    color: var(--vscode-textLink-foreground);
+    text-decoration: underline;
+}
+
+/* 卡片操作按钮 */
+.section-card-actions {
+    display: flex;
+    align-items: center;
+    gap: var(--s-gap-xs);
+    margin-left: auto;
+}
+
+/* 描述区域 */
+.section-card-desc {
+    font-size: var(--s-font-base);
+    color: var(--vscode-descriptionForeground);
+    line-height: 1.5;
+    word-break: break-word;
+    padding: 0 14px;
+    margin-bottom: var(--s-gap-sm);
+}
+
+.section-card-desc.collapsed {
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.description-toggle {
+    display: inline;
+    margin-left: 4px;
+    color: var(--vscode-textLink-foreground);
+    cursor: pointer;
+    font-size: 12px;
+}
+
+.description-toggle:hover {
+    text-decoration: underline;
+}
+
+/* ===== 只读标签 ===== */
+.readonly-tab {
+    font-size: var(--s-font-xs);
+    font-weight: 500;
+    padding: 1px 6px;
+    border-radius: var(--s-radius-sm);
+    background: rgba(128, 128, 128, 0.12);
+    color: var(--vscode-descriptionForeground);
+    border: 1px solid var(--s-card-border);
+    flex-shrink: 0;
+    white-space: nowrap;
+}
+
+/* ===== Tab 数量角标 ===== */
+.section-tab-count {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 18px;
+    height: 18px;
+    padding: 0 5px;
+    background: var(--vscode-badge-background);
+    color: var(--vscode-badge-foreground);
+    border-radius: 9px;
+    font-size: 10px;
+    font-weight: 600;
+    margin-left: 4px;
+}
+
+/* ===== Tab 导航右侧操作区 ===== */
+.section-tab-actions {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0 12px;
+}
+
+.section-tab-actions .section-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+}
+
+/* ===== 展开按钮 ===== */
+.section-expand-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    padding: 0;
+    border: none;
+    background: transparent;
+    color: var(--vscode-foreground);
+    cursor: pointer;
+    opacity: 0.6;
+    transition: all 0.2s ease;
+    border-radius: var(--s-radius-sm);
+    flex-shrink: 0;
+}
+
+.section-expand-btn:hover {
+    opacity: 1;
+    background: var(--vscode-list-hoverBackground);
+}
+
+.section-expand-btn svg {
+    transition: transform 0.2s ease;
+}
+
+.section-expand-btn.expanded svg {
+    transform: rotate(90deg);
+}
+
+/* ===== 图标按钮 ===== */
+.section-icon-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    border: none;
+    background: transparent;
+    color: var(--vscode-foreground);
+    cursor: pointer;
+    opacity: 0.6;
+    transition: all 0.2s ease;
+    border-radius: var(--s-radius-sm);
+    flex-shrink: 0;
+}
+
+.section-icon-btn svg {
+    display: block;
+}
+
+.section-icon-btn:hover:not(:disabled) {
+    opacity: 1;
+    background: var(--vscode-list-hoverBackground);
+}
+
+.section-icon-btn:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+}
+
+.section-icon-btn-danger:hover {
+    color: var(--s-color-danger);
+    background: var(--s-color-danger-bg);
+}
+
+/* ===== 开关样式 ===== */
+.section-switch {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 28px;
+    flex-shrink: 0;
+    margin: 0 0 0 4px;
+}
+
+.section-switch input {
+    position: absolute;
+    opacity: 0;
+    width: 0;
+    height: 0;
+    pointer-events: none;
+}
+
+.section-switch-slider {
+    position: relative;
+    cursor: pointer;
+    width: 36px;
+    height: 20px;
+    background-color: var(--vscode-input-background);
+    border: 1px solid var(--vscode-input-border);
+    border-radius: 10px;
+    transition: background-color 0.2s, border-color 0.2s;
+}
+
+.section-switch-slider:before {
+    position: absolute;
+    content: "";
+    height: 14px;
+    width: 14px;
+    left: 2px;
+    top: 2px;
+    background-color: var(--vscode-foreground);
+    border-radius: 50%;
+    transition: 0.2s;
+    opacity: 0.6;
+}
+
+.section-switch input:checked + .section-switch-slider {
+    background-color: var(--vscode-button-background);
+    border-color: var(--vscode-button-background);
+}
+
+.section-switch input:checked + .section-switch-slider:before {
+    transform: translateX(16px);
+    background-color: var(--vscode-button-foreground);
+    opacity: 1;
+}
+
+/* ===== 弹窗样式 ===== */
+.section-modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+}
+
+.section-modal {
+    background: var(--vscode-editor-background);
+    border: 1px solid var(--s-card-border);
+    border-radius: var(--s-radius-lg);
+    width: 90%;
+    max-width: 600px;
+    max-height: 80vh;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+}
+
+.section-modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: var(--s-gap-lg) 20px;
+    border-bottom: 1px solid var(--s-card-border);
+    font-size: var(--s-font-lg);
+    font-weight: 600;
+    color: var(--vscode-foreground);
+}
+
+.section-modal-close {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    padding: 0;
+    border: none;
+    background: transparent;
+    color: var(--vscode-foreground);
+    cursor: pointer;
+    opacity: 0.6;
+    border-radius: var(--s-radius-sm);
+    transition: all 0.2s ease;
+}
+
+.section-modal-close:hover {
+    opacity: 1;
+    background: var(--vscode-list-hoverBackground);
+}
+
+.section-modal-body {
+    flex: 1;
+    padding: 20px;
+    overflow: auto;
+}
+
+.section-edit-error {
+    margin-top: var(--s-gap-sm);
+    padding: var(--s-gap-sm) var(--s-gap-md);
+    background: var(--s-color-danger-bg);
+    border: 1px solid var(--s-color-danger-border);
+    border-radius: var(--s-radius-sm);
+    color: var(--s-color-danger);
+    font-size: var(--s-font-base);
+}
+
+.section-modal-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: var(--s-gap-md);
+    padding: var(--s-gap-lg) 20px;
+    border-top: 1px solid var(--s-card-border);
+}
+
+/* ===== 按钮样式 ===== */
+.section-btn {
+    padding: 8px 20px;
+    border: none;
+    border-radius: var(--s-radius-sm);
+    font-size: var(--s-font-md);
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.section-btn.primary {
+    background: var(--vscode-button-background);
+    color: var(--vscode-button-foreground);
+}
+
+.section-btn.primary:hover {
+    background: var(--vscode-button-hoverBackground);
+}
+
+.section-btn.secondary {
+    background: var(--s-btn-secondary-bg);
+    color: var(--s-btn-secondary-fg);
+}
+
+.section-btn.secondary:hover {
+    background: var(--s-btn-secondary-hover-bg);
+}
+
+.section-btn.small {
+    padding: 4px 10px;
+    font-size: 12px;
+}
+
+/* ===== 搜索框 ===== */
+.section-search-box {
+    position: relative;
+}
+
+.section-search-input {
+    width: 100%;
+    padding: 10px 12px;
+    background: var(--vscode-input-background);
+    color: var(--vscode-input-foreground);
+    border: 1px solid var(--vscode-input-border);
+    border-radius: var(--s-radius-md);
+    font-size: var(--s-font-md);
+    outline: none;
+    box-sizing: border-box;
+}
+
+.section-search-input:focus {
+    border-color: var(--vscode-focusBorder);
+}
+
+.section-search-input::placeholder {
+    color: var(--vscode-input-placeholderForeground);
+}
+
+/* ===== 安装按钮组 ===== */
+.section-install-btns {
+    display: flex;
+    gap: 6px;
+}
+
+/* ===== 已安装标签 ===== */
+.section-installed-badge {
+    display: inline-block;
+    padding: 4px 10px;
+    background: var(--s-color-success-bg);
+    color: var(--s-color-success);
+    border-radius: var(--s-radius-sm);
+    font-size: var(--s-font-base);
+    font-weight: 500;
+}
+
+/* ===== 响应式 - 弹窗 ===== */
+@media (max-width: 600px) {
+    .section-modal {
+        width: 95%;
+        max-height: 90vh;
+    }
+}

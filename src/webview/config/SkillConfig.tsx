@@ -3,7 +3,7 @@ import { VscodeApi } from './types';
 import { getColorByName } from './utils/iconUtils';
 import { RefreshIcon, EditIcon, TrashIcon } from './utils/svgIcons';
 import { SkillScope, SkillConfig as SkillConfigItem } from './types/skill';
-import './style/agent.css';
+import './style/section.css';
 
 interface SkillConfigProps {
     vscode: VscodeApi;
@@ -200,13 +200,13 @@ const SkillConfig: React.FC<SkillConfigProps> = ({ vscode }) => {
         const isReadonly = (skill.from && skill.from !== 'sema') || skill.locate === 'plugin';
 
         return (
-            <div key={globalIndex} className="agent-card">
-                <div className="agent-header">
-                    <div className="agent-icon" style={{ backgroundColor: getColorByName(skill.name) }}>
+            <div key={globalIndex} className="section-card">
+                <div className="section-card-header">
+                    <div className="section-card-icon" style={{ backgroundColor: getColorByName(skill.name) }}>
                         {getSkillInitial(skill.name)}
                     </div>
-                    <div className="agent-name-group">
-                        <span className="agent-name">{skill.name}</span>
+                    <div className="section-card-name-group">
+                        <span className="section-card-name">{skill.name}</span>
                         {isReadonly && (
                             <span className="readonly-tab">只读</span>
                         )}
@@ -215,16 +215,16 @@ const SkillConfig: React.FC<SkillConfigProps> = ({ vscode }) => {
                         )}
                     </div>
                     {!isReadonly && (
-                        <div className="agent-card-actions">
+                        <div className="section-card-actions">
                             <button
-                                className="mcp-icon-btn"
+                                className="section-icon-btn"
                                 title="编辑"
                                 onClick={(e) => { e.stopPropagation(); handleEditSkill(skill); }}
                             >
                                 <EditIcon />
                             </button>
                             <button
-                                className="mcp-icon-btn mcp-icon-btn-danger"
+                                className="section-icon-btn section-icon-btn-danger"
                                 title="删除"
                                 onClick={(e) => { e.stopPropagation(); handleDeleteSkill(skill); }}
                             >
@@ -233,7 +233,7 @@ const SkillConfig: React.FC<SkillConfigProps> = ({ vscode }) => {
                         </div>
                     )}
                 </div>
-                <div className={`agent-description ${isLongDesc && !isDescExpanded ? 'collapsed' : ''}`}>
+                <div className={`section-card-desc ${isLongDesc && !isDescExpanded ? 'collapsed' : ''}`}>
                     {isLongDesc && !isDescExpanded
                         ? description.slice(0, DESC_MAX) + '...'
                         : description
@@ -276,7 +276,7 @@ const SkillConfig: React.FC<SkillConfigProps> = ({ vscode }) => {
                 >
                     已安装
                     {skills.length > 0 && (
-                        <span className="plugin-tab-count">{skills.length}</span>
+                        <span className="section-tab-count">{skills.length}</span>
                     )}
                 </div>
                 <div
@@ -285,10 +285,10 @@ const SkillConfig: React.FC<SkillConfigProps> = ({ vscode }) => {
                 >
                     SkillHub
                 </div>
-                <div className="plugin-tab-actions">
+                <div className="section-tab-actions">
                     {activeTab === 'installed' && (
                         <button
-                            className={`mcp-icon-btn ${isRefreshing ? 'btn-loading' : ''}`}
+                            className={`section-icon-btn ${isRefreshing ? 'btn-loading' : ''}`}
                             onClick={handleRefresh}
                             title="刷新 Skills"
                             disabled={isRefreshing}
@@ -306,10 +306,10 @@ const SkillConfig: React.FC<SkillConfigProps> = ({ vscode }) => {
             {/* 内容 */}
             <div className="tab-content">
                 <div style={{ display: activeTab === 'hub' ? 'flex' : 'none', flexDirection: 'column', gap: '12px' }}>
-                    <div className="mcp-search-box" style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                    <div className="section-search-box" style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                         <input
                             type="text"
-                            className="mcp-search-input"
+                            className="section-search-input"
                             placeholder="搜索 Skill 名称或描述..."
                             value={hubSearch}
                             onChange={(e) => handleHubSearchChange(e.target.value)}
@@ -317,7 +317,7 @@ const SkillConfig: React.FC<SkillConfigProps> = ({ vscode }) => {
                             style={{ flex: 1 }}
                         />
                         <button
-                            className={`mcp-btn primary small ${hubLoading ? 'btn-loading' : ''}`}
+                            className={`section-btn primary small ${hubLoading ? 'btn-loading' : ''}`}
                             onClick={handleHubSearchSubmit}
                             disabled={hubLoading}
                         >
@@ -326,7 +326,7 @@ const SkillConfig: React.FC<SkillConfigProps> = ({ vscode }) => {
                         </button>
                     </div>
                     {hubLoading ? (
-                        <div className="agent-loading">搜索中...</div>
+                        <div className="section-loading">搜索中...</div>
                     ) : !hubSearched ? (
                         <div className="section-empty">输入关键词搜索 SkillHub</div>
                     ) : hubResults.length === 0 ? (
@@ -348,7 +348,7 @@ const SkillConfig: React.FC<SkillConfigProps> = ({ vscode }) => {
                                     <div key={item.slug} className="plugin-available-card">
                                         <div className="plugin-available-left">
                                             <div
-                                                className="agent-icon"
+                                                className="section-card-icon"
                                                 style={{ backgroundColor: getColorByName(item.slug), borderRadius: '50%', flexShrink: 0 }}
                                             >
                                                 {item.displayName.charAt(0).toUpperCase()}
@@ -365,11 +365,11 @@ const SkillConfig: React.FC<SkillConfigProps> = ({ vscode }) => {
                                         </div>
                                         <div className="plugin-available-right">
                                             {isInstalled ? (
-                                                <span className="mcp-installed-badge">已安装</span>
+                                                <span className="section-installed-badge">已安装</span>
                                             ) : (
-                                                <div className="mcp-install-btns">
+                                                <div className="section-install-btns">
                                                     <button
-                                                        className={`mcp-btn secondary small ${isInstallingProject ? 'btn-loading' : ''}`}
+                                                        className={`section-btn secondary small ${isInstallingProject ? 'btn-loading' : ''}`}
                                                         onClick={() => handleInstallFromHub(item.slug, 'project')}
                                                         title="安装到当前项目"
                                                         disabled={isInstallingProject || isInstallingUser}
@@ -378,7 +378,7 @@ const SkillConfig: React.FC<SkillConfigProps> = ({ vscode }) => {
                                                         项目安装
                                                     </button>
                                                     <button
-                                                        className={`mcp-btn primary small ${isInstallingUser ? 'btn-loading' : ''}`}
+                                                        className={`section-btn primary small ${isInstallingUser ? 'btn-loading' : ''}`}
                                                         onClick={() => handleInstallFromHub(item.slug, 'user')}
                                                         title="安装到用户全局"
                                                         disabled={isInstallingProject || isInstallingUser}
@@ -408,9 +408,9 @@ const SkillConfig: React.FC<SkillConfigProps> = ({ vscode }) => {
                     )}
                 </div>
                 {activeTab !== 'hub' && loading ? (
-                    <div className="agent-loading">加载中...</div>
+                    <div className="section-loading">加载中...</div>
                 ) : activeTab !== 'hub' ? (
-                    <div className="agent-sections">
+                    <div className="section-groups">
                         {ALL_SECTIONS.map(scope => {
                             const sectionSkills = groupedSkills[scope] || [];
                             if (sectionSkills.length === 0) return null;
@@ -423,7 +423,7 @@ const SkillConfig: React.FC<SkillConfigProps> = ({ vscode }) => {
                             });
 
                             return (
-                                <div key={scope} className={`agent-section section-${scope}`}>
+                                <div key={scope} className={`section-group section-${scope}`}>
                                     <div
                                         className="section-group-title section-group-title-collapsible"
                                         style={{ cursor: 'pointer', userSelect: 'none' }}
@@ -439,7 +439,7 @@ const SkillConfig: React.FC<SkillConfigProps> = ({ vscode }) => {
                                         sectionSkills.length === 0 ? (
                                             <div className="section-empty">暂无 Skill</div>
                                         ) : (
-                                            <div className="agent-list">
+                                            <div className="section-list">
                                                 {sectionSkills.map((skill, localIndex) =>
                                                     renderSkillCard(skill, getGlobalIndex(scope, localIndex))
                                                 )}

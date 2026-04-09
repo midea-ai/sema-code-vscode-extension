@@ -1,0 +1,73 @@
+/* Design Tokens */
+:root {
+    /* 圆角 */
+    --s-radius-sm: 4px;
+    --s-radius-md: 6px;
+    --s-radius-lg: 8px;
+
+    /* 间距 */
+    --s-gap-xs: 4px;
+    --s-gap-sm: 8px;
+    --s-gap-md: 12px;
+    --s-gap-lg: 16px;
+    --s-gap-xl: 24px;
+
+    /* 字号 */
+    --s-font-xs: 10px;
+    --s-font-sm: 11px;
+    --s-font-base: 12px;
+    --s-font-md: 13px;
+    --s-font-lg: 14px;
+    --s-font-xl: 16px;
+
+    /* 语义色 */
+    --s-color-success: #10b981;
+    --s-color-success-bg: rgba(16, 185, 129, 0.15);
+    --s-color-danger: #ef4444;
+    --s-color-danger-hover: #dc2626;
+    --s-color-danger-bg: rgba(239, 68, 68, 0.1);
+    --s-color-danger-border: rgba(239, 68, 68, 0.3);
+    --s-color-warning: #f59e0b;
+    --s-color-warning-bg: rgba(245, 158, 11, 0.1);
+    --s-color-warning-border: rgba(245, 158, 11, 0.3);
+    --s-color-info: #4eabff;
+    --s-color-info-bg: rgba(78, 171, 255, 0.2);
+
+    /* 状态色 */
+    --s-color-running: #4eabff;
+    --s-color-completed: #89d185;
+    --s-color-failed: #f48771;
+    --s-color-stopped: #cca700;
+
+    /* 反馈色（test-status / message） */
+    --s-color-testing: #6496c8;
+    --s-color-testing-bg: rgba(100, 150, 200, 0.12);
+    --s-color-testing-border: rgba(100, 150, 200, 0.3);
+    --s-color-ok: #48bb78;
+    --s-color-ok-bg: rgba(72, 187, 120, 0.12);
+    --s-color-ok-border: rgba(72, 187, 120, 0.3);
+    --s-color-err: #f56565;
+    --s-color-err-bg: rgba(245, 101, 101, 0.12);
+    --s-color-err-border: rgba(245, 101, 101, 0.3);
+
+    /* 卡片 */
+    --s-card-bg: var(--vscode-sideBar-background);
+    --s-card-border: var(--vscode-panel-border);
+    --s-card-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    --s-card-hover-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    --s-card-header-padding: 10px 14px;
+
+    /* 次要按钮 —— 不依赖 vscode secondary 变量，部分主题未定义或值为透明 */
+    --s-btn-secondary-bg: color-mix(in srgb, var(--vscode-foreground, #ccc) 15%, transparent);
+    --s-btn-secondary-fg: var(--vscode-foreground, #ccc);
+    --s-btn-secondary-hover-bg: color-mix(in srgb, var(--vscode-foreground, #ccc) 22%, transparent);
+
+    /* Badge */
+    --s-badge-main-bg: rgba(255, 186, 73, 0.2);
+    --s-badge-main-color: #ffba49;
+    --s-badge-quick-bg: rgba(149, 117, 255, 0.2);
+    --s-badge-quick-color: #9575ff;
+    --s-badge-kill-bg: rgba(176, 124, 232, 0.2);
+    --s-badge-kill-color: #b07ce8;
+    --s-badge-kill-hover-bg: rgba(176, 124, 232, 0.35);
+}

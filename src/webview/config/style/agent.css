@@ -17,159 +17,22 @@
     margin-bottom: 0;
 }
 
-.agent-count {
-    font-size: 12px;
-    color: var(--vscode-descriptionForeground);
-    background: var(--vscode-badge-background);
-    padding: 4px 10px;
-    border-radius: 12px;
-}
-
-.agent-loading {
-    text-align: center;
-    padding: 40px;
-    color: var(--vscode-descriptionForeground);
-    font-size: 13px;
-}
-
-/* Agent 分组区域 */
-.agent-sections {
-    display: flex;
-    flex-direction: column;
-    gap: 24px;
-}
-
-.agent-section {
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-}
-
-.section-group-title {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    font-size: 14px;
-    font-weight: 600;
-    color: var(--vscode-foreground);
-    margin-bottom: 12px;
-    padding-bottom: 8px;
-    border-bottom: 1px solid var(--vscode-panel-border);
-}
-
-.section-collapse-arrow {
-    display: inline-block;
-    width: 0;
-    height: 0;
-    border-left: 4px solid transparent;
-    border-right: 4px solid transparent;
-    border-top: 5px solid var(--vscode-descriptionForeground);
-    opacity: 0;
-    transition: opacity 0.15s, transform 0.15s;
-    transform: rotate(0deg);
-    flex-shrink: 0;
-}
-
-.section-collapse-arrow.collapsed {
-    transform: rotate(-90deg);
-}
-
-.section-group-title-collapsible:hover .section-collapse-arrow {
-    opacity: 1;
-}
-
-.section-group-count {
-    font-size: 12px;
-    font-weight: 400;
-    color: var(--vscode-descriptionForeground);
-}
-
-/* Agent 列表 */
-.agent-list {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-    gap: 16px;
-}
-
-/* Agent 卡片 */
-.agent-card {
-    background: var(--vscode-sideBar-background);
-    border: 1px solid var(--vscode-panel-border);
-    border-radius: 8px;
-    padding: 16px;
-    transition: all 0.2s ease;
-}
-
-.agent-card:hover {
-    border-color: var(--vscode-focusBorder);
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-}
-
-.agent-header {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    margin-bottom: 12px;
-}
-
-.agent-icon {
-    width: 28px;
-    height: 28px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: 6px;
-    color: #fff;
-    flex-shrink: 0;
-    font-size: 13px;
-    font-weight: 600;
-}
-
-.agent-name-group {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    flex: 1;
-    min-width: 0;
-}
-
-.agent-name {
-    font-size: 14px;
-    font-weight: 600;
-    color: var(--vscode-foreground);
-    word-break: break-word;
-}
-
-.agent-name-link:hover {
-    color: var(--vscode-textLink-foreground);
-    text-decoration: underline;
-}
-
-/* Agent 卡片操作按钮 */
-.agent-card-actions {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    margin-left: auto;
-}
-
-
 /* 模型标签 */
 .model-badge {
-    font-size: 10px;
+    font-size: var(--s-font-xs);
     padding: 2px 6px;
-    border-radius: 4px;
+    border-radius: var(--s-radius-sm);
     font-weight: 500;
 }
 
 .model-main {
-    background: rgba(255, 186, 73, 0.2);
-    color: #ffba49;
+    background: var(--s-badge-main-bg);
+    color: var(--s-badge-main-color);
 }
 
 .model-quick {
-    background: rgba(149, 117, 255, 0.2);
-    color: #9575ff;
+    background: var(--s-badge-quick-bg);
+    color: var(--s-badge-quick-color);
 }
 
 .model-default {
@@ -178,72 +41,51 @@
     color: var(--vscode-descriptionForeground);
 }
 
-.agent-description {
-    font-size: 12px;
-    color: var(--vscode-descriptionForeground);
-    line-height: 1.5;
-    word-break: break-word;
-    margin-bottom: 12px;
-}
-
-.agent-description.collapsed {
-    display: inline;
-}
-
-.description-toggle {
-    display: inline;
-    margin-left: 4px;
-    color: var(--vscode-textLink-foreground);
-    cursor: pointer;
-    font-size: 12px;
-}
-
-.description-toggle:hover {
-    text-decoration: underline;
-}
-
 /* 模型行 */
 .agent-model-row {
     display: flex;
     align-items: center;
-    gap: 8px;
-    margin-top: 8px;
+    gap: var(--s-gap-sm);
+    padding: 0 14px;
+    margin-top: var(--s-gap-sm);
 }
 
 /* 工具区域 */
 .agent-tools {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: var(--s-gap-sm);
+    padding: 0 14px;
     margin-top: 6px;
+    margin-bottom: 10px;
     flex-wrap: wrap;
 }
 
 .tools-label {
-    font-size: 11px;
+    font-size: var(--s-font-sm);
     color: var(--vscode-descriptionForeground);
     flex-shrink: 0;
 }
 
 .tools-list {
     display: flex;
-    gap: 4px;
+    gap: var(--s-gap-xs);
     flex-wrap: wrap;
 }
 
 .tool-tag {
-    font-size: 10px;
+    font-size: var(--s-font-xs);
     padding: 2px 6px;
     background: var(--vscode-badge-background);
     color: var(--vscode-badge-foreground);
-    border-radius: 4px;
+    border-radius: var(--s-radius-sm);
     opacity: 0.7;
 }
 
 .tool-more,
 .tool-collapse {
-    background: var(--vscode-button-secondaryBackground);
-    color: var(--vscode-button-secondaryForeground);
+    background: var(--s-btn-secondary-bg);
+    color: var(--s-btn-secondary-fg);
     cursor: pointer;
     opacity: 1;
     transition: opacity 0.2s ease;
@@ -255,15 +97,15 @@
 }
 
 .tools-all {
-    font-size: 10px;
+    font-size: var(--s-font-xs);
     padding: 2px 6px;
-    background: rgba(78, 171, 255, 0.2);
-    color: #4eabff;
-    border-radius: 4px;
+    background: var(--s-color-info-bg);
+    color: var(--s-color-info);
+    border-radius: var(--s-radius-sm);
 }
 
 .tools-none {
-    font-size: 11px;
+    font-size: var(--s-font-sm);
     color: var(--vscode-descriptionForeground);
     font-style: italic;
 }
@@ -276,7 +118,7 @@
 }
 
 .agent-config .empty-state .empty-icon {
-    margin-bottom: 16px;
+    margin-bottom: var(--s-gap-lg);
     opacity: 0.5;
 }
 
@@ -289,32 +131,12 @@
     margin: 0;
 }
 
-/* 分组内空状态 */
-.section-empty {
-    text-align: center;
-    padding: 20px;
-    color: var(--vscode-descriptionForeground);
-    font-size: 13px;
-    font-style: italic;
-    background: var(--vscode-sideBar-background);
-    border: 1px solid var(--vscode-panel-border);
-    border-radius: 8px;
-    opacity: 0.7;
-}
-
-/* 响应式布局 */
-@media (max-width: 768px) {
-    .agent-list {
-        grid-template-columns: 1fr;
-    }
-}
-
 /* Memory 列表始终单列占满宽度 */
 .memory-list {
     grid-template-columns: 1fr;
 }
 
-.memory-list .agent-card {
+.memory-list .section-card {
     width: 100%;
     box-sizing: border-box;
 }
@@ -341,33 +163,6 @@
 .memory-ref-file svg {
     flex-shrink: 0;
     opacity: 0.7;
-}
-
-/* 头部右侧区域 */
-.section-header-right {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-}
-
-/* 创建按钮 */
-.btn-create {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    padding: 6px 12px;
-    font-size: 12px;
-    font-weight: 500;
-    color: var(--vscode-button-foreground);
-    background: var(--vscode-button-background);
-    border: none;
-    border-radius: 4px;
-    cursor: pointer;
-    transition: background 0.2s ease;
-}
-
-.btn-create:hover {
-    background: var(--vscode-button-hoverBackground);
 }
 
 /* 创建 Agent 表单 */
@@ -581,10 +376,10 @@
 }
 
 .add-agent-form-footer .btn-secondary {
-    color: var(--vscode-button-secondaryForeground);
-    background: var(--vscode-button-secondaryBackground);
+    color: var(--s-btn-secondary-fg);
+    background: var(--s-btn-secondary-bg);
 }
 
 .add-agent-form-footer .btn-secondary:hover {
-    background: var(--vscode-button-secondaryHoverBackground);
+    background: var(--s-btn-secondary-hover-bg);
 }

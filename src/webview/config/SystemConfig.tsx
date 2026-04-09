@@ -332,7 +332,7 @@ const SystemConfig: React.FC<SystemConfigProps> = ({ vscode }) => {
 
             {/* 按钮组 */}
             <div className="button-group">
-                <button type="button" className="secondary" onClick={handleReset}>
+                <button type="button" className="reset-btn" onClick={handleReset}>
                     重置为默认
                 </button>
             </div>

@@ -260,7 +260,7 @@ const BackgroundTaskConfig: React.FC<BackgroundTaskConfigProps> = ({ vscode }) =
             <div className="task-detail-header">
                 <span className="task-detail-title">Shell details</span>
                 <button
-                    className="mcp-icon-btn"
+                    className="section-icon-btn"
                     title="Close"
                     onClick={() => setSelectedTaskId(null)}
                 >
@@ -288,7 +288,7 @@ const BackgroundTaskConfig: React.FC<BackgroundTaskConfigProps> = ({ vscode }) =
             <div className="task-detail-header">
                 <span className="task-detail-title">{getTaskDisplayName(task)}</span>
                 <button
-                    className="mcp-icon-btn"
+                    className="section-icon-btn"
                     title="Close"
                     onClick={() => setSelectedTaskId(null)}
                 >
@@ -329,10 +329,10 @@ const BackgroundTaskConfig: React.FC<BackgroundTaskConfigProps> = ({ vscode }) =
             {renderDetailPanel()}
 
             {/* Task sections */}
-            <div className="agent-sections">
+            <div className="section-groups">
                 {/* Bashes */}
                 {bashTasks.length > 0 && (
-                    <div className="agent-section">
+                    <div className="section-group">
                         <div className="section-group-title">
                             Bashes
                             <span className="section-group-count">({bashTasks.length})</span>
@@ -343,7 +343,7 @@ const BackgroundTaskConfig: React.FC<BackgroundTaskConfigProps> = ({ vscode }) =
 
                 {/* Local agents */}
                 {agentTasks.length > 0 && (
-                    <div className="agent-section">
+                    <div className="section-group">
                         <div className="section-group-title">
                             Local agents
                             <span className="section-group-count">({agentTasks.length})</span>

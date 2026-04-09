@@ -22,7 +22,6 @@ export function transformCommandToPrompt(text: string): string {
 
 // 命令到 prompt 的映射关系
 export const COMMAND_PROMPT_MAP: Record<string, string> = {
-    '/knowledge': '帮我扫描整个代码项目，构建非常完善的wiki项目文档，需要是多个文档，分门别类的存放，按照目录来索引，对整个仓库做深度解析，越详细越好。',
     '/init': `Please analyze this codebase and create a AGENTS.md file, which will be given to future instances of Sema Code to operate in this repository.
 
 What to add:

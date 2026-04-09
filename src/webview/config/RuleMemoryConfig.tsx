@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { VscodeApi } from './types';
 import { RefreshIcon, LinkIcon } from './utils/svgIcons';
+import './style/section.css';
 import './style/agent.css';
 
 interface MemoryConfigItem {
@@ -156,11 +157,11 @@ const RuleMemoryConfig: React.FC<RuleMemoryConfigProps> = ({ vscode }) => {
     const renderMemoryCard = (item: MemoryConfigItem, index: number) => {
         const readonly = isMemoryReadonly(item);
         return (
-            <div key={index} className="agent-card">
-                <div className="agent-header">
-                    <div className="agent-name-group">
+            <div key={index} className="section-card">
+                <div className="section-card-header">
+                    <div className="section-card-name-group">
                         <span
-                            className={`agent-name${item.FilePath ? ' agent-name-link' : ''}`}
+                            className={`section-card-name${item.FilePath ? ' section-card-name-link' : ''}`}
                             onClick={item.FilePath ? () => openFile(item.FilePath!) : undefined}
                             style={item.FilePath ? { cursor: 'pointer' } : undefined}
                         >
@@ -239,11 +240,11 @@ const RuleMemoryConfig: React.FC<RuleMemoryConfigProps> = ({ vscode }) => {
     const renderRuleCard = (item: RuleConfig, index: number) => {
         const readonly = !!item.from && item.from !== 'sema';
         return (
-            <div key={index} className="agent-card">
-                <div className="agent-header">
-                    <div className="agent-name-group">
+            <div key={index} className="section-card">
+                <div className="section-card-header">
+                    <div className="section-card-name-group">
                         <span
-                            className={`agent-name${item.filePath ? ' agent-name-link' : ''}`}
+                            className={`section-card-name${item.filePath ? ' section-card-name-link' : ''}`}
                             onClick={item.filePath ? () => openFile(item.filePath!) : undefined}
                             style={item.filePath ? { cursor: 'pointer' } : undefined}
                         >
@@ -291,10 +292,10 @@ const RuleMemoryConfig: React.FC<RuleMemoryConfigProps> = ({ vscode }) => {
                 >
                     Memory
                 </div>
-                <div className="plugin-tab-actions">
+                <div className="section-tab-actions">
                     {activeTab === 'rule' ? (
                         <button
-                            className={`mcp-icon-btn ${isRuleRefreshing ? 'btn-loading' : ''}`}
+                            className={`section-icon-btn ${isRuleRefreshing ? 'btn-loading' : ''}`}
                             onClick={handleRuleRefresh}
                             title="刷新 Rule"
                             disabled={isRuleRefreshing}
@@ -303,7 +304,7 @@ const RuleMemoryConfig: React.FC<RuleMemoryConfigProps> = ({ vscode }) => {
                         </button>
                     ) : (
                         <button
-                            className={`mcp-icon-btn ${isMemoryRefreshing ? 'btn-loading' : ''}`}
+                            className={`section-icon-btn ${isMemoryRefreshing ? 'btn-loading' : ''}`}
                             onClick={handleMemoryRefresh}
                             title="刷新 Memory"
                             disabled={isMemoryRefreshing}
@@ -319,15 +320,15 @@ const RuleMemoryConfig: React.FC<RuleMemoryConfigProps> = ({ vscode }) => {
                 {/* Rule 内容 */}
                 {activeTab === 'rule' && (
                     ruleLoading ? (
-                        <div className="agent-loading">加载中...</div>
+                        <div className="section-loading">加载中...</div>
                     ) : (
-                        <div className="agent-sections">
+                        <div className="section-groups">
                             {(['project', 'user', 'other'] as RuleScope[]).map(scope => {
                                 const items = groupedRule[scope];
                                 if (scope !== 'project' && scope !== 'user' && items.length === 0) return null;
                                 const isCollapsed = collapsedRuleSections.has(scope);
                                 return (
-                                    <div key={scope} className={`agent-section section-${scope}`}>
+                                    <div key={scope} className={`section-group section-${scope}`}>
                                         <div
                                             className="section-group-title section-group-title-collapsible"
                                             style={{ cursor: 'pointer', userSelect: 'none' }}
@@ -343,7 +344,7 @@ const RuleMemoryConfig: React.FC<RuleMemoryConfigProps> = ({ vscode }) => {
                                             items.length === 0 ? (
                                                 <div className="section-empty">暂无 Rule 配置</div>
                                             ) : (
-                                                <div className="agent-list memory-list">
+                                                <div className="section-list memory-list">
                                                     {items.map((item, index) => renderRuleCard(item, index))}
                                                 </div>
                                             )
@@ -358,15 +359,15 @@ const RuleMemoryConfig: React.FC<RuleMemoryConfigProps> = ({ vscode }) => {
                 {/* Memory 内容 */}
                 {activeTab === 'memory' && (
                     memoryLoading ? (
-                        <div className="agent-loading">加载中...</div>
+                        <div className="section-loading">加载中...</div>
                     ) : (
-                        <div className="agent-sections">
+                        <div className="section-groups">
                             {(['project', 'other'] as MemoryScope[]).map(scope => {
                                 const items = groupedMemory[scope];
                                 if (scope !== 'project' && items.length === 0) return null;
                                 const isCollapsed = collapsedSections.has(scope);
                                 return (
-                                    <div key={scope} className={`agent-section section-${scope}`}>
+                                    <div key={scope} className={`section-group section-${scope}`}>
                                         <div
                                             className="section-group-title section-group-title-collapsible"
                                             style={{ cursor: 'pointer', userSelect: 'none' }}
@@ -382,7 +383,7 @@ const RuleMemoryConfig: React.FC<RuleMemoryConfigProps> = ({ vscode }) => {
                                             items.length === 0 ? (
                                                 <div className="section-empty">暂无 Memory 配置</div>
                                             ) : (
-                                                <div className="agent-list memory-list">
+                                                <div className="section-list memory-list">
                                                     {items.map((item, index) => renderMemoryCard(item, index))}
                                                 </div>
                                             )

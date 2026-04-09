@@ -4,6 +4,7 @@ import { getColorByName } from './utils/iconUtils';
 import { RefreshIcon, EditIcon, TrashIcon } from './utils/svgIcons';
 import AddCommandForm from './AddCommandForm';
 import { CommandScope, CommandConfig as CommandConfigItem } from './types/command';
+import './style/section.css';
 import './style/agent.css';
 
 interface CommandConfigProps {
@@ -121,13 +122,13 @@ const CommandConfig: React.FC<CommandConfigProps> = ({ vscode }) => {
         const isReadonly = (cmd.from && cmd.from !== 'sema') || cmd.locate === 'plugin';
 
         return (
-            <div key={globalIndex} className="agent-card">
-                <div className="agent-header">
-                    <div className="agent-icon" style={{ backgroundColor: getColorByName(cmd.name) }}>
+            <div key={globalIndex} className="section-card">
+                <div className="section-card-header">
+                    <div className="section-card-icon" style={{ backgroundColor: getColorByName(cmd.name) }}>
                         {getCommandInitial(cmd.name)}
                     </div>
-                    <div className="agent-name-group">
-                        <span className="agent-name">/{cmd.name}</span>
+                    <div className="section-card-name-group">
+                        <span className="section-card-name">/{cmd.name}</span>
                         {isReadonly && (
                             <span className="readonly-tab">只读</span>
                         )}
@@ -136,10 +137,10 @@ const CommandConfig: React.FC<CommandConfigProps> = ({ vscode }) => {
                         )}
                     </div>
                     {!isReadonly && (
-                        <div className="agent-card-actions">
+                        <div className="section-card-actions">
                             {cmd.filePath && (
                                 <button
-                                    className="mcp-icon-btn"
+                                    className="section-icon-btn"
                                     title="编辑"
                                     onClick={(e) => { e.stopPropagation(); handleEditCommand(cmd); }}
                                 >
@@ -147,7 +148,7 @@ const CommandConfig: React.FC<CommandConfigProps> = ({ vscode }) => {
                                 </button>
                             )}
                             <button
-                                className="mcp-icon-btn mcp-icon-btn-danger"
+                                className="section-icon-btn section-icon-btn-danger"
                                 title="删除"
                                 onClick={(e) => { e.stopPropagation(); handleDeleteCommand(cmd); }}
                             >
@@ -156,7 +157,7 @@ const CommandConfig: React.FC<CommandConfigProps> = ({ vscode }) => {
                         </div>
                     )}
                 </div>
-                <div className={`agent-description ${isLongDesc && !isDescExpanded ? 'collapsed' : ''}`}>
+                <div className={`section-card-desc ${isLongDesc && !isDescExpanded ? 'collapsed' : ''}`}>
                     {isLongDesc && !isDescExpanded
                         ? description.slice(0, DESC_MAX) + '...'
                         : description
@@ -171,7 +172,7 @@ const CommandConfig: React.FC<CommandConfigProps> = ({ vscode }) => {
                     )}
                 </div>
                 {cmd.argumentHint && (
-                    <div className="agent-description">
+                    <div className="section-card-desc">
                         <span className="tools-label">参数提示:</span>{' '}
                         {Array.isArray(cmd.argumentHint)
                             ? cmd.argumentHint.map((hint, i) => (
@@ -215,7 +216,7 @@ const CommandConfig: React.FC<CommandConfigProps> = ({ vscode }) => {
                 >
                     已安装
                     {commands.length > 0 && (
-                        <span className="plugin-tab-count">{commands.length}</span>
+                        <span className="section-tab-count">{commands.length}</span>
                     )}
                 </div>
                 <div
@@ -224,10 +225,10 @@ const CommandConfig: React.FC<CommandConfigProps> = ({ vscode }) => {
                 >
                     创建 Command
                 </div>
-                <div className="plugin-tab-actions">
+                <div className="section-tab-actions">
                     {activeTab === 'installed' && (
                         <button
-                            className={`mcp-icon-btn ${isRefreshing ? 'btn-loading' : ''}`}
+                            className={`section-icon-btn ${isRefreshing ? 'btn-loading' : ''}`}
                             onClick={handleRefresh}
                             title="刷新 Commands"
                             disabled={isRefreshing}
@@ -252,9 +253,9 @@ const CommandConfig: React.FC<CommandConfigProps> = ({ vscode }) => {
                     />
                 </div>
                 {activeTab !== 'add' && loading ? (
-                    <div className="agent-loading">加载中...</div>
+                    <div className="section-loading">加载中...</div>
                 ) : activeTab !== 'add' ? (
-                    <div className="agent-sections">
+                    <div className="section-groups">
                         {ALL_SECTIONS.map(scope => {
                             const sectionCommands = groupedCommands[scope] || [];
                             if (sectionCommands.length === 0) return null;
@@ -267,7 +268,7 @@ const CommandConfig: React.FC<CommandConfigProps> = ({ vscode }) => {
                             });
 
                             return (
-                                <div key={scope} className={`agent-section section-${scope}`}>
+                                <div key={scope} className={`section-group section-${scope}`}>
                                     <div
                                         className="section-group-title section-group-title-collapsible"
                                         style={{ cursor: 'pointer', userSelect: 'none' }}
@@ -283,7 +284,7 @@ const CommandConfig: React.FC<CommandConfigProps> = ({ vscode }) => {
                                         sectionCommands.length === 0 ? (
                                             <div className="section-empty">暂无 Command</div>
                                         ) : (
-                                            <div className="agent-list">
+                                            <div className="section-list">
                                                 {sectionCommands.map((cmd, localIndex) =>
                                                     renderCommandCard(cmd, getGlobalIndex(scope, localIndex))
                                                 )}
