@@ -16,7 +16,7 @@ body.vscode-light .bash-permission-block {
 
 /* 头部：继承 .chat-block-header */
 .bash-permission-header {
-    cursor: pointer;
+    cursor: default;
 }
 
 .bash-permission-title {
@@ -25,11 +25,6 @@ body.vscode-light .bash-permission-block {
     gap: 8px;
     flex: 1;
     min-width: 0;
-}
-
-.bash-permission-dot {
-    font-size: var(--chat-font-base);
-    color: var(--chat-color-success);
 }
 
 .bash-permission-title-text {
@@ -215,6 +210,14 @@ body.vscode-light .bash-permission-content {
 }
 
 .file-permission-file-left-clickable:hover {
+    opacity: 0.8;
+}
+
+.file-permission-title-clickable {
+    cursor: pointer;
+}
+
+.file-permission-title-clickable:hover {
     opacity: 0.8;
 }
 

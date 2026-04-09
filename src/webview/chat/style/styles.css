@@ -187,6 +187,7 @@ code, pre, .code {
     border: 1px dashed var(--chat-border-input);
     border-width: 0.6px;
     opacity: 0.6;
+    cursor: default;
 }
 
 .user-input-content.pending {
@@ -290,9 +291,6 @@ code, pre, .code {
 /* Dot 状态色（全局复用） */
 .dot-success {
     color: var(--chat-color-success) !important;
-}
-.dot-pending {
-    color: var(--chat-color-warning) !important;
 }
 .dot-error {
     color: var(--chat-color-error) !important;
@@ -452,7 +450,7 @@ code, pre, .code {
     display: flex;
     align-items: center;
     gap: 6px;
-    padding: 6px 12px;
+    padding: 6px var(--chat-spacing-md);
     transition: background-color 0.15s;
     position: relative;
     overflow: visible;
@@ -471,25 +469,28 @@ code, pre, .code {
 .todos-panel-content {
     max-height: 200px;
     overflow-y: auto;
-    padding: 4px 12px 8px 12px;
+    padding: 4px var(--chat-spacing-md) 8px var(--chat-spacing-md);
 }
 
 
 .todo-panel-item {
     display: flex;
     align-items: flex-start;
-    gap: 8px;
-    padding: 3px 0;
+    gap: 4px;
+    padding: 3px 8px;
 }
 
 .todo-panel-circle {
     font-size: var(--chat-font-xs);
     line-height: 1.5;
     flex-shrink: 0;
+    width: 18px;
+    text-align: center;
     margin-top: 1px;
 }
 
-.todo-panel-circle.completed {
+.todo-panel-circle.completed,
+.todo-panel-circle.in-progress {
     color: var(--chat-color-success);
 }
 
@@ -498,6 +499,14 @@ code, pre, .code {
     color: var(--chat-text-primary);
     line-height: 1.5;
     word-break: break-word;
+}
+
+.todo-panel-item.pending .todo-panel-text {
+    color: var(--chat-text-secondary);
+}
+
+.todo-panel-item.completed .todo-panel-text {
+    text-decoration: line-through;
 }
 
 /* File Changes Panel 样式 */
@@ -510,7 +519,7 @@ code, pre, .code {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 6px 12px;
+    padding: 6px var(--chat-spacing-md);
     user-select: none;
     transition: background-color 0.15s;
 }
@@ -526,7 +535,7 @@ code, pre, .code {
 .file-changes-header-right {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: var(--chat-spacing-xs);
 }
 
 .file-changes-header-left:hover {
@@ -571,7 +580,7 @@ code, pre, .code {
 }
 
 .file-changes-content {
-    padding: 0 12px 8px 12px;
+    padding: 0 var(--chat-spacing-md) 8px var(--chat-spacing-md);
     max-height: 150px;
     overflow-y: auto;
 }
@@ -621,6 +630,25 @@ code, pre, .code {
     display: flex;
     align-items: center;
     margin-left: 4px;
+    gap: var(--chat-spacing-lg);
+}
+
+.file-change-discard-btn {
+    display: none;
+    align-items: center;
+    gap: 4px;
+    cursor: pointer;
+    color: var(--chat-text-secondary);
+    transition: color 0.15s;
+}
+
+.file-change-item:hover .file-change-discard-btn {
+    display: flex;
+}
+
+
+.file-change-discard-btn:hover {
+    color: var(--chat-text-primary);
 }
 
 .file-change-name {
@@ -639,7 +667,7 @@ code, pre, .code {
 .file-change-stats {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: var(--chat-spacing-xs);
     font-size: var(--chat-font-base);
     font-weight: 500;
 }

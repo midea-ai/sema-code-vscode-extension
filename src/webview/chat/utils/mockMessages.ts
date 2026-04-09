@@ -559,83 +559,151 @@ export function getPreviewMessages(): Message[] {
 }
 
 /** Mock dialog / 状态组件数据 */
-export const mockDialogMap: Record<string, any> = {
-    ProcessingSpinner: {
-        accumulatedSeconds: 5,
-        in_progress: '正在分析代码结构…',
-        next_progress: '优化配置缓存逻辑',
-    },
-    ModelConfigReminder: {
-        message: '未检测到有效的模型配置，请先配置 API Key 和模型信息。',
-    },
-    PermissionDialog: {
-        type: 'permission',
-        data: {
-            agentId: 'mock-agent-1',
-            toolId: 'mock-tool-perm-1',
-            toolName: 'Bash',
-            title: 'rm -rf node_modules && npm install',
-            content: 'rm -rf node_modules && npm install',
-            options: {
-                agree: '确认',
-                allow: '确认，本项目不再询问 `npm` 开头的命令',
-                refuse: '拒绝'
-            }
+export const mockDialogMap: Record<string, any[]> = {
+    ProcessingSpinner: [
+        {
+            accumulatedSeconds: 5,
+            in_progress: '正在分析代码结构…',
+            next_progress: '优化配置缓存逻辑',
         },
-        isBackground: false,
-    },
-    AskQuestionDialog: {
-        type: 'askQuestion',
-        data: {
-            agentId: 'mock-agent-2',
-            questions: [
-                {
-                    question: '请选择您希望在2048游戏中包含的核心模块（可多选）：',
-                    header: '核心模块',
-                    multiSelect: true,
-                    options: [
-                        { label: '游戏核心逻辑', description: '包含游戏板状态管理、数字移动合并算法、游戏规则实现等核心功能' },
-                        { label: 'UI界面渲染', description: '游戏界面显示、数字方块渲染、分数显示等视觉界面' },
-                        { label: '输入控制系统', description: '键盘方向键控制、触摸滑动控制等用户交互' },
-                        { label: '动画效果', description: '方块移动动画、合并动画、新方块出现动画等视觉效果' },
+    ],
+    ModelConfigReminder: [
+        {
+            message: '未检测到有效的模型配置，请先配置 API Key 和模型信息。',
+        },
+    ],
+    PermissionDialog: [
+        {
+            type: 'permission',
+            data: {
+                agentId: 'mock-agent-1',
+                toolId: 'mock-tool-perm-1',
+                toolName: 'Bash',
+                title: 'rm -rf node_modules && npm install',
+                content: '重装依赖',
+                options: {
+                    agree: '确认',
+                    allow: '确认，本项目不再询问 `npm` 开头的命令',
+                    refuse: '拒绝'
+                }
+            },
+            isBackground: false,
+        },
+        {
+            type: 'permission',
+            data: {
+                agentId: 'main',
+                toolId: 'write-2',
+                toolName: 'Write',
+                title: 'src/utils/configCache.ts',
+                content: {
+                    type: 'new' as const,
+                    patch: [
+                        {
+                            oldStart: 0,
+                            oldLines: 0,
+                            newStart: 1,
+                            newLines: 6,
+                            lines: [
+                                '+export class ConfigCache {',
+                                '+    private store = new Map<string, any>();',
+                                '+    get(key: string) { return this.store.get(key); }',
+                                '+    set(key: string, val: any) { this.store.set(key, val); }',
+                                '+    has(key: string) { return this.store.has(key); }',
+                                '+}',
+                            ],
+                        },
                     ],
+                    diffText: '',
                 },
-                {
-                    question: '请选择您希望在2048游戏中包含的扩展功能（可多选）：',
-                    header: '扩展功能',
-                    multiSelect: true,
-                    options: [
-                        { label: '数据存储', description: '最高分记录、游戏状态保存等本地存储功能' },
-                        { label: '声音效果', description: '移动音效、合并音效、游戏结束音效等音频反馈' },
-                        { label: '主题系统', description: '多种颜色主题、深色/浅色模式切换等个性化设置' },
-                        { label: '游戏设置', description: '难度调节、游戏重新开始、暂停等辅助功能' },
-                    ],
-                },
+                options: {
+                    agree: '确认',
+                    allow: '确认, 本次会话不再询问文件编辑',
+                    refuse: '拒绝'
+                }
+            },
+            isBackground: false,
+        },
+    ],
+    AskQuestionDialog: [
+        {
+            type: 'askQuestion',
+            data: {
+                agentId: 'mock-agent-2',
+                questions: [
+                    {
+                        question: '请选择您希望在2048游戏中包含的核心模块（可多选）：',
+                        header: '核心模块',
+                        multiSelect: true,
+                        options: [
+                            { label: '游戏核心逻辑', description: '包含游戏板状态管理、数字移动合并算法、游戏规则实现等核心功能' },
+                            { label: 'UI界面渲染', description: '游戏界面显示、数字方块渲染、分数显示等视觉界面' },
+                            { label: '输入控制系统', description: '键盘方向键控制、触摸滑动控制等用户交互' },
+                            { label: '动画效果', description: '方块移动动画、合并动画、新方块出现动画等视觉效果' },
+                        ],
+                    },
+                    {
+                        question: '请选择您希望在2048游戏中包含的扩展功能（可多选）：',
+                        header: '扩展功能',
+                        multiSelect: true,
+                        options: [
+                            { label: '数据存储', description: '最高分记录、游戏状态保存等本地存储功能' },
+                            { label: '声音效果', description: '移动音效、合并音效、游戏结束音效等音频反馈' },
+                            { label: '主题系统', description: '多种颜色主题、深色/浅色模式切换等个性化设置' },
+                            { label: '游戏设置', description: '难度调节、游戏重新开始、暂停等辅助功能' },
+                        ],
+                    },
+                ],
+            },
+            isBackground: false,
+        },
+    ],
+    PlanExitDialog: [
+        {
+            type: 'planExit',
+            data: {
+                agentId: 'mock-agent-3',
+                planFilePath: '/workspace/plan.md',
+                planContent: '# Optimization Plan\n\n## Steps\n1. ~~Analyze codebase~~ ✅\n2. ~~Add caching~~ ✅\n3. Update `callers`\n4. Write tests',
+                options: {
+                    startEditing: '开始代码编辑',
+                    clearContextAndStart: '清理上下文，并开始代码编辑',
+                }
+            },
+            isBackground: false,
+        },
+    ],
+    TodosPanel: [
+        {
+            todos: [
+                { content: '分析代码结构', status: 'completed' },
+                { content: '添加缓存层', status: 'completed' },
+                { content: '更新所有调用方', status: 'in_progress', activeForm: '正在更新 src/app/index.ts ...' },
+                { content: '添加缓存失效逻辑', status: 'pending' },
+                { content: '编写集成测试', status: 'pending' },
             ],
         },
-        isBackground: false,
-    },
-    PlanExitDialog: {
-        type: 'planExit',
-        data: {
-            agentId: 'mock-agent-3',
-            planFilePath: '/workspace/plan.md',
-            planContent: '# Optimization Plan\n\n## Steps\n1. ~~Analyze codebase~~ ✅\n2. ~~Add caching~~ ✅\n3. Update `callers`\n4. Write tests',
-            options: {
-                startEditing: '开始代码编辑',
-                clearContextAndStart: '清理上下文，并开始代码编辑',
-            }
+    ],
+    FileChangesPanel: [
+        {
+            changes: [
+                { fileName: 'config.ts', fullPath: 'src/utils/config.ts', additions: 12, removals: 5, type: 'edit', minLine: 10 },
+                { fileName: 'configCache.ts', fullPath: 'src/utils/configCache.ts', additions: 6, removals: 0, type: 'write', minLine: 1 },
+                { fileName: 'index.ts', fullPath: 'src/app/index.ts', additions: 3, removals: 2, type: 'edit', minLine: 5 },
+                { fileName: 'analysis.ipynb', fullPath: 'notebooks/analysis.ipynb', additions: 0, removals: 0, type: 'edit', minLine: 1, isNotebook: true },
+            ],
         },
-        isBackground: false,
-    },
-    BtwDialog: {
-        type: 'btw',
-        data: {
-            question: '你知道可以用 Map 代替对象来做缓存吗？',
-            content: '使用 `Map` 相比普通对象有以下优势：\n\n1. **键可以是任意类型**\n2. **保持插入顺序**\n3. **内置 `size` 属性**\n\n```typescript\nconst cache = new Map<string, any>();\ncache.set("key", value);\n```',
+    ],
+    BtwDialog: [
+        {
+            type: 'btw',
+            data: {
+                question: '你知道可以用 Map 代替对象来做缓存吗？',
+                content: '使用 `Map` 相比普通对象有以下优势：\n\n1. **键可以是任意类型**\n2. **保持插入顺序**\n3. **内置 `size` 属性**\n\n```typescript\nconst cache = new Map<string, any>();\ncache.set("key", value);\n```',
+            },
+            isBackground: false,
         },
-        isBackground: false,
-    },
+    ],
 };
 
 /** 根据 PREVIEW_COMPONENTS 过滤需要预览的 dialog 组件 key */
@@ -643,6 +711,11 @@ export function getPreviewDialogKeys(): string[] {
     if (PREVIEW_COMPONENTS !== null && PREVIEW_COMPONENTS.length === 0) return [];
     const allKeys = Object.keys(mockDialogMap);
     return PREVIEW_COMPONENTS ? PREVIEW_COMPONENTS.filter(k => allKeys.includes(k)) : allKeys;
+}
+
+/** 指定 key 是否在预览范围内 */
+export function isPreviewActive(key: string): boolean {
+    return PREVIEW_MODE && (PREVIEW_COMPONENTS === null || PREVIEW_COMPONENTS.includes(key));
 }
 
 /** 是否开启预览 */

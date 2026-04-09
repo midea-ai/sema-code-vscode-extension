@@ -25,42 +25,46 @@ const PreviewDialogs: React.FC<{ vscode: any }> = ({ vscode }) => {
 
     return (
         <>
-            {show('ProcessingSpinner') && (
-                <ProcessingSpinner {...mockDialogMap.ProcessingSpinner} />
-            )}
-            {show('ModelConfigReminder') && (
+            {show('ProcessingSpinner') && mockDialogMap.ProcessingSpinner.map((item, i) => (
+                <ProcessingSpinner key={`ProcessingSpinner-${i}`} {...item} />
+            ))}
+            {show('ModelConfigReminder') && mockDialogMap.ModelConfigReminder.map((item, i) => (
                 <ModelConfigReminder
-                    {...mockDialogMap.ModelConfigReminder}
+                    key={`ModelConfigReminder-${i}`}
+                    {...item}
                     onClose={() => dismiss('ModelConfigReminder', 'onClose')}
                     onOpenConfig={() => dismiss('ModelConfigReminder', 'onOpenConfig')}
                 />
-            )}
-            {show('BtwDialog') && (
-                <BtwDialog data={mockDialogMap.BtwDialog.data} onClose={() => dismiss('BtwDialog', 'onClose')} />
-            )}
-            {show('PermissionDialog') && (
+            ))}
+            {show('BtwDialog') && mockDialogMap.BtwDialog.map((item, i) => (
+                <BtwDialog key={`BtwDialog-${i}`} data={item.data} onClose={() => dismiss('BtwDialog', 'onClose')} />
+            ))}
+            {show('PermissionDialog') && mockDialogMap.PermissionDialog.map((item, i) => (
                 <PermissionDialog
-                    permissionData={mockDialogMap.PermissionDialog.data}
+                    key={`PermissionDialog-${i}`}
+                    permissionData={item.data}
                     onPermissionSelect={(action) => dismiss('PermissionDialog', 'onPermissionSelect', action)}
                     onCancel={() => dismiss('PermissionDialog', 'onCancel')}
                     vscode={vscode}
                 />
-            )}
-            {show('AskQuestionDialog') && (
+            ))}
+            {show('AskQuestionDialog') && mockDialogMap.AskQuestionDialog.map((item, i) => (
                 <AskQuestionDialog
-                    data={mockDialogMap.AskQuestionDialog.data}
+                    key={`AskQuestionDialog-${i}`}
+                    data={item.data}
                     onSubmit={(answers) => dismiss('AskQuestionDialog', 'onSubmit', answers)}
                     onCancel={() => dismiss('AskQuestionDialog', 'onCancel')}
                 />
-            )}
-            {show('PlanExitDialog') && (
+            ))}
+            {show('PlanExitDialog') && mockDialogMap.PlanExitDialog.map((item, i) => (
                 <PlanExitDialog
-                    data={mockDialogMap.PlanExitDialog.data}
+                    key={`PlanExitDialog-${i}`}
+                    data={item.data}
                     onSubmit={(selected) => dismiss('PlanExitDialog', 'onSubmit', selected)}
                     onCancel={() => dismiss('PlanExitDialog', 'onCancel')}
                     vscode={vscode}
                 />
-            )}
+            ))}
         </>
     );
 };

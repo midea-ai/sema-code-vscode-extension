@@ -46,6 +46,7 @@ export class ChatWebviewProvider {
                 requestModelInfo: () => this.sendModelInfo(),
                 switchModel: () => this.switchModel(msg.modelName),
                 restoreFromSnapshots: () => this.restoreFromSnapshots(msg.filePaths),
+                restoreFromSnapshot: () => this.restoreFromSnapshot(msg.filePath),
                 showFileDiff: () => this.fileStateDiffManager.showFileDiff(msg.filePath, msg.minLine),
                 showPermissionDiff: () => this.fileStateDiffManager.showPermissionDiff(msg.filePath, msg.diffContent),
                 getFileChangeStats: () => this.getFileChangeStats(msg.filePath),
@@ -190,6 +191,12 @@ export class ChatWebviewProvider {
     private async restoreFromSnapshots(filePaths: string[]): Promise<void> {
         await this.fileStateDiffManager.revertAllChanges(filePaths);
         this.postMessage({ type: 'clearFileChanges' });
+    }
+
+    private async restoreFromSnapshot(filePath: string): Promise<void> {
+        if (!filePath) return;
+        await this.fileStateDiffManager.revertAllChanges([filePath]);
+        this.postMessage({ type: 'removeFileChange', filePath });
     }
 
     private async getFileChangeStats(filePath: string): Promise<void> {

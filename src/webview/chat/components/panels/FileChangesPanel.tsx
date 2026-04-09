@@ -125,6 +125,8 @@ const FileChangesPanel: React.FC<FileChangesPanelProps> = ({ changes, vscode, on
                                 >
                                     {change.fullPath}
                                 </span>
+                            </div>
+                            <div className="file-change-right">
                                 {!change.isNotebook && (
                                     <div className="file-change-stats">
                                         {change.additions > 0 && (
@@ -135,9 +137,20 @@ const FileChangesPanel: React.FC<FileChangesPanelProps> = ({ changes, vscode, on
                                         )}
                                     </div>
                                 )}
-                            </div>
-                            <div className="file-change-right">
-                                <CheckIcon />
+                                <span
+                                    className="file-change-discard-btn"
+                                    title="放弃此文件修改"
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        vscode.postMessage({
+                                            type: 'restoreFromSnapshot',
+                                            filePath: change.fullPath
+                                        });
+                                    }}
+                                >
+                                    <CancelCircleIcon />
+                                    放弃
+                                </span>
                             </div>
                         </div>
                     ))}

@@ -13,7 +13,7 @@ import PlanExitDialog from './components/ui/PlanExitDialog';
 import BtwDialog from './components/ui/BtwDialog';
 import ProcessingSpinner from './components/ui/ProcessingSpinner';
 import ModelConfigReminder from './components/ui/ModelConfigReminder';
-import { PREVIEW_MODE, getPreviewMessages } from './utils/mockMessages';
+import { PREVIEW_MODE, getPreviewMessages, mockDialogMap, isPreviewActive } from './utils/mockMessages';
 import PreviewDialogs from './utils/PreviewDialogs';
 
 const App: React.FC<AppProps> = ({ vscode }) => {
@@ -28,8 +28,8 @@ const App: React.FC<AppProps> = ({ vscode }) => {
     const [inputDisabled, setInputDisabled] = useState<boolean>(true);
     const [inputPlaceholder, setInputPlaceholder] = useState<string>('正在初始化 CLI，请稍候...');
     const [processingState, setProcessingState] = useState<'idle' | 'processing'>('idle');
-    const [fileChanges, setFileChanges] = useState<FileChange[]>([]);
-    const [todos, setTodos] = useState<TodoItem[]>([]);
+    const [fileChanges, setFileChanges] = useState<FileChange[]>(isPreviewActive('FileChangesPanel') ? (mockDialogMap.FileChangesPanel?.[0]?.changes || []) : []);
+    const [todos, setTodos] = useState<TodoItem[]>(isPreviewActive('TodosPanel') ? (mockDialogMap.TodosPanel?.[0]?.todos || []) : []);
     const [modelName, setModelName] = useState<string>('');
     const [availableModels, setAvailableModels] = useState<string[]>([]);
     type DialogQueueItem =
@@ -209,6 +209,12 @@ const App: React.FC<AppProps> = ({ vscode }) => {
                 case 'clearFileChanges':
                     // 清空文件变更列表
                     setFileChanges([]);
+                    break;
+                case 'removeFileChange':
+                    // 移除单个文件变更
+                    if (message.filePath) {
+                        setFileChanges(prev => prev.filter(c => c.fullPath !== message.filePath));
+                    }
                     break;
                 case 'todosUpdate':
                     // 更新 todos 列表 - 直接使用 SemaCore 的格式

@@ -209,12 +209,12 @@ const PermissionContent: React.FC<PermissionContentProps> = ({
             <div className="file-permission-container">
                 <div className="file-permission-title-wrapper">
                     <div className="file-permission-title-divider-top" />
-                    <div className="file-permission-title">
+                    <div
+                        className={`file-permission-title${vscode ? ' file-permission-title-clickable' : ''}`}
+                        onClick={vscode ? handleFileClick : undefined}
+                    >
                         <strong className="file-permission-action">{actionLabel}</strong>
-                        <div
-                            className={`file-permission-file-left${vscode ? ' file-permission-file-left-clickable' : ''}`}
-                            onClick={vscode ? handleFileClick : undefined}
-                        >
+                        <div className="file-permission-file-left">
                             <FileIcon fileName={displayFileName} isDirectory={false} size={18} />
                             <span className="file-permission-filename">{fileName}</span>
                             {renderDiffStats()}
@@ -233,11 +233,25 @@ const PermissionContent: React.FC<PermissionContentProps> = ({
 
     // 渲染Bash命令内容
     const renderBashContent = () => {
+        const handleBashTitleClick = () => {
+            if (vscode) {
+                vscode.postMessage({
+                    type: 'openBashOutput',
+                    content: title,
+                    command: '',
+                    toolId: ''
+                });
+            }
+        };
+
         return (
             <div className="file-permission-container">
                 <div className="file-permission-title-wrapper">
                     <div className="file-permission-title-divider-top" />
-                    <div className="file-permission-title">
+                    <div
+                        className={`file-permission-title${vscode ? ' file-permission-title-clickable' : ''}`}
+                        onClick={vscode ? handleBashTitleClick : undefined}
+                    >
                         <strong className="file-permission-action">Bash command</strong>
                     </div>
                 </div>
