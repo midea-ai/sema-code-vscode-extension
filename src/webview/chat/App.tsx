@@ -13,6 +13,8 @@ import PlanExitDialog from './components/ui/PlanExitDialog';
 import BtwDialog from './components/ui/BtwDialog';
 import ProcessingSpinner from './components/ui/ProcessingSpinner';
 import ModelConfigReminder from './components/ui/ModelConfigReminder';
+import { PREVIEW_MODE, getPreviewMessages } from './utils/mockMessages';
+import PreviewDialogs from './utils/PreviewDialogs';
 
 const App: React.FC<AppProps> = ({ vscode }) => {
     const [messages, setMessages] = useState<Message[]>([]);
@@ -376,6 +378,15 @@ const App: React.FC<AppProps> = ({ vscode }) => {
         prevMessagesLenRef.current = messages.length;
     }, [messages]);
 
+    // 预览模式：首次渲染后对 mock 消息中的代码块应用高亮
+    useEffect(() => {
+        if (PREVIEW_MODE && window.hljs && outputContainerRef.current) {
+            outputContainerRef.current.querySelectorAll('pre code:not(.hljs)').forEach((block) => {
+                window.hljs.highlightElement(block);
+            });
+        }
+    }, []);
+
     // 当弹窗切换时滚动到底部，权限对话框还需应用代码高亮
     useEffect(() => {
         if (activeDialog && outputContainerRef.current) {
@@ -553,15 +564,31 @@ const App: React.FC<AppProps> = ({ vscode }) => {
         });
     };
 
-    // 使用 useMemo 缓存渲染内容，避免不必要的重新计算
     const renderedContent = useMemo(() => {
         if (!messages || messages.length === 0) {
+            // 预览模式：渲染 mock 消息，方便调试各组件样式对齐
+            if (PREVIEW_MODE) {
+                return getPreviewMessages().map((message) => (
+                    <div key={message.id} className="msg-wrap">
+                        <MessageItem
+                            message={message}
+                            shouldReportChange={false}
+                            toolPermissionData={null}
+                            vscode={vscode}
+                            onFileChange={handleFileChange}
+                            streamingAssistantId={null}
+                            streamingToolId={null}
+                            openAgentTaskId={null}
+                            onAgentModalClose={() => {}}
+                        />
+                    </div>
+                ));
+            }
             // 只有在有模型配置信息且当前不在处理状态时才显示Welcome组件
             // 处理中时隐藏Welcome，避免Linux上后端响应延迟导致Welcome和Spinner同时显示
             if (modelName && availableModels.length > 0 && processingState !== 'processing') {
                 return <Welcome />;
             }
-            // 没有模型配置信息或正在处理时返回null，不显示Welcome组件
             return null;
         }
 
@@ -672,6 +699,7 @@ const App: React.FC<AppProps> = ({ vscode }) => {
                         onOpenConfig={handleOpenConfig}
                     />
                 )}
+                {PREVIEW_MODE && <PreviewDialogs vscode={vscode} />}
             </div>
             <TodosPanel todos={todos} onScrollToBottom={scrollToBottom} />
             <FileChangesPanel changes={fileChanges} vscode={vscode} onScrollToBottom={scrollToBottom} />

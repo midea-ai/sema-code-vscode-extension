@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { ToggleIcon } from '../../components/ui/IconButton';
 import { ToolContent } from '../../types';
+import { CONTINUATION_SYMBOL } from '../../utils/symbols';
 
 const MAX_VISIBLE_LINES = 4;
 
@@ -28,13 +29,13 @@ const PubBlock: React.FC<PubBlockProps> = React.memo(({ content, vscode }) => {
         return name;
     };
 
-    const toolValue = toolNameMap[toolName as keyof typeof toolNameMap] || parseMcpToolName(toolName);
-    const formattedTitle = toolName === 'AskUserQuestion' ? 'User Response' : `${toolValue} (${title})`;
+    const toolValue = toolName === 'AskUserQuestion' ? 'User Response' : (toolNameMap[toolName as keyof typeof toolNameMap] || parseMcpToolName(toolName));
+    const displayTitle = toolName === 'AskUserQuestion' ? null : title;
 
     // 处理内容格式
     const formatContent = () => {
         if (summary) {
-            return `⎿ ${summary}\n${toolContent}`;
+            return `${CONTINUATION_SYMBOL} ${summary}\n${toolContent}`;
         }
         return toolContent.toString();
     };
@@ -61,24 +62,25 @@ const PubBlock: React.FC<PubBlockProps> = React.memo(({ content, vscode }) => {
             vscode.postMessage({
                 type: 'openBashOutput',
                 content: contentLines.join('\n'),
-                command: formattedTitle,
+                command: displayTitle ? `${toolValue} ${displayTitle}` : toolValue,
                 toolId: content.toolId || ''
             });
         }
     };
 
     return (
-        <div className="pub-block">
-            <div className="pub-block-header" onClick={handleToggle}>
-                <div className="pub-block-title">
-                    <span className="pub-title-text">{formattedTitle}</span>
+        <div className="chat-block chat-block--borderless pub-block">
+            <div className="chat-block-header pub-block-header" onClick={handleToggle}>
+                <div className="chat-block-title pub-block-title">
+                    <span className="chat-block-title-label">{toolValue}</span>
+                    {displayTitle && <span className="chat-block-title-detail">{displayTitle}</span>}
                     <div className="pub-toggle-btn">
                         <ToggleIcon isExpanded={isExpanded} />
                     </div>
                 </div>
             </div>
             {isExpanded && visibleLines.length > 0 && (
-                <div className="pub-block-content">
+                <div className="chat-block-content pub-block-content">
                     {omittedCount > 0 && (
                         <div className="bash-omitted-lines bash-omitted-lines-clickable" onClick={handleViewAll}>...省略了 {omittedCount} 行</div>
                     )}

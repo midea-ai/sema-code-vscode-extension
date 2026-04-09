@@ -60,7 +60,6 @@ const MessageItem: React.FC<MessageItemProps> = React.memo(({
             case 'TodoWrite':
                 return null;
             case 'Read':
-            case 'NotebookRead':
                 return <ReadBlock content={message.content} vscode={vscode} />;
             case 'Bash':
                 return <BashBlock content={message.content} messageId={message.id} vscode={vscode} />;
@@ -91,7 +90,7 @@ const MessageItem: React.FC<MessageItemProps> = React.memo(({
             const displayReasoning = message.reasoning;
 
             const hasReasoning = !!(displayReasoning && displayReasoning.trim().length > 0);
-            const isCompleted = !!message.content?.completed;
+            const isCompleted = message.content?.completed !== false;
             // 流式中即使 content 暂时为空也需要渲染 AiResponseBlock（等待 store 推送内容）
             const hasContent = isCurrentlyStreaming || !!(displayContent && displayContent.trim().length > 0);
             const isThinking = hasReasoning && !hasContent && !isCompleted;

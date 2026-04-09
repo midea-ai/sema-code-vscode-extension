@@ -68,14 +68,14 @@ const BashBlock: React.FC<BashBlockProps> = ({ content: toolContent, messageId, 
 
     // 完成后清除本地 streaming 状态，回归 props 的最终内容
     useEffect(() => {
-        if (toolContent.completed) {
+        if (toolContent.completed !== false) {
             streamContentRef.current = '';
             setStreamContent('');
         }
     }, [toolContent.completed]);
 
     // streaming 中用本地累积的 content，完成后用 props
-    const displayContent = (!toolContent.completed && streamContent)
+    const displayContent = (toolContent.completed === false && streamContent)
         ? { ...toolContent, content: (toolContent.content || '') + streamContent }
         : toolContent;
 
@@ -98,7 +98,7 @@ const BashBlock: React.FC<BashBlockProps> = ({ content: toolContent, messageId, 
     }, [displayContent.content, displayContent.title]);
 
     const { command, outputLines, visibleLines, omittedCount, outputText } = parsedContent;
-    const isStreaming = !toolContent.completed;
+    const isStreaming = toolContent.completed === false;
 
     const handleToggle = () => {
         setIsExpanded(!isExpanded);
@@ -117,10 +117,10 @@ const BashBlock: React.FC<BashBlockProps> = ({ content: toolContent, messageId, 
     };
 
     return (
-        <div className="bash-block">
-            <div className="bash-block-header" onClick={handleToggle}>
-                <div className="bash-block-title">
-                    <span className="bash-title-text">Bash</span>
+        <div className="chat-block bash-block">
+            <div className="chat-block-header bash-block-header" onClick={handleToggle}>
+                <div className="chat-block-title bash-block-title">
+                    <span className="chat-block-title-label">Bash</span>
                     {isStreaming && <span className="bash-streaming-dot" />}
                     <div className="bash-toggle-btn">
                         <ToggleIcon isExpanded={isExpanded} />
@@ -128,7 +128,7 @@ const BashBlock: React.FC<BashBlockProps> = ({ content: toolContent, messageId, 
                 </div>
             </div>
             {isExpanded && (
-                <div className="bash-block-content">
+                <div className="chat-block-content bash-block-content">
                     {command && (
                         <BaseBashContent command={command} />
                     )}

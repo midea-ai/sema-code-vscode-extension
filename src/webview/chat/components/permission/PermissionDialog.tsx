@@ -2,7 +2,8 @@ import React from 'react';
 import PermissionContent from './PermissionContent';
 import PermissionOptions from './PermissionOptions';
 import { ToolContent } from '../../types';
-import { isNotebookType, isMcpToolType, isSkillType, getPermissionTitle, getResponseDot } from '../../utils/permissionUtils';
+import { isNotebookType, isMcpToolType, isSkillType, getPermissionTitle } from '../../utils/permissionUtils';
+import { getResponseDot } from '../../utils/symbols';
 
 interface ToolPermissionRequestData extends ToolContent {
     agentId?: string;
@@ -58,10 +59,10 @@ const PermissionDialog: React.FC<PermissionDialogProps> = ({
     };
 
     return (
-        <div className="bash-permission-block" tabIndex={0}>
-            <div className="bash-permission-header">
-                <div className="bash-permission-title">
-                    <span className="bash-permission-dot">{getResponseDot()}</span>
+        <div className="chat-block bash-permission-block" tabIndex={0}>
+            <div className="chat-block-header bash-permission-header">
+                <div className="chat-block-title bash-permission-title">
+                    <span className="bash-permission-dot dot-pending">{getResponseDot()}</span>
                     <span className="bash-permission-title-text">
                         {permissionData.agentId && permissionData.agentId !== 'main' && (
                             <span className="bash-permission-agent-id">[{permissionData.agentId.slice(0, 4)}]</span>

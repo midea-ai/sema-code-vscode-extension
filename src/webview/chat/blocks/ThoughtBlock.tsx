@@ -36,12 +36,12 @@ const ThoughtBlock: React.FC<ThoughtBlockProps> = React.memo(({
     };
 
     return (
-        <div className="thought-block">
+        <div className="chat-block chat-block--borderless thought-block">
             <div
-                className="thought-block-header"
+                className="chat-block-header thought-block-header"
                 onClick={handleToggle}
             >
-                <div className="thought-block-title">
+                <div className="chat-block-title thought-block-title">
                     <span className="thought-title-text">
                         {isThinking ? 'Thinking...' : 'Thought'}
                     </span>
@@ -51,7 +51,7 @@ const ThoughtBlock: React.FC<ThoughtBlockProps> = React.memo(({
                 </div>
             </div>
             {isExpanded && (streamReasoning ?? content) && (
-                <div className="thought-block-content">
+                <div className="chat-block-content thought-block-content">
                     <div className="thought-content">
                         {streamReasoning ?? content}
                     </div>

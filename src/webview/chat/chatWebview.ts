@@ -98,9 +98,6 @@ export class ChatWebviewProvider {
         this.coreManager.getSemaCore().on('input:received', (data: any) => {
             this.postMessage({ type: 'inputReceived', data });
         });
-        this.coreManager.getSemaCore().on('input:processing', (data: any) => {
-            this.postMessage({ type: 'inputProcessing', data });
-        });
         this.coreManager.getSemaCore().on('btw:response', (data: any) => {
             this.postMessage({ type: 'btwResponse', data });
         });

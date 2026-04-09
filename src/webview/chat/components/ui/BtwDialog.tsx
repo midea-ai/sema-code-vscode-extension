@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { renderMarkdownToHtml } from '../../utils/markdown';
-import '../../utils/markdown.css';
+import '../../style/markdown.css';
 
 interface BtwDialogProps {
     data: { question: string; content: string };
@@ -30,6 +30,7 @@ const BtwDialog: React.FC<BtwDialogProps> = ({ data, onClose }) => {
                 <div className="btw-dialog-header">
                     <span className="btw-dialog-icon">💡</span>
                     <span className="btw-dialog-title">BTW</span>
+                    <button className="task-modal-close" onClick={onClose} title="关闭">✕</button>
                 </div>
                 <div className="btw-dialog-body" ref={bodyRef}>
                     <div className="btw-question">{data.question}</div>

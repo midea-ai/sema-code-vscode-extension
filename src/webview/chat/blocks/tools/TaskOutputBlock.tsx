@@ -64,14 +64,14 @@ const TaskOutputBlock: React.FC<TaskOutputBlockProps> = ({ content: toolContent,
 
     // 完成后清除本地 streaming 状态，回归 props 的最终内容
     useEffect(() => {
-        if (toolContent.completed) {
+        if (toolContent.completed !== false) {
             streamContentRef.current = '';
             setStreamContent('');
         }
     }, [toolContent.completed]);
 
     // streaming 中用本地累积的 content，完成后用 props
-    const displayContent = (!toolContent.completed && streamContent)
+    const displayContent = (toolContent.completed === false && streamContent)
         ? { ...toolContent, content: (toolContent.content || '') + streamContent }
         : toolContent;
 
@@ -91,7 +91,7 @@ const TaskOutputBlock: React.FC<TaskOutputBlockProps> = ({ content: toolContent,
     }, [displayContent.content, displayContent.title]);
 
     const { title, outputLines, visibleLines, omittedCount, outputText } = parsedContent;
-    const isStreaming = !toolContent.completed;
+    const isStreaming = toolContent.completed === false;
 
     const handleToggle = () => {
         setIsExpanded(!isExpanded);
@@ -110,11 +110,11 @@ const TaskOutputBlock: React.FC<TaskOutputBlockProps> = ({ content: toolContent,
     };
 
     return (
-        <div className="bash-block">
-            <div className="bash-block-header" onClick={handleToggle}>
-                <div className="bash-block-title">
-                    <span className="bash-title-text">TaskOutput</span>
-                    {title && <span className="bash-title-text">({title})</span>}
+        <div className="chat-block chat-block--borderless bash-block">
+            <div className="chat-block-header bash-block-header" onClick={handleToggle}>
+                <div className="chat-block-title bash-block-title">
+                    <span className="chat-block-title-label">TaskOutput</span>
+                    {title && <span className="chat-block-title-detail">{title}</span>}
                     {isStreaming && <span className="bash-streaming-dot" />}
                     <div className="bash-toggle-btn">
                         <ToggleIcon isExpanded={isExpanded} />
@@ -122,13 +122,13 @@ const TaskOutputBlock: React.FC<TaskOutputBlockProps> = ({ content: toolContent,
                 </div>
             </div>
             {isExpanded && (
-                <div className="bash-block-content">
+                <div className="chat-block-content bash-block-content">
                     {visibleLines.length > 0 && (
                         <>
                             {omittedCount > 0 && (
                                 <div className="bash-omitted-lines bash-omitted-lines-clickable" onClick={handleViewAll}>...省略了 {omittedCount} 行</div>
                             )}
-                            <pre className="bash-output">{visibleLines.join('\n')}</pre>
+                            <pre className="bash-output pub-block-content">{visibleLines.join('\n')}</pre>
                         </>
                     )}
                 </div>

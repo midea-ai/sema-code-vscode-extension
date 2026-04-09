@@ -40,13 +40,6 @@ export const parseMcpToolName = (toolName: string): { mcpName: string; toolName:
 };
 
 /**
- * 获取平台对应的圆点字符（Windows用●，其他平台用⏺）
- */
-export const getResponseDot = (): string => {
-    return navigator.platform.toLowerCase().includes('win') ? '●' : '⏺';
-};
-
-/**
  * 获取权限类型标题
  */
 export const getPermissionTitle = (toolName: string): string => {

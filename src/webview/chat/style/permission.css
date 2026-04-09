@@ -1,36 +1,22 @@
-/* Bash权限对话框样式 - 参考bash组件样式 */
+/* Bash权限对话框样式 — 继承 .chat-block */
 .bash-permission-block {
-    margin: 5px;
-    border: 1px solid var(--vscode-panel-border);
-    border-radius: 3px;
-    overflow: hidden;
-    width: 100%;
-    max-width: calc(100% - 10px); /* 减去左右margin的空间 */
-    box-sizing: border-box;
     outline: none;
-    background-color: var(--vscode-sideBar-background);
+    background-color: var(--chat-bg-primary);
 }
 
 body.vscode-light .bash-permission-block {
-    background-color: #ffffff;
+    background-color: var(--chat-bg-light);
 }
 
 .bash-permission-block:focus,
 .bash-permission-block:focus-visible {
     outline: none;
-    border-color: var(--vscode-panel-border);
+    border-color: var(--chat-border);
 }
 
+/* 头部：继承 .chat-block-header */
 .bash-permission-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 3px 8px;
-    background-color: transparent;
-    cursor: default;
-    min-height: 22px;
-    width: 100%;
-    box-sizing: border-box;
+    cursor: pointer;
 }
 
 .bash-permission-title {
@@ -42,17 +28,13 @@ body.vscode-light .bash-permission-block {
 }
 
 .bash-permission-dot {
-    font-size: 12px;
-    color: #4ec9b0;
-}
-
-.bash-permission-dot.dot-red {
-    color: #f47171;
+    font-size: var(--chat-font-base);
+    color: var(--chat-color-success);
 }
 
 .bash-permission-title-text {
-    font-size: 12px;
-    color: #808080;
+    font-size: var(--chat-font-base);
+    color: var(--chat-color-muted);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -62,32 +44,32 @@ body.vscode-light .bash-permission-block {
     display: flex;
     align-items: center;
     gap: 4px;
-    font-size: 12px;
+    font-size: var(--chat-font-base);
     font-weight: 500;
     flex-shrink: 0;
 }
 
 .bash-permission-diff-stats .diff-added {
-    color: var(--diff-added-color, #4ec9b0);
+    color: var(--chat-color-success);
 }
 
 .bash-permission-diff-stats .diff-removed {
-    color: var(--diff-removed-color, #f48771);
+    color: var(--chat-color-error);
     font-weight: 500;
-    font-size: 12px;
+    font-size: var(--chat-font-base);
 }
 
 .bash-permission-status {
-    font-size: 10px;
-    color: #ffa500;
-    background-color: rgba(255, 165, 0, 0.1);
+    font-size: var(--chat-font-xs);
+    color: var(--chat-color-warning);
+    background-color: var(--chat-color-warning-bg);
     padding: 1px 4px;
     border-radius: 2px;
     margin-left: auto;
 }
 
 .bash-permission-content {
-    background-color: var(--vscode-sideBar-background);
+    background-color: var(--chat-bg-primary);
     padding: 8px;
     width: 100%;
     max-width: 100%;
@@ -95,7 +77,7 @@ body.vscode-light .bash-permission-block {
 }
 
 body.vscode-light .bash-permission-content {
-    background-color: #ffffff;
+    background-color: var(--chat-bg-light);
 }
 
 .bash-permission-info {
@@ -103,8 +85,8 @@ body.vscode-light .bash-permission-content {
 }
 
 .bash-permission-description {
-    font-size: 12px;
-    /* color: #808080; */
+    font-size: var(--chat-font-base);
+    /* color: var(--chat-color-muted); */
 }
 
 .bash-permission-buttons {
@@ -121,11 +103,11 @@ body.vscode-light .bash-permission-content {
 }
 
 .bash-permission-btn {
-    background-color: var(--vscode-button-secondaryBackground, rgba(128, 128, 128, 0.25));
-    color: var(--vscode-button-secondaryForeground, var(--vscode-foreground));
+    background-color: var(--chat-bg-button-secondary);
+    color: var(--chat-text-button-secondary);
     border: none;
     border-radius: 3px;
-    font-size: 12px;
+    font-size: var(--chat-font-base);
     cursor: pointer;
     padding: 8px 16px;
     text-align: center;
@@ -137,22 +119,22 @@ body.vscode-light .bash-permission-content {
 }
 
 .bash-permission-btn:hover {
-    background-color: var(--vscode-button-secondaryHoverBackground, rgba(128, 128, 128, 0.35));
+    background-color: var(--chat-bg-button-secondary-hover);
 }
 
 .bash-permission-btn:active {
-    background-color: var(--vscode-button-background);
+    background-color: var(--chat-bg-button);
     transform: translateY(1px);
 }
 
 .bash-permission-btn.selected:hover {
-    background-color: var(--vscode-button-hoverBackground);
+    background-color: var(--chat-bg-button-hover);
     opacity: 0.9;
 }
 
 .bash-permission-btn.selected {
-    background-color: var(--vscode-button-background);
-    color: var(--vscode-button-foreground);
+    background-color: var(--chat-bg-button);
+    color: var(--chat-text-button);
 }
 
 .bash-permission-btn:focus {
@@ -175,13 +157,13 @@ body.vscode-light .bash-permission-content {
 
 .bash-permission-bash-description {
     margin: 0px 10px 20px 20px;
-    color: #808080;
+    color: var(--chat-color-muted);
 }
 
 .bash-permission-status.refused,
 .bash-permission-status.interrupted {
-    color: #f47171;
-    background-color: rgba(244, 135, 113, 0.1);
+    color: var(--chat-color-error);
+    background-color: var(--chat-color-error-bg);
 }
 
 .permission-content-dimmed {
@@ -199,7 +181,7 @@ body.vscode-light .bash-permission-content {
 
 .file-permission-title-divider-top {
     height: 1px;
-    background-color: var(--vscode-textLink-foreground, #4ec9b0);
+    background-color: var(--chat-text-link);
     margin-bottom: 8px;
 }
 
@@ -207,12 +189,12 @@ body.vscode-light .bash-permission-content {
     display: flex;
     align-items: center;
     gap: 4px;
-    font-size: 12px;
+    font-size: var(--chat-font-base);
     margin-bottom: 8px;
 }
 
 .file-permission-action {
-    color: var(--vscode-textLink-foreground, #4ec9b0);
+    color: var(--chat-text-link);
     font-weight: bold;
 }
 
@@ -220,8 +202,8 @@ body.vscode-light .bash-permission-content {
     display: flex;
     align-items: center;
     gap: 4px;
-    font-size: 12px;
-    color: var(--vscode-editor-foreground);
+    font-size: var(--chat-font-base);
+    color: var(--chat-text-editor);
     flex-shrink: 1;
     min-width: 0;
     overflow: hidden;
@@ -237,9 +219,9 @@ body.vscode-light .bash-permission-content {
 }
 
 .file-permission-filename {
-    color: var(--vscode-foreground);
+    color: var(--chat-text-primary);
     font-weight: normal;
-    font-size: 12px;
+    font-size: var(--chat-font-base);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -248,21 +230,21 @@ body.vscode-light .bash-permission-content {
 }
 
 .file-permission-cell-label {
-    color: var(--vscode-descriptionForeground);
-    font-size: 12px;
+    color: var(--chat-text-secondary);
+    font-size: var(--chat-font-base);
     white-space: nowrap;
     flex-shrink: 0;
 }
 
 .file-permission-title-divider-bottom {
     height: 1px;
-    border-top: 1px dashed #808080;
+    border-top: 1px dashed var(--chat-color-muted);
     margin-bottom: 12px;
 }
 
 .file-permission-code-divider {
     height: 1px;
-    border-top: 1px dashed #808080;
+    border-top: 1px dashed var(--chat-color-muted);
     margin-top: 12px;
 }
 
@@ -270,10 +252,10 @@ body.vscode-light .bash-permission-content {
 .mcp-tool-content {
     margin: 10px 10px;
     padding: 8px 12px;
-    background-color: rgba(128, 128, 128, 0.15);
+    background-color: var(--chat-bg-hover);
     border-radius: 3px;
-    color: var(--vscode-foreground);
-    font-size: 12px;
+    color: var(--chat-text-primary);
+    font-size: var(--chat-font-base);
     line-height: 1.6;
     white-space: pre-wrap;
     word-wrap: break-word;
@@ -284,18 +266,18 @@ body.vscode-light .bash-permission-content {
 /* Skill权限内容区域样式 */
 .skill-permission-info {
     margin: 10px 10px 8px 10px;
-    font-size: 12px;
-    color: var(--vscode-foreground);
+    font-size: var(--chat-font-base);
+    color: var(--chat-text-primary);
     line-height: 1.6;
 }
 
 .skill-permission-content {
     margin: 0px 10px 10px 10px;
     padding: 8px 12px;
-    background-color: rgba(128, 128, 128, 0.15);
+    background-color: var(--chat-bg-hover);
     border-radius: 3px;
-    color: var(--vscode-foreground);
-    font-size: 12px;
+    color: var(--chat-text-primary);
+    font-size: var(--chat-font-base);
     line-height: 1.6;
     white-space: pre-wrap;
     word-wrap: break-word;
@@ -304,92 +286,19 @@ body.vscode-light .bash-permission-content {
 }
 
 /* ==================== 问答对话框样式 ==================== */
+/* ask-question-dialog — 继承 .chat-block */
 .ask-question-dialog {
-    margin: 5px;
-    border: 1px solid var(--vscode-panel-border);
-    border-radius: 3px;
-    overflow: hidden;
-    width: 100%;
-    max-width: calc(100% - 10px); /* 减去左右margin的空间 */
-    box-sizing: border-box;
     outline: none;
 }
 
 .ask-question-dialog:focus,
 .ask-question-dialog:focus-visible {
     outline: none;
-    border-color: var(--vscode-panel-border);
+    border-color: var(--chat-border);
 }
 
 .ask-question-content {
-    background-color: var(--vscode-sideBar-background);
     padding: 12px;
-}
-
-/* 步骤条样式 */
-.ask-question-stepper {
-    display: flex;
-    align-items: center;
-    margin-bottom: 16px;
-    padding-bottom: 12px;
-    border-bottom: 1px solid var(--vscode-panel-border);
-}
-
-.ask-question-step {
-    display: flex;
-    align-items: center;
-    position: relative;
-}
-
-.ask-question-step-indicator {
-    width: 20px;
-    height: 20px;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 11px;
-    background-color: var(--vscode-button-secondaryBackground, #5a5a5a);
-    color: var(--vscode-button-secondaryForeground);
-    flex-shrink: 0;
-}
-
-.ask-question-step.active .ask-question-step-indicator {
-    background-color: var(--vscode-button-background);
-    color: var(--vscode-button-foreground);
-}
-
-.ask-question-step.completed .ask-question-step-indicator {
-    background-color: var(--vscode-button-background);
-    color: var(--vscode-button-foreground);
-}
-
-.ask-question-step-label {
-    font-size: 11px;
-    color: var(--vscode-descriptionForeground);
-    margin-left: 6px;
-    white-space: nowrap;
-}
-
-.ask-question-step.active .ask-question-step-label {
-    color: var(--vscode-foreground);
-    font-weight: 500;
-}
-
-.ask-question-step.completed .ask-question-step-label {
-    color: var(--vscode-foreground);
-}
-
-.ask-question-step-line {
-    width: 24px;
-    height: 1px;
-    background-color: var(--vscode-panel-border);
-    margin: 0 8px;
-}
-
-.ask-question-step.completed + .ask-question-step .ask-question-step-line,
-.ask-question-step.completed .ask-question-step-line {
-    background-color: var(--vscode-button-background);
 }
 
 .ask-question-item {
@@ -407,18 +316,9 @@ body.vscode-light .bash-permission-content {
     margin-bottom: 8px;
 }
 
-.ask-question-header-tag {
-    font-size: 10px;
-    color: #569cd6;
-    background-color: rgba(86, 156, 214, 0.15);
-    padding: 2px 6px;
-    border-radius: 3px;
-    font-weight: 500;
-}
-
 .ask-question-text {
-    font-size: 12px;
-    color: var(--vscode-foreground);
+    font-size: var(--chat-font-base);
+    color: var(--chat-text-primary);
 }
 
 .ask-question-options {
@@ -434,16 +334,16 @@ body.vscode-light .bash-permission-content {
     gap: 8px;
     cursor: pointer;
     padding: 4px 0;
-    font-size: 12px;
-    color: var(--vscode-foreground);
+    font-size: var(--chat-font-base);
+    color: var(--chat-text-primary);
 }
 
 .ask-question-option:hover {
-    color: var(--vscode-foreground);
+    color: var(--chat-text-primary);
 }
 
 .ask-question-option.focused {
-    background-color: var(--vscode-list-hoverBackground);
+    background-color: var(--chat-bg-list-hover);
     margin: 0 -8px;
     padding: 4px 8px;
     border-radius: 3px;
@@ -452,7 +352,7 @@ body.vscode-light .bash-permission-content {
 
 .ask-question-option input[type="checkbox"],
 .ask-question-option input[type="radio"] {
-    accent-color: var(--vscode-button-background);
+    accent-color: var(--chat-bg-button);
     width: 14px;
     height: 14px;
     margin: 0;
@@ -480,8 +380,8 @@ body.vscode-light .bash-permission-content {
 }
 
 .ask-question-option-label {
-    font-size: 12px;
-    color: var(--vscode-foreground);
+    font-size: var(--chat-font-base);
+    color: var(--chat-text-primary);
     line-height: 1.4;
     white-space: nowrap;
     overflow: hidden;
@@ -489,8 +389,8 @@ body.vscode-light .bash-permission-content {
 }
 
 .ask-question-option-description {
-    font-size: 11px;
-    color: var(--vscode-descriptionForeground);
+    font-size: var(--chat-font-sm);
+    color: var(--chat-text-secondary);
     line-height: 1.4;
     white-space: nowrap;
     overflow: hidden;
@@ -505,109 +405,18 @@ body.vscode-light .bash-permission-content {
 }
 
 .ask-question-submit-btn {
-    background-color: var(--vscode-button-background);
-    color: var(--vscode-button-foreground);
+    background-color: var(--chat-bg-button);
+    color: var(--chat-text-button);
     border: none;
     border-radius: 3px;
     cursor: pointer;
     padding: 6px 16px;
-    font-size: 12px;
+    font-size: var(--chat-font-base);
     transition: all 0.15s;
 }
 
 .ask-question-submit-btn:hover {
-    background-color: var(--vscode-button-hoverBackground);
-}
-
-/* 确认按钮区域 */
-.ask-question-confirm {
-    margin-top: 10px;
-    display: flex;
-    align-items: center;
-    gap: 12px;
-}
-
-.ask-question-confirm-btn {
-    background-color: var(--vscode-button-background);
-    color: var(--vscode-button-foreground);
-    border: none;
-    border-radius: 3px;
-    cursor: pointer;
-    padding: 6px 16px;
-    font-size: 12px;
-    transition: all 0.15s;
-}
-
-.ask-question-confirm-btn:hover {
-    background-color: var(--vscode-button-hoverBackground);
-}
-
-/* 提示文本 */
-.ask-question-hint {
-    font-size: 11px;
-    color: var(--vscode-descriptionForeground);
-    margin-top: 8px;
-}
-
-/* 汇总页面样式 */
-.ask-question-summary {
-    padding: 4px 0;
-}
-
-.ask-question-summary-title {
-    font-size: 13px;
-    font-weight: 500;
-    color: var(--vscode-foreground);
-    margin-bottom: 12px;
-    padding-bottom: 8px;
-    border-bottom: 1px solid var(--vscode-panel-border);
-}
-
-.ask-question-summary-item {
-    margin-bottom: 12px;
-    padding: 8px;
-    background-color: rgba(128, 128, 128, 0.1);
-    border-radius: 3px;
-}
-
-.ask-question-summary-question {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    margin-bottom: 6px;
-    font-size: 12px;
-    color: var(--vscode-foreground);
-}
-
-.ask-question-summary-answer {
-    font-size: 12px;
-    color: var(--vscode-button-background);
-    padding-left: 8px;
-    font-weight: 500;
-}
-
-.ask-question-summary-actions {
-    display: flex;
-    justify-content: flex-end;
-    gap: 8px;
-    margin-top: 16px;
-    padding-top: 12px;
-    border-top: 1px solid var(--vscode-panel-border);
-}
-
-.ask-question-back-btn {
-    background-color: var(--vscode-button-secondaryBackground, #5a5a5a);
-    color: var(--vscode-button-secondaryForeground, var(--vscode-foreground));
-    border: none;
-    border-radius: 3px;
-    cursor: pointer;
-    padding: 6px 16px;
-    font-size: 12px;
-    transition: all 0.15s;
-}
-
-.ask-question-back-btn:hover {
-    background-color: var(--vscode-button-secondaryHoverBackground, #666666);
+    background-color: var(--chat-bg-button-hover);
 }
 
 /* 按钮区域 */
@@ -615,274 +424,58 @@ body.vscode-light .bash-permission-content {
     display: flex;
     gap: 8px;
     margin-top: 12px;
+    justify-content: flex-end;
+}
+
+.ask-question-buttons button {
+    max-width: 150px;
 }
 
 /* 全宽提交按钮 */
 .ask-question-submit-btn-full {
     flex: 1;
-    background-color: var(--vscode-button-background);
-    color: var(--vscode-button-foreground);
+    background-color: var(--chat-bg-button);
+    color: var(--chat-text-button);
     border: none;
     border-radius: 3px;
     cursor: pointer;
     padding: 8px 16px;
-    font-size: 12px;
+    font-size: var(--chat-font-base);
     transition: all 0.15s;
 }
 
 .ask-question-submit-btn-full:hover {
-    background-color: var(--vscode-button-hoverBackground);
+    background-color: var(--chat-bg-button-hover);
 }
 
 .ask-question-submit-btn-full.focused {
-    background-color: var(--vscode-button-hoverBackground);
+    background-color: var(--chat-bg-button-hover);
     outline: none;
 }
 
 /* Skip 按钮 */
 .ask-question-skip-btn {
-    background-color: var(--vscode-button-secondaryBackground, #5a5a5a);
-    color: var(--vscode-button-secondaryForeground, var(--vscode-foreground));
+    background-color: var(--chat-bg-button-secondary);
+    color: var(--chat-text-button-secondary);
     border: none;
     border-radius: 3px;
     cursor: pointer;
     padding: 8px 16px;
-    font-size: 12px;
+    font-size: var(--chat-font-base);
     transition: all 0.15s;
 }
 
 .ask-question-skip-btn:hover {
-    background-color: var(--vscode-button-secondaryHoverBackground, #666666);
+    background-color: var(--chat-bg-button-secondary-hover);
 }
 
 .ask-question-skip-btn.focused {
-    background-color: var(--vscode-button-secondaryHoverBackground, #666666);
+    background-color: var(--chat-bg-button-secondary-hover);
     outline: none;
-}
-
-/* ==================== 退出Plan模式对话框样式 ==================== */
-.plan-exit-dialog {
-    margin: 6px 0;
-    border: 1px solid var(--vscode-panel-border);
-    border-radius: 3px;
-    overflow: hidden;
-    width: 100%;
-    max-width: 100%;
-    box-sizing: border-box;
-    outline: none;
-}
-
-.plan-exit-dialog:focus,
-.plan-exit-dialog:focus-visible {
-    outline: none;
-    border-color: var(--vscode-panel-border);
-}
-
-.plan-exit-content {
-    background-color: var(--vscode-sideBar-background);
-    padding: 12px;
-}
-
-.plan-exit-header {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    margin-bottom: 12px;
-}
-
-.plan-exit-header-tag {
-    font-size: 10px;
-    color: #4ec9b0;
-    background-color: rgba(78, 201, 176, 0.15);
-    padding: 2px 6px;
-    border-radius: 3px;
-    font-weight: 500;
-}
-
-.plan-exit-title {
-    font-size: 12px;
-    color: var(--vscode-foreground);
-}
-
-.plan-exit-file-path {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    padding: 6px 8px;
-    background-color: rgba(128, 128, 128, 0.1);
-    border-radius: 3px;
-    margin-bottom: 8px;
-}
-
-.plan-exit-file-icon {
-    font-size: 12px;
-    flex-shrink: 0;
-}
-
-.plan-exit-file-name {
-    font-size: 11px;
-    color: var(--vscode-foreground);
-    flex: 1;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    font-family: var(--vscode-editor-font-family, monospace);
-}
-
-.plan-exit-toggle-btn {
-    background: none;
-    border: none;
-    color: var(--vscode-descriptionForeground);
-    cursor: pointer;
-    font-size: 10px;
-    padding: 2px 4px;
-    flex-shrink: 0;
-}
-
-.plan-exit-toggle-btn:hover {
-    color: var(--vscode-foreground);
-}
-
-.plan-exit-plan-content {
-    max-height: 300px;
-    overflow-y: auto;
-    padding: 8px 12px;
-    background-color: rgba(128, 128, 128, 0.08);
-    border-radius: 3px;
-    margin-bottom: 12px;
-    font-size: 12px;
-    line-height: 1.5;
-}
-
-.plan-exit-plan-content h1,
-.plan-exit-plan-content h2,
-.plan-exit-plan-content h3,
-.plan-exit-plan-content h4 {
-    margin-top: 8px;
-    margin-bottom: 4px;
-    font-size: 13px;
-    color: var(--vscode-foreground);
-}
-
-.plan-exit-plan-content h1:first-child,
-.plan-exit-plan-content h2:first-child,
-.plan-exit-plan-content h3:first-child {
-    margin-top: 0;
-}
-
-.plan-exit-plan-content p {
-    margin: 4px 0;
-    color: var(--vscode-foreground);
-}
-
-.plan-exit-plan-content ul,
-.plan-exit-plan-content ol {
-    margin: 4px 0;
-    padding-left: 20px;
-}
-
-.plan-exit-plan-content li {
-    margin: 2px 0;
-    color: var(--vscode-foreground);
-}
-
-.plan-exit-plan-content code {
-    background-color: rgba(128, 128, 128, 0.2);
-    padding: 1px 4px;
-    border-radius: 2px;
-    font-family: var(--vscode-editor-font-family, monospace);
-    font-size: 11px;
-}
-
-.plan-exit-plan-content pre {
-    background-color: rgba(0, 0, 0, 0.2);
-    padding: 8px;
-    border-radius: 3px;
-    overflow-x: auto;
-    margin: 8px 0;
-}
-
-.plan-exit-plan-content pre code {
-    background: none;
-    padding: 0;
-}
-
-.plan-exit-options {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-}
-
-.plan-exit-option-btn {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    width: 100%;
-    padding: 10px 12px;
-    background-color: var(--vscode-button-secondaryBackground, #5a5a5a);
-    color: var(--vscode-button-secondaryForeground, var(--vscode-foreground));
-    border: 1px solid transparent;
-    border-radius: 3px;
-    cursor: pointer;
-    text-align: left;
-    transition: all 0.15s;
-}
-
-.plan-exit-option-btn:hover {
-    background-color: var(--vscode-button-secondaryHoverBackground, #666666);
-}
-
-.plan-exit-option-btn.focused {
-    background-color: var(--vscode-button-background);
-    color: var(--vscode-button-foreground);
-    border-color: transparent;
-}
-
-.plan-exit-option-icon {
-    font-size: 14px;
-    flex-shrink: 0;
-    width: 20px;
-    text-align: center;
-}
-
-.plan-exit-option-content {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-    flex: 1;
-    min-width: 0;
-}
-
-.plan-exit-option-label {
-    font-size: 12px;
-    font-weight: 500;
-}
-
-.plan-exit-option-description {
-    font-size: 11px;
-    opacity: 0.8;
-}
-
-.plan-exit-hint {
-    font-size: 11px;
-    color: var(--vscode-descriptionForeground);
-    text-align: left;
-    margin-top: 10px;
 }
 
 /* ==================== 计划实施面板样式 ==================== */
-.plan-implement-panel {
-    margin: 6px 0;
-    border: 1px solid var(--vscode-panel-border);
-    border-radius: 3px;
-    overflow: hidden;
-    width: 100%;
-    max-width: 100%;
-    box-sizing: border-box;
-}
-
 .plan-implement-content {
-    background-color: var(--vscode-sideBar-background);
     padding: 12px;
 }
 
@@ -894,9 +487,9 @@ body.vscode-light .bash-permission-content {
 }
 
 .plan-implement-header-tag {
-    font-size: 10px;
-    color: #4ec9b0;
-    background-color: rgba(78, 201, 176, 0.15);
+    font-size: var(--chat-font-xs);
+    color: var(--chat-color-success);
+    background-color: var(--chat-color-success-bg);
     padding: 2px 6px;
     border-radius: 3px;
     font-weight: 500;
@@ -904,14 +497,14 @@ body.vscode-light .bash-permission-content {
 }
 
 .plan-implement-title {
-    font-size: 12px;
-    color: var(--vscode-foreground);
+    font-size: var(--chat-font-base);
+    color: var(--chat-text-primary);
     flex-shrink: 0;
 }
 
 .plan-implement-file-name {
-    font-size: 12px;
-    color: var(--vscode-textLink-foreground);
+    font-size: var(--chat-font-base);
+    color: var(--chat-text-link);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -926,7 +519,7 @@ body.vscode-light .bash-permission-content {
 .plan-implement-toggle-btn {
     background: none;
     border: none;
-    color: var(--vscode-descriptionForeground);
+    color: var(--chat-text-secondary);
     cursor: pointer;
     padding: 2px;
     flex-shrink: 0;
@@ -936,7 +529,7 @@ body.vscode-light .bash-permission-content {
 }
 
 .plan-implement-toggle-btn:hover {
-    color: var(--vscode-foreground);
+    color: var(--chat-text-primary);
 }
 
 .plan-implement-toggle-btn svg {
@@ -951,9 +544,9 @@ body.vscode-light .bash-permission-content {
     max-height: 300px;
     overflow-y: auto;
     padding: 8px 12px;
-    background-color: rgba(128, 128, 128, 0.08);
+    background-color: var(--chat-bg-hover);
     border-radius: 3px;
-    font-size: 12px;
+    font-size: var(--chat-font-base);
     line-height: 1.5;
 }
 
@@ -962,19 +555,19 @@ body.vscode-light .bash-permission-content {
     white-space: pre-wrap;
     word-wrap: break-word;
     font-family: var(--vscode-editor-font-family, monospace);
-    color: var(--vscode-foreground);
+    color: var(--chat-text-primary);
 }
 
 /* ==================== Plan Exit Dialog 新样式 ==================== */
 /* 可点击的文件名链接 */
 .plan-file-link {
     cursor: pointer;
-    color: var(--vscode-textLink-foreground);
+    color: var(--chat-text-link);
     text-decoration: underline;
 }
 
 .plan-file-link:hover {
-    color: var(--vscode-textLink-activeForeground);
+    color: var(--chat-text-link-active);
 }
 
 /* Plan MD 内容区域 */
@@ -982,12 +575,12 @@ body.vscode-light .bash-permission-content {
     max-height: 400px;
     overflow-y: auto;
     padding: 12px 16px;
-    font-size: 12px;
+    font-size: var(--chat-font-base);
     line-height: 1.6;
 }
 
 .plan-exit-md-content .markdown-content {
-    color: var(--vscode-foreground);
+    color: var(--chat-text-primary);
 }
 
 .plan-exit-md-content .markdown-content h1,
@@ -996,7 +589,7 @@ body.vscode-light .bash-permission-content {
 .plan-exit-md-content .markdown-content h4 {
     margin-top: 12px;
     margin-bottom: 6px;
-    color: var(--vscode-foreground);
+    color: var(--chat-text-primary);
 }
 
 .plan-exit-md-content .markdown-content h1:first-child,
@@ -1020,15 +613,15 @@ body.vscode-light .bash-permission-content {
 }
 
 .plan-exit-md-content .markdown-content code {
-    background-color: rgba(128, 128, 128, 0.2);
+    background-color: var(--chat-bg-active);
     padding: 1px 4px;
     border-radius: 2px;
     font-family: var(--vscode-editor-font-family, monospace);
-    font-size: 11px;
+    font-size: var(--chat-font-sm);
 }
 
 .plan-exit-md-content .markdown-content pre {
-    background-color: rgba(0, 0, 0, 0.2);
+    background-color: var(--chat-overlay);
     padding: 10px;
     border-radius: 3px;
     overflow-x: auto;
@@ -1047,19 +640,19 @@ body.vscode-light .bash-permission-content {
     gap: 4px;
     margin-bottom: 12px;
     padding-bottom: 8px;
-    border-bottom: 1px solid var(--vscode-panel-border);
+    border-bottom: 1px solid var(--chat-border);
     flex-wrap: wrap;
 }
 
 .ask-question-tab {
     background: none;
-    color: var(--vscode-descriptionForeground);
+    color: var(--chat-text-secondary);
     border: none;
     border-bottom: 2px solid transparent;
     border-radius: 0;
     cursor: pointer;
     padding: 6px 12px;
-    font-size: 12px;
+    font-size: var(--chat-font-base);
     transition: all 0.15s;
     display: flex;
     align-items: center;
@@ -1068,7 +661,7 @@ body.vscode-light .bash-permission-content {
 }
 
 .ask-question-tab:hover {
-    color: var(--vscode-foreground);
+    color: var(--chat-text-primary);
 }
 
 .ask-question-tab:focus {
@@ -1080,8 +673,8 @@ body.vscode-light .bash-permission-content {
 }
 
 .ask-question-tab.active {
-    color: var(--vscode-foreground);
-    border-bottom-color: var(--vscode-button-background);
+    color: var(--chat-text-primary);
+    border-bottom-color: var(--chat-bg-button);
     font-weight: 500;
 }
 
@@ -1089,73 +682,31 @@ body.vscode-light .bash-permission-content {
     position: relative;
 }
 
-.ask-question-tab-check {
-    font-size: 10px;
-    color: #4ec9b0;
-}
-
-.ask-question-tab.active .ask-question-tab-check {
-    color: var(--vscode-button-foreground);
-}
-
 .ask-question-tab-hint {
-    font-size: 10px;
-    color: var(--vscode-descriptionForeground);
+    font-size: var(--chat-font-xs);
+    color: var(--chat-text-secondary);
     margin-left: auto;
-}
-
-.ask-question-multi-hint {
-    font-size: 11px;
-    color: var(--vscode-descriptionForeground);
-    margin-left: 4px;
-}
-
-/* Other 输入框样式 */
-.ask-question-other-input-wrapper {
-    margin-top: 6px;
-    margin-left: 22px;
-    padding-right: 4px;
-}
-
-.ask-question-other-input {
-    width: 100%;
-    padding: 6px 10px;
-    font-size: 12px;
-    color: var(--vscode-input-foreground);
-    background-color: var(--vscode-input-background);
-    border: 1px solid var(--vscode-input-border, var(--vscode-panel-border));
-    border-radius: 3px;
-    outline: none;
-    box-sizing: border-box;
-}
-
-.ask-question-other-input:focus {
-    border-color: var(--vscode-input-border, var(--vscode-panel-border));
-}
-
-.ask-question-other-input::placeholder {
-    color: var(--vscode-input-placeholderForeground);
 }
 
 /* Other 内联输入框样式 */
 .ask-question-other-inline-input {
     width: 100%;
     padding: 4px 8px;
-    font-size: 12px;
-    color: var(--vscode-input-foreground);
-    background-color: var(--vscode-input-background);
-    border: 1px solid var(--vscode-input-border, var(--vscode-panel-border));
+    font-size: var(--chat-font-base);
+    color: var(--chat-text-input);
+    background-color: var(--chat-bg-input);
+    border: 1px solid var(--chat-border-input);
     border-radius: 3px;
     outline: none;
     box-sizing: border-box;
 }
 
 .ask-question-other-inline-input:focus {
-    border-color: var(--vscode-input-border, var(--vscode-panel-border));
+    border-color: var(--chat-border-input);
 }
 
 .ask-question-other-inline-input::placeholder {
-    color: var(--vscode-input-placeholderForeground);
+    color: var(--chat-text-placeholder);
 }
 
 /* ==================== Permission 自定义输入框样式 ==================== */
@@ -1168,10 +719,10 @@ body.vscode-light .bash-permission-content {
 .permission-custom-input {
     flex: 1;
     padding: 8px 16px;
-    font-size: 12px;
-    color: var(--vscode-input-foreground);
+    font-size: var(--chat-font-base);
+    color: var(--chat-text-input);
     background-color: transparent;
-    border: 1px solid var(--vscode-panel-border);
+    border: 1px solid var(--chat-border);
     border-radius: 3px;
     outline: none;
     box-sizing: border-box;
@@ -1181,16 +732,16 @@ body.vscode-light .bash-permission-content {
 
 .permission-custom-input:hover {
     background-color: transparent;
-    border-color: var(--vscode-panel-border);
+    border-color: var(--chat-border);
 }
 
 .permission-custom-input:focus {
     background-color: transparent;
-    border-color: var(--vscode-focusBorder, var(--vscode-panel-border));
+    border-color: var(--chat-border-focus);
 }
 
 .permission-custom-input::placeholder {
-    color: var(--vscode-descriptionForeground);
+    color: var(--chat-text-secondary);
     opacity: 0.6;
 }
 
@@ -1201,7 +752,7 @@ body.vscode-light .bash-permission-content {
     left: 0;
     right: 0;
     bottom: 0;
-    background: rgba(0, 0, 0, 0.4);
+    background: var(--chat-overlay);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -1209,15 +760,14 @@ body.vscode-light .bash-permission-content {
 }
 
 .btw-dialog-modal {
-    background: var(--vscode-editor-background);
-    border: 1px solid var(--vscode-panel-border);
+    background: var(--chat-bg-editor);
+    border: 1px solid var(--chat-border);
     border-radius: 8px;
     width: 95%;
-    max-width: 720px;
     max-height: 80vh;
     display: flex;
     flex-direction: column;
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+    box-shadow: var(--chat-shadow-lg);
 }
 
 .btw-dialog-header {
@@ -1225,18 +775,19 @@ body.vscode-light .bash-permission-content {
     align-items: center;
     gap: 6px;
     padding: 12px 16px;
-    border-bottom: 1px solid var(--vscode-panel-border);
+    border-bottom: 1px solid var(--chat-border);
     flex-shrink: 0;
 }
 
 .btw-dialog-icon {
-    font-size: 14px;
+    font-size: var(--chat-font-lg);
 }
 
 .btw-dialog-title {
-    font-size: 13px;
+    font-size: var(--chat-font-md);
     font-weight: 600;
-    color: var(--vscode-foreground);
+    color: var(--chat-text-primary);
+    flex: 1;
 }
 
 .btw-dialog-body {
@@ -1250,15 +801,15 @@ body.vscode-light .bash-permission-content {
     padding: 8px 16px 12px;
     display: flex;
     justify-content: flex-end;
-    border-top: 1px solid var(--vscode-panel-border);
+    border-top: 1px solid var(--chat-border);
     flex-shrink: 0;
 }
 
 .btw-question {
-    font-size: 12px;
-    color: var(--vscode-descriptionForeground);
+    font-size: var(--chat-font-base);
+    color: var(--chat-text-secondary);
     padding: 4px 0 8px 0;
-    border-bottom: 1px solid var(--vscode-panel-border);
+    border-bottom: 1px solid var(--chat-border);
     margin-bottom: 8px;
 }
 
@@ -1266,6 +817,6 @@ body.vscode-light .bash-permission-content {
     max-height: 400px;
     overflow-y: auto;
     padding: 8px 0;
-    font-size: 12px;
+    font-size: var(--chat-font-base);
     line-height: 1.6;
 }

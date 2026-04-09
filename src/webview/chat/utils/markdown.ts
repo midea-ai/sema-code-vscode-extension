@@ -27,18 +27,20 @@ export function renderMarkdownToHtml(content: string, vscode?: any): string {
       'yaml', 'yml', 'markdown', 'bash', 'sh', 'sql', 'r', 'vue', 'dart'
     ];
 
-    // 如果第一行是语言标识符，去掉它
+    // 如果第一行是语言标识符，去掉它并记录语言
+    let langClass = '';
     const lines = processedCode.split('\n');
     if (lines.length > 0 && lines[0].trim()) {
       const firstLine = lines[0].trim().toLowerCase();
       if (languageIdentifiers.includes(firstLine)) {
+        langClass = ` class="language-${firstLine}"`;
         processedCode = lines.slice(1).join('\n');
       }
     }
 
     const escapedCode = escapeHtml(processedCode);
     const placeholder = `\x00CODE_BLOCK_${codeBlockPlaceholders.length}\x00`;
-    codeBlockPlaceholders.push(`<pre class="code-block"><code>${escapedCode}</code></pre>`);
+    codeBlockPlaceholders.push(`<pre class="code-block"><code${langClass}>${escapedCode}</code></pre>`);
     return placeholder;
   });
 

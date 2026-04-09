@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { renderMarkdownToHtml } from '../../utils/markdown';
-import { getResponseDot } from '../../utils/permissionUtils';
-import '../../utils/markdown.css';
+import { getResponseDot } from '../../utils/symbols';
+import '../../style/markdown.css';
 
 interface PlanExitRequestData {
     agentId: string;
@@ -100,14 +100,14 @@ const PlanExitDialog: React.FC<PlanExitDialogProps> = ({
 
     return (
         <div
-            className="bash-permission-block"
+            className="chat-block bash-permission-block"
             tabIndex={0}
             ref={containerRef}
             style={{ outline: 'none' }}
         >
-            <div className="bash-permission-header">
-                <div className="bash-permission-title">
-                    <span className="bash-permission-dot">{getResponseDot()}</span>
+            <div className="chat-block-header bash-permission-header">
+                <div className="chat-block-title bash-permission-title">
+                    <span className="bash-permission-dot dot-pending">{getResponseDot()}</span>
                     <span className="bash-permission-title-text">Ready to code</span>
                     <span className="bash-permission-status">Pending</span>
                 </div>

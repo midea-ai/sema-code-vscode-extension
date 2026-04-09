@@ -1,5 +1,5 @@
 import React from 'react';
-import { getResponseDot } from '../utils/permissionUtils';
+import { getResponseDot, CONTINUATION_SYMBOL } from '../utils/symbols';
 
 interface ToolErrorBlockProps {
     toolName: string;
@@ -13,13 +13,16 @@ const ToolErrorBlock: React.FC<ToolErrorBlockProps> = React.memo(({ toolName, ti
         : toolName;
 
     return (
-        <div className="tool-error-block">
-            <div className="tool-error-header">
+        <div className="chat-block chat-block--borderless ai-resp-block tool-error-block">
+            <div className="output-line ai-response-content tool-error-header">
                 <span className="response-indicator tool-error-indicator">{getResponseDot()}</span>
-                <span className="tool-error-name">{headerText}</span>
+                <span className="chat-block-title-label">{toolName}</span>
+                {title && title !== toolName && (
+                    <span className="chat-block-title-detail">{title}</span>
+                )}
             </div>
             {content && (
-                <div className="tool-error-content">⎿ {content}</div>
+                <div className="tool-error-content">{CONTINUATION_SYMBOL} {content}</div>
             )}
         </div>
     );

@@ -69,7 +69,6 @@ export interface Message {
     id: string;
     type: 'user' | 'assistant' | 'tool' | 'system' | 'permission_request';
     content: any;
-    timestamp: number;
     toolName?: string;
     toolArgs?: any;
     reasoning?: string;
@@ -165,7 +164,6 @@ export class SemaCoreWrapper {
                         type: 'file_reference',
                         content: data.references.map(ref => ref.content)
                     },
-                    timestamp: Date.now()
                 };
                 this.messageHistory.push(msg);
                 this.sendAppendMessages([msg]);
@@ -178,7 +176,6 @@ export class SemaCoreWrapper {
                     id: this.generateId(),
                     type: 'system',
                     content: { type: 'interrupted', content: data.content },
-                    timestamp: Date.now()
                 });
                 return;
             }
@@ -200,7 +197,6 @@ export class SemaCoreWrapper {
                 id: this.generateId(),
                 type: 'system',
                 content: { type: 'interrupted', content: data.content },
-                timestamp: Date.now()
             };
             this.messageHistory.push(interruptedMsg);
             this.sendAppendMessages([interruptedMsg]);
@@ -217,7 +213,6 @@ export class SemaCoreWrapper {
                     content: `Error: [${data.type}]${errorMessage}`,
                     errorType: data.type
                 },
-                timestamp: Date.now()
             };
             this.messageHistory.push(sessionErrorMsg);
             this.sendAppendMessages([sessionErrorMsg]);
@@ -230,13 +225,11 @@ export class SemaCoreWrapper {
                 id: this.generateId(),
                 type: 'user',
                 content: '/clear',
-                timestamp: Date.now()
             });
             this.messageHistory.push({
                 id: this.generateId(),
                 type: 'system',
                 content: { type: 'clear', content: '(no content)' },
-                timestamp: Date.now()
             });
             this.sendContentUpdate();
             this.callbacks.onSessionCleared?.();
@@ -260,10 +253,12 @@ export class SemaCoreWrapper {
                 id: this.generateId(),
                 type: 'user',
                 content: content,
-                timestamp: Date.now()
             };
             this.messageHistory.push(userMsg);
             this.sendAppendMessages([userMsg]);
+
+            // 通知前端清除 pending 状态
+            this.callbacks.onMessage?.({ type: 'inputProcessing', data });
         });
     }
 
@@ -288,7 +283,6 @@ export class SemaCoreWrapper {
                 type: 'assistant',
                 content: { messageType: 'text', content: '', completed: false },
                 reasoning: delta,
-                timestamp: Date.now()
             };
             this.streamingAssistantMap.set(msgId, newMessage);
             this.messageHistory.push(newMessage);
@@ -308,7 +302,6 @@ export class SemaCoreWrapper {
                 id: msgId,
                 type: 'assistant',
                 content: { messageType: 'text', content: data.delta, completed: false },
-                timestamp: Date.now()
             };
             this.streamingAssistantMap.set(msgId, newMessage);
             this.messageHistory.push(newMessage);
@@ -332,7 +325,6 @@ export class SemaCoreWrapper {
                         hasToolCalls: data.hasToolCalls,
                     },
                     reasoning: data.reasoning,
-                    timestamp: Date.now()
                 });
                 return;
             }
@@ -374,7 +366,6 @@ export class SemaCoreWrapper {
                         completed: true,
                         hasToolCalls: data.hasToolCalls,
                     },
-                    timestamp: Date.now()
                 };
                 if (data.reasoning) {
                     newCompleteMessage.reasoning = data.reasoning;
@@ -416,7 +407,6 @@ export class SemaCoreWrapper {
                     type: 'tool',
                     content: { ...data, completed: false },
                     toolName: data.toolName,
-                    timestamp: Date.now()
                 };
                 this.messageHistory.push(newMessage);
                 if (toolId) {
@@ -435,7 +425,6 @@ export class SemaCoreWrapper {
                     type: 'tool',
                     content: { ...data, completed: true },
                     toolName: data.toolName,
-                    timestamp: Date.now()
                 });
                 return;
             }
@@ -459,7 +448,6 @@ export class SemaCoreWrapper {
                     type: 'tool',
                     content: { ...data, completed: true },
                     toolName: data.toolName,
-                    timestamp: Date.now()
                 };
                 this.messageHistory.push(newToolMsg);
                 this.sendAppendMessages([newToolMsg]);
@@ -479,7 +467,6 @@ export class SemaCoreWrapper {
                     title: data.title
                 },
                 toolName: data.toolName,
-                timestamp: Date.now()
             };
 
             if (this.isSubAgent(data.agentId)) {
@@ -526,7 +513,6 @@ export class SemaCoreWrapper {
                 id: this.generateId(),
                 type: 'system',
                 content: { type: 'compact', content: finalContent },
-                timestamp: Date.now()
             };
             this.messageHistory.push(compactMsg);
             this.sendContentUpdate();
@@ -542,7 +528,6 @@ export class SemaCoreWrapper {
                     planFilePath: data.planFilePath,
                     planContent: data.planContent
                 },
-                timestamp: Date.now()
             };
             this.messageHistory.push(planMsg);
             this.sendAppendMessages([planMsg]);
@@ -555,7 +540,7 @@ export class SemaCoreWrapper {
             this.callbacks.onTaskStart?.(data);
         });
 
-        this.semaCore.on<{ taskId: string; from: string; to: string }>('task:transfer', (data) => {
+        this.semaCore.on<TaskTransferData>('task:transfer', (data) => {
             if (data.to === 'background') {
                 this.callbacks.onTaskStart?.({ taskId: data.taskId, filepath: '', type: 'Agent' } as TaskStartData);
             }
@@ -573,7 +558,6 @@ export class SemaCoreWrapper {
                         status: data.status,
                         summary: data.summary,
                     },
-                    timestamp: Date.now()
                 };
                 this.messageHistory.push(taskEndMessage);
                 this.sendAppendMessages([taskEndMessage]);
@@ -642,7 +626,6 @@ export class SemaCoreWrapper {
             id: this.generateId(),
             type: 'user',
             content: data.prompt,
-            timestamp: Date.now()
         };
 
         const taskMessage: Message = {
@@ -659,7 +642,6 @@ export class SemaCoreWrapper {
                 taskMessages: [userMessage],
                 run_in_background: data.run_in_background
             } as TaskMessageContent,
-            timestamp: Date.now()
         };
 
         this.messageHistory.push(taskMessage);
@@ -902,7 +884,6 @@ export class SemaCoreWrapper {
                 action: permissionData.action,
                 refuseMessage: permissionData.refuseMessage
             },
-            timestamp: Date.now()
         };
 
         if (this.isSubAgent(permissionData.agentId)) {

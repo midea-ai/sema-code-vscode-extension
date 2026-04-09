@@ -1,8 +1,8 @@
-/* 简化的Markdown样式 - 只支持基本功能 */
+/* ===== Markdown 内容样式 ===== */
 .markdown-content {
   font-family: var(--vscode-editor-font-family);
   line-height: 1.4;
-  color: var(--vscode-editor-foreground);
+  color: var(--chat-text-editor);
   width: 100%;
   max-width: 100%;
   box-sizing: border-box;
@@ -11,18 +11,18 @@
 /* 粗体样式 - 用于标题和 **加粗** 文本 */
 .markdown-content strong {
   font-weight: 600;
-  color: var(--vscode-editor-foreground);
+  color: var(--chat-text-editor);
 }
 
 /* 内联代码样式 - `代码` 变色 */
 .markdown-content .inline-code {
-  color: var(--vscode-symbolIcon-variableForeground);
+  color: var(--chat-text-symbol);
   background: none;
 }
 
 /* 文件路径内联代码样式 - 可点击的文件路径 */
 .markdown-content .file-path-code {
-  color: var(--vscode-textLink-foreground);
+  color: var(--chat-text-link);
   background: none;
   cursor: pointer;
   text-decoration: underline;
@@ -30,18 +30,15 @@
 }
 
 .markdown-content .file-path-code:hover {
-  color: var(--vscode-textLink-activeForeground);
+  color: var(--chat-text-link-active);
   text-decoration: underline;
 }
 
 /* 代码块样式 - ``` 代码块高亮 */
 .markdown-content .code-block {
-  /* 使用 editor-foreground 替代 textPreformat-foreground 以确保在浅色主题下清晰可见 */
-  color: var(--vscode-editor-foreground);
-  /* background: var(--vscode-textCodeBlock-background); */
-  /* border: 1px solid var(--vscode-panel-border); */
-  border-radius: 6px;
-  padding: 12px;
+  color: var(--chat-text-editor);
+  border-radius: var(--chat-radius-md);
+  padding: var(--chat-spacing-lg);
   margin: 0;
   overflow-x: auto;
   overflow-y: hidden;
@@ -74,13 +71,13 @@
 /* 表格样式 */
 .markdown-content .markdown-table {
   border-collapse: collapse;
-  margin: 8px 0;
+  margin: 3px 0;
 }
 
 .markdown-content .markdown-table th,
 .markdown-content .markdown-table td {
-  border: 1px solid var(--vscode-panel-border);
-  padding: 4px 8px;
+  border: 1px solid var(--chat-border);
+  padding: var(--chat-spacing-xs) var(--chat-spacing-md);
   text-align: left;
 }
 
@@ -90,12 +87,12 @@
 
 /* 表格内的内联代码 */
 .markdown-content .markdown-table .inline-code {
-  color: var(--vscode-symbolIcon-variableForeground);
+  color: var(--chat-text-symbol);
   background: none;
 }
 
 .markdown-content .markdown-table .file-path-code {
-  color: var(--vscode-textLink-foreground);
+  color: var(--chat-text-link);
   cursor: pointer;
   text-decoration: underline;
 }

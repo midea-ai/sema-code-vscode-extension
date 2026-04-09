@@ -165,7 +165,7 @@ const applyWordDiffOverlay = (
 const processPatchToRows = (diffContent: DiffContent): RenderRow[] => {
   const rows: RenderRow[] = [];
 
-  diffContent.patch.forEach((hunk, index) => {
+  (diffContent.patch || []).forEach((hunk, index) => {
     if (index > 0) {
       rows.push({ type: 'separator', content: '' });
     }

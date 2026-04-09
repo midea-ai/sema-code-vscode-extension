@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useState } from 'react';
 import PermissionContent from './PermissionContent';
-import { getPermissionTitle, getResponseDot } from '../../utils/permissionUtils';
+import { ToggleIcon } from '../../components/ui/IconButton';
+import { getPermissionTitle } from '../../utils/permissionUtils';
 
 interface PermissionRequestData {
     toolName: string;
@@ -15,6 +16,7 @@ interface PermissionRequestBlockProps {
 }
 
 const PermissionRequestBlock: React.FC<PermissionRequestBlockProps> = ({ permissionData }) => {
+    const [isExpanded, setIsExpanded] = useState(true);
 
     // 获取状态文本和样式类
     const getStatusInfo = () => {
@@ -26,29 +28,37 @@ const PermissionRequestBlock: React.FC<PermissionRequestBlockProps> = ({ permiss
         return { text: 'Unknown', className: '' };
     };
 
+    const handleToggle = () => {
+        setIsExpanded(!isExpanded);
+    };
+
     return (
-        <div className="bash-permission-block" tabIndex={0}>
-            <div className="bash-permission-header">
-                <div className="bash-permission-title">
-                    <span className="bash-permission-dot dot-red">{getResponseDot()}</span>
-                    <span className="bash-permission-title-text">
+        <div className="chat-block bash-permission-block" tabIndex={0}>
+            <div className="chat-block-header bash-permission-header" onClick={handleToggle}>
+                <div className="chat-block-title bash-permission-title">
+                    <span className="chat-block-title-label">
                         {getPermissionTitle(permissionData.toolName)}
                     </span>
+                    <div className="bash-toggle-btn">
+                        <ToggleIcon isExpanded={isExpanded} />
+                    </div>
                     <span className={`bash-permission-status ${getStatusInfo().className}`}>{getStatusInfo().text}</span>
                 </div>
             </div>
-            <div className="bash-permission-content permission-content-dimmed">
-                <PermissionContent
-                    toolName={permissionData.toolName}
-                    title={permissionData.title}
-                    content={permissionData.content}
-                />
-                {permissionData.refuseMessage && (
-                    <div className="bash-permission-refuse-message">
-                        <strong>User said：</strong>{permissionData.refuseMessage}
-                    </div>
-                )}
-            </div>
+            {isExpanded && (
+                <div className="bash-permission-content permission-content-dimmed">
+                    <PermissionContent
+                        toolName={permissionData.toolName}
+                        title={permissionData.title}
+                        content={permissionData.content}
+                    />
+                    {permissionData.refuseMessage && (
+                        <div className="bash-permission-refuse-message">
+                            <strong>User said：</strong>{permissionData.refuseMessage}
+                        </div>
+                    )}
+                </div>
+            )}
         </div>
     );
 };

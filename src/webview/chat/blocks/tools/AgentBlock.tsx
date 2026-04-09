@@ -77,9 +77,9 @@ const AgentBlock: React.FC<AgentBlockProps> = React.memo(({ content, vscode, for
 
     return (
         <>
-            <div className={`task-block task-status-${status}`}>
-                <div className="task-block-header">
-                    <div className="task-block-title">
+            <div className={`chat-block task-block task-status-${status}`}>
+                <div className="chat-block-header task-block-header">
+                    <div className="chat-block-title task-block-title">
                         {getStatusIcon()}
                         {run_in_background && <span className="task-background-tag">后台</span>}
                         <span className="task-title-text">{title}</span>

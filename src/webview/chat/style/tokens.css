@@ -1,0 +1,119 @@
+/* ===== 设计 Token：统一字号、间距、圆角、颜色 ===== */
+:root {
+    /* -------- 字号 -------- */
+    --chat-font-xs: 10px;
+    --chat-font-sm: 11px;
+    --chat-font-base: 12px;
+    --chat-font-md: 13px;
+    --chat-font-lg: 14px;
+    --chat-font-xl: 16px;
+
+    /* -------- 间距 -------- */
+    --chat-spacing-xs: 4px;
+    --chat-spacing-sm: 6px;
+    --chat-spacing-md: 8px;
+    --chat-spacing-lg: 12px;
+
+    /* -------- 圆角 -------- */
+    --chat-radius-sm: 3px;
+    --chat-radius-md: 6px;
+
+    /* -------- 文本色 -------- */
+    --chat-text-primary: var(--vscode-foreground);
+    --chat-text-secondary: var(--vscode-descriptionForeground);
+    --chat-text-editor: var(--vscode-editor-foreground);
+    --chat-text-input: var(--vscode-input-foreground);
+    --chat-text-link: var(--vscode-textLink-foreground);
+    --chat-text-link-active: var(--vscode-textLink-activeForeground);
+    --chat-text-placeholder: var(--vscode-input-placeholderForeground);
+    --chat-text-terminal-green: var(--vscode-terminal-ansiGreen);
+    --chat-text-terminal-cyan: var(--vscode-terminal-ansiBrightCyan);
+    --chat-text-symbol: var(--vscode-symbolIcon-variableForeground);
+
+    /* -------- 状态色 -------- */
+    --chat-color-success: #4ec9b0;
+    --chat-color-success-bg: rgba(78, 201, 176, 0.15);
+    --chat-color-error: #f48771;
+    --chat-color-error-bg: rgba(244, 135, 113, 0.1);
+    --chat-color-warning: #ffba49;
+    --chat-color-warning-bg: rgba(255, 186, 73, 0.2);
+
+    /* -------- 语义色 -------- */
+    --chat-color-purple: #9575ff;
+    --chat-color-spinner: #4fc08d;
+
+    /* -------- 灰阶 -------- */
+    --chat-color-muted: #808080;
+    --chat-color-muted-hover: #a0a0a0;
+    --chat-color-muted-light: #a0a0a0;
+
+    /* -------- 背景色 -------- */
+    --chat-bg-primary: var(--vscode-sideBar-background);
+    --chat-bg-editor: var(--vscode-editor-background);
+    --chat-bg-input: var(--vscode-input-background);
+    --chat-bg-panel-header: var(--vscode-panel-sectionHeader-background);
+    --chat-bg-list-hover: var(--vscode-list-hoverBackground);
+    --chat-bg-list-active: var(--vscode-list-activeSelectionBackground);
+    --chat-bg-button: var(--vscode-button-background);
+    --chat-bg-button-hover: var(--vscode-button-hoverBackground);
+    --chat-bg-button-secondary: var(--vscode-button-secondaryBackground, #5a5a5a);
+    --chat-bg-button-secondary-hover: var(--vscode-button-secondaryHoverBackground, #666666);
+    --chat-bg-badge: var(--vscode-badge-background);
+    --chat-bg-light: #ffffff;
+    --chat-bg-hover: rgba(128, 128, 128, 0.1);
+    --chat-bg-active: rgba(128, 128, 128, 0.2);
+    --chat-overlay: rgba(0, 0, 0, 0.4);
+
+    /* -------- 按钮 / 列表前景 -------- */
+    --chat-text-button: var(--vscode-button-foreground);
+    --chat-text-button-secondary: var(--vscode-button-secondaryForeground, var(--vscode-foreground));
+    --chat-text-list-active: var(--vscode-list-activeSelectionForeground);
+    --chat-text-badge: var(--vscode-badge-foreground);
+
+    /* -------- 边框 -------- */
+    --chat-border: var(--vscode-panel-border);
+    --chat-border-input: var(--vscode-input-border, rgba(128, 128, 128, 0.35));
+    --chat-border-focus: var(--vscode-focusBorder);
+    --chat-border-dropdown: var(--vscode-dropdown-border);
+    --chat-border-contrast: var(--vscode-contrastBorder);
+
+    /* -------- 滚动条 -------- */
+    --chat-scrollbar: var(--vscode-scrollbarSlider-background);
+    --chat-scrollbar-hover: var(--vscode-scrollbarSlider-hoverBackground);
+
+    /* -------- 通知 -------- */
+    --chat-notification-bg: var(--vscode-notifications-background);
+    --chat-notification-fg: var(--vscode-notifications-foreground);
+    --chat-notification-border: var(--vscode-notifications-border);
+    --chat-notification-warning-icon: var(--vscode-notificationsWarningIcon-foreground);
+
+    /* -------- Tooltip -------- */
+    --chat-tooltip-bg: var(--vscode-editorHoverWidget-background);
+    --chat-tooltip-fg: var(--vscode-editorHoverWidget-foreground);
+    --chat-tooltip-border: var(--vscode-editorHoverWidget-border);
+
+    /* -------- 阴影 -------- */
+    --chat-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+    --chat-shadow-lg: 0 4px 16px rgba(0, 0, 0, 0.3);
+
+    /* -------- Diff -------- */
+    --chat-diff-added-bg: rgba(46, 160, 67, 0.15);
+    --chat-diff-removed-bg: rgba(248, 81, 73, 0.15);
+
+    /* -------- Spinner -------- */
+    --chat-spinner-accent: #4fc08d;
+    --chat-spinner-shimmer: rgba(79, 192, 141, 0.1);
+
+    /* -------- 块级组件公共尺寸 -------- */
+    --chat-block-margin: 3px 8px;
+    --chat-block-header-padding: 4px 8px;
+    --chat-block-content-padding: 6px 8px;
+    --chat-block-header-min-height: 22px;
+    --chat-block-max-width: calc(100% - 16px);
+}
+
+/* ===== 亮色主题 Token 覆盖 ===== */
+.vscode-light {
+    --chat-spinner-accent: rgb(36, 95, 184);
+    --chat-spinner-shimmer: rgba(36, 95, 184, 0.1);
+}

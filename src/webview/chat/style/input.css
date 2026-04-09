@@ -7,13 +7,13 @@
 
 .input-box-wrapper {
     position: relative;
-    border: 1px solid var(--vscode-input-border, rgba(128, 128, 128, 0.35));
+    border: 1px solid var(--chat-border-input);
     border-radius: 6px;
     padding: 6px;
 }
 
 .input-box-wrapper:focus-within {
-    border-color: var(--vscode-focusBorder);
+    border-color: var(--chat-border-focus);
 }
 
 /* 顶部区域：加号按钮和文件标签 */
@@ -34,9 +34,9 @@
     height: 20px;
     padding: 0;
     background-color: transparent;
-    border: 1px solid var(--vscode-button-border, var(--vscode-input-border));
+    border: 1px solid var(--chat-border-input);
     border-radius: 3px;
-    color: var(--vscode-foreground);
+    color: var(--chat-text-primary);
     cursor: pointer;
     transition: all 0.2s;
     flex-shrink: 0;
@@ -48,44 +48,10 @@
 }
 
 .add-file-btn:hover:not(:disabled) {
-    background-color: var(--vscode-list-hoverBackground);
+    background-color: var(--chat-bg-list-hover);
 }
 
 .add-file-btn:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-}
-
-/* 快捷按钮 */
-.shortcut-btn {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 20px;
-    height: 20px;
-    padding: 0;
-    background-color: transparent;
-    border: 1px solid var(--vscode-button-border, var(--vscode-input-border));
-    border-radius: 3px;
-    color: var(--vscode-descriptionForeground);
-    cursor: pointer;
-    transition: all 0.15s;
-    flex-shrink: 0;
-    font-size: 12px;
-    font-weight: 600;
-    margin-left: 4px;
-}
-
-.shortcut-btn:hover:not(:disabled) {
-    color: var(--vscode-foreground);
-    background-color: var(--vscode-list-hoverBackground);
-}
-
-.shortcut-btn:active:not(:disabled) {
-    opacity: 0.8;
-}
-
-.shortcut-btn:disabled {
     opacity: 0.5;
     cursor: not-allowed;
 }
@@ -104,9 +70,9 @@
     align-items: center;
     gap: 1px;
     padding: 2px 6px;
-    border: 1px solid var(--vscode-input-border);
+    border: 1px solid var(--chat-border-input);
     border-radius: 10px;
-    font-size: 11px;
+    font-size: var(--chat-font-sm);
     max-width: 180px;
 }
 
@@ -185,10 +151,10 @@
     width: 100%;
     max-height: 300px;
     margin-bottom: 8px;
-    background: var(--vscode-sideBar-background);
-    border: 1px solid var(--vscode-dropdown-border);
+    background: var(--chat-bg-primary);
+    border: 1px solid var(--chat-border-dropdown);
     border-radius: 4px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    box-shadow: var(--chat-shadow-lg);
     display: flex;
     flex-direction: column;
     z-index: 1000;
@@ -196,22 +162,22 @@
 
 .file-picker-search {
     padding: 8px;
-    border-bottom: 1px solid var(--vscode-dropdown-border);
+    border-bottom: 1px solid var(--chat-border-dropdown);
 }
 
 .file-picker-search input {
     width: 100%;
     padding: 6px 8px;
-    background-color: var(--vscode-input-background);
-    color: var(--vscode-input-foreground);
-    border: 1px solid var(--vscode-input-border);
+    background-color: var(--chat-bg-input);
+    color: var(--chat-text-input);
+    border: 1px solid var(--chat-border-input);
     border-radius: 4px;
-    font-size: 12px;
+    font-size: var(--chat-font-base);
 }
 
 .file-picker-search input:focus {
     outline: none;
-    border-color: var(--vscode-focusBorder);
+    border-color: var(--chat-border-focus);
 }
 
 .file-picker-list {
@@ -220,18 +186,6 @@
     padding: 4px;
 }
 
-.file-picker-list::-webkit-scrollbar {
-    width: 8px;
-}
-
-.file-picker-list::-webkit-scrollbar-thumb {
-    background-color: var(--vscode-scrollbarSlider-background);
-    border-radius: 4px;
-}
-
-.file-picker-list::-webkit-scrollbar-thumb:hover {
-    background-color: var(--vscode-scrollbarSlider-hoverBackground);
-}
 
 .file-picker-item {
     display: flex;
@@ -239,13 +193,13 @@
     gap: 8px;
     padding: 8px 12px;
     cursor: pointer;
-    font-size: 12px;
+    font-size: var(--chat-font-base);
     border-radius: 4px;
     transition: background-color 0.2s;
 }
 
 .file-picker-item:hover {
-    background-color: var(--vscode-list-hoverBackground);
+    background-color: var(--chat-bg-list-hover);
 }
 
 .file-picker-item .file-icon {
@@ -291,9 +245,9 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    color: var(--vscode-descriptionForeground);
+    color: var(--chat-text-secondary);
     opacity: 0.7;
-    font-size: 12px;
+    font-size: var(--chat-font-base);
     min-width: 0;
     /* 允许缩小 */
 }
@@ -301,15 +255,15 @@
 /* 分割线 */
 .file-picker-divider {
     height: 1px;
-    background-color: var(--vscode-dropdown-border);
+    background-color: var(--chat-border-dropdown);
     margin: 4px 8px;
 }
 
 .file-picker-empty {
     padding: 16px;
     text-align: center;
-    color: var(--vscode-descriptionForeground);
-    font-size: 12px;
+    color: var(--chat-text-secondary);
+    font-size: var(--chat-font-base);
 }
 
 /* 快捷面板弹窗 */
@@ -319,10 +273,10 @@
     left: 0;
     width: 100%;
     margin-bottom: 8px;
-    background: var(--vscode-sideBar-background);
-    border: 1px solid var(--vscode-dropdown-border);
+    background: var(--chat-bg-primary);
+    border: 1px solid var(--chat-border-dropdown);
     border-radius: 4px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    box-shadow: var(--chat-shadow-lg);
     z-index: 1000;
     padding: 0;
 }
@@ -333,10 +287,10 @@
     gap: 6px;
     padding: 8px 12px;
     cursor: pointer;
-    font-size: 13px;
+    font-size: var(--chat-font-md);
     border-radius: 0;
     transition: background-color 0.15s;
-    color: var(--vscode-foreground);
+    color: var(--chat-text-primary);
     gap: 0;
     /* 移除默认间距 */
     min-width: 0;
@@ -356,34 +310,34 @@
 }
 
 .shortcut-panel-item:hover {
-    background-color: var(--vscode-list-hoverBackground);
+    background-color: var(--chat-bg-list-hover);
 }
 
 /* 选中项样式（键盘导航） */
 .shortcut-panel-item.selected {
-    background-color: var(--vscode-list-activeSelectionBackground);
-    color: var(--vscode-list-activeSelectionForeground);
+    background-color: var(--chat-bg-list-active);
+    color: var(--chat-text-list-active);
 }
 
 .shortcut-panel-item.selected .shortcut-command,
 .shortcut-panel-item.selected .shortcut-desc {
-    color: var(--vscode-list-activeSelectionForeground);
+    color: var(--chat-text-list-active);
 }
 
 /* / 符号高亮 */
 .shortcut-slash {
     flex-shrink: 0;
-    font-size: 14px;
+    font-size: var(--chat-font-lg);
     font-weight: bold;
-    color: var(--vscode-textLink-foreground);
+    color: var(--chat-text-link);
 }
 
 /* 命令名称正常颜色 */
 .shortcut-command {
     flex-shrink: 0;
-    font-size: 13px;
+    font-size: var(--chat-font-md);
     /* font-weight: bold; */
-    color: var(--vscode-foreground);
+    color: var(--chat-text-primary);
     margin-right: 8px;
     /* 与描述之间的间距 */
 }
@@ -391,8 +345,8 @@
 /* 描述文本灰色 */
 .shortcut-desc {
     flex: 1;
-    font-size: 11px;
-    color: var(--vscode-descriptionForeground);
+    font-size: var(--chat-font-sm);
+    color: var(--chat-text-secondary);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -404,9 +358,9 @@
     width: 100%;
     padding: 6px 8px;
     background-color: transparent;
-    color: var(--vscode-input-foreground);
+    color: var(--chat-text-input);
     border: none;
-    font-size: 12px;
+    font-size: var(--chat-font-base);
     resize: none;
     min-height: 36px;
     max-height: 200px;
@@ -423,7 +377,7 @@
 }
 
 .input-textarea::placeholder {
-    color: rgba(128, 128, 128, 0.8);
+    color: var(--chat-color-muted);
     opacity: 1;
 }
 
@@ -442,7 +396,7 @@
     bottom: 0;
     pointer-events: none;
     z-index: 1;
-    font-size: 12px;
+    font-size: var(--chat-font-base);
     line-height: 1.2;
     padding: 6px 8px;
     white-space: pre-wrap;
@@ -466,8 +420,8 @@
 }
 
 .highlighted-char {
-    background-color: var(--vscode-button-background);
-    color: var(--vscode-button-foreground);
+    background-color: var(--chat-bg-button);
+    color: var(--chat-text-button);
     border-radius: 2px;
     padding: 0 1px;
     margin: 0 -1px;
@@ -495,7 +449,7 @@
     background-color: transparent;
     border: none;
     border-radius: 50%;
-    color: var(--vscode-foreground);
+    color: var(--chat-text-primary);
     cursor: pointer;
     opacity: 0.6;
     transition: all 0.2s;
@@ -508,7 +462,7 @@
 
 .expand-btn:hover:not(:disabled) {
     opacity: 1;
-    background-color: var(--vscode-list-hoverBackground);
+    background-color: var(--chat-bg-list-hover);
     transform: scale(1.05);
 }
 
@@ -525,11 +479,11 @@
     width: 22px;
     height: 22px;
     padding: 0;
-    background-color: var(--vscode-button-background);
+    background-color: var(--chat-bg-button);
     border: none;
     border-radius: 50%;
     /* 完全圆形 */
-    color: var(--vscode-button-foreground);
+    color: var(--chat-text-button);
     cursor: pointer;
     opacity: 0.5;
     transition: all 0.2s;
@@ -542,11 +496,11 @@
 
 .send-btn.active {
     opacity: 1;
-    background-color: var(--vscode-button-background);
+    background-color: var(--chat-bg-button);
 }
 
 .send-btn.active:hover:not(:disabled) {
-    background-color: var(--vscode-button-hoverBackground);
+    background-color: var(--chat-bg-button-hover);
     transform: scale(1.1);
 }
 
@@ -564,7 +518,7 @@
     gap: 4px;
     margin-left: auto;
     position: relative;
-    background-color: rgba(128, 128, 128, 0.08);
+    background-color: var(--chat-bg-hover);
     padding: 2px 4px;
     border-radius: 3px;
 }
@@ -577,13 +531,13 @@
 
 .token-circle-bg {
     fill: none;
-    stroke: rgba(128, 128, 128, 0.2);
+    stroke: var(--chat-bg-active);
     stroke-width: 3;
 }
 
 .token-circle-progress {
     fill: none;
-    stroke: var(--vscode-foreground);
+    stroke: var(--chat-text-primary);
     stroke-width: 3;
     stroke-linecap: round;
     transition: stroke-dasharray 0.3s ease;
@@ -591,8 +545,8 @@
 }
 
 .token-percentage {
-    font-size: 11px;
-    color: var(--vscode-descriptionForeground);
+    font-size: var(--chat-font-sm);
+    color: var(--chat-text-secondary);
     font-weight: 400;
     font-variant-numeric: tabular-nums;
     min-width: 35px;
@@ -614,9 +568,9 @@
 
 /* 分隔符样式 */
 .bottom-separator {
-    color: var(--vscode-descriptionForeground);
+    color: var(--chat-text-secondary);
     opacity: 0.4;
-    font-size: 11px;
+    font-size: var(--chat-font-sm);
     user-select: none;
 }
 
@@ -632,24 +586,24 @@
     align-items: center;
     gap: 4px;
     padding: 2px 6px;
-    background: rgba(128, 128, 128, 0.15);
+    background: var(--chat-bg-hover);
     border: none;
     border-radius: 4px;
-    font-size: 11px;
-    color: var(--vscode-descriptionForeground);
+    font-size: var(--chat-font-sm);
+    color: var(--chat-text-secondary);
     cursor: pointer;
     transition: all 0.15s;
 }
 
 /* Agent 模式按钮 - 根据当前模式设置颜色 */
 .agent-mode-btn.mode-agent {
-    background: rgba(128, 128, 128, 0.15);
-    color: var(--vscode-descriptionForeground);
+    background: var(--chat-bg-hover);
+    color: var(--chat-text-secondary);
 }
 
 .agent-mode-btn.mode-plan {
-    background: rgba(255, 186, 73, 0.2);
-    color: #ffba49;
+    background: var(--chat-color-warning-bg);
+    color: var(--chat-color-warning);
 }
 
 .agent-mode-btn:hover {
@@ -674,17 +628,6 @@
     stroke: currentColor;
 }
 
-/* Agent 模式文本 */
-.agent-mode-text {
-    font-size: 11px;
-    color: var(--vscode-descriptionForeground);
-    transition: color 0.15s;
-}
-
-.agent-mode-btn:hover .agent-mode-text {
-    color: var(--vscode-foreground);
-}
-
 /* Agent 模式菜单弹窗 */
 .agent-mode-menu-popup {
     position: absolute;
@@ -693,10 +636,10 @@
     min-width: 100px;
     max-width: 160px;
     width: max-content;
-    background: var(--vscode-sideBar-background);
-    border: 1px solid var(--vscode-panel-border, rgba(128, 128, 128, 0.35));
+    background: var(--chat-bg-primary);
+    border: 1px solid var(--chat-border);
     border-radius: 4px;
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+    box-shadow: var(--chat-shadow-lg);
     overflow: hidden;
     z-index: 1000;
     animation: fadeIn 0.15s ease-out;
@@ -709,14 +652,14 @@
     justify-content: space-between;
     gap: 10px;
     padding: 6px 10px;
-    font-size: 12px;
-    color: var(--vscode-foreground);
+    font-size: var(--chat-font-base);
+    color: var(--chat-text-primary);
     cursor: pointer;
     transition: background 0.15s;
 }
 
 .agent-mode-menu-item:hover {
-    background: rgba(128, 128, 128, 0.15);
+    background: var(--chat-bg-hover);
 }
 
 /* 当前 Agent 模式项 */
@@ -725,7 +668,7 @@
 }
 
 .agent-mode-menu-item.agent-mode-current:hover {
-    background: rgba(128, 128, 128, 0.08);
+    background: var(--chat-bg-hover);
 }
 
 /* Agent 模式菜单文本 */
@@ -734,37 +677,6 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-}
-
-/* Agent 模式检查图标 */
-.agent-mode-check-icon {
-    width: 14px;
-    height: 14px;
-    flex-shrink: 0;
-    color: #4ec9b0;
-}
-
-/* Agent 模式标签样式 */
-.mode-badge {
-    font-size: 10px;
-    padding: 2px 6px;
-    border-radius: 4px;
-    font-weight: 500;
-}
-
-.mode-agent {
-    background: rgba(78, 201, 176, 0.2);
-    color: #4ec9b0;
-}
-
-.mode-ask {
-    background: rgba(255, 186, 73, 0.2);
-    color: #ffba49;
-}
-
-.mode-plan {
-    background: rgba(149, 117, 255, 0.2);
-    color: #9575ff;
 }
 
 /* 模型信息容器 */
@@ -781,8 +693,8 @@
     padding: 4px 0;
     background: transparent;
     border: none;
-    color: var(--vscode-descriptionForeground);
-    font-size: 11px;
+    color: var(--chat-text-secondary);
+    font-size: var(--chat-font-sm);
     cursor: pointer;
     transition: color 0.15s;
     max-width: min(200px, calc(100vw - 120px));
@@ -791,7 +703,7 @@
 }
 
 .model-info-btn:hover {
-    color: var(--vscode-foreground);
+    color: var(--chat-text-primary);
 }
 
 .model-info-btn:disabled {
@@ -800,7 +712,7 @@
 }
 
 .model-info-btn:disabled:hover {
-    color: var(--vscode-descriptionForeground);
+    color: var(--chat-text-secondary);
 }
 
 /* 模型按钮内的图标 */
@@ -818,13 +730,13 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    font-size: 11px;
-    color: var(--vscode-descriptionForeground);
+    font-size: var(--chat-font-sm);
+    color: var(--chat-text-secondary);
     transition: color 0.15s;
 }
 
 .model-info-btn:hover .model-name-text {
-    color: var(--vscode-foreground);
+    color: var(--chat-text-primary);
 }
 
 /* 模型菜单下拉图标 */
@@ -832,12 +744,12 @@
     width: 12px;
     height: 12px;
     flex-shrink: 0;
-    color: var(--vscode-descriptionForeground);
+    color: var(--chat-text-secondary);
     transition: color 0.15s;
 }
 
 .model-info-btn:hover .model-chevron {
-    color: var(--vscode-foreground);
+    color: var(--chat-text-primary);
 }
 
 /* 模型菜单弹窗 */
@@ -849,10 +761,10 @@
     min-width: 180px;
     max-width: min(320px, calc(100vw - 20px));
     width: max-content;
-    background: var(--vscode-sideBar-background);
-    border: 1px solid var(--vscode-panel-border, rgba(128, 128, 128, 0.35));
+    background: var(--chat-bg-primary);
+    border: 1px solid var(--chat-border);
     border-radius: 4px;
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+    box-shadow: var(--chat-shadow-lg);
     overflow: hidden;
     z-index: 1000;
     animation: fadeIn 0.15s ease-out;
@@ -886,8 +798,8 @@
     justify-content: space-between;
     gap: 10px;
     padding: 6px 10px;
-    font-size: 12px;
-    color: var(--vscode-foreground);
+    font-size: var(--chat-font-base);
+    color: var(--chat-text-primary);
     cursor: pointer;
     transition: background 0.15s;
     min-width: 0;
@@ -898,12 +810,12 @@
     .model-menu-item {
         padding: 6px 8px;
         gap: 6px;
-        font-size: 11px;
+        font-size: var(--chat-font-sm);
     }
 }
 
 .model-menu-item:hover {
-    background: rgba(128, 128, 128, 0.15);
+    background: var(--chat-bg-hover);
 }
 
 /* 当前模型项 */
@@ -912,7 +824,7 @@
 }
 
 .model-menu-item.model-current:hover {
-    background: rgba(128, 128, 128, 0.08);
+    background: var(--chat-bg-hover);
 }
 
 /* 模型菜单文本 */
@@ -929,21 +841,21 @@
     width: 14px;
     height: 14px;
     flex-shrink: 0;
-    color: #4ec9b0;
+    color: var(--chat-color-success);
 }
 
 /* 模型菜单分隔线 */
 .model-menu-divider {
     height: 1px;
-    background: var(--vscode-panel-border, rgba(128, 128, 128, 0.35));
+    background: var(--chat-border);
     margin: 0;
 }
 
 /* Light主题下的input组件背景 */
 .vscode-light .input-box-wrapper {
-    background-color: #ffffff;
+    background-color: var(--chat-bg-light);
 }
 
 .vscode-light .input-textarea {
-    background-color: #ffffff;
+    background-color: var(--chat-bg-light);
 }

@@ -1,36 +1,11 @@
-/* CSS 变量定义 */
-:root {
-    --diff-added-color: #4ec9b0;
-    --diff-removed-color: #f48771;
-    --diff-cell-info-color: #dcdcaa;
-    --code-line-number-color: #858585;
-    --code-action-btn-color: #808080;
-    --code-action-btn-hover-bg: rgba(128, 128, 128, 0.15);
-    --code-action-btn-active-bg: rgba(128, 128, 128, 0.25);
-}
+/* CSS 变量已迁移到 tokens.css */
 
-/* Edit Block 样式 */
-.edit-block {
-    margin: 5px;
-    border: 1px solid var(--vscode-panel-border);
-    border-radius: 3px;
-    overflow: hidden;
-    width: 100%;
-    max-width: calc(100% - 10px); /* 减去左右margin的空间 */
-    box-sizing: border-box;
-}
+/* Edit Block 样式 — 容器继承 .chat-block */
 
 /* 头部样式 */
 .edit-block-header {
-    display: flex;
-    align-items: center;
-    padding: 3px 8px;
-    background-color: transparent;
     cursor: pointer;
-    min-height: 22px;
-    width: 100%;
-    box-sizing: border-box;
-    gap: 4px;
+    gap: var(--chat-spacing-xs);
 }
 
 /* 左侧可点击区域 - 打开文件 */
@@ -38,8 +13,8 @@
     display: flex;
     align-items: center;
     gap: 4px;
-    font-size: 12px;
-    color: var(--vscode-editor-foreground);
+    font-size: var(--chat-font-base);
+    color: var(--chat-text-editor);
     cursor: pointer;
     flex-shrink: 0;
     overflow: hidden;
@@ -57,7 +32,7 @@
 
 /* 文件名样式 */
 .edit-title-left .file-name {
-    font-size: 12px;
+    font-size: var(--chat-font-base);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -70,19 +45,19 @@
     display: flex;
     align-items: center;
     gap: 4px;
-    font-size: 12px;
+    font-size: var(--chat-font-base);
     font-weight: 500;
     flex-shrink: 0;
 }
 
 .edit-stats .additions {
-    color: var(--diff-added-color);
+    color: var(--chat-color-success);
 }
 
 .edit-stats .removals {
-    color: var(--diff-removed-color);
+    color: var(--chat-color-error);
     font-weight: 500;
-    font-size: 12px;
+    font-size: var(--chat-font-base);
 }
 
 /* 折叠按钮 - 在增减号右侧，悬浮时显示 */
@@ -92,7 +67,7 @@
     justify-content: center;
     width: 20px;
     height: 20px;
-    color: var(--code-action-btn-color);
+    color: var(--chat-color-muted);
     flex-shrink: 0;
     opacity: 0;
     transition: opacity 0.15s;
@@ -119,9 +94,9 @@
     background-color: transparent;
     border: none;
     border-radius: 2px;
-    color: var(--code-action-btn-color);
+    color: var(--chat-color-muted);
     cursor: pointer;
-    font-size: 11px;
+    font-size: var(--chat-font-sm);
     transition: all 0.15s;
     flex-shrink: 0;
     white-space: nowrap;
@@ -133,20 +108,18 @@
 }
 
 .edit-copy-btn:hover {
-    background-color: var(--code-action-btn-hover-bg);
-    color: #a0a0a0;
+    background-color: var(--chat-bg-hover);
+    color: var(--chat-color-muted-hover);
 }
 
 .edit-copy-btn:active {
-    background-color: var(--code-action-btn-active-bg);
+    background-color: var(--chat-bg-active);
 }
 
 .cell-info {
-    color: var(--diff-cell-info-color);
+    color: var(--chat-color-warning);
     font-weight: 500;
 }
-
-/* 操作按钮容器 - 已移除，不再使用 */
 
 /* 切换图标动画 */
 .toggle-icon {
@@ -157,147 +130,21 @@
     transform: rotate(90deg);
 }
 
-/* 旧的操作按钮样式 - 已移除，不再使用 */
-
-
-/* Edit Block 内容区域 */
-.edit-block-content {
-    background-color: var(--vscode-sideBar-background);
-    padding: 6px 8px;
-    overflow-x: auto;
-    width: 100%;
-    max-width: 100%;
-    box-sizing: border-box;
-}
-
-.edit-code {
-    line-height: 1.3;
-    width: 100%;
-    max-width: 100%;
-}
-
-.edit-line {
-    display: flex;
-    align-items: flex-start;
-    white-space: pre-wrap;
-    word-wrap: break-word;
-    word-break: break-word;
-    overflow-wrap: break-word;
-    min-height: 14px;
-    width: 100%;
-    max-width: 100%;
-}
-
-.edit-line .line-number {
-    color: var(--code-line-number-color);
-    margin-right: 12px;
-    flex-shrink: 0;
-    text-align: right;
-    min-width: 28px;
-    user-select: none;
-}
-
-.edit-line .line-content {
-    flex: 1;
-    color: var(--vscode-foreground);
-    white-space: pre-wrap;
-    word-wrap: break-word;
-    word-break: break-word;
-    overflow-wrap: break-word;
-    min-width: 0;
-    overflow: hidden;
-}
-
-.edit-line.add .line-content {
-    background-color: var(--vscode-diffEditor-insertedTextBackground);
-}
-
-.edit-line.remove .line-content {
-    background-color: var(--vscode-diffEditor-removedTextBackground);
-}
-
-/* 差异标记样式 */
-.edit-line .diff-marker {
-    display: inline-block;
-    width: 14px;
-    text-align: center;
-    flex-shrink: 0;
-    font-weight: 500;
-    font-size: 12px;
-    color: rgba(255, 255, 255, 0.6);
-}
-
-/* 代码文本样式 */
-.edit-line .code-text {
-    white-space: pre-wrap;
-    word-wrap: break-word;
-    word-break: break-word;
-    overflow-wrap: break-word;
-    tab-size: 4;
-    flex: 1;
-    color: var(--vscode-foreground);
-}
-
-.edit-block-content::-webkit-scrollbar {
-    height: 8px;
-}
-
-.edit-block-content::-webkit-scrollbar-thumb {
-    background-color: var(--vscode-scrollbarSlider-background);
-    border-radius: 4px;
-}
-
-.edit-block-content::-webkit-scrollbar-thumb:hover {
-    background-color: var(--vscode-scrollbarSlider-hoverBackground);
-}
-
-/* Read Block 样式 */
-.read-block {
-    margin: 8px;
-    border-radius: 3px;
-    overflow: hidden;
-    width: 500px;
-    max-width: calc(100% - 16px); /* 减去左右margin的空间 */
-}
+/* Read Block 样式 — 容器继承 .chat-block--borderless */
 
 .read-block-header {
     cursor: pointer;
-    display: flex;
-    align-items: center;
-    background-color: transparent;
-    min-height: 22px;
+    gap: var(--chat-spacing-sm);
     transition: opacity 0.15s;
-    gap: 6px;
-    overflow: hidden;
 }
 
 .read-block-header:hover .read-file-name {
-    color: #65a9f3;
+    color: var(--chat-text-link);
     opacity: 1;
 }
 
-.read-title {
-    font-size: 12px;
-    color: var(--code-action-btn-color);
-    flex-shrink: 0;
-}
-
-.read-content-wrapper {
-    flex: 1;
-    min-width: 0; /* 关键：允许内容收缩 */
-    overflow: hidden;
-}
-
 .read-file-name {
-    font-size: 12px;
-    color: var(--code-action-btn-color);
-    opacity: 0.7;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
     transition: color 0.2s, opacity 0.2s;
-    display: block;
-    width: 100%;
 }
 
 /* UpdateCodeDiff 样式 */
@@ -307,9 +154,9 @@
     display: flex;
     flex-direction: column;
     overflow: hidden;
-    background-color: var(--vscode-editor-background);
+    background-color: var(--chat-bg-editor);
     font-family: var(--vscode-editor-font-family, 'Menlo', 'Monaco', 'Courier New', monospace);
-    font-size: 12px;
+    font-size: var(--chat-font-base);
     line-height: 16px;
 }
 
@@ -320,18 +167,6 @@
     min-height: 0;
 }
 
-.update-code-diff-scroll::-webkit-scrollbar {
-    width: 8px;
-}
-
-.update-code-diff-scroll::-webkit-scrollbar-thumb {
-    background-color: var(--vscode-scrollbarSlider-background);
-    border-radius: 4px;
-}
-
-.update-code-diff-scroll::-webkit-scrollbar-thumb:hover {
-    background-color: var(--vscode-scrollbarSlider-hoverBackground);
-}
 
 .update-code-diff table {
     width: 100%;
@@ -357,17 +192,17 @@
 
 /* 行样式 */
 .diff-row-separator {
-    background-color: var(--vscode-editorGutter-background, var(--vscode-editor-background));
+    background-color: var(--vscode-editorGutter-background, var(--chat-bg-editor));
 }
 
 .diff-row-separator td:nth-child(1) {
-    background-color: var(--vscode-editorGutter-background, var(--vscode-editor-background));
+    background-color: var(--vscode-editorGutter-background, var(--chat-bg-editor));
     border-right: 1px solid var(--vscode-editorGroup-border, transparent);
 }
 
 .diff-row-separator td:nth-child(2) {
-    background-color: var(--vscode-editorGutter-background, var(--vscode-editor-background));
-    border-right: 1px solid var(--vscode-panel-border, transparent);
+    background-color: var(--vscode-editorGutter-background, var(--chat-bg-editor));
+    border-right: 1px solid var(--chat-border, transparent);
 }
 
 .diff-row-separator td:nth-child(3) {
@@ -390,30 +225,30 @@
 }
 
 .diff-row-meta {
-    background-color: var(--vscode-editor-background);
-    color: var(--vscode-descriptionForeground, #858585);
+    background-color: var(--chat-bg-editor);
+    color: var(--chat-text-secondary);
 }
 
 .diff-row-meta td {
     padding: 4px 16px;
     font-style: italic;
-    font-size: 10px;
+    font-size: var(--chat-font-xs);
     opacity: 0.7;
-    border-top: 1px solid var(--vscode-panel-border, #333);
+    border-top: 1px solid var(--chat-border);
 }
 
 .diff-row-added {
-    background-color: var(--vscode-diffEditor-insertedLineBackground, rgba(46, 160, 67, 0.15));
+    background-color: var(--vscode-diffEditor-insertedLineBackground, var(--chat-diff-added-bg));
 }
 
 .diff-row-added .diff-line-number,
 .diff-row-removed .diff-line-number {
-    color: var(--vscode-editor-foreground);
+    color: var(--chat-text-editor);
     opacity: 0.7;
 }
 
 .diff-row-removed {
-    background-color: var(--vscode-diffEditor-removedLineBackground, rgba(248, 81, 73, 0.15));
+    background-color: var(--vscode-diffEditor-removedLineBackground, var(--chat-diff-removed-bg));
 }
 
 /* 单元格样式 */
@@ -421,7 +256,7 @@
     user-select: none;
     text-align: right;
     padding-right: 0;
-    color: #858585;
+    color: var(--chat-color-muted);
     vertical-align: top;
     opacity: 0.7;
     font-weight: 100;
@@ -432,7 +267,7 @@
     user-select: none;
     text-align: center;
     padding: 0;
-    color: #858585;
+    color: var(--chat-color-muted);
     vertical-align: top;
     opacity: 0.7;
     font-weight: 100;
@@ -443,7 +278,7 @@
     white-space: pre-wrap;
     word-break: break-all;
     padding-left: 8px;
-    color: var(--vscode-editor-foreground);
+    color: var(--chat-text-editor);
     vertical-align: top;
 }
 
@@ -455,10 +290,3 @@
     padding-bottom: 2px;
 }
 
-.diff-highlight-removed {
-    background-color: var(--vscode-diffEditor-removedTextBackground, rgba(255, 0, 0, 0.3));
-}
-
-.diff-highlight-added {
-    background-color: var(--vscode-diffEditor-insertedTextBackground, rgba(0, 200, 80, 0.3));
-}

@@ -67,11 +67,11 @@ const ReadBlock: React.FC<ReadBlockProps> = React.memo(({ content, vscode }) => 
     const lineRange = getLineRange();
 
     return (
-        <div className="read-block">
-            <div className="read-block-header" onClick={handleOpenFile}>
-                <span className="read-title">Read</span>
-                <div className="read-content-wrapper">
-                    <span className="read-file-name" title={finalFileName + lineRange}>
+        <div className="chat-block chat-block--borderless read-block">
+            <div className="chat-block-header read-block-header" onClick={handleOpenFile}>
+                <div className="chat-block-title">
+                    <span className="chat-block-title-label">Read</span>
+                    <span className="chat-block-title-detail read-file-name" title={finalFileName + lineRange}>
                         {displayFileName}{lineRange}
                     </span>
                 </div>

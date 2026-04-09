@@ -1,5 +1,8 @@
 import { createRoot } from 'react-dom/client';
 import App from './App';
+import './style/tokens.css';
+import './style/highlight.css';
+import './style/blocks.css';
 import './style/styles.css';
 import './style/input.css';
 import './style/tools.css';

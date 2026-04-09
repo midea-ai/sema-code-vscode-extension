@@ -14,7 +14,7 @@ const ModelConfigReminder: React.FC<ModelConfigReminderProps> = ({
     if (!message) return null;
 
     return (
-        <div className="model-config-reminder">
+        <div className="chat-block model-config-reminder">
             <div className="model-config-reminder-content">
                 <div className="model-config-reminder-icon">⚠️</div>
                 <div className="model-config-reminder-text">{message}</div>

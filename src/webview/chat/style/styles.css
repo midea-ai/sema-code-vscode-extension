@@ -10,7 +10,7 @@
 }
 
 *:focus-visible {
-    outline: 1px solid var(--vscode-focusBorder);
+    outline: 1px solid var(--chat-border-focus);
     outline-offset: -1px;
 }
 
@@ -27,15 +27,15 @@ input:focus,
 textarea:focus,
 select:focus {
     outline: none;
-    border-color: var(--vscode-focusBorder);
+    border-color: var(--chat-border-focus);
 }
 
 body {
     /* 使用 VSCode 默认 UI 字体（非等宽） */
     font-family: var(--vscode-font-family);
-    font-size: var(--vscode-font-size);
-    color: var(--vscode-foreground);
-    background-color: var(--vscode-sideBar-background);
+    font-size: var(--chat-font-base);
+    color: var(--chat-text-primary);
+    background-color: var(--chat-bg-primary);
     height: 100vh;
     display: flex;
     flex-direction: column;
@@ -52,11 +52,26 @@ code, pre, .code {
     font-family: var(--vscode-editor-font-family);
 }
 
+/* 全局统一滚动条样式 */
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+::-webkit-scrollbar-thumb {
+    background-color: var(--chat-scrollbar);
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background-color: var(--chat-scrollbar-hover);
+}
+
 /* 统一的图标按钮样式 */
 .icon-btn {
     background: none;
     border: none;
-    color: var(--vscode-descriptionForeground);
+    color: var(--chat-text-secondary);
     cursor: pointer;
     padding: 2px;
     display: flex;
@@ -67,12 +82,12 @@ code, pre, .code {
 }
 
 .icon-btn:hover {
-    background-color: rgba(128, 128, 128, 0.15);
-    color: #a0a0a0;
+    background-color: var(--chat-bg-hover);
+    color: var(--chat-color-muted-hover);
 }
 
 .icon-btn:active {
-    background-color: rgba(128, 128, 128, 0.25);
+    background-color: var(--chat-bg-active);
 }
 
 .icon-btn svg {
@@ -93,25 +108,12 @@ code, pre, .code {
     overflow-y: auto;
     overflow-x: hidden;
     padding: 0 5px 5px 5px;
-    font-size: 12px;
+    font-size: var(--chat-font-base);
     line-height: 1.6;
     width: 100%;
     overflow-anchor: none;
 }
 
-#output-container::-webkit-scrollbar {
-    width: 8px;
-    height: 8px;
-}
-
-#output-container::-webkit-scrollbar-thumb {
-    background-color: var(--vscode-scrollbarSlider-background);
-    border-radius: 4px;
-}
-
-#output-container::-webkit-scrollbar-thumb:hover {
-    background-color: var(--vscode-scrollbarSlider-hoverBackground);
-}
 
 /* 消息包装层：让浏览器跳过视口外元素的 layout 和 paint，
    contain-intrinsic-size 作为未渲染时的占位高度估算 */
@@ -127,7 +129,7 @@ code, pre, .code {
 }
 
 .output-line.user-input {
-    color: var(--vscode-terminal-ansiGreen);
+    color: var(--chat-text-terminal-green);
     font-weight: 500;
     margin-top: 16px;
     margin-bottom: 12px;
@@ -138,10 +140,11 @@ code, pre, .code {
     display: flex;
     align-items: flex-start;
     padding: 8px 10px;
-    margin: 5px;
-    border: 1px solid var(--vscode-input-border, var(--vscode-contrastBorder, #555));
-    border-radius: 4px;
-    background-color: var(--vscode-sideBar-background);
+    margin: var(--chat-block-margin);
+    border: 1px solid var(--chat-border-input);
+    border-radius: var(--chat-radius-sm);
+    background-color: var(--chat-bg-primary);
+    max-width: var(--chat-block-max-width);
 
     /* 严格限制为3行，允许滚动 */
     line-height: 1.4;
@@ -161,26 +164,13 @@ code, pre, .code {
 }
 
 
-.user-input-block::-webkit-scrollbar {
-    width: 8px;
-}
-
-.user-input-block::-webkit-scrollbar-thumb {
-    background-color: var(--vscode-scrollbarSlider-background);
-    border-radius: 4px;
-}
-
-.user-input-block::-webkit-scrollbar-thumb:hover {
-    background-color: var(--vscode-scrollbarSlider-hoverBackground);
-}
-
 .user-input-content {
     flex: 1;
     width: 100%;
     min-width: 0;
-    color: var(--vscode-terminal-ansiGreen);
+    color: var(--chat-text-terminal-green);
     font-weight: 500;
-    font-size: 12px;
+    font-size: var(--chat-font-base);
     line-height: 1.5;
     white-space: pre-wrap;
     word-wrap: break-word;
@@ -194,13 +184,13 @@ code, pre, .code {
 
 /* 队列中待处理的用户输入 */
 .user-input-block.pending {
-    border: 1px dashed var(--vscode-input-border);
+    border: 1px dashed var(--chat-border-input);
     border-width: 0.6px;
     opacity: 0.6;
 }
 
 .user-input-content.pending {
-    color: var(--vscode-foreground);
+    color: var(--chat-text-primary);
     font-weight: 400;
 }
 
@@ -210,55 +200,29 @@ code, pre, .code {
     align-items: center;
     gap: 6px;
     padding: 4px 16px;
-    font-size: 12px;
-    color: var(--vscode-descriptionForeground);
+    font-size: var(--chat-font-base);
+    color: var(--chat-text-secondary);
     cursor: pointer;
     transition: background 0.15s;
     border-radius: 4px;
 }
 
 .running-tasks-bar:hover {
-    background: var(--vscode-list-hoverBackground);
-    color: var(--vscode-foreground);
+    background: var(--chat-bg-list-hover);
+    color: var(--chat-text-primary);
 }
 
 .running-task-dot {
     width: 6px;
     height: 6px;
     border-radius: 50%;
-    background: #4eabff;
+    background: var(--chat-text-link);
     flex-shrink: 0;
-    animation: task-dot-pulse 1.5s ease-in-out infinite;
-}
-
-@keyframes task-dot-pulse {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.4; }
+    animation: pulse 1.5s ease-in-out infinite;
 }
 
 .running-task-label {
     white-space: nowrap;
-}
-
-.task-end-dot {
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    flex-shrink: 0;
-    display: inline-block;
-    margin-top: 4px;
-}
-
-.task-end-dot--completed {
-    background: #4ec9a0;
-}
-
-.task-end-dot--failed {
-    background: #f48771;
-}
-
-.task-end-dot--stopped {
-    background: #cca700;
 }
 
 .user-input-block.clickable {
@@ -270,40 +234,41 @@ code, pre, .code {
     height: 200px;
     transition: height 0.2s ease;
     resize: none;
-    border: 1px solid var(--vscode-input-border);
-    background-color: var(--vscode-input-background);
-    color: var(--vscode-input-foreground);
+    border: 1px solid var(--chat-border-input);
+    background-color: var(--chat-bg-input);
+    color: var(--chat-text-input);
     padding: 8px;
     border-radius: 4px;
-    font-size: var(--vscode-font-size);
+    font-size: var(--chat-font-base);
     width: 100%;
     outline: none;
 }
 
 /* 补充信息信息样式 如文件引用、中断、压缩 */
 .supplementary-info {
-    margin-top: 5px;
+    margin-top: 1px;
     width: 100%;
 }
 
 .supplementary-info-item {
-    color: var(--vscode-descriptionForeground);
-    font-size: 12px;
+    color: var(--chat-text-secondary);
+    font-size: var(--chat-font-base);
     line-height: 1.3;
-    margin: 4px;
+    margin: 1px var(--chat-spacing-xs);
+    margin-left: 8px;
     opacity: 0.8;
 }
 
 .ai-resp-block {
     display: flex;
-    margin: 8px;
-    width: calc(100% - 16px);
-    max-width: calc(100% - 16px);
+    margin: var(--chat-block-margin);
+    width: var(--chat-block-max-width);
+    max-width: var(--chat-block-max-width);
     box-sizing: border-box;
 }
 
 .output-line.ai-response {
-    color: var(--vscode-terminal-ansiBrightCyan);
+    color: var(--chat-text-terminal-cyan);
 }
 
 .output-line.ai-response-content {
@@ -318,10 +283,28 @@ code, pre, .code {
     width: 100%;
     max-width: 100%;
     box-sizing: border-box;
+    padding-left: 8px;
+    position: relative;
+}
+
+/* Dot 状态色（全局复用） */
+.dot-success {
+    color: var(--chat-color-success) !important;
+}
+.dot-pending {
+    color: var(--chat-color-warning) !important;
+}
+.dot-error {
+    color: var(--chat-color-error) !important;
+}
+.dot-killed {
+    color: var(--chat-color-warning) !important;
 }
 
 /* AI响应内容样式优化 */
 .ai-response-content .response-indicator {
+    position: absolute;
+    left: -6px;
     flex-shrink: 0;
     line-height: 1.4;
     /* 确保与内容文本行高一致 */
@@ -345,7 +328,7 @@ code, pre, .code {
 }
 
 .ai-response-content .streaming-cursor {
-    /* color: var(--vscode-terminal-ansiBrightCyan); */
+    /* color: var(--chat-text-terminal-cyan); */
     animation: blink 1s infinite;
     line-height: 1.4;
 }
@@ -364,121 +347,23 @@ code, pre, .code {
 }
 
 .output-line.ai-response-block {
-    font-size: 12px;
-    color: rgb(110, 110, 110);
+    font-size: var(--chat-font-base);
+    color: var(--chat-color-muted);
     line-height: 0.9;
 }
 
-.temporary-line {
-    color: var(--vscode-descriptionForeground);
-    opacity: 0.7;
-    animation: fadeIn 0.2s;
-    white-space: pre;
-    /* 不自动换行，保持原始格式 */
-}
-
-@keyframes fadeIn {
-    from {
-        opacity: 0;
-    }
-
-    to {
-        opacity: 0.7;
-    }
-}
-
-
-.diff-del {
-    background-color: #4a1414;
-}
-
-.diff-add {
-    background-color: #143314;
-}
-
 .line-number {
-    color: #858585;
+    color: var(--chat-color-muted);
 }
-
-.code-edit {
-    font-size: 12px;
-    line-height: 0.95;
-}
-
-/* 覆盖 highlight.js 的默认样式以适配 VS Code 主题 */
-.hljs {
-    background: transparent !important;
-    padding: 0 !important;
-}
-
-/* 适配日间主题 */
-.vscode-light .hljs {
-    background: transparent !important;
-}
-
-/* 确保语法高亮在日间模式下更清晰可见 */
-.vscode-light .hljs-keyword,
-.vscode-light .hljs-selector-tag,
-.vscode-light .hljs-literal,
-.vscode-light .hljs-section,
-.vscode-light .hljs-link {
-    color: #0000ff !important;
-}
-
-.vscode-light .hljs-string,
-.vscode-light .hljs-title,
-.vscode-light .hljs-name,
-.vscode-light .hljs-attribute,
-.vscode-light .hljs-symbol,
-.vscode-light .hljs-bullet,
-.vscode-light .hljs-built_in,
-.vscode-light .hljs-addition,
-.vscode-light .hljs-template-tag,
-.vscode-light .hljs-template-variable {
-    color: #a31515 !important;
-}
-
-.vscode-light .hljs-comment,
-.vscode-light .hljs-quote,
-.vscode-light .hljs-deletion {
-    color: #008000 !important;
-}
-
-.vscode-light .hljs-meta {
-    color: #800000 !important;
-}
-
-.vscode-light .hljs-number,
-.vscode-light .hljs-regexp,
-.vscode-light .hljs-literal,
-.vscode-light .hljs-variable {
-    color: #098658 !important;
-}
-
-.vscode-light .hljs-type,
-.vscode-light .hljs-params,
-.vscode-light .hljs-class {
-    color: #267f99 !important;
-}
-
-.vscode-light .hljs-attr,
-.vscode-light .hljs-subst {
-    color: #1f377f !important;
-}
-
-.vscode-light .hljs-function {
-    color: #795e26 !important;
-}
-
 
 /* 对应的 CSS 样式 */
 .welcome-container {
-    background: var(--vscode-editor-background);
-    border: 1px solid var(--vscode-panel-border);
+    background: var(--chat-bg-editor);
+    border: 1px solid var(--chat-border);
     border-radius: 8px;
     margin: 12px 0;
     padding: 0;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    box-shadow: var(--chat-shadow);
 }
 
 .welcome-header {
@@ -486,24 +371,24 @@ code, pre, .code {
     align-items: center;
     gap: 8px;
     padding: 12px 16px;
-    background: var(--vscode-panel-sectionHeader-background);
-    border-bottom: 1px solid var(--vscode-panel-border);
+    background: var(--chat-bg-panel-header);
+    border-bottom: 1px solid var(--chat-border);
     border-radius: 8px 8px 0 0;
 }
 
 .welcome-icon {
-    font-size: 16px;
+    font-size: var(--chat-font-xl);
 }
 
 .welcome-title {
     font-weight: 600;
-    color: var(--vscode-foreground);
-    font-size: 14px;
+    color: var(--chat-text-primary);
+    font-size: var(--chat-font-lg);
 }
 
 .welcome-message {
-    font-size: 12px;
-    color: var(--vscode-descriptionForeground);
+    font-size: var(--chat-font-base);
+    color: var(--chat-text-secondary);
     padding: 16px;
     line-height: 1.5;
     max-height: 300px;
@@ -514,26 +399,21 @@ code, pre, .code {
     margin-bottom: 4px;
 }
 
-.version-text {
-    color: var(--vscode-textLink-foreground);
-    font-size: 13px;
-}
-
 .command-text {
-    color: var(--vscode-symbolIcon-variableForeground);
+    color: var(--chat-text-symbol);
 }
 
 .welcome-footer {
     padding: 8px 16px;
-    background: var(--vscode-panel-sectionHeader-background);
-    border-top: 1px solid var(--vscode-panel-border);
+    background: var(--chat-bg-panel-header);
+    border-top: 1px solid var(--chat-border);
     border-radius: 0 0 8px 8px;
     text-align: center;
 }
 
 .hint-text {
-    font-size: 11px;
-    color: var(--vscode-descriptionForeground);
+    font-size: var(--chat-font-sm);
+    color: var(--chat-text-secondary);
     opacity: 0.8;
     font-style: italic;
 }
@@ -547,7 +427,7 @@ code, pre, .code {
 }
 
 .welcome-intro-text {
-    color: var(--vscode-foreground);
+    color: var(--chat-text-primary);
 }
 
 .welcome-version-badge img {
@@ -555,19 +435,6 @@ code, pre, .code {
     display: block;
 }
 
-/* 滚动条样式 */
-.welcome-message::-webkit-scrollbar {
-    width: 6px;
-}
-
-.welcome-message::-webkit-scrollbar-track {
-    background: var(--vscode-scrollbarSlider-background);
-}
-
-.welcome-message::-webkit-scrollbar-thumb {
-    background: var(--vscode-scrollbarSlider-hoverBackground);
-    border-radius: 3px;
-}
 
 
 
@@ -575,8 +442,8 @@ code, pre, .code {
 
 /* Todos Panel 样式 */
 .todos-panel {
-    border-top: 1px solid var(--vscode-panel-border);
-    background-color: var(--vscode-sideBar-background);
+    border-top: 1px solid var(--chat-border);
+    background-color: var(--chat-bg-primary);
     position: relative;
     overflow: visible;
 }
@@ -592,24 +459,12 @@ code, pre, .code {
 }
 
 .todos-panel-header:hover {
-    background-color: rgba(255, 255, 255, 0.03);
-}
-
-.todos-toggle-btn {
-    background: none;
-    border: none;
-    padding: 0;
-    margin: 0;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: currentColor;
+    background-color: var(--chat-bg-hover);
 }
 
 .todos-panel-title {
-    font-size: 12px;
-    color: #808080;
+    font-size: var(--chat-font-base);
+    color: var(--chat-color-muted);
     font-weight: 500;
 }
 
@@ -619,18 +474,6 @@ code, pre, .code {
     padding: 4px 12px 8px 12px;
 }
 
-.todos-panel-content::-webkit-scrollbar {
-    width: 8px;
-}
-
-.todos-panel-content::-webkit-scrollbar-thumb {
-    background-color: var(--vscode-scrollbarSlider-background);
-    border-radius: 4px;
-}
-
-.todos-panel-content::-webkit-scrollbar-thumb:hover {
-    background-color: var(--vscode-scrollbarSlider-hoverBackground);
-}
 
 .todo-panel-item {
     display: flex;
@@ -640,27 +483,27 @@ code, pre, .code {
 }
 
 .todo-panel-circle {
-    font-size: 10px;
+    font-size: var(--chat-font-xs);
     line-height: 1.5;
     flex-shrink: 0;
     margin-top: 1px;
 }
 
 .todo-panel-circle.completed {
-    color: #4ec9b0;
+    color: var(--chat-color-success);
 }
 
 .todo-panel-text {
-    font-size: 12px;
-    color: var(--vscode-foreground);
+    font-size: var(--chat-font-base);
+    color: var(--chat-text-primary);
     line-height: 1.5;
     word-break: break-word;
 }
 
 /* File Changes Panel 样式 */
 .file-changes-panel {
-    border-top: 1px solid var(--vscode-panel-border);
-    background-color: var(--vscode-sideBar-background);
+    border-top: 1px solid var(--chat-border);
+    background-color: var(--chat-bg-primary);
 }
 
 .file-changes-header {
@@ -687,7 +530,7 @@ code, pre, .code {
 }
 
 .file-changes-header-left:hover {
-    background-color: rgba(255, 255, 255, 0.03);
+    background-color: var(--chat-bg-hover);
 }
 
 /* 文件变更操作按钮样式 */
@@ -696,7 +539,7 @@ code, pre, .code {
     align-items: center;
     gap: 4px;
     padding: 4px 8px;
-    font-size: 12px;
+    font-size: var(--chat-font-base);
     border: none;
     background: none;
     cursor: pointer;
@@ -706,15 +549,15 @@ code, pre, .code {
 }
 
 .file-changes-action-btn.discard-btn {
-    color: var(--vscode-descriptionForeground);
+    color: var(--chat-text-secondary);
 }
 
 .file-changes-action-btn.adopted-btn {
-    color: var(--vscode-foreground);
+    color: var(--chat-text-primary);
 }
 
 .file-changes-action-btn.discard-btn:hover {
-    background-color: rgba(255, 255, 255, 0.1);
+    background-color: var(--chat-bg-hover);
 }
 
 .file-changes-action-btn svg {
@@ -722,9 +565,9 @@ code, pre, .code {
 }
 
 .file-changes-title {
-    font-size: 12px;
+    font-size: var(--chat-font-base);
     font-weight: 500;
-    color: #808080;
+    color: var(--chat-color-muted);
 }
 
 .file-changes-content {
@@ -738,18 +581,6 @@ code, pre, .code {
     width: 100%;
 }
 
-.file-changes-content::-webkit-scrollbar {
-    width: 8px;
-}
-
-.file-changes-content::-webkit-scrollbar-thumb {
-    background-color: var(--vscode-scrollbarSlider-background);
-    border-radius: 4px;
-}
-
-.file-changes-content::-webkit-scrollbar-thumb:hover {
-    background-color: var(--vscode-scrollbarSlider-hoverBackground);
-}
 
 .file-change-item {
     display: flex;
@@ -763,34 +594,20 @@ code, pre, .code {
 }
 
 .file-change-item:hover {
-    background-color: rgba(255, 255, 255, 0.05);
+    background-color: var(--chat-bg-hover);
 }
 
 .file-change-left {
     display: flex;
     align-items: center;
-    gap: 10px;
-    /* 保持原有的gap值 */
-    flex: 1;
-    min-width: 0;
-}
-
-/* 专门调整图标和文件名之间的间距 */
-.file-change-left> :first-child {
-    margin-right: -9px;
-    /* 使用负边距来减小间隙 */
-}
-
-.file-change-info {
-    display: flex;
-    flex-direction: column;
+    gap: 4px;
     flex: 1;
     min-width: 0;
 }
 
 .file-change-fullpath {
-    font-size: 10px;
-    color: var(--vscode-descriptionForeground);
+    font-size: var(--chat-font-xs);
+    color: var(--chat-text-secondary);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -807,8 +624,8 @@ code, pre, .code {
 }
 
 .file-change-name {
-    font-size: 12px;
-    color: var(--vscode-foreground);
+    font-size: var(--chat-font-base);
+    color: var(--chat-text-primary);
     white-space: nowrap;
     /* 添加这行防止折行 */
     overflow: hidden;
@@ -823,16 +640,16 @@ code, pre, .code {
     display: flex;
     align-items: center;
     gap: 6px;
-    font-size: 12px;
+    font-size: var(--chat-font-base);
     font-weight: 500;
 }
 
 .file-change-stats .additions {
-    color: #4ec9b0;
+    color: var(--chat-color-success);
 }
 
 .file-change-stats .removals {
-    color: #f48771
+    color: var(--chat-color-error);
 }
 
 .file-info {
@@ -862,8 +679,8 @@ code, pre, .code {
 }
 
 .file-full-path {
-    color: var(--vscode-descriptionForeground);
-    font-size: 0.9em;
+    color: var(--chat-text-secondary);
+    font-size: var(--chat-font-sm);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -872,19 +689,6 @@ code, pre, .code {
     text-align: right;
     min-width: 0;
 }
-
-.file-picker-item {
-    display: flex;
-    align-items: center;
-    gap: 2px;
-    padding: 6px 12px;
-    cursor: pointer;
-}
-
-.file-picker-item:hover {
-    background-color: var(--vscode-list-hoverBackground);
-}
-
 
 @keyframes tooltipFadeIn {
     from {
@@ -913,14 +717,14 @@ code, pre, .code {
     bottom: calc(100% + 6px);
     left: 50%;
     transform: translateX(-50%);
-    background-color: var(--vscode-editorHoverWidget-background);
-    border: 1px solid var(--vscode-editorHoverWidget-border);
-    color: var(--vscode-editorHoverWidget-foreground);
+    background-color: var(--chat-tooltip-bg);
+    border: 1px solid var(--chat-tooltip-border);
+    color: var(--chat-tooltip-fg);
     padding: 3px 6px;
     border-radius: 3px;
-    font-size: 10px;
+    font-size: var(--chat-font-xs);
     white-space: nowrap;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+    box-shadow: var(--chat-shadow);
     z-index: 1000;
     animation: tooltipFadeIn 0.15s ease-out;
     pointer-events: none;
@@ -942,14 +746,14 @@ code, pre, .code {
     display: flex;
     flex-direction: column;
     align-items: flex-start;
-    margin: 8px 5px;
-    padding: 8px 12px;
+    margin: var(--chat-block-margin);
+    padding: var(--chat-spacing-md) var(--chat-spacing-lg);
     width: 100%;
-    max-width: calc(100% - 10px); /* 减去左右margin的空间 */
+    max-width: var(--chat-block-max-width);
     box-sizing: border-box;
-    border-radius: 6px;
-    background: linear-gradient(135deg, rgba(255, 255, 255, 0.03) 0%, rgba(255, 255, 255, 0.01) 100%);
-    border: 1px solid rgba(128, 128, 128, 0.1);
+    border-radius: var(--chat-radius-md);
+    background: var(--chat-bg-hover);
+    border: 1px solid var(--chat-bg-hover);
     position: relative;
     overflow: hidden;
     min-height: 32px;
@@ -963,7 +767,7 @@ code, pre, .code {
     left: -100%;
     width: 100%;
     height: 100%;
-    background: linear-gradient(90deg, transparent, rgba(79, 192, 141, 0.1), transparent);
+    background: linear-gradient(90deg, transparent, var(--chat-spinner-shimmer), transparent);
     animation: shimmer 3s infinite;
 }
 
@@ -984,9 +788,9 @@ code, pre, .code {
 }
 
 .spinner-char {
-    font-size: 12px;
+    font-size: var(--chat-font-base);
     font-weight: 600;
-    color: var(--vscode-textLink-foreground);
+    color: var(--chat-spinner-accent);
     animation: spinnerGlow 2s ease-in-out infinite alternate;
     flex-shrink: 0;
     width: 1em;
@@ -1002,8 +806,8 @@ code, pre, .code {
 }
 
 .spinner-message {
-    font-size: 12px;
-    color: var(--vscode-descriptionForeground);
+    font-size: var(--chat-font-base);
+    color: var(--chat-text-secondary);
     flex: 0 1 auto;
     min-width: 0;
     max-width: max-content;
@@ -1013,13 +817,13 @@ code, pre, .code {
 }
 
 .spinner-message.custom-message {
-    color: #4fc08d;
+    color: var(--chat-color-spinner);
     font-weight: 500;
 }
 
 .spinner-time-info {
-    font-size: 12px;
-    color: var(--vscode-descriptionForeground);
+    font-size: var(--chat-font-base);
+    color: var(--chat-text-secondary);
     font-variant-numeric: tabular-nums;
     opacity: 0.8;
     flex-shrink: 0;
@@ -1062,8 +866,8 @@ code, pre, .code {
 .spinner-next-progress {
     margin-top: 4px;
     margin-left: 26px;
-    font-size: 10px;
-    color: var(--vscode-descriptionForeground);
+    font-size: var(--chat-font-xs);
+    color: var(--chat-text-secondary);
     font-variant-numeric: tabular-nums;
     opacity: 0.8;
     white-space: nowrap;
@@ -1074,47 +878,21 @@ code, pre, .code {
     z-index: 1;
 }
 
-/* 暗色主题 */
-.vscode-dark .processing-spinner {
-    background: linear-gradient(135deg, rgba(255, 255, 255, 0.04) 0%, rgba(255, 255, 255, 0.01) 100%);
-    border-color: rgba(128, 128, 128, 0.15);
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
-}
-
-.vscode-dark .spinner-char {
-    color: #4fc08d;
-    text-shadow: 0 0 6px rgba(79, 192, 141, 0.4);
-}
-
-.vscode-dark .processing-spinner::before {
-    background: linear-gradient(90deg, transparent, rgba(79, 192, 141, 0.15), transparent);
-}
-
 /* 亮色主题 */
 .vscode-light .processing-spinner {
-    background: linear-gradient(135deg, rgba(0, 0, 0, 0.03) 0%, rgba(0, 0, 0, 0.01) 100%);
-    border: 1px solid rgba(128, 128, 128, 0.2);
-    border-left: 3px solid var(--vscode-textLink-foreground);
-    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
-}
-
-.vscode-light .spinner-char {
-    text-shadow: 0 0 2px rgba(0, 123, 255, 0.3);
+    background: linear-gradient(135deg, #f5f7fa, #eef2f9);
+    border-color: rgba(36, 95, 184, 0.12);
 }
 
 .vscode-light .spinner-message {
-    color: var(--vscode-foreground);
-}
-
-.vscode-light .processing-spinner::before {
-    background: linear-gradient(90deg, transparent, rgba(0, 123, 255, 0.1), transparent);
+    color: var(--chat-text-primary);
 }
 
 /* 高对比度主题 */
 .vscode-high-contrast .processing-spinner {
-    border: 2px solid var(--vscode-foreground);
-    background: var(--vscode-editor-background);
-    box-shadow: 0 0 0 1px var(--vscode-focusBorder);
+    border: 2px solid var(--chat-text-primary);
+    background: var(--chat-bg-editor);
+    box-shadow: 0 0 0 1px var(--chat-border-focus);
 }
 
 .vscode-high-contrast .spinner-char {
@@ -1128,60 +906,58 @@ code, pre, .code {
 
 /* Light主题专用样式 - Chat页面白色背景 */
 .vscode-light body {
-    background-color: #ffffff;
+    background-color: var(--chat-bg-light);
 }
 
 .vscode-light #root {
-    background-color: #ffffff;
+    background-color: var(--chat-bg-light);
 }
 
 
 /* Light主题下的文件面板背景 */
 .vscode-light .file-changes-panel {
-    background-color: #ffffff;
+    background-color: var(--chat-bg-light);
 }
 
 .vscode-light .file-changes-content {
-    background-color: #ffffff;
+    background-color: var(--chat-bg-light);
 }
 
 /* Light主题下的todo面板背景 */
 .vscode-light .todos-panel {
-    background-color: #ffffff;
+    background-color: var(--chat-bg-light);
 }
 
 .vscode-light .todos-panel-content {
-    background-color: #ffffff;
+    background-color: var(--chat-bg-light);
 }
 
 /* ModelConfigReminder 组件样式 - 简化版 */
 .model-config-reminder {
-    background: var(--vscode-notifications-background);
-    border: 1px solid var(--vscode-notifications-border);
-    border-left: 4px solid var(--vscode-notificationsWarningIcon-foreground);
-    border-radius: 4px;
-    margin: 12px 0;
-    padding: 12px;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    background: var(--chat-notification-bg);
+    border-color: var(--chat-notification-border);
+    border-left: 4px solid var(--chat-notification-warning-icon);
+    padding: var(--chat-spacing-lg);
+    box-shadow: var(--chat-shadow);
 }
 
 .model-config-reminder-content {
     display: flex;
     align-items: flex-start;
-    gap: 12px;
+    gap: var(--chat-spacing-lg);
 }
 
 .model-config-reminder-icon {
-    color: var(--vscode-notificationsWarningIcon-foreground);
-    font-size: 16px;
+    color: var(--chat-notification-warning-icon);
+    font-size: var(--chat-font-xl);
     line-height: 1;
     margin-top: 1px;
 }
 
 .model-config-reminder-text {
     flex: 1;
-    font-size: 13px;
-    color: var(--vscode-notifications-foreground);
+    font-size: var(--chat-font-md);
+    color: var(--chat-notification-fg);
     line-height: 1.5;
     margin-bottom: 12px;
 }
@@ -1195,7 +971,7 @@ code, pre, .code {
 
 .model-config-reminder-button {
     padding: 4px 12px;
-    font-size: 12px;
+    font-size: var(--chat-font-base);
     border-radius: 3px;
     border: 1px solid transparent;
     cursor: pointer;
@@ -1203,20 +979,20 @@ code, pre, .code {
 }
 
 .model-config-reminder-button.primary {
-    background-color: var(--vscode-button-background);
-    color: var(--vscode-button-foreground);
+    background-color: var(--chat-bg-button);
+    color: var(--chat-text-button);
 }
 
 .model-config-reminder-button.primary:hover {
-    background-color: var(--vscode-button-hoverBackground);
+    background-color: var(--chat-bg-button-hover);
 }
 
 .model-config-reminder-button.secondary {
     background-color: transparent;
-    color: var(--vscode-foreground);
-    border-color: var(--vscode-contrastBorder);
+    color: var(--chat-text-primary);
+    border-color: var(--chat-border-contrast);
 }
 
 .model-config-reminder-button.secondary:hover {
-    background-color: rgba(128, 128, 128, 0.1);
+    background-color: var(--chat-bg-hover);
 }

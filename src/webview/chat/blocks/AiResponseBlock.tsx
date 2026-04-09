@@ -1,9 +1,9 @@
 // 简化的 AiResponseBlock - 只支持基本Markdown功能
 import React, { useEffect, useRef, useState, useMemo } from 'react';
 import { renderMarkdownToHtml, hasMarkdownFormatting } from '../utils/markdown';
-import { getResponseDot } from '../utils/permissionUtils';
+import { getResponseDot } from '../utils/symbols';
 import { streamingStore } from '../utils/StreamingStore';
-import '../utils/markdown.css';
+import '../style/markdown.css';
 
 interface AiResponseBlockProps {
     content: string;

@@ -62,7 +62,6 @@ export interface Message {
     id: string;
     type: 'user' | 'assistant' | 'tool' | 'system' | 'permission_request';
     content: any;
-    timestamp: number;
     toolName?: string;
     toolArgs?: any;
     reasoning?: string;  // 用于存储思考过程（thinking）
@@ -90,5 +89,5 @@ export interface ToolContent {
     title: string;
     summary?: string;
     content: string | DiffContent;  // 支持字符串（旧格式）或 DiffContent 对象（新格式）
-    completed?: boolean;  // undefined 表示旧数据，false 表示流式中间态，true 表示完成
+    completed?: boolean;  // false 表示流式中间态，undefined/true 表示完成
 }

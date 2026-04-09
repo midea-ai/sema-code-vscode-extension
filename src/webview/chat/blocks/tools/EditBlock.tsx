@@ -128,8 +128,8 @@ const EditBlock: React.FC<EditBlockProps> = React.memo(({
     }
 
     return (
-        <div className="edit-block">
-            <div className="edit-block-header" onClick={handleHeaderClick}>
+        <div className="chat-block edit-block">
+            <div className="chat-block-header edit-block-header" onClick={handleHeaderClick}>
                 <div className="edit-title-left" onClick={(e) => { e.stopPropagation(); handleShowDiff(e); }}>
                     <FileIcon
                         fileName={displayFileName}
@@ -151,7 +151,7 @@ const EditBlock: React.FC<EditBlockProps> = React.memo(({
                 </div>
             </div>
             {isExpanded && (
-                <div className="edit-block-content">
+                <div className="chat-block-content edit-block-content">
                     <UpdateCodeDiff
                         diffContent={diffContent}
                         language={language}

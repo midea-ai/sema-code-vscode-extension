@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { renderMarkdownToHtml, hasMarkdownFormatting } from '../../utils/markdown';
 import { ToggleIcon } from './IconButton';
-import '../../utils/markdown.css';
+import '../../style/markdown.css';
 
 interface PlanImplementPanelProps {
     planFilePath: string;
@@ -32,7 +32,7 @@ const PlanImplementPanel: React.FC<PlanImplementPanelProps> = ({
     const fileName = planFilePath.split('/').pop() || planFilePath;
 
     return (
-        <div className="plan-implement-panel">
+        <div className="chat-block bash-permission-block plan-implement-panel">
             <div className="plan-implement-content">
                 {/* 标题区域 */}
                 <div className="plan-implement-header">

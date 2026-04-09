@@ -404,7 +404,7 @@ const AskQuestionDialog: React.FC<AskQuestionDialogProps> = ({
     };
 
     return (
-        <div className="ask-question-dialog" ref={containerRef} tabIndex={0}>
+        <div className="chat-block bash-permission-block ask-question-dialog" ref={containerRef} tabIndex={0}>
             <div className="ask-question-content">
                 {/* 标签栏 */}
                 {isMultiPage && (
