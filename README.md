@@ -1,5 +1,9 @@
 ## 项目概述
 
+<p align="center">
+  <img src="https://raw.githubusercontent.com/midea-ai/sema-code-core/main/docs/images/semacode-logo.png" alt="Sema Code Core Logo" width="75%"/>
+</p>
+
 **Sema Code VSCode Extension** 是基于 [Sema Code Core](https://github.com/midea-ai/sema-code-core) 引擎的智能编程插件。
 
 <img src="https://raw.githubusercontent.com/midea-ai/sema-code-vscode-extension/main/imgs/sema.gif" alt="Sema Code VSCode Extension" />
