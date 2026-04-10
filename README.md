@@ -1,13 +1,17 @@
 <div align="center">
 
-<img src="https://raw.githubusercontent.com/midea-ai/sema-code-core/main/docs/images/semacode-logo.png" alt="Sema Code Core Logo" width="75%"/>
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/midea-ai/sema-code-core/main/docs/images/semacode-logo-dark.png">
+  <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/midea-ai/sema-code-core/main/docs/images/semacode-logo.png">
+  <img src="https://raw.githubusercontent.com/midea-ai/sema-code-core/main/docs/images/semacode-logo.png" alt="Sema Code Core Logo" width="75%"/>
+</picture>
 
 <h3>基于 Sema Code Core 的 VSCode 智能编程插件</h3>
 
 <p>为开发者提供开箱即用的 AI 编程体验</p>
 
 [![GitHub License](https://img.shields.io/github/license/midea-ai/sema-code-vscode-extension?style=flat-square)](https://github.com/midea-ai/sema-code-vscode-extension/blob/main/LICENSE)
-[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/midea-ai/sema-code-vscode-extension)
+[![Ask DeepWiki](https://img.shields.io/badge/Ask-DeepWiki-blue?style=flat-square)](https://deepwiki.com/midea-ai/sema-code-vscode-extension)
 [![GitHub Release](https://img.shields.io/github/v/release/midea-ai/sema-code-vscode-extension?style=flat-square)](https://github.com/midea-ai/sema-code-vscode-extension/releases)
 [![Sema Code Core](https://img.shields.io/badge/powered%20by-sema--code--core-blue?style=flat-square)](https://github.com/midea-ai/sema-code-core)
 
