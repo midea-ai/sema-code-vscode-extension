@@ -13,12 +13,14 @@ import { CommandConfig } from './types/command';
 export class ConfigWebviewProvider {
     private panel?: vscode.WebviewPanel;
     private coreManager: any;
+    private fileOperationManager: any;
     private mcpStatusHandler?: (data: any) => void;
     private taskWatcherMap: Map<string, () => void> = new Map();
     private pendingPage?: string;
 
-    constructor(coreManager: any) {
+    constructor(coreManager: any, fileOperationManager?: any) {
         this.coreManager = coreManager;
+        this.fileOperationManager = fileOperationManager;
     }
 
     public show(extensionUri: vscode.Uri, page?: string) {
@@ -100,6 +102,7 @@ export class ConfigWebviewProvider {
                 watchTask:                  () => this.watchTask(m.taskId),
                 unwatchTask:                () => Promise.resolve(this.unwatchTask(m.taskId)),
                 stopTask:                   () => this.stopTask(m.taskId),
+                openBashOutput:             () => this.openBashOutput(m.content, m.title, m.toolId),
                 openAgentDetail:            () => Promise.resolve(this.openAgentDetail(m.taskId)),
                 openFile:                   () => Promise.resolve(this.openFile(m.filePath)),
             };
@@ -774,6 +777,12 @@ export class ConfigWebviewProvider {
 
     private openAgentDetail(taskId: string): void {
         this.coreManager.openAgentDetail(taskId);
+    }
+
+    private async openBashOutput(content: string, title: string, toolId?: string) {
+        if (this.fileOperationManager) {
+            await this.fileOperationManager.openBashOutputAsDocument(content, title, toolId);
+        }
     }
 
     private openFile(filePath: string) {

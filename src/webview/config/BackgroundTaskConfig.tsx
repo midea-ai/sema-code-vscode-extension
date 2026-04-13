@@ -64,9 +64,10 @@ const RuntimeText: React.FC<{ start: number; end?: number; status: TaskStatus }>
     return <>{formatRuntime(start, end)}</>;
 };
 
-const BashOutputPanel: React.FC<{ taskId: string; status: TaskStatus; vscode: VscodeApi }> = ({ taskId, status, vscode }) => {
+const MAX_VISIBLE_LINES = 4;
+
+const BashOutputPanel: React.FC<{ taskId: string; command?: string; status: TaskStatus; vscode: VscodeApi }> = ({ taskId, command, status, vscode }) => {
     const [output, setOutput] = useState('');
-    const outputRef = useRef<HTMLPreElement>(null);
 
     useEffect(() => {
         setOutput('');
@@ -86,17 +87,39 @@ const BashOutputPanel: React.FC<{ taskId: string; status: TaskStatus; vscode: Vs
         };
     }, [taskId, vscode]);
 
-    useEffect(() => {
-        if (outputRef.current) {
-            outputRef.current.scrollTop = outputRef.current.scrollHeight;
-        }
-    }, [output]);
+    const handleViewAll = () => {
+        vscode.postMessage({
+            command: 'openBashOutput',
+            content: output,
+            title: command || taskId,
+            toolId: taskId
+        });
+    };
+
+    if (!output) {
+        return (
+            <div className="task-detail-output-section">
+                <div className="task-detail-output-label">Output:</div>
+                <pre className="task-detail-output">
+                    {status === 'running' ? 'Waiting for output...' : 'No output'}
+                </pre>
+            </div>
+        );
+    }
+
+    const contentLines = output.split('\n').filter(line => line.trim());
+    const totalLines = contentLines.length;
+    const visibleLines = totalLines > MAX_VISIBLE_LINES ? contentLines.slice(-MAX_VISIBLE_LINES) : contentLines;
+    const omittedCount = totalLines > MAX_VISIBLE_LINES ? totalLines - MAX_VISIBLE_LINES : 0;
 
     return (
         <div className="task-detail-output-section">
             <div className="task-detail-output-label">Output:</div>
-            <pre ref={outputRef} className="task-detail-output">
-                {output || (status === 'running' ? 'Waiting for output...' : 'No output')}
+            <pre className="task-detail-output">
+                {omittedCount > 0 && (
+                    <div className="bash-omitted-lines bash-omitted-lines-clickable" onClick={handleViewAll}>...省略了 {omittedCount} 行</div>
+                )}
+                {visibleLines.join('\n')}
             </pre>
         </div>
     );
@@ -279,7 +302,7 @@ const BackgroundTaskConfig: React.FC<BackgroundTaskConfigProps> = ({ vscode }) =
                     <span className="task-detail-command-value">{task.command || task.filepath}</span>
                 </div>
             </div>
-            <BashOutputPanel taskId={task.taskId} status={task.status} vscode={vscode} />
+            <BashOutputPanel taskId={task.taskId} command={task.command || task.filepath} status={task.status} vscode={vscode} />
         </div>
     );
 

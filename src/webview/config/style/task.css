@@ -137,6 +137,23 @@
     border-radius: var(--s-radius-sm);
 }
 
+.task-detail-output .bash-omitted-lines {
+    font-size: 12px;
+    color: var(--vscode-descriptionForeground);
+    padding: 0 0 4px 0;
+    opacity: 0.8;
+}
+
+.task-detail-output .bash-omitted-lines-clickable {
+    cursor: pointer;
+}
+
+.task-detail-output .bash-omitted-lines-clickable:hover {
+    color: var(--vscode-textLink-foreground);
+    opacity: 1;
+    text-decoration: underline;
+}
+
 .task-view-detail-btn {
     padding: 6px 14px;
     background: var(--vscode-button-background);
