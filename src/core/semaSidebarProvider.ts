@@ -47,6 +47,7 @@ export class SemaSidebarProvider implements vscode.WebviewViewProvider {
                 onStateChange:            this.handleStateChange,
                 onTopicUpdate:            this.handleTopicUpdate,
                 onToolExecutionComplete:  this.handleToolExecutionComplete,
+                onFileReference:          this.handleFileReference,
                 onTaskStart:              this.handleTaskStart,
                 onTaskEnd:                this.handleTaskEnd,
                 onSessionCleared:         this.handleSessionCleared,
@@ -169,6 +170,16 @@ export class SemaSidebarProvider implements vscode.WebviewViewProvider {
     private handleToolExecutionComplete = (data: any): void => {
         if (data.toolName === 'Read') {
             this.fileStateDiffManager.addFileToSnapshotIfNew(data.title);
+        }
+    };
+
+    private handleFileReference = (data: any): void => {
+        if (data.references && Array.isArray(data.references)) {
+            for (const ref of data.references) {
+                if (ref.type === 'file' && ref.name) {
+                    this.fileStateDiffManager.addFileToSnapshotIfNew(ref.name);
+                }
+            }
         }
     };
 

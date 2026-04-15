@@ -59,6 +59,7 @@ export interface SemaWrapperCallbacks {
     onMessage?: (message: any) => void;
     onTopicUpdate?: (topic: TopicUpdateData) => void;
     onToolExecutionComplete?: (data: ToolExecutionCompleteData & { agentId?: string }) => void;
+    onFileReference?: (data: FileReferenceData) => void;
     onTaskStart?: (data: TaskStartData) => void;
     onTaskEnd?: (data: TaskEndData) => void;
     onSessionCleared?: () => void;
@@ -167,6 +168,7 @@ export class SemaCoreWrapper {
                 };
                 this.messageHistory.push(msg);
                 this.sendAppendMessages([msg]);
+                this.callbacks.onFileReference?.(data);
             }
         });
 
