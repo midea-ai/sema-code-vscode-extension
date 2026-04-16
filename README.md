@@ -1,11 +1,5 @@
 <div align="center">
 
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/midea-ai/sema-code-core/main/docs/images/semacode-logo-dark.png">
-  <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/midea-ai/sema-code-core/main/docs/images/semacode-logo.png">
-  <img src="https://raw.githubusercontent.com/midea-ai/sema-code-core/main/docs/images/semacode-logo.png" alt="Sema Code Core Logo" width="75%"/>
-</picture>
-
 <h3>基于 Sema Code Core 的 VSCode 智能编程插件</h3>
 
 <p>为开发者提供开箱即用的 AI 编程体验</p>
