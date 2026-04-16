@@ -76,7 +76,7 @@ const MessageItem: React.FC<MessageItemProps> = React.memo(({
                     />
                 );
             default:
-                return <PubBlock content={message.content} vscode={vscode} />;
+                return <PubBlock content={message.content} messageId={message.id} vscode={vscode} />;
         }
     };
 

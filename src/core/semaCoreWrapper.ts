@@ -45,7 +45,8 @@ import {
     MCPServerInfo,
     MemoryConfig,
     RuleConfig,
-    TaskListItem
+    TaskListItem,
+    CronTask
 } from 'sema-core/types';
 
 import { SystemConfigManager } from '../managers/SystemConfigManager';
@@ -1060,6 +1061,28 @@ export class SemaCoreWrapper {
 
     public getTaskList(): TaskListItem[] {
         return this.semaCore.getTaskList();
+    }
+
+    // ===== Cron 管理相关方法 =====
+
+    public async getCronTasks(): Promise<CronTask[]> {
+        return this.semaCore.getCronTasks();
+    }
+
+    public async refreshCronTasks(): Promise<CronTask[]> {
+        return this.semaCore.refreshCronTasks();
+    }
+
+    public deleteCronTask(id: string): boolean {
+        return this.semaCore.deleteCronTask(id);
+    }
+
+    public enableCronTask(id: string): boolean {
+        return this.semaCore.enableCronTask(id);
+    }
+
+    public disableCronTask(id: string): boolean {
+        return this.semaCore.disableCronTask(id);
     }
 
     // ===== Mem 管理相关方法 =====

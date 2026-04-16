@@ -15,6 +15,7 @@ export class ConfigWebviewProvider {
     private coreManager: any;
     private fileOperationManager: any;
     private mcpStatusHandler?: (data: any) => void;
+    private cronUpdateHandler?: () => void;
     private taskWatcherMap: Map<string, () => void> = new Map();
     private pendingPage?: string;
 
@@ -43,6 +44,12 @@ export class ConfigWebviewProvider {
             this.postMessage({ command: 'mcpServerStatusUpdate', data });
         };
         this.coreManager.getSemaCore().on('mcp:server:status', this.mcpStatusHandler);
+
+        // 订阅定时任务变更事件，实时推送给 webview
+        this.cronUpdateHandler = () => {
+            this.postMessage({ command: 'cronUpdate' });
+        };
+        this.coreManager.getSemaCore().on('cron:update', this.cronUpdateHandler);
 
         this.panel.webview.onDidReceiveMessage(async (msg) => {
             const m = msg;
@@ -104,7 +111,12 @@ export class ConfigWebviewProvider {
                 stopTask:                   () => this.stopTask(m.taskId),
                 openBashOutput:             () => this.openBashOutput(m.content, m.title, m.toolId),
                 openAgentDetail:            () => Promise.resolve(this.openAgentDetail(m.taskId)),
-                openFile:                   () => Promise.resolve(this.openFile(m.filePath)),
+                openFile:                   () => Promise.resolve(this.openFile(m.filePath, m.line, m.endLine)),
+                loadCronTasks:              () => this.loadCronTasks(),
+                refreshCronTasks:           () => this.refreshCronTasks(),
+                deleteCronTask:             () => this.deleteCronTask(m.id),
+                enableCronTask:             () => this.enableCronTask(m.id),
+                disableCronTask:            () => this.disableCronTask(m.id),
             };
             await handlers[m.command]?.();
         });
@@ -113,6 +125,10 @@ export class ConfigWebviewProvider {
             if (this.mcpStatusHandler) {
                 this.coreManager.getSemaCore().off('mcp:server:status', this.mcpStatusHandler);
                 this.mcpStatusHandler = undefined;
+            }
+            if (this.cronUpdateHandler) {
+                this.coreManager.getSemaCore().off('cron:update', this.cronUpdateHandler);
+                this.cronUpdateHandler = undefined;
             }
             for (const unwatch of this.taskWatcherMap.values()) {
                 unwatch();
@@ -176,7 +192,6 @@ export class ConfigWebviewProvider {
     // ─── Models ───────────────────────────────────────────────────────────────
 
     private async loadConfig() {
-        if (!this.panel) return;
         try {
             await this.ensureCoreReady();
             const modelData = await this.coreManager.getModelData();
@@ -228,7 +243,6 @@ export class ConfigWebviewProvider {
     }
 
     private async fetchModels(data: { provider: string; baseURL: string; apiKey: string }) {
-        if (!this.panel) return;
         try {
             await this.ensureCoreReady();
             const result = await this.coreManager.fetchAvailableModels(data);
@@ -251,7 +265,6 @@ export class ConfigWebviewProvider {
     }
 
     private async testConnection(data: any) {
-        if (!this.panel) return;
         try {
             await this.ensureCoreReady();
             const result = await this.coreManager.testApiConnection(data);
@@ -301,7 +314,6 @@ export class ConfigWebviewProvider {
     // ─── Tools ────────────────────────────────────────────────────────────────
 
     private async loadSystemTools() {
-        if (!this.panel) return;
         try {
             await this.ensureCoreReady();
             this.postMessage({ command: 'loadSystemToolsResult', success: true, data: this.coreManager.getToolInfos() });
@@ -320,7 +332,6 @@ export class ConfigWebviewProvider {
     // ─── Plugins / Marketplace ───────────────────────────────────────────────
 
     private async loadPluginConfig() {
-        if (!this.panel) return;
         try {
             await this.ensureCoreReady();
             const pluginsInfo = await this.coreManager.getMarketplacePluginsInfo();     
@@ -400,7 +411,6 @@ export class ConfigWebviewProvider {
     // ─── Agents ───────────────────────────────────────────────────────────────
 
     private async loadAgentsInfo() {
-        if (!this.panel) return;
         try {
             await this.ensureCoreReady();
             const agentsInfo = await this.coreManager.getAgentsInfo();
@@ -412,7 +422,6 @@ export class ConfigWebviewProvider {
     }
 
     private async refreshAgentsInfo() {
-        if (!this.panel) return;
         try {
             await this.ensureCoreReady();
             this.postMessage({ command: 'refreshAgentsInfoResult', success: true, data: await this.coreManager.refreshAgentsInfo() });
@@ -439,7 +448,6 @@ export class ConfigWebviewProvider {
     // ─── Skills ───────────────────────────────────────────────────────────────
 
     private async loadSkillsInfo() {
-        if (!this.panel) return;
         try {
             await this.ensureCoreReady();
             const skillsInfo = await this.coreManager.getSkillsInfo();
@@ -451,7 +459,6 @@ export class ConfigWebviewProvider {
     }
 
     private async refreshSkillsInfo() {
-        if (!this.panel) return;
         try {
             await this.ensureCoreReady();
             this.postMessage({ command: 'refreshSkillsInfoResult', success: true, data: await this.coreManager.refreshSkillsInfo() });
@@ -469,7 +476,6 @@ export class ConfigWebviewProvider {
     }
 
     private async searchSkillHub(query: string) {
-        if (!this.panel) return;
         try {
             const data = await this.httpsGet(skillHubConfig.searchUrl(query));
             const json = JSON.parse(data);
@@ -480,7 +486,6 @@ export class ConfigWebviewProvider {
     }
 
     private async installSkillFromHub(slug: string, scope: 'project' | 'user') {
-        if (!this.panel) return;
         try {
             // 确定安装目录（绝对路径）
             let skillsDir: string;
@@ -565,7 +570,6 @@ export class ConfigWebviewProvider {
     // ─── Commands ─────────────────────────────────────────────────────────────
 
     private async loadCommandsInfo() {
-        if (!this.panel) return;
         try {
             await this.ensureCoreReady();
             const commandsInfo = await this.coreManager.getCommandsInfo();
@@ -577,7 +581,6 @@ export class ConfigWebviewProvider {
     }
 
     private async refreshCommandsInfo() {
-        if (!this.panel) return;
         try {
             await this.ensureCoreReady();
             this.postMessage({ command: 'refreshCommandsInfoResult', success: true, data: await this.coreManager.refreshCommandsInfo() });
@@ -604,7 +607,6 @@ export class ConfigWebviewProvider {
     // ─── MCP ─────────────────────────────────────────────────────────────────
 
     private async loadMCPServerInfo() {
-        if (!this.panel) return;
         try {
             await this.ensureCoreReady();
             const MCPServerInfo = await this.coreManager.getMCPServerInfo();
@@ -616,7 +618,6 @@ export class ConfigWebviewProvider {
     }
 
     private async refreshMCPServerInfo() {
-        if (!this.panel) return;
         try {
             await this.ensureCoreReady();
             const MCPServerInfo = await this.coreManager.refreshMCPServerInfo();
@@ -672,7 +673,6 @@ export class ConfigWebviewProvider {
     // ─── Memory ───────────────────────────────────────────────────────────────
 
     private async loadMemoryInfo() {
-        if (!this.panel) return;
         try {
             await this.ensureCoreReady();
             const memoryInfo = await this.coreManager.getMemoryInfo();
@@ -684,7 +684,6 @@ export class ConfigWebviewProvider {
     }
 
     private async refreshMemoryInfo() {
-        if (!this.panel) return;
         try {
             await this.ensureCoreReady();
             const memoryInfo = await this.coreManager.refreshMemoryInfo();
@@ -697,7 +696,6 @@ export class ConfigWebviewProvider {
     // ─── Rule ───────────────────────────────────────────────────────────────
 
     private async loadRuleInfo() {
-        if (!this.panel) return;
         try {
             await this.ensureCoreReady();
             const ruleInfo = await this.coreManager.getRuleInfo();
@@ -709,7 +707,6 @@ export class ConfigWebviewProvider {
     }
 
     private async refreshRuleInfo() {
-        if (!this.panel) return;
         try {
             await this.ensureCoreReady();
             const ruleInfo = await this.coreManager.refreshRuleInfo();
@@ -722,7 +719,6 @@ export class ConfigWebviewProvider {
     // ─── Task (后台任务) ──────────────────────────────────────────────────────
 
     private async loadTaskList() {
-        if (!this.panel) return;
         try {
             await this.ensureCoreReady();
             const list = this.coreManager.getTaskList();
@@ -773,6 +769,44 @@ export class ConfigWebviewProvider {
         });
     }
 
+    // ─── Cron Tasks ─────────────────────────────────────────────────────────
+
+    private async loadCronTasks() {
+        await this.execute('', '加载定时任务', async () => {
+            const data = await this.coreManager.getCronTasks();
+            // console.log('[loadCronTasks] data:', data);
+            this.postMessage({ command: 'loadCronTasksResult', success: true, data });
+        });
+    }
+
+    private async refreshCronTasks() {
+        await this.execute('', '刷新定时任务', async () => {
+            const data = await this.coreManager.refreshCronTasks();
+            this.postMessage({ command: 'refreshCronTasksResult', success: true, data });
+        });
+    }
+
+    private async deleteCronTask(id: string) {
+        await this.execute('', '删除定时任务', async () => {
+            const success = this.coreManager.deleteCronTask(id);
+            this.postMessage({ command: 'deleteCronTaskResult', success, id });
+        });
+    }
+
+    private async enableCronTask(id: string) {
+        await this.execute('', '启用定时任务', async () => {
+            const success = this.coreManager.enableCronTask(id);
+            this.postMessage({ command: 'enableCronTaskResult', success, id });
+        });
+    }
+
+    private async disableCronTask(id: string) {
+        await this.execute('', '禁用定时任务', async () => {
+            const success = this.coreManager.disableCronTask(id);
+            this.postMessage({ command: 'disableCronTaskResult', success, id });
+        });
+    }
+
     // ─── Utils ────────────────────────────────────────────────────────────────
 
     private openAgentDetail(taskId: string): void {
@@ -785,12 +819,16 @@ export class ConfigWebviewProvider {
         }
     }
 
-    private openFile(filePath: string) {
+    private openFile(filePath: string, line?: number, endLine?: number) {
         if (!filePath) return;
-        vscode.workspace.openTextDocument(filePath).then(
-            doc => vscode.window.showTextDocument(doc),
-            err => vscode.window.showErrorMessage(`打开文件失败：${(err as Error).message}`)
-        );
+        if (this.fileOperationManager && (line || endLine)) {
+            this.fileOperationManager.openFileAtLine(filePath, line || 1, endLine);
+        } else {
+            vscode.workspace.openTextDocument(filePath).then(
+                doc => vscode.window.showTextDocument(doc),
+                err => vscode.window.showErrorMessage(`打开文件失败：${(err as Error).message}`)
+            );
+        }
     }
 
     private openExternalUrl(url: string) {

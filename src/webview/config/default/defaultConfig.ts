@@ -9,6 +9,7 @@ export const defaultConfig = {
     skipBashExecPermission: false,
     skipSkillPermission: false,
     skipMCPToolPermission: false,
+    skipWebFetchPermission: false,
     systemPrompt: "You are Sema, AIRC's Agent AI for coding.",
     customRules: "- 中文回答",
     enableLLMCache: false,

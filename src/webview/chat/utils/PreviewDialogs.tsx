@@ -48,6 +48,15 @@ const PreviewDialogs: React.FC<{ vscode: any }> = ({ vscode }) => {
                     vscode={vscode}
                 />
             ))}
+            {show('WebFetchPermissionDialog') && mockDialogMap.WebFetchPermissionDialog.map((item, i) => (
+                <PermissionDialog
+                    key={`WebFetchPermissionDialog-${i}`}
+                    permissionData={item.data}
+                    onPermissionSelect={(action) => dismiss('WebFetchPermissionDialog', 'onPermissionSelect', action)}
+                    onCancel={() => dismiss('WebFetchPermissionDialog', 'onCancel')}
+                    vscode={vscode}
+                />
+            ))}
             {show('AskQuestionDialog') && mockDialogMap.AskQuestionDialog.map((item, i) => (
                 <AskQuestionDialog
                     key={`AskQuestionDialog-${i}`}

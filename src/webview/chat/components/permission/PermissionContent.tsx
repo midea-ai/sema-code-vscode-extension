@@ -267,9 +267,32 @@ const PermissionContent: React.FC<PermissionContentProps> = ({
         );
     };
 
+    // 渲染WebFetch内容
+    const renderWebFetchContent = () => {
+        const url = typeof content === 'string' ? content : '';
+
+        return (
+            <div className="file-permission-container">
+                <div className="file-permission-title-wrapper">
+                    <div className="file-permission-title-divider-top" />
+                    <div className="file-permission-title">
+                        <strong className="file-permission-action">Fetch URL</strong>
+                    </div>
+                </div>
+                <div className="bash-permission-bash-body">
+                    <div className="bash-permission-bash-command">
+                        <BaseBashContent command={url} />
+                    </div>
+                </div>
+            </div>
+        );
+    };
+
     // 根据工具类型渲染对应内容
     if (toolName === 'Bash') {
         return renderBashContent();
+    } else if (toolName === 'WebFetch') {
+        return renderWebFetchContent();
     } else if (isSkillType(toolName)) {
         return renderSkillContent();
     } else if (isMcpToolType(toolName)) {

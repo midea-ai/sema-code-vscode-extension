@@ -1,17 +1,46 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { ToggleIcon } from '../../components/ui/IconButton';
 import { ToolContent } from '../../types';
 import { CONTINUATION_SYMBOL } from '../../utils/symbols';
+import { streamingStore } from '../../utils/StreamingStore';
 
 const MAX_VISIBLE_LINES = 4;
 
 interface PubBlockProps {
     content: ToolContent;
+    messageId: string;
     vscode?: any;
 }
 
-const PubBlock: React.FC<PubBlockProps> = React.memo(({ content, vscode }) => {
-    const { toolName, title, summary, content: toolContent } = content;
+const PubBlock: React.FC<PubBlockProps> = React.memo(({ content, messageId, vscode }) => {
+    const streamContentRef = useRef('');
+    const [streamContent, setStreamContent] = useState('');
+
+    useEffect(() => {
+        const unsub = streamingStore.subscribeTool(messageId, (delta: string) => {
+            streamContentRef.current += delta;
+            setStreamContent(streamContentRef.current);
+        });
+        return () => {
+            unsub();
+            streamContentRef.current = '';
+        };
+    }, [messageId]);
+
+    // 完成后清除本地 streaming 状态，回归 props 的最终内容
+    useEffect(() => {
+        if (content.completed !== false) {
+            streamContentRef.current = '';
+            setStreamContent('');
+        }
+    }, [content.completed]);
+
+    // streaming 中用本地累积的 content，完成后用 props
+    const displayToolContent = (content.completed === false && streamContent)
+        ? { ...content, content: (content.content || '') + streamContent }
+        : content;
+
+    const { toolName, title, summary, content: toolContent } = displayToolContent;
 
     // 构建格式化标题
     const toolNameMap = {
@@ -48,9 +77,9 @@ const PubBlock: React.FC<PubBlockProps> = React.memo(({ content, vscode }) => {
     const visibleLines = totalLines > MAX_VISIBLE_LINES ? contentLines.slice(-MAX_VISIBLE_LINES) : contentLines;
     const omittedCount = totalLines > MAX_VISIBLE_LINES ? totalLines - MAX_VISIBLE_LINES : 0;
 
-    // 默认展开的工具列表
+    // 默认展开的工具列表，流式中也自动展开
     const DEFAULT_EXPANDED_TOOLS = ['TaskStop'];
-    const [isExpanded, setIsExpanded] = useState(DEFAULT_EXPANDED_TOOLS.includes(toolName));
+    const [isExpanded, setIsExpanded] = useState(DEFAULT_EXPANDED_TOOLS.includes(toolName) || content.completed === false);
 
     const handleToggle = () => {
         setIsExpanded(!isExpanded);

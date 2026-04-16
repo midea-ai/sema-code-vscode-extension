@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Config, VscodeApi } from './types';
 import ModelList from './ModelList';
 import TaskConfig from './TaskConfig';
@@ -11,9 +11,12 @@ import PluginConfig from './PluginConfig';
 import CommandConfig from './CommandConfig';
 import RuleMemoryConfig from './RuleMemoryConfig';
 import BackgroundTaskConfig from './BackgroundTaskConfig';
+import CronTaskConfig from './CronTaskConfig';
+import { RefreshIcon } from './utils/svgIcons';
 
 type PageType = 'models' | 'system' | 'memory' | 'mcp' | 'skill' | 'agent' | 'command' | 'plugin' | 'task';
 type ModelTabType = 'list' | 'add';
+type TaskTabType = 'background' | 'cron';
 
 interface AppProps {
     vscode: VscodeApi;
@@ -22,7 +25,15 @@ interface AppProps {
 const App: React.FC<AppProps> = ({ vscode }) => {
     const [currentPage, setCurrentPage] = useState<PageType>('models');
     const [modelTab, setModelTab] = useState<ModelTabType>('list');
+    const [taskTab, setTaskTab] = useState<TaskTabType>('background');
+    const [taskRefreshTrigger, setTaskRefreshTrigger] = useState(0);
+    const [backgroundTaskCount, setBackgroundTaskCount] = useState(0);
+    const [cronTaskCount, setCronTaskCount] = useState(0);
     const [config, setConfig] = useState<Config | null>(null);
+    const currentPageRef = useRef(currentPage);
+    const taskTabRef = useRef(taskTab);
+    currentPageRef.current = currentPage;
+    taskTabRef.current = taskTab;
 
     useEffect(() => {
         const handleMessage = (event: MessageEvent) => {
@@ -41,6 +52,11 @@ const App: React.FC<AppProps> = ({ vscode }) => {
                 case 'navigateTo':
                     if (message.page) {
                         setCurrentPage(message.page as PageType);
+                    }
+                    break;
+                case 'cronUpdate':
+                    if (currentPageRef.current === 'task' && taskTabRef.current === 'cron') {
+                        setTaskRefreshTrigger(n => n + 1);
                     }
                     break;
             }
@@ -77,7 +93,7 @@ const App: React.FC<AppProps> = ({ vscode }) => {
                     className={`nav-item nav-main ${currentPage === 'task' ? 'active' : ''}`}
                     onClick={() => setCurrentPage('task')}
                 >
-                    后台任务
+                    任务管理
                 </div>
 
                 <div
@@ -206,10 +222,46 @@ const App: React.FC<AppProps> = ({ vscode }) => {
                     </div>
                 )}
 
-                {/* 后台任务页面 */}
+                {/* 任务管理页面 */}
                 {currentPage === 'task' && (
                     <div className="page active">
-                        <BackgroundTaskConfig vscode={vscode} />
+                        <div className="tab-navigation">
+                            <div
+                                className={`tab-item ${taskTab === 'background' ? 'active' : ''}`}
+                                onClick={() => setTaskTab('background')}
+                            >
+                                后台任务
+                                {backgroundTaskCount > 0 && (
+                                    <span className="section-tab-count">{backgroundTaskCount}</span>
+                                )}
+                            </div>
+                            <div
+                                className={`tab-item ${taskTab === 'cron' ? 'active' : ''}`}
+                                onClick={() => setTaskTab('cron')}
+                            >
+                                定时任务
+                                {cronTaskCount > 0 && (
+                                    <span className="section-tab-count">{cronTaskCount}</span>
+                                )}
+                            </div>
+                            <div style={{ marginLeft: 'auto' }}>
+                                <button
+                                    className="section-icon-btn"
+                                    title="刷新"
+                                    onClick={() => setTaskRefreshTrigger(n => n + 1)}
+                                >
+                                    <RefreshIcon size={14} />
+                                </button>
+                            </div>
+                        </div>
+                        <div className="tab-content">
+                            <div style={{ display: taskTab === 'background' ? 'block' : 'none' }}>
+                                <BackgroundTaskConfig vscode={vscode} refreshTrigger={taskRefreshTrigger} onCountChange={setBackgroundTaskCount} />
+                            </div>
+                            <div style={{ display: taskTab === 'cron' ? 'block' : 'none' }}>
+                                <CronTaskConfig vscode={vscode} refreshTrigger={taskRefreshTrigger} onCountChange={setCronTaskCount} />
+                            </div>
+                        </div>
                     </div>
                 )}
             </div>

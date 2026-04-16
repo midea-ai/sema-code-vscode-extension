@@ -14,6 +14,7 @@ interface SystemConfigData {
     skipBashExecPermission?: boolean;
     skipSkillPermission?: boolean;
     skipMCPToolPermission?: boolean;
+    skipWebFetchPermission?: boolean;
     systemPrompt?: string;
     customRules?: string;
     enableLLMCache?: boolean;
@@ -264,6 +265,21 @@ const SystemConfig: React.FC<SystemConfigProps> = ({ vscode }) => {
                             />
                             <span className="checkmark"></span>
                             跳过MCP工具权限检查
+                        </label>
+                    </div>
+                </div>
+
+                {/* 跳过权限第三行 */}
+                <div className="form-row">
+                    <div className="form-group">
+                        <label className="checkbox-label" title="启用后将直接执行WebFetch而不需要确认">
+                            <input
+                                type="checkbox"
+                                checked={config.skipWebFetchPermission || false}
+                                onChange={(e) => handleChange('skipWebFetchPermission', e.target.checked)}
+                            />
+                            <span className="checkmark"></span>
+                            跳过WebFetch权限检查
                         </label>
                     </div>
                 </div>

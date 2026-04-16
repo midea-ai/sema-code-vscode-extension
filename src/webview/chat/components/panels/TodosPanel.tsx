@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { ToggleIcon } from '../ui/IconButton';
+import { ToggleIcon, CheckIcon } from '../ui/IconButton';
 
 interface TodoItem {
+    id: string;
     content: string;
     status: 'pending' | 'in_progress' | 'completed';
     activeForm?: string;
@@ -60,9 +61,9 @@ const TodosPanel: React.FC<TodosPanelProps> = ({ todos, onScrollToBottom }) => {
                         }
 
                         return (
-                            <div key={index} className={`todo-panel-item ${statusClass}`}>
+                            <div key={todo.id} className={`todo-panel-item ${statusClass}`}>
                                 <span className={`todo-panel-circle ${statusClass}`}>
-                                    {statusIcon}
+                                    {todo.status === 'completed' ? <CheckIcon /> : statusIcon}
                                 </span>
                                 <span className="todo-panel-text">{displayText}</span>
                             </div>

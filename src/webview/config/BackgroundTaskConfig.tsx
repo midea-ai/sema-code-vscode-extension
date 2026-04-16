@@ -1,10 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { CloseIcon } from './utils/svgIcons';
+import { formatDateTime } from './utils/timeUtils';
 import { VscodeApi } from './types';
 import './style/task.css';
 
 interface BackgroundTaskConfigProps {
     vscode: VscodeApi;
+    refreshTrigger?: number;
+    onCountChange?: (count: number) => void;
 }
 
 type TaskType = 'Bash' | 'Agent';
@@ -64,7 +67,7 @@ const RuntimeText: React.FC<{ start: number; end?: number; status: TaskStatus }>
     return <>{formatRuntime(start, end)}</>;
 };
 
-const MAX_VISIBLE_LINES = 4;
+const MAX_LINES = 2;
 
 const BashOutputPanel: React.FC<{ taskId: string; command?: string; status: TaskStatus; vscode: VscodeApi }> = ({ taskId, command, status, vscode }) => {
     const [output, setOutput] = useState('');
@@ -109,8 +112,8 @@ const BashOutputPanel: React.FC<{ taskId: string; command?: string; status: Task
 
     const contentLines = output.split('\n').filter(line => line.trim());
     const totalLines = contentLines.length;
-    const visibleLines = totalLines > MAX_VISIBLE_LINES ? contentLines.slice(-MAX_VISIBLE_LINES) : contentLines;
-    const omittedCount = totalLines > MAX_VISIBLE_LINES ? totalLines - MAX_VISIBLE_LINES : 0;
+    const visibleLines = totalLines > MAX_LINES ? contentLines.slice(-MAX_LINES) : contentLines;
+    const omittedCount = totalLines > MAX_LINES ? totalLines - MAX_LINES : 0;
 
     return (
         <div className="task-detail-output-section">
@@ -125,7 +128,35 @@ const BashOutputPanel: React.FC<{ taskId: string; command?: string; status: Task
     );
 };
 
-const BackgroundTaskConfig: React.FC<BackgroundTaskConfigProps> = ({ vscode }) => {
+const CommandPanel: React.FC<{ command: string; taskId: string; vscode: VscodeApi }> = ({ command, taskId, vscode }) => {
+    const handleViewAll = () => {
+        vscode.postMessage({
+            command: 'openBashOutput',
+            content: command,
+            title: 'Command: ' + command.split('\n')[0],
+            toolId: taskId + '-cmd'
+        });
+    };
+
+    const contentLines = command.split('\n').filter(line => line.trim());
+    const totalLines = contentLines.length;
+    const visibleLines = totalLines > MAX_LINES ? contentLines.slice(0, MAX_LINES) : contentLines;
+    const omittedCount = totalLines > MAX_LINES ? totalLines - MAX_LINES : 0;
+
+    return (
+        <div className="task-detail-output-section">
+            <div className="task-detail-output-label">Command:</div>
+            <pre className="task-detail-output">
+                {visibleLines.join('\n')}
+                {omittedCount > 0 && (
+                    <div className="bash-omitted-lines bash-omitted-lines-clickable" onClick={handleViewAll}>...省略了 {omittedCount} 行</div>
+                )}
+            </pre>
+        </div>
+    );
+};
+
+const BackgroundTaskConfig: React.FC<BackgroundTaskConfigProps> = ({ vscode, refreshTrigger, onCountChange }) => {
     const [tasks, setTasks] = useState<Map<string, TaskItem>>(new Map());
     const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
     const autoOpenAppliedRef = useRef<Set<string>>(new Set());
@@ -221,6 +252,16 @@ const BackgroundTaskConfig: React.FC<BackgroundTaskConfigProps> = ({ vscode }) =
         return () => window.removeEventListener('message', handleMessage);
     }, []);
 
+    useEffect(() => {
+        if (refreshTrigger && refreshTrigger > 0) {
+            vscode.postMessage({ command: 'loadTaskList' });
+        }
+    }, [refreshTrigger]);
+
+    useEffect(() => {
+        onCountChange?.(Array.from(tasks.values()).filter(t => t.status === 'running').length);
+    }, [tasks]);
+
     // Auto-open detail when only 1 task total
     useEffect(() => {
         const allTasks = Array.from(tasks.values());
@@ -281,7 +322,7 @@ const BackgroundTaskConfig: React.FC<BackgroundTaskConfigProps> = ({ vscode }) =
     const renderBashDetail = (task: TaskItem) => (
         <div>
             <div className="task-detail-header">
-                <span className="task-detail-title">Shell details</span>
+                <span className="task-detail-title">Shell 详情</span>
                 <button
                     className="section-icon-btn"
                     title="Close"
@@ -291,17 +332,14 @@ const BackgroundTaskConfig: React.FC<BackgroundTaskConfigProps> = ({ vscode }) =
                 </button>
             </div>
             <div className="task-detail-info">
-                <div><strong>TaskID:</strong> {task.taskId}</div>
-                <div><strong>Status:</strong> <span className={`task-status-text ${task.status}`}>{STATUS_LABELS[task.status]}</span></div>
-                <div><strong>Runtime:</strong> <RuntimeText start={task.startTime} end={task.endTime} status={task.status} /></div>
+                <div><strong>任务:</strong> {task.taskId}</div>
+                <div><strong>状态:</strong> <span className={`task-status-text ${task.status}`}>{STATUS_LABELS[task.status]}</span></div>
+                <div><strong>已运行:</strong> <RuntimeText start={task.startTime} end={task.endTime} status={task.status} /></div>
                 {task.status !== 'running' && task.endTime && (
-                    <div><strong>End:</strong> {new Date(task.endTime).toLocaleTimeString()}</div>
+                    <div><strong>结束:</strong> {formatDateTime(task.endTime)}</div>
                 )}
-                <div className="task-detail-command-row">
-                    <strong>Command:</strong>
-                    <span className="task-detail-command-value">{task.command || task.filepath}</span>
                 </div>
-            </div>
+            <CommandPanel command={task.command || task.filepath} taskId={task.taskId} vscode={vscode} />
             <BashOutputPanel taskId={task.taskId} command={task.command || task.filepath} status={task.status} vscode={vscode} />
         </div>
     );
@@ -319,11 +357,11 @@ const BackgroundTaskConfig: React.FC<BackgroundTaskConfigProps> = ({ vscode }) =
                 </button>
             </div>
             <div className="task-detail-info">
-                <div><strong>TaskID:</strong> {task.taskId}</div>
-                <div><strong>Status:</strong> <span className={`task-status-text ${task.status}`}>{STATUS_LABELS[task.status]}</span></div>
-                <div><strong>Runtime:</strong> <RuntimeText start={task.startTime} end={task.endTime} status={task.status} /></div>
+                <div><strong>任务:</strong> {task.taskId}</div>
+                <div><strong>状态:</strong> <span className={`task-status-text ${task.status}`}>{STATUS_LABELS[task.status]}</span></div>
+                <div><strong>已运行:</strong> <RuntimeText start={task.startTime} end={task.endTime} status={task.status} /></div>
                 {task.status !== 'running' && task.endTime && (
-                    <div><strong>End:</strong> {new Date(task.endTime).toLocaleTimeString()}</div>
+                    <div><strong>结束:</strong> {formatDateTime(task.endTime)}</div>
                 )}
             </div>
             <div style={{ marginTop: 16, padding: '0 14px 14px' }}>
@@ -354,31 +392,28 @@ const BackgroundTaskConfig: React.FC<BackgroundTaskConfigProps> = ({ vscode }) =
             {/* Task sections */}
             <div className="section-groups">
                 {/* Bashes */}
-                {bashTasks.length > 0 && (
-                    <div className="section-group">
-                        <div className="section-group-title">
-                            Bashes
-                            <span className="section-group-count">({bashTasks.length})</span>
-                        </div>
-                        <div>{bashTasks.map(renderTaskRow)}</div>
+                <div className="section-group">
+                    <div className="section-group-title">
+                        Bashes
+                        <span className="section-group-count">({bashTasks.length})</span>
                     </div>
-                )}
+                    {bashTasks.length > 0
+                        ? <div>{bashTasks.map(renderTaskRow)}</div>
+                        : <div className="section-empty">暂无 Bash 任务</div>
+                    }
+                </div>
 
                 {/* Local agents */}
-                {agentTasks.length > 0 && (
-                    <div className="section-group">
-                        <div className="section-group-title">
-                            Local agents
-                            <span className="section-group-count">({agentTasks.length})</span>
-                        </div>
-                        <div>{agentTasks.map(renderTaskRow)}</div>
+                <div className="section-group">
+                    <div className="section-group-title">
+                        Local agents
+                        <span className="section-group-count">({agentTasks.length})</span>
                     </div>
-                )}
-
-                {/* Empty state */}
-                {allTasks.length === 0 && (
-                    <div className="section-empty">No background tasks</div>
-                )}
+                    {agentTasks.length > 0
+                        ? <div>{agentTasks.map(renderTaskRow)}</div>
+                        : <div className="section-empty">暂无 Agent 任务</div>
+                    }
+                </div>
             </div>
 
         </div>

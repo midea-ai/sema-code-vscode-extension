@@ -120,6 +120,16 @@ const InstalledPluginCard: React.FC<{
                     <>
                         <span className="readonly-tab">只读</span>
                         <span className="readonly-tab">{plugin.from}</span>
+                        <div className="plugin-card-actions" onClick={(e) => e.stopPropagation()}>
+                            <label className="section-switch">
+                                <input
+                                    type="checkbox"
+                                    checked={plugin.status}
+                                    onChange={(e) => e.target.checked ? onEnable(plugin) : onDisable(plugin)}
+                                />
+                                <span className="section-switch-slider"></span>
+                            </label>
+                        </div>
                     </>
                 )}
                 {!isReadonly && (
@@ -504,7 +514,6 @@ const PluginConfig: React.FC<PluginConfigProps> = ({ vscode }) => {
         const groups: Record<string, PluginInfo[]> = { project: [], user: [], local: [], other: [] };
         data.plugins.forEach(p => {
             if (p.from !== 'sema') {
-                if (!p.status) return;
                 groups.other.push(p);
             } else if (groups[p.scope]) {
                 groups[p.scope].push(p);

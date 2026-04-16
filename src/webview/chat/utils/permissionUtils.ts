@@ -45,6 +45,8 @@ export const parseMcpToolName = (toolName: string): { mcpName: string; toolName:
 export const getPermissionTitle = (toolName: string): string => {
     if (toolName === 'Bash') {
         return 'Bash Permission';
+    } else if (toolName === 'WebFetch') {
+        return 'Network Permission';
     } else if (isSkillType(toolName)) {
         return 'Skill Permission';
     } else if (isMcpToolType(toolName)) {

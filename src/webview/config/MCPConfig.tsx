@@ -3,7 +3,7 @@ import { VscodeApi, ToolInfo, SystemToolInfo } from './types';
 import { MCPServerInfo, MCPServerConfig, MCPScopeType } from './types/mcp';
 import { ExpandArrowIcon, RefreshIcon, EditIcon, TrashIcon, CloseIcon, GearIcon, GitHubIcon, WarningCircleIcon } from './utils/svgIcons';
 import { defaultMCPMarketInfos, MCPMarketInfo } from './default/defaultMCPMarket';
-import { inlineSvgIcons } from './mcpIcon';
+import { inlineSvgIcons } from './utils/mcpIcon';
 import { initialBgColors, hashString } from './utils/iconUtils';
 import './style/section.css';
 import './style/mcp.css';
@@ -629,7 +629,15 @@ const MCPConfig: React.FC<MCPConfigProps> = ({ vscode }) => {
 
     const handleEdit = (server: MCPServerInfo, scope: MCPGroupScope) => {
         if (server.filePath) {
-            vscode.postMessage({ command: 'openFile', filePath: server.filePath });
+            const match = server.filePath.match(/^(.+?)(?::(\d+)(?:-(\d+))?)?$/);
+            if (match) {
+                vscode.postMessage({
+                    command: 'openFile',
+                    filePath: match[1],
+                    ...(match[2] ? { line: Number(match[2]) } : {}),
+                    ...(match[3] ? { endLine: Number(match[3]) } : {}),
+                });
+            }
         }
     };
 

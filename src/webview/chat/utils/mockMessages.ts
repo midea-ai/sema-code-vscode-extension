@@ -625,6 +625,24 @@ export const mockDialogMap: Record<string, any[]> = {
             isBackground: false,
         },
     ],
+    WebFetchPermissionDialog: [
+        {
+            type: 'permission',
+            data: {
+                agentId: 'main',
+                toolId: 'webfetch-1',
+                toolName: 'WebFetch',
+                title: 'WebFetch',
+                content: 'https://github.com/midea-ai/sema-code-core',
+                options: {
+                    agree: '确认',
+                    allow: '确认，本项目不再询问 github.com 域名',
+                    refuse: '拒绝'
+                }
+            },
+            isBackground: false,
+        },
+    ],
     AskQuestionDialog: [
         {
             type: 'askQuestion',

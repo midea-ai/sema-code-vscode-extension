@@ -44,9 +44,12 @@
 .task-status-tag.running { color: var(--s-color-running); }
 .task-status-tag.completed { color: var(--s-color-completed); }
 .task-status-tag.failed { color: var(--s-color-failed); }
-.task-status-tag.stopped { color: var(--s-color-stopped); }
+.task-status-tag.killed { color: var(--s-color-stopped); }
 
-/* 选中状态下保留状态标签颜色 */
+.task-status-text.running { color: var(--s-color-running); }
+.task-status-text.completed { color: var(--s-color-completed); }
+.task-status-text.failed { color: var(--s-color-failed); }
+.task-status-text.killed { color: var(--s-color-stopped); }
 
 .task-kill-btn {
     flex: none;
@@ -100,6 +103,7 @@
 .task-detail-command-row {
     display: flex;
     gap: 4px;
+    margin-top: 8px;
 }
 
 .task-detail-command-row strong {
@@ -166,5 +170,39 @@
 
 .task-view-detail-btn:hover {
     background: var(--vscode-button-hoverBackground);
+}
+
+/* ===== Cron Task 卡片 ===== */
+.cron-card-body {
+    padding: 8px 14px 10px;
+    font-size: 12px;
+    line-height: 1.6;
+}
+
+.cron-meta-row {
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+    color: var(--vscode-descriptionForeground);
+    font-size: 11px;
+    margin-top: 6px;
+}
+
+.cron-expression-tag {
+    display: inline-block;
+    font-family: var(--vscode-editor-font-family, monospace);
+    font-size: 11px;
+    padding: 1px 6px;
+    border-radius: 3px;
+    background: rgba(128, 128, 128, 0.12);
+    border: none;
+}
+
+.cron-highlight {
+    color: var(--s-badge-kill-color);
+}
+
+.cron-next-fire-section {
+    margin-top: 12px;
 }
 
