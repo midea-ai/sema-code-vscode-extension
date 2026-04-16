@@ -125,6 +125,7 @@ export const defaultModelProvider: Record<string, ProviderDefaults> = {
         baseURLPlaceholder: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
         apiKeyPlaceholder: '输入您的阿里云 API Key',
         defaultModel: 'qwen3-max-preview',
+        apikeyUrl: 'https://bailian.console.aliyun.com/cn-beijing?api-key',
         defaultAdapt: 'openai',
     },
     'custom': {
