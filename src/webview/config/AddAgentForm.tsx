@@ -5,7 +5,7 @@ import { VscodeApi } from './types';
 const TOOL_PRESETS = {
     readonly: {
         name: '只读工具',
-        tools: ['Glob', 'Grep', 'Read', 'TodoWrite']
+        tools: ['Glob', 'Grep', 'Read']
     },
     edit: {
         name: '编辑工具',
@@ -15,14 +15,22 @@ const TOOL_PRESETS = {
         name: '执行工具',
         tools: ['Bash']
     },
+    cron: {
+        name: '定时任务工具',
+        tools: ['CronCreate', 'CronDelete', 'CronList']
+    },
     other: {
         name: '其他工具',
-        tools: ['Skill']
+        tools: ['WebFetch', 'Skill']
     }
 };
 
 // 所有可用工具列表
-const ALL_TOOLS = ['Bash', 'Glob', 'Grep', 'Read', 'Edit', 'Write', 'NotebookEdit', 'TodoWrite', 'Skill'];
+const ALL_TOOLS = [
+    'Bash', 'Glob', 'Grep', 'Read', 'Write', 'Edit', 'NotebookEdit',
+    'CronCreate', 'CronDelete', 'CronList',
+    'WebFetch', 'Skill'
+];
 
 // 创建表单的初始状态
 const initialFormState = {
