@@ -1,0 +1,11 @@
+node_modules
+dist
+package-lock.json
+core-pack
+docs
+.sema
+
+*.vsix
+
+.build/
+test

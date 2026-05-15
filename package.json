@@ -1,0 +1,121 @@
+{
+  "name": "sema-vscode-extension",
+  "displayName": "Sema Code",
+  "description": "VSCode integration for code-agent",
+  "version": "2.0.4",
+  "icon": "imgs/icon.png",
+  "publisher": "SemaCode",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/midea-ai/sema-code-vscode-extension.git"
+  },
+  "bugs": {
+    "url": "https://github.com/midea-ai/sema-code-vscode-extension/issues"
+  },
+  "homepage": "https://github.com/midea-ai/sema-code-vscode-extension#readme",
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [],
+  "engines": {
+    "vscode": "^1.75.0"
+  },
+  "main": "./dist/extension.js",
+  "contributes": {
+    "configuration": {
+      "title": "Sema Code",
+      "properties": {}
+    },
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "sema-vscode",
+          "title": "Sema Code",
+          "icon": "imgs/icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "sema-vscode": [
+        {
+          "type": "webview",
+          "id": "sema-vscode-view",
+          "name": "Sema Code",
+          "icon": "imgs/icon.svg"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "sema-vscode-extension.newSession",
+        "title": "开始新对话",
+        "icon": "$(add)"
+      },
+      {
+        "command": "sema-vscode-extension.openHistory",
+        "title": "历史会话",
+        "icon": "$(history)"
+      },
+      {
+        "command": "sema-vscode-extension.openConfig",
+        "title": "配置",
+        "icon": "$(gear)"
+      }
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "sema-vscode-extension.newSession",
+          "when": "view == sema-vscode-view",
+          "group": "navigation"
+        },
+        {
+          "command": "sema-vscode-extension.openHistory",
+          "when": "view == sema-vscode-view",
+          "group": "navigation@1"
+        },
+        {
+          "command": "sema-vscode-extension.openConfig",
+          "when": "view == sema-vscode-view",
+          "group": "navigation@2"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "compile": "webpack && mkdir -p dist/pet && cp -f pet/macos/.build/arm64-apple-macosx/release/sema-pet-darwin-arm64.zip dist/pet/ 2>/dev/null || echo '⚠️  dist/pet/sema-pet-darwin-arm64.zip 缺失（先跑 npm run pet:build）' && cp -f pet/macos/.build/x86_64-apple-macosx/release/sema-pet-darwin-x64.zip dist/pet/ 2>/dev/null || echo '⚠️  dist/pet/sema-pet-darwin-x64.zip 缺失（先跑 npm run pet:build）'",
+    "pet:build": "bash pet/macos/build-zips.sh",
+    "pet:build:arm64": "bash pet/macos/build-zips.sh arm64",
+    "pet:build:x64": "bash pet/macos/build-zips.sh x64"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.28.5",
+    "@babel/preset-env": "^7.28.5",
+    "@babel/preset-react": "^7.28.5",
+    "@babel/preset-typescript": "^7.28.5",
+    "@types/adm-zip": "^0.5.8",
+    "@types/node": "^18.x",
+    "@types/react": "^18.2.0",
+    "@types/react-dom": "^18.2.0",
+    "@types/vscode": "^1.74.0",
+    "babel-loader": "^10.0.0",
+    "css-loader": "^7.1.2",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "style-loader": "^4.0.0",
+    "ts-loader": "^9.4.2",
+    "typescript": "^4.9.4",
+    "webpack": "^5.75.0",
+    "webpack-cli": "^5.0.1"
+  },
+  "dependencies": {
+    "@types/dompurify": "^3.0.5",
+    "@vscode/ripgrep": "^1.17.0",
+    "adm-zip": "^0.5.16",
+    "diff": "^8.0.2",
+    "dompurify": "^3.3.1",
+    "sema-core": "^2.0.0",
+    "turndown": "^7.2.4"
+  }
+}

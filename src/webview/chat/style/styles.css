@@ -1,0 +1,1026 @@
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+/* 全局禁用橙色焦点边框，使用VSCode焦点样式 */
+*:focus {
+    outline: none;
+}
+
+*:focus-visible {
+    outline: 1px solid var(--chat-border-focus);
+    outline-offset: -1px;
+}
+
+/* 对于不需要焦点样式的元素 */
+button:focus,
+button:focus-visible,
+[tabindex]:focus,
+[tabindex]:focus-visible {
+    outline: none;
+}
+
+/* 输入框焦点样式 */
+input:focus,
+textarea:focus,
+select:focus {
+    outline: none;
+    border-color: var(--chat-border-focus);
+}
+
+body {
+    /* 使用 VSCode 默认 UI 字体（非等宽） */
+    font-family: var(--vscode-font-family);
+    font-size: var(--chat-font-base);
+    color: var(--chat-text-primary);
+    background-color: var(--chat-bg-primary);
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+/* 确保所有元素继承 UI 字体 */
+body * {
+    font-family: inherit;
+}
+
+/* 代码块使用等宽字体 */
+code, pre, .code {
+    font-family: var(--vscode-editor-font-family);
+}
+
+/* 全局统一滚动条样式 */
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+::-webkit-scrollbar-thumb {
+    background-color: var(--chat-scrollbar);
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background-color: var(--chat-scrollbar-hover);
+}
+
+/* 统一的图标按钮样式 */
+.icon-btn {
+    background: none;
+    border: none;
+    color: var(--chat-text-secondary);
+    cursor: pointer;
+    padding: 2px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 3px;
+    transition: all 0.15s;
+}
+
+.icon-btn:hover {
+    background-color: var(--chat-bg-hover);
+    color: var(--chat-color-muted-hover);
+}
+
+.icon-btn:active {
+    background-color: var(--chat-bg-active);
+}
+
+.icon-btn svg {
+    /* Use width and height from the SVG itself */
+    max-width: 14px;
+    max-height: 14px;
+}
+
+#root {
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+#output-container {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 0 5px 5px 5px;
+    font-size: var(--chat-font-base);
+    line-height: 1.6;
+    width: 100%;
+    overflow-anchor: none;
+}
+
+
+/* 消息包装层：让浏览器跳过视口外元素的 layout 和 paint，
+   contain-intrinsic-size 作为未渲染时的占位高度估算 */
+.msg-wrap {
+    content-visibility: auto;
+    contain-intrinsic-size: 0 80px;
+}
+
+.output-line {
+    margin-bottom: 4px;
+    white-space: pre;
+    /* 不自动换行，保持原始格式 */
+}
+
+.output-line.user-input {
+    color: var(--chat-text-terminal-green);
+    font-weight: 500;
+    margin-top: 16px;
+    margin-bottom: 12px;
+}
+
+/* 用户输入块组件 */
+.user-input-block {
+    display: flex;
+    align-items: flex-start;
+    padding: 8px 10px;
+    margin: var(--chat-block-margin);
+    border: 1px solid var(--chat-border-input);
+    border-radius: var(--chat-radius-sm);
+    background-color: var(--chat-bg-primary);
+    max-width: var(--chat-block-max-width);
+
+    /* 严格限制为3行，允许滚动 */
+    line-height: 1.4;
+    /* 设置合适的行高 */
+    max-height: calc(1.4em * 3 + 16px);
+    /* 3行文本高度 + 内边距 */
+    min-height: calc(1.4em * 1 + 16px);
+    /* 最小高度为1行 */
+
+    box-sizing: border-box;
+    overflow-y: auto;
+    /* 超过三行显示滚动条 */
+    overflow-x: hidden;
+    white-space: pre-wrap;
+    /* 保留空白符和换行 */
+    word-wrap: break-word;
+}
+
+
+.user-input-content {
+    flex: 1;
+    width: 100%;
+    min-width: 0;
+    color: var(--chat-text-terminal-green);
+    font-weight: 500;
+    font-size: var(--chat-font-base);
+    line-height: 1.5;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+}
+
+/* 用户输入块编辑模式 */
+.user-input-block.editing {
+    max-height: none;
+    overflow: visible;
+}
+
+/* 队列中待处理的用户输入 */
+.user-input-block.pending {
+    border: 1px dashed var(--chat-border-input);
+    border-width: 0.6px;
+    opacity: 0.6;
+    cursor: default;
+}
+
+.user-input-content.pending {
+    color: var(--chat-text-primary);
+    font-weight: 400;
+}
+
+/* 后台任务运行状态条 */
+.running-tasks-bar {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 16px;
+    font-size: var(--chat-font-base);
+    color: var(--chat-text-secondary);
+    cursor: pointer;
+    transition: background 0.15s;
+    border-radius: 4px;
+}
+
+.running-tasks-bar:hover {
+    background: var(--chat-bg-list-hover);
+    color: var(--chat-text-primary);
+}
+
+.running-task-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--chat-text-link);
+    flex-shrink: 0;
+    animation: pulse 1.5s ease-in-out infinite;
+}
+
+.running-task-label {
+    white-space: nowrap;
+}
+
+.user-input-block.clickable {
+    cursor: pointer;
+}
+
+/* 用户输入文本域 */
+.user-input-textarea {
+    height: 200px;
+    transition: height 0.2s ease;
+    resize: none;
+    border: 1px solid var(--chat-border-input);
+    background-color: var(--chat-bg-input);
+    color: var(--chat-text-input);
+    padding: 8px;
+    border-radius: 4px;
+    font-size: var(--chat-font-base);
+    width: 100%;
+    outline: none;
+}
+
+/* 补充信息信息样式 如文件引用、中断、压缩 */
+.supplementary-info {
+    margin-top: 1px;
+    width: 100%;
+}
+
+.supplementary-info-item {
+    color: var(--chat-text-secondary);
+    font-size: var(--chat-font-base);
+    line-height: 1.3;
+    margin: 1px var(--chat-spacing-xs);
+    margin-left: 8px;
+    opacity: 0.8;
+}
+
+.ai-resp-block {
+    display: flex;
+    margin: var(--chat-block-margin);
+    width: var(--chat-block-max-width);
+    max-width: var(--chat-block-max-width);
+    box-sizing: border-box;
+}
+
+.output-line.ai-response {
+    color: var(--chat-text-terminal-cyan);
+}
+
+.output-line.ai-response-content {
+    line-height: 1.4;
+    white-space: pre-wrap;
+    word-break: break-word;
+    overflow-wrap: break-word;
+    display: flex;
+    align-items: baseline;
+    /* 使用baseline对齐确保文本基线一致 */
+    gap: 6px;
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+    padding-left: 8px;
+    position: relative;
+}
+
+/* Dot 状态色（全局复用） */
+.dot-success {
+    color: var(--chat-color-success) !important;
+}
+.dot-error {
+    color: var(--chat-color-error) !important;
+}
+.dot-killed {
+    color: var(--chat-color-warning) !important;
+}
+
+/* AI响应内容样式优化 */
+.ai-response-content .response-indicator {
+    position: absolute;
+    left: -6px;
+    flex-shrink: 0;
+    line-height: 1.4;
+    /* 确保与内容文本行高一致 */
+}
+
+.ai-response-content .plain-text-content {
+    flex: 1;
+    line-height: 1.4;
+}
+
+.ai-response-content .markdown-content {
+    flex: 1;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+}
+
+/* 确保markdown内容的第一个元素与指示符对齐 */
+.ai-response-content .markdown-content> :first-child {
+    margin-top: 0;
+}
+
+.ai-response-content .streaming-cursor {
+    /* color: var(--chat-text-terminal-cyan); */
+    animation: blink 1s infinite;
+    line-height: 1.4;
+}
+
+@keyframes blink {
+
+    0%,
+    50% {
+        opacity: 1;
+    }
+
+    51%,
+    100% {
+        opacity: 0;
+    }
+}
+
+.output-line.ai-response-block {
+    font-size: var(--chat-font-base);
+    color: var(--chat-color-muted);
+    line-height: 0.9;
+}
+
+.line-number {
+    color: var(--chat-color-muted);
+}
+
+/* 对应的 CSS 样式 */
+.welcome-container {
+    background: var(--chat-bg-editor);
+    border: 1px solid var(--chat-border);
+    border-radius: 8px;
+    margin: 12px 0;
+    padding: 0;
+    box-shadow: var(--chat-shadow);
+}
+
+.welcome-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 16px;
+    background: var(--chat-bg-panel-header);
+    border-bottom: 1px solid var(--chat-border);
+    border-radius: 8px 8px 0 0;
+}
+
+.welcome-icon {
+    font-size: var(--chat-font-xl);
+}
+
+.welcome-title {
+    font-weight: 600;
+    color: var(--chat-text-primary);
+    font-size: var(--chat-font-lg);
+}
+
+.welcome-message {
+    font-size: var(--chat-font-base);
+    color: var(--chat-text-secondary);
+    padding: 16px;
+    line-height: 1.5;
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.welcome-line {
+    margin-bottom: 4px;
+}
+
+.command-text {
+    color: var(--chat-text-symbol);
+}
+
+.welcome-footer {
+    padding: 8px 16px;
+    background: var(--chat-bg-panel-header);
+    border-top: 1px solid var(--chat-border);
+    border-radius: 0 0 8px 8px;
+    text-align: center;
+}
+
+.hint-text {
+    font-size: var(--chat-font-sm);
+    color: var(--chat-text-secondary);
+    opacity: 0.8;
+    font-style: italic;
+}
+
+.welcome-version-badge {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    flex-shrink: 0;
+    margin-bottom: 10px;
+}
+
+.welcome-intro-text {
+    color: var(--chat-text-primary);
+}
+
+.welcome-version-badge img {
+    height: 18px;
+    display: block;
+}
+
+
+
+
+
+
+/* Todos Panel 样式 */
+.todos-panel {
+    border-top: 1px solid var(--chat-border);
+    background-color: var(--chat-bg-primary);
+    position: relative;
+    overflow: visible;
+}
+
+.todos-panel-header {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px var(--chat-spacing-md);
+    transition: background-color 0.15s;
+    position: relative;
+    overflow: visible;
+}
+
+.todos-panel-header:hover {
+    background-color: var(--chat-bg-hover);
+}
+
+.todos-panel-title {
+    font-size: var(--chat-font-base);
+    color: var(--chat-color-muted);
+    font-weight: 500;
+}
+
+.todos-panel-content {
+    max-height: 200px;
+    overflow-y: auto;
+    padding: 4px var(--chat-spacing-md) 8px var(--chat-spacing-md);
+}
+
+
+.todo-panel-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 4px;
+    padding: 3px 8px;
+}
+
+.todo-panel-circle {
+    font-size: var(--chat-font-xs);
+    line-height: 1.5;
+    flex-shrink: 0;
+    width: 18px;
+    text-align: center;
+    margin-top: 1px;
+}
+
+.todo-panel-circle.completed,
+.todo-panel-circle.in-progress {
+    color: var(--chat-color-success);
+}
+
+.todo-panel-text {
+    font-size: var(--chat-font-base);
+    color: var(--chat-text-primary);
+    line-height: 1.5;
+    word-break: break-word;
+}
+
+.todo-panel-item.pending .todo-panel-text {
+    color: var(--chat-text-secondary);
+}
+
+.todo-panel-item.completed .todo-panel-text {
+    text-decoration: line-through;
+}
+
+/* File Changes Panel 样式 */
+.file-changes-panel {
+    border-top: 1px solid var(--chat-border);
+    background-color: var(--chat-bg-primary);
+}
+
+.file-changes-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px var(--chat-spacing-md);
+    user-select: none;
+    transition: background-color 0.15s;
+}
+
+.file-changes-header-left {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+    flex: 1;
+}
+
+.file-changes-header-right {
+    display: flex;
+    align-items: center;
+    gap: var(--chat-spacing-xs);
+}
+
+.file-changes-header-left:hover {
+    background-color: var(--chat-bg-hover);
+}
+
+/* 文件变更操作按钮样式 */
+.file-changes-action-btn {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 8px;
+    font-size: var(--chat-font-base);
+    border: none;
+    background: none;
+    cursor: pointer;
+    border-radius: 3px;
+    transition: background-color 0.15s;
+    user-select: none;
+}
+
+.file-changes-action-btn.discard-btn {
+    color: var(--chat-text-secondary);
+}
+
+.file-changes-action-btn.adopted-btn {
+    color: var(--chat-text-primary);
+}
+
+.file-changes-action-btn.discard-btn:hover {
+    background-color: var(--chat-bg-hover);
+}
+
+.file-changes-action-btn svg {
+    flex-shrink: 0;
+}
+
+.file-changes-title {
+    font-size: var(--chat-font-base);
+    font-weight: 500;
+    color: var(--chat-color-muted);
+}
+
+.file-changes-content {
+    padding: 0 var(--chat-spacing-md) 8px var(--chat-spacing-md);
+    max-height: 150px;
+    overflow-y: auto;
+}
+
+.file-changes-content .tooltip-wrapper {
+    display: flex;
+    width: 100%;
+}
+
+
+.file-change-item {
+    display: flex;
+    align-items: center;
+    padding: 4px 8px;
+    margin-bottom: 2px;
+    border-radius: 3px;
+    transition: background-color 0.15s;
+    cursor: pointer;
+    width: 100%;
+}
+
+.file-change-item:hover {
+    background-color: var(--chat-bg-hover);
+}
+
+.file-change-left {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex: 1;
+    min-width: 0;
+}
+
+.file-change-fullpath {
+    font-size: var(--chat-font-xs);
+    color: var(--chat-text-secondary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    flex: 1;
+    /* 确保完整路径能够自适应 */
+    min-width: 0;
+    /* 重要：允许在flex布局中收缩 */
+}
+
+.file-change-right {
+    display: flex;
+    align-items: center;
+    margin-left: 4px;
+    gap: var(--chat-spacing-lg);
+}
+
+.file-change-discard-btn {
+    display: none;
+    align-items: center;
+    gap: 4px;
+    cursor: pointer;
+    color: var(--chat-text-secondary);
+    transition: color 0.15s;
+}
+
+.file-change-item:hover .file-change-discard-btn {
+    display: flex;
+}
+
+
+.file-change-discard-btn:hover {
+    color: var(--chat-text-primary);
+}
+
+.file-change-name {
+    font-size: var(--chat-font-base);
+    color: var(--chat-text-primary);
+    white-space: nowrap;
+    /* 添加这行防止折行 */
+    overflow: hidden;
+    /* 添加这行隐藏溢出内容 */
+    text-overflow: ellipsis;
+    /* 添加这行显示省略号 */
+    max-width: 150px;
+    /* 可选：设置最大宽度 */
+}
+
+.file-change-stats {
+    display: flex;
+    align-items: center;
+    gap: var(--chat-spacing-xs);
+    font-size: var(--chat-font-base);
+    font-weight: 500;
+}
+
+.file-change-stats .additions {
+    color: var(--chat-color-success);
+}
+
+.file-change-stats .removals {
+    color: var(--chat-color-error);
+}
+
+.file-info {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex: 1;
+    min-width: 0;
+    /* 允许子元素收缩 */
+    gap: 8px;
+}
+
+.file-name {
+    font-weight: normal;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    flex-shrink: 0;
+    /* 文件名不收缩 */
+    max-width: 150px;
+    /* 根据需要调整 */
+}
+
+.file-name-open {
+    font-weight: 500;
+    /* 已打开文件的文件名加粗 */
+}
+
+.file-full-path {
+    color: var(--chat-text-secondary);
+    font-size: var(--chat-font-sm);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    flex-shrink: 1;
+    /* 完整路径可以收缩 */
+    text-align: right;
+    min-width: 0;
+}
+
+@keyframes tooltipFadeIn {
+    from {
+        opacity: 0;
+    }
+
+    to {
+        opacity: 1;
+    }
+}
+
+/* 通用Tooltip组件样式 */
+.tooltip-wrapper {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    max-width: 100%;
+}
+
+.tooltip-wrapper>* {
+    cursor: inherit;
+}
+
+.tooltip-content {
+    position: absolute;
+    bottom: calc(100% + 6px);
+    left: 50%;
+    transform: translateX(-50%);
+    background-color: var(--chat-tooltip-bg);
+    border: 1px solid var(--chat-tooltip-border);
+    color: var(--chat-tooltip-fg);
+    padding: 3px 6px;
+    border-radius: 3px;
+    font-size: var(--chat-font-xs);
+    white-space: nowrap;
+    box-shadow: var(--chat-shadow);
+    z-index: 1000;
+    animation: tooltipFadeIn 0.15s ease-out;
+    pointer-events: none;
+}
+
+.tooltip-wrapper.tooltip-right .tooltip-content {
+    left: auto;
+    right: 0;
+    transform: none;
+}
+
+.tooltip-wrapper.tooltip-left .tooltip-content {
+    left: 0;
+    transform: none;
+}
+
+/* ProcessingSpinner 样式 */
+.processing-spinner {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    margin: var(--chat-block-margin);
+    padding: var(--chat-spacing-md) var(--chat-spacing-lg);
+    width: 100%;
+    max-width: var(--chat-block-max-width);
+    box-sizing: border-box;
+    border-radius: var(--chat-radius-md);
+    background: var(--chat-bg-hover);
+    border: 1px solid var(--chat-bg-hover);
+    position: relative;
+    overflow: hidden;
+    min-height: 32px;
+    container-type: inline-size;
+}
+
+.processing-spinner::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, var(--chat-spinner-shimmer), transparent);
+    animation: shimmer 3s infinite;
+}
+
+@keyframes shimmer {
+    to {
+        left: 100%;
+    }
+}
+
+.processing-spinner-main {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    position: relative;
+    z-index: 1;
+    min-width: 0;
+}
+
+.spinner-char {
+    font-size: var(--chat-font-base);
+    font-weight: 600;
+    color: var(--chat-spinner-accent);
+    animation: spinnerGlow 2s ease-in-out infinite alternate;
+    flex-shrink: 0;
+    width: 1em;
+    text-align: center;
+    display: inline-block;
+}
+
+@keyframes spinnerGlow {
+    to {
+        opacity: 1;
+        filter: brightness(1.2);
+    }
+}
+
+.spinner-message {
+    font-size: var(--chat-font-base);
+    color: var(--chat-text-secondary);
+    flex: 0 1 auto;
+    min-width: 0;
+    max-width: max-content;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.spinner-message.custom-message {
+    color: var(--chat-color-spinner);
+    font-weight: 500;
+}
+
+.spinner-time-info {
+    font-size: var(--chat-font-base);
+    color: var(--chat-text-secondary);
+    font-variant-numeric: tabular-nums;
+    opacity: 0.8;
+    flex-shrink: 0;
+    white-space: nowrap;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.spinner-interrupt-hint {
+    display: inline;
+}
+
+/* 当空间不足时，interrupt hint 自动隐藏 */
+@container (max-width: 350px) {
+    .spinner-interrupt-hint {
+        display: none;
+    }
+}
+
+/* 如果不支持 container queries，使用 flex 自动换行 */
+@supports not (container-type: inline-size) {
+    .spinner-time-info {
+        max-width: 100%;
+    }
+
+    .spinner-interrupt-hint {
+        overflow: hidden;
+        text-overflow: clip;
+        max-width: 0;
+        transition: max-width 0.2s;
+    }
+
+    .processing-spinner:hover .spinner-interrupt-hint,
+    .processing-spinner:focus-within .spinner-interrupt-hint {
+        max-width: 200px;
+    }
+}
+
+.spinner-next-progress {
+    margin-top: 4px;
+    margin-left: 26px;
+    font-size: var(--chat-font-xs);
+    color: var(--chat-text-secondary);
+    font-variant-numeric: tabular-nums;
+    opacity: 0.8;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: calc(100% - 26px);
+    position: relative;
+    z-index: 1;
+}
+
+/* 亮色主题 */
+.vscode-light .processing-spinner {
+    background: linear-gradient(135deg, #f5f7fa, #eef2f9);
+    border-color: rgba(36, 95, 184, 0.12);
+}
+
+.vscode-light .spinner-message {
+    color: var(--chat-text-primary);
+}
+
+/* 高对比度主题 */
+.vscode-high-contrast .processing-spinner {
+    border: 2px solid var(--chat-text-primary);
+    background: var(--chat-bg-editor);
+    box-shadow: 0 0 0 1px var(--chat-border-focus);
+}
+
+.vscode-high-contrast .spinner-char {
+    font-weight: 700;
+    filter: contrast(1.2);
+}
+
+.vscode-high-contrast .processing-spinner::before {
+    display: none;
+}
+
+/* Light主题专用样式 - Chat页面白色背景 */
+.vscode-light body {
+    background-color: var(--chat-bg-light);
+}
+
+.vscode-light #root {
+    background-color: var(--chat-bg-light);
+}
+
+
+/* Light主题下的文件面板背景 */
+.vscode-light .file-changes-panel {
+    background-color: var(--chat-bg-light);
+}
+
+.vscode-light .file-changes-content {
+    background-color: var(--chat-bg-light);
+}
+
+/* Light主题下的todo面板背景 */
+.vscode-light .todos-panel {
+    background-color: var(--chat-bg-light);
+}
+
+.vscode-light .todos-panel-content {
+    background-color: var(--chat-bg-light);
+}
+
+/* ModelConfigReminder 组件样式 - 简化版 */
+.model-config-reminder {
+    background: var(--chat-notification-bg);
+    border-color: var(--chat-notification-border);
+    border-left: 4px solid var(--chat-notification-warning-icon);
+    padding: var(--chat-spacing-lg);
+    box-shadow: var(--chat-shadow);
+}
+
+.model-config-reminder-content {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--chat-spacing-lg);
+}
+
+.model-config-reminder-icon {
+    color: var(--chat-notification-warning-icon);
+    font-size: var(--chat-font-xl);
+    line-height: 1;
+    margin-top: 1px;
+}
+
+.model-config-reminder-text {
+    flex: 1;
+    font-size: var(--chat-font-md);
+    color: var(--chat-notification-fg);
+    line-height: 1.5;
+    margin-bottom: 12px;
+}
+
+.model-config-reminder-actions {
+    display: flex;
+    gap: 8px;
+    margin-left: 28px;
+    /* 对齐文本内容 */
+}
+
+.model-config-reminder-button {
+    padding: 4px 12px;
+    font-size: var(--chat-font-base);
+    border-radius: 3px;
+    border: 1px solid transparent;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.model-config-reminder-button.primary {
+    background-color: var(--chat-bg-button);
+    color: var(--chat-text-button);
+}
+
+.model-config-reminder-button.primary:hover {
+    background-color: var(--chat-bg-button-hover);
+}
+
+.model-config-reminder-button.secondary {
+    background-color: transparent;
+    color: var(--chat-text-primary);
+    border-color: var(--chat-border-contrast);
+}
+
+.model-config-reminder-button.secondary:hover {
+    background-color: var(--chat-bg-hover);
+}

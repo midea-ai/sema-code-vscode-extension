@@ -1,0 +1,60 @@
+/* highlight.js 语法高亮样式 — 覆盖 hljs 默认以适配 VSCode 主题 */
+
+/* 去除 hljs 默认背景 */
+#root .hljs {
+    background: transparent;
+    padding: 0;
+}
+
+/* Light 主题语法高亮 — dark 主题使用 hljs 默认配色 */
+.vscode-light #root .hljs-keyword,
+.vscode-light #root .hljs-selector-tag,
+.vscode-light #root .hljs-section,
+.vscode-light #root .hljs-link {
+    color: #0000ff;
+}
+
+.vscode-light #root .hljs-string,
+.vscode-light #root .hljs-title,
+.vscode-light #root .hljs-name,
+.vscode-light #root .hljs-attribute,
+.vscode-light #root .hljs-symbol,
+.vscode-light #root .hljs-bullet,
+.vscode-light #root .hljs-built_in,
+.vscode-light #root .hljs-addition,
+.vscode-light #root .hljs-template-tag,
+.vscode-light #root .hljs-template-variable {
+    color: #a31515;
+}
+
+.vscode-light #root .hljs-comment,
+.vscode-light #root .hljs-quote,
+.vscode-light #root .hljs-deletion {
+    color: #008000;
+}
+
+.vscode-light #root .hljs-meta {
+    color: #800000;
+}
+
+.vscode-light #root .hljs-number,
+.vscode-light #root .hljs-regexp,
+.vscode-light #root .hljs-literal,
+.vscode-light #root .hljs-variable {
+    color: #098658;
+}
+
+.vscode-light #root .hljs-type,
+.vscode-light #root .hljs-params,
+.vscode-light #root .hljs-class {
+    color: #267f99;
+}
+
+.vscode-light #root .hljs-attr,
+.vscode-light #root .hljs-subst {
+    color: #1f377f;
+}
+
+.vscode-light #root .hljs-function {
+    color: #795e26;
+}

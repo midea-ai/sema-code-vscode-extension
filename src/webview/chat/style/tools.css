@@ -1,0 +1,443 @@
+/* 工具组件专用样式 — 仅保留差异化属性，公共属性由 blocks.css 提供 */
+
+/* ========== Bash Block ========== */
+/* 容器：继承 .chat-block，无额外属性 */
+
+.bash-block-header {
+    cursor: pointer;
+}
+
+.bash-block-title {
+    gap: var(--chat-spacing-sm);
+}
+
+
+.bash-streaming-dot {
+    display: inline-block;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background-color: var(--chat-color-success);
+    flex-shrink: 0;
+    animation: pulse 1s ease-in-out infinite;
+}
+
+.bash-toggle-btn,
+.pub-toggle-btn,
+.thought-toggle-btn {
+    display: none;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    color: var(--chat-color-muted);
+    width: 14px;
+    height: 14px;
+    margin-left: 0;
+}
+
+.bash-block-header:hover .bash-toggle-btn,
+.bash-permission-header:hover .bash-toggle-btn,
+.pub-block-header:hover .pub-toggle-btn,
+.thought-block-header:hover .thought-toggle-btn {
+    display: flex;
+}
+
+/* 内容区：继承 .chat-block-content */
+.bash-command {
+    margin-bottom: var(--chat-spacing-md);
+    background-color: transparent;
+    width: 100%;
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.bash-command pre {
+    margin: 0;
+    padding: 0;
+    background: transparent;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    word-break: break-word;
+    overflow-wrap: break-word;
+    width: 100%;
+    max-width: 100%;
+}
+
+.bash-command code::before {
+    content: '$ ';
+    color: var(--chat-color-purple);
+}
+
+.bash-command code {
+    font-size: var(--chat-font-base);
+    line-height: 1.3;
+    display: block;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    word-break: break-word;
+    overflow-wrap: break-word;
+    color: var(--chat-text-primary);
+    background-color: transparent;
+    width: 100%;
+    max-width: 100%;
+}
+
+.bash-command .hljs {
+    background: transparent !important;
+}
+
+.bash-omitted-lines {
+    font-size: var(--chat-font-sm);
+    color: var(--chat-color-muted);
+    padding: 0 0 4px 0;
+    opacity: 0.8;
+}
+
+.bash-omitted-lines-clickable {
+    cursor: pointer;
+    text-decoration: none;
+}
+
+.bash-omitted-lines-clickable:hover {
+    color: var(--chat-color-muted-hover);
+    opacity: 1;
+    text-decoration: underline;
+}
+
+.bash-output {
+    margin: 0;
+    padding: 0;
+    overflow-y: auto;
+    white-space: pre;
+    font-size: var(--chat-font-base);
+    line-height: 1.3;
+    color: var(--chat-color-muted);
+    font-family: var(--vscode-editor-font-family);
+    background: transparent;
+}
+
+
+/* ========== Pub Block ========== */
+/* 容器：继承 .chat-block--borderless */
+
+.pub-block-header {
+    cursor: default;
+}
+
+.pub-block-title {
+    font-size: var(--chat-font-base);
+    color: var(--chat-color-muted);
+}
+
+
+/* 内容区：继承 .chat-block-content */
+.pub-block-content {
+    overflow-y: auto;
+    max-height: 300px;
+    font-size: var(--chat-font-base);
+    line-height: 1.3;
+    white-space: pre;
+    color: var(--chat-color-muted);
+    font-family: var(--vscode-editor-font-family);
+}
+
+/* ========== Thought Block ========== */
+/* 容器：继承 .chat-block--borderless */
+
+.thought-block-header {
+    padding: var(--chat-block-header-padding);
+    cursor: pointer;
+}
+
+.thought-block-title {
+    justify-content: flex-start;
+    font-size: var(--chat-font-base);
+    color: var(--chat-color-muted);
+    width: 100%;
+}
+
+.thought-title-text {
+    font-size: var(--chat-font-base);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    flex-shrink: 0;
+}
+
+
+/* 内容区：继承 .chat-block-content */
+.thought-block-content {
+    padding: var(--chat-spacing-xs) var(--chat-spacing-md);
+    margin-left: 0;
+}
+
+.thought-content {
+    font-size: var(--chat-font-sm);
+    color: var(--chat-text-secondary);
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    word-break: break-word;
+    overflow-wrap: break-word;
+    line-height: 1.4;
+    width: 100%;
+    max-width: 100%;
+    max-height: calc(1.4em * 5);
+    overflow-y: auto;
+}
+
+.vscode-light .thought-content {
+    color: var(--chat-color-muted-light);
+}
+
+/* ========== Tool Error Block ========== */
+/* 容器：继承 .chat-block--borderless */
+
+.tool-error-block {
+    flex-direction: column;
+}
+
+.tool-error-header {
+    display: flex;
+    align-items: baseline;
+    gap: var(--chat-spacing-sm);
+    font-size: var(--chat-font-base);
+    line-height: 1.4;
+    overflow: visible;
+    white-space: nowrap;
+}
+
+.tool-error-header .tool-error-indicator {
+    color: var(--chat-color-error);
+    flex-shrink: 0;
+}
+
+.tool-error-content {
+    font-size: var(--chat-font-base);
+    color: var(--chat-color-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    line-height: 1.4;
+    margin-top: 2px;
+    margin-left: 8px;
+}
+
+/* ========== Light 主题覆盖 ========== */
+/* 注意：大部分 light 覆盖已由 blocks.css 的 .vscode-light .chat-block-content 处理 */
+
+.vscode-light .pub-block-content {
+    color: var(--chat-color-muted-light);
+}
+
+/* ========== Task Block (Agent) ========== */
+/* 容器：继承 .chat-block */
+
+.task-block.task-status-running {
+    border-left: 2px solid var(--chat-color-warning);
+}
+
+.task-block.task-status-completed {
+    border-left: 2px solid var(--chat-color-success);
+}
+
+.task-block.task-status-failed {
+    border-left: 2px solid var(--chat-color-error);
+}
+
+.task-block-header {
+    cursor: default;
+}
+
+.task-background-tag {
+    font-size: var(--chat-font-xs);
+    padding: 1px 5px;
+    border-radius: var(--chat-radius-sm);
+    background: var(--chat-bg-badge);
+    color: var(--chat-text-badge);
+    opacity: 0.6;
+    flex-shrink: 0;
+    line-height: 1.4;
+}
+
+.task-status-icon {
+    font-size: var(--chat-font-xs);
+    flex-shrink: 0;
+}
+
+.task-status-icon.running {
+    color: var(--chat-color-warning);
+    animation: pulse 1.5s ease-in-out infinite;
+}
+
+.task-status-icon.completed {
+    color: var(--chat-color-success);
+}
+
+.task-status-icon.failed {
+    color: var(--chat-color-error);
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+}
+
+.task-title-text {
+    font-size: var(--chat-font-base);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.task-detail-btn {
+    font-size: var(--chat-font-sm);
+    padding: 2px 8px;
+    background-color: transparent;
+    border: 1px solid var(--chat-border);
+    border-radius: var(--chat-radius-sm);
+    color: var(--chat-color-muted);
+    cursor: pointer;
+    transition: all 0.15s;
+    flex-shrink: 0;
+}
+
+.task-detail-btn:hover {
+    background-color: var(--chat-bg-hover);
+    color: var(--chat-text-primary);
+}
+
+.task-block-summary {
+    padding: 4px 8px 6px 8px;
+}
+
+.task-block-summary pre {
+    margin: 0;
+    font-size: var(--chat-font-sm);
+    color: var(--chat-color-muted);
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    line-height: 1.4;
+}
+
+/* ========== Task Detail Modal ========== */
+.task-modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: var(--chat-overlay);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+}
+
+.task-modal-container {
+    width: 95%;
+    max-height: 80vh;
+    background-color: var(--chat-bg-editor);
+    border: 1px solid var(--chat-border);
+    border-radius: var(--chat-radius-md);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    box-shadow: var(--chat-shadow-lg);
+}
+
+.task-modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--chat-border);
+    background-color: var(--chat-bg-primary);
+}
+
+.task-modal-title {
+    display: flex;
+    align-items: center;
+    gap: var(--chat-spacing-md);
+    flex: 1;
+    min-width: 0;
+}
+
+.task-modal-status {
+    font-size: var(--chat-font-sm);
+    padding: 2px 6px;
+    border-radius: var(--chat-radius-sm);
+    flex-shrink: 0;
+}
+
+.task-modal-status.task-status-running {
+    background-color: var(--chat-color-warning-bg);
+    color: var(--chat-color-warning);
+}
+
+.task-modal-status.task-status-completed {
+    background-color: var(--chat-color-success-bg);
+    color: var(--chat-color-success);
+}
+
+.task-modal-status.task-status-failed {
+    background-color: var(--chat-color-error-bg);
+    color: var(--chat-color-error);
+}
+
+.task-modal-title-text {
+    font-size: var(--chat-font-md);
+    color: var(--chat-text-primary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.task-modal-close {
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    border: none;
+    color: var(--chat-color-muted);
+    cursor: pointer;
+    border-radius: var(--chat-radius-sm);
+    font-size: var(--chat-font-lg);
+    transition: all 0.15s;
+    flex-shrink: 0;
+}
+
+.task-modal-close:hover {
+    background-color: var(--chat-bg-active);
+    color: var(--chat-text-primary);
+}
+
+.task-modal-content {
+    flex: 1;
+    overflow-y: auto;
+    padding: var(--chat-spacing-lg) 14px;
+    min-height: 200px;
+    font-size: var(--chat-font-base);
+    line-height: 1.6;
+}
+
+
+.task-modal-empty {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    min-height: 150px;
+    color: var(--chat-color-muted);
+    font-size: var(--chat-font-md);
+}
+
+/* Light主题下的Task样式调整 */
+.vscode-light .task-modal-container {
+    box-shadow: var(--chat-shadow-lg);
+}
+
+.vscode-light .task-modal-overlay {
+    background-color: var(--chat-overlay);
+}

@@ -1,0 +1,803 @@
+/* Input组件专用样式 */
+
+/* 新的输入组件样式 */
+.input-box-container {
+    padding: 8px;
+}
+
+.input-box-wrapper {
+    position: relative;
+    border: 1px solid var(--chat-border-input);
+    border-radius: 6px;
+    padding: 6px;
+    container-type: inline-size;
+}
+
+.input-box-wrapper:focus-within {
+    border-color: var(--chat-border-focus);
+}
+
+/* 顶部区域：加号按钮和文件标签 */
+.input-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 4px;
+    margin-bottom: 4px;
+    min-height: 28px;
+    /* 增加最小高度以容纳文件标签，避免抖动 */
+}
+
+.add-file-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    padding: 0;
+    background-color: transparent;
+    border: 1px solid var(--chat-border-input);
+    border-radius: 3px;
+    color: var(--chat-text-primary);
+    cursor: pointer;
+    transition: all 0.2s;
+    flex-shrink: 0;
+}
+
+.add-file-btn svg {
+    width: 14px;
+    height: 14px;
+}
+
+.add-file-btn:hover:not(:disabled) {
+    background-color: var(--chat-bg-list-hover);
+}
+
+.add-file-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* 文件选择器：弹窗、列表、分割线复用 .shortcut-panel-* 样式 */
+.file-picker-item .file-icon {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    line-height: 1;
+    margin-right: 4px;
+}
+
+.file-picker-item .file-icon svg {
+    display: block;
+    width: 18px;
+    height: 18px;
+}
+
+/* 文件信息容器 - 使用flex布局让完整路径靠右；文件名/路径复用 .shortcut-command / .shortcut-desc 样式 */
+.file-picker-item .file-info {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    min-width: 0;
+    /* 允许子元素缩小 */
+}
+
+/* 文件名特有：限制最大宽度、超出省略，间距由 .shortcut-command 提供 */
+.file-picker-item .file-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 40%;
+}
+
+/* 完整路径特有：稍微降低透明度，其余样式继承 .shortcut-desc */
+.file-picker-item .file-full-path {
+    opacity: 0.7;
+    min-width: 0;
+}
+
+.file-picker-empty {
+    padding: 16px;
+    text-align: center;
+    color: var(--chat-text-secondary);
+    font-size: var(--chat-font-base);
+}
+
+/* 快捷面板弹窗 */
+.shortcut-panel-popup {
+    position: absolute;
+    bottom: 100%;
+    left: 0;
+    width: 100%;
+    max-height: 300px;
+    overflow-y: auto;
+    margin-bottom: 8px;
+    background: var(--chat-bg-primary);
+    border: 1px solid var(--chat-border-dropdown);
+    border-radius: 4px;
+    box-shadow: var(--chat-shadow-lg);
+    z-index: 1000;
+    padding: 0;
+}
+
+.shortcut-panel-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 12px;
+    cursor: pointer;
+    font-size: var(--chat-font-md);
+    border-radius: 0;
+    transition: background-color 0.15s;
+    color: var(--chat-text-primary);
+    gap: 0;
+    /* 移除默认间距 */
+    min-width: 0;
+    /* 允许 flex 子元素收缩 */
+}
+
+.shortcut-panel-section-title {
+    display: flex;
+    align-items: center;
+    padding: 8px 12px;
+    font-size: var(--chat-font-md);
+    color: var(--chat-text-secondary);
+    user-select: none;
+    cursor: default;
+}
+
+.shortcut-panel-divider {
+    height: 1px;
+    background-color: var(--chat-border-dropdown);
+    margin: 4px 8px;
+}
+
+.shortcut-panel-item:first-child {
+    border-radius: 4px 4px 0 0;
+}
+
+.shortcut-panel-item:last-child {
+    border-radius: 0 0 4px 4px;
+}
+
+.shortcut-panel-item:only-child {
+    border-radius: 4px;
+}
+
+.shortcut-panel-item:hover {
+    background-color: var(--chat-bg-list-hover);
+}
+
+/* 选中项样式（键盘导航） */
+.shortcut-panel-item.selected {
+    background-color: var(--chat-bg-list-active);
+    color: var(--chat-text-list-active);
+}
+
+.shortcut-panel-item.selected .shortcut-command,
+.shortcut-panel-item.selected .shortcut-desc {
+    color: var(--chat-text-list-active);
+}
+
+/* / 符号高亮 */
+.shortcut-slash {
+    flex-shrink: 0;
+    font-size: var(--chat-font-md);
+    font-weight: bold;
+    color: var(--chat-text-link);
+}
+
+/* 命令名称正常颜色 */
+.shortcut-command {
+    flex-shrink: 0;
+    font-size: var(--chat-font-md);
+    /* font-weight: bold; */
+    color: var(--chat-text-primary);
+    margin-right: 40px;
+    /* 与描述之间的间距 */
+}
+
+/* 描述文本灰色 */
+.shortcut-desc {
+    flex: 1;
+    font-size: var(--chat-font-base);
+    color: var(--chat-text-secondary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    text-align: right;
+    min-width: 0;
+}
+
+/* 当描述被截断需要展示 Tooltip 时，外层 .tooltip-wrapper 接管 flex:1 撑满剩余空间 */
+.shortcut-desc-tooltip.tooltip-wrapper {
+    flex: 1;
+    min-width: 0;
+    justify-content: flex-end;
+}
+
+.shortcut-desc-tooltip .shortcut-desc {
+    flex: 1;
+}
+
+/* 描述较长时允许 Tooltip 内容换行，避免溢出视口 */
+.shortcut-desc-tooltip .tooltip-content {
+    white-space: normal;
+    max-width: 320px;
+    text-align: left;
+}
+
+/* 输入框（contentEditable div） */
+.input-textarea {
+    width: 100%;
+    padding: 6px 8px;
+    background-color: transparent;
+    color: var(--chat-text-input);
+    border: none;
+    font-size: var(--chat-font-base);
+    min-height: 36px;
+    max-height: 300px;
+    line-height: 1.4;
+    transition: max-height 0.3s ease;
+    overflow-y: auto;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    outline: none;
+}
+
+.input-textarea.expanded {
+    min-height: 300px;
+    max-height: 600px;
+}
+
+.input-textarea:focus {
+    outline: none;
+}
+
+/* contentEditable 占位符：仅当编辑器为空时显示 */
+.input-editable[contenteditable="true"]:empty::before {
+    content: attr(data-placeholder);
+    color: var(--chat-color-muted);
+    pointer-events: none;
+}
+
+.input-editable[contenteditable="false"] {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.input-textarea-container {
+    position: relative;
+    width: 100%;
+    overflow: hidden;
+}
+
+/* @文件 高亮 */
+.file-mention {
+    background-color: var(--chat-bg-button);
+    color: var(--chat-text-button);
+    border-radius: 3px;
+    padding: 0 3px;
+    margin: 0 1px;
+    font-weight: 500;
+    /* 让 mention 内部的字符可被光标命中，但视觉上是一整块 */
+    white-space: nowrap;
+}
+
+.file-mention:focus {
+    outline: none;
+}
+
+/* 底部按钮组 */
+.input-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 3px;
+    padding-top: 1px;
+    margin-top: 0;
+}
+
+/* 缩放按钮 */
+.expand-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    padding: 0;
+    background-color: transparent;
+    border: none;
+    border-radius: 50%;
+    color: var(--chat-text-primary);
+    cursor: pointer;
+    opacity: 0.6;
+    transition: all 0.2s;
+}
+
+.expand-btn svg {
+    width: 12px;
+    height: 12px;
+}
+
+.expand-btn:hover:not(:disabled) {
+    opacity: 1;
+    background-color: var(--chat-bg-list-hover);
+    transform: scale(1.05);
+}
+
+.expand-btn:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+}
+
+/* 发送/停止按钮 */
+.send-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    padding: 0;
+    background-color: var(--chat-bg-button);
+    border: none;
+    border-radius: 50%;
+    /* 完全圆形 */
+    color: var(--chat-text-button);
+    cursor: pointer;
+    opacity: 0.5;
+    transition: all 0.2s;
+}
+
+.send-btn svg {
+    width: 12px;
+    height: 12px;
+}
+
+.send-btn.active {
+    opacity: 1;
+    background-color: var(--chat-bg-button);
+}
+
+.send-btn.active:hover:not(:disabled) {
+    background-color: var(--chat-bg-button-hover);
+    transform: scale(1.1);
+}
+
+.send-btn:disabled {
+    cursor: not-allowed;
+}
+
+
+
+/* Token Progress Circle */
+.token-progress {
+    display: flex;
+    align-items: center;
+    flex-direction: row-reverse;
+    gap: 4px;
+    margin-left: auto;
+    position: relative;
+    background-color: var(--chat-bg-hover);
+    padding: 2px 4px;
+    border-radius: 3px;
+}
+
+.token-circle {
+    width: 10px;
+    height: 10px;
+    transform: rotate(-90deg);
+}
+
+.token-circle-bg {
+    fill: none;
+    stroke: var(--chat-bg-active);
+    stroke-width: 3;
+}
+
+.token-circle-progress {
+    fill: none;
+    stroke: var(--chat-text-primary);
+    stroke-width: 3;
+    stroke-linecap: round;
+    transition: stroke-dasharray 0.3s ease;
+    opacity: 0.6;
+}
+
+.token-percentage {
+    font-size: var(--chat-font-sm);
+    color: var(--chat-text-secondary);
+    font-weight: 400;
+    font-variant-numeric: tabular-nums;
+    min-width: 35px;
+    text-align: right;
+    letter-spacing: 0.02em;
+}
+
+/* 左下角容器 - 包含 Agent 模式和模型信息 */
+.bottom-left-container {
+    position: absolute;
+    left: 8px;
+    bottom: 8px;
+    z-index: 10;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    max-width: calc(100% - 80px);
+}
+
+/* 分隔符样式 */
+.bottom-separator {
+    color: var(--chat-text-secondary);
+    opacity: 0.4;
+    font-size: var(--chat-font-sm);
+    user-select: none;
+}
+
+/* Agent 模式容器 */
+.agent-mode-container {
+    position: relative;
+    min-width: 0;
+}
+
+/* Agent 模式按钮 */
+.agent-mode-btn {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 6px;
+    background: var(--chat-bg-hover);
+    border: none;
+    border-radius: 4px;
+    font-size: var(--chat-font-sm);
+    color: var(--chat-text-secondary);
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+/* Agent 模式按钮 - 根据当前模式设置颜色 */
+.agent-mode-btn.mode-agent {
+    background: var(--chat-bg-hover);
+    color: var(--chat-text-secondary);
+}
+
+.agent-mode-btn.mode-plan {
+    background: var(--chat-color-warning-bg);
+    color: var(--chat-color-warning);
+}
+
+.agent-mode-btn.mode-design {
+    background: var(--chat-color-purple-bg);
+    color: var(--chat-color-purple);
+}
+
+.agent-mode-btn:hover {
+    filter: brightness(1.15);
+}
+
+.agent-mode-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.agent-mode-btn:disabled:hover {
+    filter: none;
+}
+
+/* Agent 模式按钮内的图标 */
+.agent-mode-btn svg {
+    width: 10px;
+    height: 10px;
+    flex-shrink: 0;
+    color: inherit;
+    stroke: currentColor;
+}
+
+/* AutoEdit 开关按钮 */
+.auto-edit-btn {
+    display: flex;
+    align-items: center;
+    padding: 2px 6px;
+    background: var(--chat-bg-hover);
+    border: none;
+    border-radius: 4px;
+    font-size: var(--chat-font-sm);
+    color: var(--chat-text-secondary);
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.auto-edit-btn.active {
+    background: var(--chat-color-success-bg, rgba(72, 187, 120, 0.15));
+    color: var(--chat-color-success, #48bb78);
+}
+
+.auto-edit-btn:hover {
+    filter: brightness(1.15);
+}
+
+.auto-edit-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.auto-edit-btn:disabled:hover {
+    filter: none;
+}
+
+/* Agent 模式菜单弹窗 */
+.agent-mode-menu-popup {
+    position: absolute;
+    bottom: calc(100% + 6px);
+    left: 0;
+    min-width: 100px;
+    max-width: 160px;
+    width: max-content;
+    background: var(--chat-bg-primary);
+    border: 1px solid var(--chat-border);
+    border-radius: 4px;
+    box-shadow: var(--chat-shadow-lg);
+    overflow: hidden;
+    z-index: 1000;
+    animation: fadeIn 0.15s ease-out;
+}
+
+/* Agent 模式菜单项 */
+.agent-mode-menu-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 6px 10px;
+    font-size: var(--chat-font-base);
+    color: var(--chat-text-primary);
+    cursor: pointer;
+    transition: background 0.15s;
+}
+
+.agent-mode-menu-item:hover {
+    background: var(--chat-bg-hover);
+}
+
+/* 当前 Agent 模式项 */
+.agent-mode-menu-item.agent-mode-current {
+    cursor: default;
+}
+
+.agent-mode-menu-item.agent-mode-current:hover {
+    background: var(--chat-bg-hover);
+}
+
+/* Agent 模式菜单文本 */
+.agent-mode-menu-text {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Design 模式 beta 角标 */
+.agent-mode-beta-tag {
+    font-size: 10px;
+    line-height: 1;
+    padding: 2px 6px;
+    border-radius: 3px;
+    background: var(--chat-bg-active);
+    color: var(--chat-text-secondary);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    opacity: 0.75;
+}
+
+/* 模型信息容器 */
+.model-info-container {
+    position: relative;
+    min-width: 0;
+}
+
+/* 模型信息按钮 */
+.model-info-btn {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 0;
+    background: transparent;
+    border: none;
+    color: var(--chat-text-secondary);
+    font-size: var(--chat-font-sm);
+    cursor: pointer;
+    transition: color 0.15s;
+    max-width: min(200px, calc(100vw - 120px));
+    overflow: hidden;
+    min-width: 0;
+}
+
+.model-info-btn:hover {
+    color: var(--chat-text-primary);
+}
+
+.model-info-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.model-info-btn:disabled:hover {
+    color: var(--chat-text-secondary);
+}
+
+/* 模型按钮内的图标 */
+.model-info-btn svg {
+    width: 10px;
+    height: 10px;
+    flex-shrink: 0;
+    color: inherit;
+    stroke: currentColor;
+}
+
+/* 模型名文本 */
+.model-name-text {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: var(--chat-font-sm);
+    color: var(--chat-text-secondary);
+    transition: color 0.15s;
+}
+
+.model-info-btn:hover .model-name-text {
+    color: var(--chat-text-primary);
+}
+
+/* 模型菜单下拉图标 */
+.model-chevron {
+    width: 12px;
+    height: 12px;
+    flex-shrink: 0;
+    color: var(--chat-text-secondary);
+    transition: color 0.15s;
+}
+
+.model-info-btn:hover .model-chevron {
+    color: var(--chat-text-primary);
+}
+
+/* 模型菜单弹窗 */
+.model-menu-popup {
+    position: absolute;
+    bottom: calc(100% + 6px);
+    left: 0;
+    right: 0;
+    min-width: 180px;
+    max-width: min(320px, calc(100vw - 20px));
+    width: max-content;
+    background: var(--chat-bg-primary);
+    border: 1px solid var(--chat-border);
+    border-radius: 4px;
+    box-shadow: var(--chat-shadow-lg);
+    overflow: hidden;
+    z-index: 1000;
+    animation: fadeIn 0.15s ease-out;
+}
+
+/* 在极窄屏幕下调整菜单位置 */
+@media (max-width: 360px) {
+    .model-menu-popup {
+        left: 50%;
+        right: auto;
+        transform: translateX(-50%);
+        min-width: 160px;
+        max-width: calc(100vw - 40px);
+    }
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+
+    to {
+        opacity: 1;
+    }
+}
+
+/* 模型菜单项 */
+.model-menu-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 6px 10px;
+    font-size: var(--chat-font-base);
+    color: var(--chat-text-primary);
+    cursor: pointer;
+    transition: background 0.15s;
+    min-width: 0;
+}
+
+/* 在极窄屏幕下减少内边距 */
+@media (max-width: 360px) {
+    .model-menu-item {
+        padding: 6px 8px;
+        gap: 6px;
+        font-size: var(--chat-font-sm);
+    }
+}
+
+.model-menu-item:hover {
+    background: var(--chat-bg-hover);
+}
+
+/* 当前模型项 */
+.model-menu-item.model-current {
+    cursor: default;
+}
+
+.model-menu-item.model-current:hover {
+    background: var(--chat-bg-hover);
+}
+
+/* 模型菜单文本 */
+.model-menu-text {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0;
+}
+
+/* 模型菜单右侧图标 */
+.model-check-icon {
+    width: 14px;
+    height: 14px;
+    flex-shrink: 0;
+    color: var(--chat-color-success);
+}
+
+/* 模型菜单分隔线 */
+.model-menu-divider {
+    height: 1px;
+    background: var(--chat-border);
+    margin: 0;
+}
+
+/* Light主题下的input组件背景 */
+.vscode-light .input-box-wrapper {
+    background-color: var(--chat-bg-light);
+}
+
+.vscode-light .input-textarea {
+    background-color: var(--chat-bg-light);
+}
+
+.vscode-light .input-editable[contenteditable="true"]:empty::before {
+    color: var(--chat-color-muted);
+}
+
+/* 响应式隐藏：侧边栏变窄时依次隐藏底部左侧元素 */
+/* 第一阶段：AutoEdit 消失 */
+@container (max-width: 280px) {
+    .auto-edit-btn,
+    .separator-autoedit {
+        display: none;
+    }
+}
+
+/* 第二阶段：模型选择器消失 */
+@container (max-width: 210px) {
+    .model-info-container,
+    .separator-model {
+        display: none;
+    }
+}
+
+/* 第三阶段：Agent 模式选择器消失 */
+@container (max-width: 150px) {
+    .agent-mode-container {
+        display: none;
+    }
+}

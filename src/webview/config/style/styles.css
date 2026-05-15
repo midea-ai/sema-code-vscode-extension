@@ -1,0 +1,753 @@
+@import './token.css';
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+/* 全局禁用橙色焦点边框，使用VSCode焦点样式 */
+*:focus {
+    outline: none;
+}
+
+*:focus-visible {
+    outline: 1px solid var(--vscode-focusBorder);
+    outline-offset: -1px;
+}
+
+/* 对于不需要焦点样式的元素 */
+button:focus,
+button:focus-visible,
+[tabindex]:focus,
+[tabindex]:focus-visible {
+    outline: none;
+}
+
+/* 输入框焦点样式 */
+input:focus,
+textarea:focus,
+select:focus {
+    outline: none;
+    border-color: var(--vscode-focusBorder);
+}
+
+body {
+    font-family: var(--vscode-font-family);
+    color: var(--vscode-foreground);
+    background: var(--vscode-editor-background);
+    padding: 0;
+    overflow-x: hidden;
+    line-height: 1.6;
+}
+
+/* 应用容器 - 使用flex布局 */
+.app-container {
+    display: flex;
+    height: 100vh;
+    width: 100%;
+}
+
+/* 左侧导航栏 */
+.sidebar {
+    width: 130px;
+    background: var(--vscode-sideBar-background);
+    border-right: 1px solid var(--vscode-panel-border);
+    padding: 20px 0;
+    flex-shrink: 0;
+    position: fixed;
+    left: 0;
+    top: 0;
+    height: 100vh;
+    z-index: 100;
+}
+
+/* 导航项 */
+.nav-item {
+    padding: 8px 12px;
+    cursor: pointer;
+    font-size: 13px;
+    color: var(--vscode-foreground);
+    transition: all 0.2s ease;
+    border-left: 3px solid transparent;
+}
+
+.nav-item:hover {
+    background: var(--vscode-list-hoverBackground);
+    color: var(--vscode-list-hoverForeground);
+}
+
+.nav-item.active {
+    background: var(--vscode-list-activeSelectionBackground);
+    color: var(--vscode-list-activeSelectionForeground);
+    border-left-color: var(--vscode-button-background);
+}
+
+/* 主导航项 */
+.nav-item.nav-main {
+    margin-bottom: 4px;
+}
+
+/* 主内容区域 */
+.main-content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px 24px;
+    margin-left: 130px;
+}
+
+.container {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 0;
+}
+
+/* 页面内容 */
+.page {
+    display: none;
+}
+
+.page.active {
+    display: block;
+}
+
+/* 模型列表 */
+.model-list {
+    margin-bottom: 40px;
+}
+
+.section-title {
+    font-size: 16px;
+    font-weight: 600;
+    margin-bottom: 16px;
+    color: var(--vscode-foreground);
+    letter-spacing: 0.5px;
+}
+
+.section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+}
+
+.model-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    background: var(--vscode-sideBar-background);
+    border: 1px solid var(--vscode-panel-border);
+    border-radius: var(--s-radius-lg);
+    overflow: hidden;
+    box-shadow: var(--s-card-shadow);
+}
+
+.model-table thead {
+    background: var(--vscode-list-hoverBackground);
+}
+
+.model-table th,
+.model-table td {
+    padding: 8px 16px;
+    text-align: left;
+    border-bottom: 1px solid var(--vscode-panel-border);
+}
+
+.model-table th:nth-child(3),
+.model-table td:nth-child(3) {
+    width: 80px;
+    text-align: center;
+}
+
+.model-table th:nth-child(4),
+.model-table td:nth-child(4) {
+    width: 80px;
+    text-align: center;
+}
+
+.model-table th {
+    font-weight: 600;
+    font-size: 12px;
+    color: var(--vscode-descriptionForeground);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.model-table td {
+    font-size: 13px;
+    color: var(--vscode-foreground);
+}
+
+.model-table tbody tr:last-child td {
+    border-bottom: none;
+}
+
+.model-table tbody tr {
+    transition: background-color 0.15s;
+}
+
+.model-table tbody tr:hover {
+    background: var(--vscode-list-hoverBackground);
+}
+
+/* 删除按钮图标 */
+.delete-btn {
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    padding: 6px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--vscode-foreground);
+    opacity: 0.6;
+    transition: all 0.2s ease;
+    border-radius: 4px;
+}
+
+.delete-btn:hover {
+    opacity: 1;
+    background: var(--vscode-list-hoverBackground);
+}
+
+.delete-btn:active {
+    transform: scale(0.95);
+}
+
+.delete-btn svg {
+    width: 20px;
+    height: 20px;
+    fill: currentColor;
+}
+
+/* 任务配置 */
+.task-config {
+    margin-top: 40px;
+    padding: var(--s-gap-xl);
+    background: var(--s-card-bg);
+    border: 1px solid var(--s-card-border);
+    border-radius: var(--s-radius-lg);
+    box-shadow: var(--s-card-shadow);
+}
+
+.confirm-task-btn {
+    padding: 11px 24px;
+    background: var(--s-btn-secondary-bg);
+    color: var(--s-btn-secondary-fg);
+    border: none;
+    border-radius: var(--s-radius-md);
+    cursor: pointer;
+    font-size: var(--s-font-md);
+    font-weight: 600;
+    transition: all 0.2s ease;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+    width: 100%;
+}
+
+.confirm-task-btn:hover:not(:disabled) {
+    background: var(--s-btn-secondary-hover-bg);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
+    transform: translateY(-1px);
+}
+
+.confirm-task-btn:active:not(:disabled) {
+    transform: translateY(0);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+.confirm-task-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.task-row {
+    display: grid;
+    grid-template-columns: 70px 1fr;
+    align-items: center;
+    margin-bottom: 16px;
+}
+
+.task-row:last-child {
+    margin-bottom: 0;
+}
+
+.task-select-wrapper {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.task-select-wrapper select {
+    width: 100%;
+}
+
+.task-recommend {
+    font-size: 11px;
+    color: var(--vscode-descriptionForeground);
+    opacity: 0.8;
+}
+
+.task-label {
+    font-weight: 600;
+    font-size: 13px;
+    color: var(--vscode-foreground);
+}
+
+/* 表单样式 */
+.form-card {
+    background: var(--s-card-bg);
+    border: 1px solid var(--s-card-border);
+    border-radius: var(--s-radius-lg);
+    padding: 32px;
+    box-shadow: var(--s-card-shadow);
+}
+
+.form-group {
+    margin-bottom: 16px;
+}
+
+label {
+    display: block;
+    margin-bottom: 8px;
+    font-weight: 600;
+    font-size: 13px;
+    color: var(--vscode-foreground);
+}
+
+input, select {
+    width: 100%;
+    padding: 10px 14px;
+    background: var(--vscode-input-background);
+    color: var(--vscode-input-foreground);
+    border: 1px solid var(--vscode-input-border);
+    border-radius: var(--s-radius-md);
+    font-size: var(--s-font-md);
+    transition: all 0.2s ease;
+}
+
+input:hover, select:hover {
+    border-color: var(--vscode-focusBorder);
+}
+
+input:focus, select:focus {
+    outline: none;
+    border-color: var(--vscode-focusBorder);
+    box-shadow: 0 0 0 3px rgba(14, 99, 156, 0.1);
+}
+
+select {
+    cursor: pointer;
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%23A0A0A0' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 12px center;
+    padding-right: 36px;
+    transition: all 0.2s ease, background-image 0s;
+}
+
+select:hover {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%23E0E0E0' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+}
+
+.description {
+    font-size: 12px;
+    color: var(--vscode-descriptionForeground);
+    margin-top: 6px;
+    line-height: 1.4;
+}
+
+.form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+}
+
+.button-group {
+    margin-top: 32px;
+    display: flex;
+    gap: 12px;
+}
+
+button[type="submit"], button[type="button"] {
+    padding: 11px 24px;
+    background: var(--vscode-button-background);
+    color: var(--vscode-button-foreground);
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 600;
+    transition: all 0.2s ease;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+button[type="submit"]:hover, button[type="button"]:hover {
+    background: var(--vscode-button-hoverBackground);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
+    transform: translateY(-1px);
+}
+
+button[type="submit"]:active, button[type="button"]:active {
+    transform: translateY(0);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+button[type="button"].secondary {
+    background: var(--s-btn-secondary-bg);
+    color: var(--s-btn-secondary-fg);
+}
+
+button[type="button"].secondary:hover {
+    background: var(--s-btn-secondary-hover-bg);
+}
+
+button.reset-btn {
+    background: var(--s-btn-secondary-bg);
+    color: var(--s-btn-secondary-fg);
+}
+
+button.reset-btn:hover {
+    background: var(--s-btn-secondary-hover-bg);
+}
+
+button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+button:disabled:hover {
+    transform: none;
+}
+
+/* Loading spinner */
+.btn-loading {
+    position: relative;
+    pointer-events: none;
+    opacity: 0.7;
+}
+
+.btn-loading .spinner {
+    display: inline-block;
+    width: 14px;
+    height: 14px;
+    border: 2px solid currentColor;
+    border-right-color: transparent;
+    border-radius: 50%;
+    animation: spin 0.6s linear infinite;
+    vertical-align: middle;
+    margin-right: 6px;
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+button.small {
+    padding: 4px 10px;
+    font-size: 12px;
+    min-width: auto;
+}
+
+.test-status {
+    margin-top: 12px;
+    padding: 12px 16px;
+    border-radius: 6px;
+    font-size: 13px;
+    display: none;
+    align-items: flex-start;
+    animation: slideIn 0.3s ease-out;
+    white-space: pre-wrap;
+    word-break: break-word;
+    line-height: 1.6;
+}
+
+.test-status.testing {
+    background: var(--s-color-testing-bg);
+    border: 1px solid var(--s-color-testing-border);
+    border-left: 3px solid var(--s-color-testing);
+    color: var(--s-color-testing);
+    display: flex;
+}
+
+.test-status.success {
+    background: var(--s-color-ok-bg);
+    border: 1px solid var(--s-color-ok-border);
+    border-left: 3px solid var(--s-color-ok);
+    color: var(--s-color-ok);
+    display: flex;
+}
+
+.test-status.error {
+    background: var(--s-color-err-bg);
+    border: 1px solid var(--s-color-err-border);
+    border-left: 3px solid var(--s-color-err);
+    color: var(--s-color-err);
+    display: flex;
+}
+
+.message {
+    margin-top: 20px;
+    padding: 14px 16px;
+    border-radius: 6px;
+    font-size: 13px;
+    display: none;
+    align-items: center;
+    animation: slideIn 0.3s ease-out;
+}
+
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.message.success {
+    background: var(--s-color-ok-bg);
+    border: 1px solid var(--s-color-ok-border);
+    border-left: 3px solid var(--s-color-ok);
+    color: var(--s-color-ok);
+}
+
+.message.error {
+    background: var(--s-color-err-bg);
+    border: 1px solid var(--s-color-err-border);
+    border-left: 3px solid var(--s-color-err);
+    color: var(--s-color-err);
+}
+
+.input-group {
+    position: relative;
+}
+
+.input-group input {
+    padding-right: 40px;
+}
+
+.input-icon {
+    position: absolute;
+    right: 14px;
+    top: 50%;
+    transform: translateY(-50%);
+    cursor: pointer;
+    width: 20px;
+    height: 20px;
+    opacity: 0.5;
+    transition: opacity 0.2s;
+    user-select: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.input-icon:hover {
+    opacity: 0.8;
+}
+
+.input-icon svg {
+    width: 18px;
+    height: 18px;
+    fill: currentColor;
+}
+
+/* 眼睛图标 - 显示状态 */
+.input-icon.show-password::after {
+    content: '';
+    width: 18px;
+    height: 18px;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23888888' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z'/%3E%3Ccircle cx='12' cy='12' r='3'/%3E%3C/svg%3E");
+    background-size: contain;
+    background-repeat: no-repeat;
+}
+
+/* 眼睛关闭图标 - 隐藏状态 */
+.input-icon.hide-password::after {
+    content: '';
+    width: 18px;
+    height: 18px;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23888888' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24'/%3E%3Cline x1='1' y1='1' x2='23' y2='23'/%3E%3C/svg%3E");
+    background-size: contain;
+    background-repeat: no-repeat;
+}
+
+.empty-state {
+    text-align: center;
+    padding: 48px 20px;
+    color: var(--vscode-descriptionForeground);
+    font-size: 13px;
+}
+
+@media (max-width: 600px) {
+    .container {
+        padding: 20px;
+    }
+
+    .form-row {
+        grid-template-columns: 1fr;
+        gap: 0;
+    }
+
+    .form-row .form-group {
+        margin-bottom: 16px;
+    }
+
+    .task-row {
+        grid-template-columns: 1fr;
+    }
+
+    .form-card {
+        padding: 24px;
+    }
+
+    .task-config {
+        padding: 20px;
+    }
+
+    .main-content {
+        padding: 20px;
+    }
+}
+
+/* 系统配置相关样式 */
+.config-section {
+    margin-bottom: 32px;
+}
+
+.config-section-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--vscode-foreground);
+    margin-bottom: 16px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--vscode-panel-border);
+}
+
+/* 复选框样式 */
+.checkbox-label {
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 400;
+    color: var(--vscode-foreground);
+    margin-bottom: 0;
+    gap: 6px;
+}
+
+.checkbox-label input[type="checkbox"] {
+    width: auto;
+    margin: 0;
+    padding: 0;
+}
+
+.checkbox-label input[type="checkbox"]:focus {
+    box-shadow: none;
+}
+
+/* 文本域样式 */
+textarea {
+    width: 100%;
+    padding: 10px 14px;
+    background: var(--vscode-input-background);
+    color: var(--vscode-input-foreground);
+    border: 1px solid var(--vscode-input-border);
+    border-radius: var(--s-radius-md);
+    font-size: var(--s-font-md);
+    line-height: 1.4;
+    resize: vertical;
+    min-height: 60px;
+    transition: all 0.2s ease;
+}
+
+textarea:hover {
+    border-color: var(--vscode-focusBorder);
+}
+
+textarea:focus {
+    outline: none;
+    border-color: var(--vscode-focusBorder);
+    box-shadow: 0 0 0 3px rgba(14, 99, 156, 0.1);
+}
+
+/* 标签页导航样式 */
+.tab-navigation {
+    display: flex;
+    border-bottom: 1px solid var(--vscode-panel-border);
+    margin-bottom: 30px;
+    background: var(--vscode-editor-background);
+}
+
+.tab-item {
+    padding: 12px 24px;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--vscode-descriptionForeground);
+    border-bottom: 2px solid transparent;
+    transition: all 0.2s ease;
+    position: relative;
+    background: transparent;
+    border: none;
+    outline: none;
+}
+
+.tab-item:hover {
+    color: var(--vscode-foreground);
+    background: var(--vscode-list-hoverBackground);
+}
+
+.tab-item.active {
+    color: var(--vscode-button-background);
+    border-bottom-color: var(--vscode-button-background);
+    background: var(--vscode-list-activeSelectionBackground);
+    font-weight: 600;
+}
+
+.tab-item:first-child {
+    border-top-left-radius: 6px;
+}
+
+.tab-item:last-child {
+    border-top-right-radius: 6px;
+}
+
+/* 标签页内容容器 */
+.tab-content {
+    animation: fadeIn 0.3s ease-in-out;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* 任务徽章样式 */
+.task-badge {
+    font-size: 12px;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-weight: 500;
+}
+
+.task-main {
+    background: var(--s-badge-main-bg);
+    color: var(--s-badge-main-color);
+}
+
+.task-quick {
+    background: var(--s-badge-quick-bg);
+    color: var(--s-badge-quick-color);
+}
+

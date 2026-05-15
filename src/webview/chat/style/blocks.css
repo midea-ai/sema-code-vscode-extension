@@ -1,0 +1,79 @@
+/* ===== 公共 Block 基类：所有 tool / message block 共享 ===== */
+
+/* ---------- 通用块容器 ---------- */
+.chat-block {
+    margin: var(--chat-block-margin);
+    border: 1px solid var(--chat-border);
+    border-radius: var(--chat-radius-sm);
+    overflow: hidden;
+    width: 100%;
+    max-width: var(--chat-block-max-width);
+    box-sizing: border-box;
+}
+
+/* 无边框变体（Read、Thought 等仅有 header 的轻量块） */
+.chat-block--borderless {
+    border: none;
+    overflow: visible;
+}
+
+/* ---------- 通用块头部 ---------- */
+.chat-block-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--chat-block-header-padding);
+    background-color: transparent;
+    min-height: var(--chat-block-header-min-height);
+    width: 100%;
+    box-sizing: border-box;
+}
+
+/* ---------- 通用块标题区 ---------- */
+.chat-block-title {
+    display: flex;
+    align-items: center;
+    gap: var(--chat-spacing-sm);
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+}
+
+/* 标题前缀（Read、BackgroundJob 等固定名称，不可省略） */
+.chat-block-title-label {
+    font-size: var(--chat-font-base);
+    color: var(--chat-text-secondary);
+    flex-shrink: 0;
+    white-space: nowrap;
+}
+
+/* 标题详情（文件名、参数等，空间不足时省略） */
+.chat-block-title-detail {
+    font-size: var(--chat-font-base);
+    color: var(--chat-color-muted);
+    opacity: 0.7;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
+}
+
+/* ---------- 通用块内容区 ---------- */
+.chat-block-content {
+    background-color: var(--chat-bg-primary);
+    padding: var(--chat-block-content-padding);
+    overflow-x: auto;
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+}
+
+/* ---------- Light 主题：内容区白底 ---------- */
+.vscode-light .chat-block-content {
+    background-color: var(--chat-bg-light);
+}
+
+/* ---------- Light 主题：标题前缀降低对比度 ---------- */
+.vscode-light .chat-block-title-label {
+    color: var(--chat-color-muted);
+}

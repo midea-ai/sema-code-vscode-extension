@@ -1,0 +1,929 @@
+/* Bash权限对话框样式 — 继承 .chat-block */
+.bash-permission-block {
+    outline: none;
+    background-color: var(--chat-bg-primary);
+}
+
+body.vscode-light .bash-permission-block {
+    background-color: var(--chat-bg-light);
+}
+
+.bash-permission-block:focus,
+.bash-permission-block:focus-visible {
+    outline: none;
+    border-color: var(--chat-border);
+}
+
+/* 头部：继承 .chat-block-header */
+.bash-permission-header {
+    cursor: default;
+}
+
+.bash-permission-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: 1;
+    min-width: 0;
+}
+
+.bash-permission-title-text {
+    font-size: var(--chat-font-base);
+    color: var(--chat-color-muted);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.bash-permission-diff-stats {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: var(--chat-font-base);
+    font-weight: 500;
+    flex-shrink: 0;
+}
+
+.bash-permission-diff-stats .diff-added {
+    color: var(--chat-color-success);
+}
+
+.bash-permission-diff-stats .diff-removed {
+    color: var(--chat-color-error);
+    font-weight: 500;
+    font-size: var(--chat-font-base);
+}
+
+.bash-permission-status {
+    font-size: var(--chat-font-xs);
+    color: var(--chat-color-warning);
+    background-color: var(--chat-color-warning-bg);
+    padding: 1px 4px;
+    border-radius: 2px;
+    margin-left: auto;
+}
+
+.bash-permission-content {
+    background-color: var(--chat-bg-primary);
+    padding: 8px;
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+}
+
+body.vscode-light .bash-permission-content {
+    background-color: var(--chat-bg-light);
+}
+
+.bash-permission-info {
+    margin-bottom: 8px;
+}
+
+.bash-permission-description {
+    font-size: var(--chat-font-base);
+    /* color: var(--chat-color-muted); */
+}
+
+.bash-permission-buttons {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-top: 10px;
+    outline: none;
+}
+
+.bash-permission-buttons:focus,
+.bash-permission-buttons:focus-visible {
+    outline: none;
+}
+
+.bash-permission-btn {
+    background-color: var(--chat-bg-button-secondary);
+    color: var(--chat-text-button-secondary);
+    border: none;
+    border-radius: 3px;
+    font-size: var(--chat-font-base);
+    cursor: pointer;
+    padding: 8px 16px;
+    text-align: center;
+    transition: all 0.15s;
+    min-height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.bash-permission-btn:hover {
+    background-color: var(--chat-bg-button-secondary-hover);
+}
+
+.bash-permission-btn:active {
+    background-color: var(--chat-bg-button);
+    transform: translateY(1px);
+}
+
+.bash-permission-btn.selected:hover {
+    background-color: var(--chat-bg-button-hover);
+    opacity: 0.9;
+}
+
+.bash-permission-btn.selected {
+    background-color: var(--chat-bg-button);
+    color: var(--chat-text-button);
+}
+
+.bash-permission-btn:focus {
+    outline: none;
+}
+
+.bash-permission-btn:focus-visible {
+    outline: none;
+}
+
+/* Bash内容区域样式 */
+.bash-permission-bash-body {
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.bash-permission-bash-command {
+    margin: 20px 10px 0px 20px;
+}
+
+.bash-permission-bash-description {
+    margin: 0px 10px 20px 20px;
+    color: var(--chat-color-muted);
+}
+
+.bash-permission-status.refused,
+.bash-permission-status.interrupted {
+    color: var(--chat-color-error);
+    background-color: var(--chat-color-error-bg);
+}
+
+.permission-content-dimmed {
+    opacity: 0.65;
+    filter: grayscale(0.2);
+}
+
+.file-permission-container {
+    margin: 8px 0px 8px 0px;
+}
+
+.file-permission-title-wrapper {
+    margin-bottom: 8px;
+}
+
+.file-permission-title-divider-top {
+    height: 1px;
+    background-color: var(--chat-text-link);
+    margin-bottom: 8px;
+}
+
+.file-permission-title {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: var(--chat-font-base);
+    margin-bottom: 8px;
+}
+
+.file-permission-action {
+    color: var(--chat-text-link);
+    font-weight: bold;
+    flex-shrink: 0;
+    white-space: nowrap;
+}
+
+.file-permission-file-left {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: var(--chat-font-base);
+    color: var(--chat-text-editor);
+    flex-shrink: 1;
+    min-width: 0;
+    overflow: hidden;
+    position: relative;
+}
+
+.file-permission-file-left-clickable {
+    cursor: pointer;
+}
+
+.file-permission-file-left-clickable:hover {
+    opacity: 0.8;
+}
+
+.file-permission-title-clickable {
+    cursor: pointer;
+}
+
+.file-permission-title-clickable:hover {
+    opacity: 0.8;
+}
+
+.file-permission-filename {
+    color: var(--chat-text-primary);
+    font-weight: normal;
+    font-size: var(--chat-font-base);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    flex-shrink: 1;
+    min-width: 0;
+}
+
+.file-permission-cell-label {
+    color: var(--chat-text-secondary);
+    font-size: var(--chat-font-base);
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.file-permission-title-divider-bottom {
+    height: 1px;
+    border-top: 1px dashed var(--chat-color-muted);
+    margin-bottom: 12px;
+}
+
+.file-permission-code-divider {
+    height: 1px;
+    border-top: 1px dashed var(--chat-color-muted);
+    margin-top: 12px;
+}
+
+/* MCP工具内容区域样式 */
+.mcp-tool-content {
+    margin: 10px 10px;
+    padding: 8px 12px;
+    background-color: var(--chat-bg-hover);
+    border-radius: 3px;
+    color: var(--chat-text-primary);
+    font-size: var(--chat-font-base);
+    line-height: 1.6;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+/* Skill权限内容区域样式 */
+.skill-permission-info {
+    margin: 10px 10px 8px 10px;
+    font-size: var(--chat-font-base);
+    color: var(--chat-text-primary);
+    line-height: 1.6;
+}
+
+.skill-permission-content {
+    margin: 0px 10px 10px 10px;
+    padding: 8px 12px;
+    background-color: var(--chat-bg-hover);
+    border-radius: 3px;
+    color: var(--chat-text-primary);
+    font-size: var(--chat-font-base);
+    line-height: 1.6;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+/* ==================== 问答表单样式 ==================== */
+/* ask-form-dialog — 继承 .chat-block */
+.ask-form-dialog {
+    outline: none;
+    position: relative;
+}
+
+body.vscode-light .ask-form-dialog {
+    background-color: var(--chat-bg-primary);
+}
+
+.ask-form-dialog:focus,
+.ask-form-dialog:focus-visible {
+    outline: none;
+    border-color: var(--chat-border);
+}
+
+.ask-form-dialog.readonly {
+    opacity: 0.85;
+}
+
+.ask-form-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 10px 12px 8px 12px;
+    border-bottom: 1px solid var(--chat-border);
+}
+
+.ask-form-header-titles {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.ask-form-header-title {
+    font-size: var(--chat-font-base);
+    font-weight: 600;
+    color: var(--chat-text-primary);
+    line-height: 1.3;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.ask-form-header-intro {
+    font-size: var(--chat-font-xs);
+    color: var(--chat-text-secondary);
+    line-height: 1.4;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.ask-form-status-badge {
+    flex-shrink: 0;
+    font-size: var(--chat-font-xs);
+    padding: 2px 8px;
+    border-radius: 0;
+    font-weight: 500;
+    pointer-events: none;
+    align-self: center;
+}
+
+.ask-form-status-badge.pending {
+    color: var(--chat-color-warning);
+    background-color: var(--chat-color-warning-bg);
+}
+
+.ask-form-status-badge.answered {
+    color: var(--chat-color-success);
+    background-color: var(--chat-color-success-bg);
+}
+
+.ask-form-content {
+    padding: 12px;
+}
+
+.ask-form-item {
+    margin-bottom: 16px;
+}
+
+.ask-form-item:last-child {
+    margin-bottom: 0;
+}
+
+.ask-form-label {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-bottom: 6px;
+}
+
+.ask-form-question-text {
+    font-size: var(--chat-font-base);
+    color: var(--chat-text-primary);
+    font-weight: 500;
+}
+
+.ask-form-required {
+    color: var(--chat-color-error, #f14c4c);
+    font-size: var(--chat-font-base);
+}
+
+.ask-form-options {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    margin-left: 4px;
+}
+
+.ask-form-options-inline {
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-left: 0;
+}
+
+.ask-form-chip {
+    display: inline-flex;
+    align-items: center;
+    cursor: pointer;
+    padding: 4px 10px;
+    font-size: var(--chat-font-base);
+    color: var(--chat-text-primary);
+    background-color: var(--chat-bg-input, var(--chat-bg-list-hover));
+    border: 1px solid var(--chat-border);
+    border-radius: 14px;
+    line-height: 1.4;
+    transition: all 0.15s;
+    font-family: inherit;
+    outline: none;
+}
+
+.ask-form-chip:hover:not(:disabled):not(.selected) {
+    border-color: var(--chat-bg-button);
+    color: var(--chat-text-primary);
+}
+
+.ask-form-chip.selected {
+    background-color: var(--chat-bg-button);
+    color: var(--chat-text-button);
+    border-color: var(--chat-bg-button);
+}
+
+.ask-form-chip.selected:hover:not(:disabled) {
+    background-color: var(--chat-bg-button-hover);
+    border-color: var(--chat-bg-button-hover);
+    color: var(--chat-text-button);
+}
+
+.ask-form-chip:disabled,
+.ask-form-chip.disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+}
+
+.ask-form-option {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    padding: 4px 0;
+    font-size: var(--chat-font-base);
+    color: var(--chat-text-primary);
+}
+
+.ask-form-option.disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+}
+
+.ask-form-option-label {
+    font-size: var(--chat-font-base);
+    color: var(--chat-text-primary);
+    line-height: 1.4;
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.ask-form-hint {
+    font-size: var(--chat-font-xs);
+    color: var(--chat-text-secondary);
+    margin-top: 4px;
+}
+
+.ask-form-hint-row {
+    flex-basis: 100%;
+}
+
+.ask-form-text-wrapper {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.ask-form-counter {
+    align-self: flex-end;
+    font-size: var(--chat-font-xs);
+    color: var(--chat-text-secondary);
+    pointer-events: none;
+}
+
+.ask-form-error {
+    font-size: var(--chat-font-xs);
+    color: var(--chat-color-error, #f14c4c);
+    margin-top: 4px;
+}
+
+.ask-form-item.has-error .ask-form-text,
+.ask-form-item.has-error .ask-form-textarea,
+.ask-form-item.has-error .ask-form-select {
+    border-color: var(--chat-color-error, #f14c4c);
+}
+
+.ask-form-select,
+.ask-form-text,
+.ask-form-textarea {
+    width: 100%;
+    box-sizing: border-box;
+    background-color: var(--chat-bg-input, var(--chat-bg-list-hover));
+    color: var(--chat-text-primary);
+    border: 1px solid var(--chat-border);
+    border-radius: 3px;
+    padding: 6px 8px;
+    font-size: var(--chat-font-base);
+    font-family: inherit;
+    outline: none;
+}
+
+.ask-form-textarea {
+    resize: vertical;
+    min-height: 60px;
+}
+
+.ask-form-select:focus,
+.ask-form-text:focus,
+.ask-form-textarea:focus {
+    border-color: var(--chat-bg-button);
+}
+
+.ask-form-select:disabled,
+.ask-form-text:disabled,
+.ask-form-textarea:disabled {
+    opacity: 0.7;
+    cursor: not-allowed;
+}
+
+.ask-form-buttons {
+    display: flex;
+    gap: 8px;
+    margin-top: 12px;
+}
+
+.ask-form-submit-btn {
+    flex: 1;
+    background-color: var(--chat-bg-button);
+    color: var(--chat-text-button);
+    border: none;
+    border-radius: 3px;
+    cursor: pointer;
+    padding: 8px 16px;
+    font-size: var(--chat-font-base);
+    transition: all 0.15s;
+}
+
+.ask-form-submit-btn:hover {
+    background-color: var(--chat-bg-button-hover);
+}
+
+.ask-form-skip-btn {
+    background-color: var(--chat-bg-button-secondary);
+    color: var(--chat-text-button-secondary);
+    border: none;
+    border-radius: 3px;
+    cursor: pointer;
+    padding: 8px 16px;
+    font-size: var(--chat-font-base);
+    transition: all 0.15s;
+}
+
+.ask-form-skip-btn:hover {
+    background-color: var(--chat-bg-button-secondary-hover);
+}
+
+/* ==================== 计划实施面板样式 ==================== */
+.plan-implement-content {
+    padding: 12px;
+}
+
+.plan-implement-header {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 12px;
+}
+
+.plan-implement-header-tag {
+    font-size: var(--chat-font-xs);
+    color: var(--chat-color-success);
+    background-color: var(--chat-color-success-bg);
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-weight: 500;
+    flex-shrink: 0;
+}
+
+.plan-implement-title {
+    font-size: var(--chat-font-base);
+    color: var(--chat-text-primary);
+    flex-shrink: 0;
+}
+
+.plan-implement-file-name {
+    font-size: var(--chat-font-base);
+    color: var(--chat-text-link);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-family: var(--vscode-editor-font-family, monospace);
+    cursor: pointer;
+    text-decoration: underline;
+    font-weight: 600;
+    flex: 1;
+    min-width: 0;
+}
+
+.plan-implement-toggle-btn {
+    background: none;
+    border: none;
+    color: var(--chat-text-secondary);
+    cursor: pointer;
+    padding: 2px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.plan-implement-toggle-btn:hover {
+    color: var(--chat-text-primary);
+}
+
+.plan-implement-toggle-btn svg {
+    transition: transform 0.2s ease;
+}
+
+.plan-implement-toggle-btn svg.toggle-icon.expanded {
+    transform: rotate(90deg);
+}
+
+.plan-implement-plan-content {
+    max-height: 300px;
+    overflow-y: auto;
+    padding: 8px 12px;
+    background-color: var(--chat-bg-hover);
+    border-radius: 3px;
+    font-size: var(--chat-font-base);
+    line-height: 1.5;
+}
+
+.plan-implement-plan-content pre {
+    margin: 0;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    font-family: var(--vscode-editor-font-family, monospace);
+    color: var(--chat-text-primary);
+}
+
+/* ==================== Plan Exit Dialog 新样式 ==================== */
+/* 可点击的文件名链接 */
+.plan-file-link {
+    cursor: pointer;
+    color: var(--chat-text-link);
+    text-decoration: underline;
+}
+
+.plan-file-link:hover {
+    color: var(--chat-text-link-active);
+}
+
+/* Plan MD 内容区域 */
+.plan-exit-md-content {
+    max-height: 400px;
+    overflow-y: auto;
+    padding: 12px 16px;
+    font-size: var(--chat-font-base);
+    line-height: 1.6;
+}
+
+.plan-exit-md-content .markdown-content {
+    color: var(--chat-text-primary);
+}
+
+.plan-exit-md-content .markdown-content h1,
+.plan-exit-md-content .markdown-content h2,
+.plan-exit-md-content .markdown-content h3,
+.plan-exit-md-content .markdown-content h4 {
+    margin-top: 12px;
+    margin-bottom: 6px;
+    color: var(--chat-text-primary);
+}
+
+.plan-exit-md-content .markdown-content h1:first-child,
+.plan-exit-md-content .markdown-content h2:first-child,
+.plan-exit-md-content .markdown-content h3:first-child {
+    margin-top: 0;
+}
+
+.plan-exit-md-content .markdown-content p {
+    margin: 6px 0;
+}
+
+.plan-exit-md-content .markdown-content ul,
+.plan-exit-md-content .markdown-content ol {
+    margin: 6px 0;
+    padding-left: 20px;
+}
+
+.plan-exit-md-content .markdown-content li {
+    margin: 3px 0;
+}
+
+.plan-exit-md-content .markdown-content code {
+    background-color: var(--chat-bg-active);
+    padding: 1px 4px;
+    border-radius: 2px;
+    font-family: var(--vscode-editor-font-family, monospace);
+    font-size: var(--chat-font-sm);
+}
+
+.plan-exit-md-content .markdown-content pre {
+    background-color: var(--chat-overlay);
+    padding: 10px;
+    border-radius: 3px;
+    overflow-x: auto;
+    margin: 8px 0;
+}
+
+.plan-exit-md-content .markdown-content pre code {
+    background: none;
+    padding: 0;
+}
+
+/* ==================== AskUserQuestion 标签页样式 ==================== */
+.ask-question-tabs {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-bottom: 12px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--chat-border);
+    flex-wrap: wrap;
+}
+
+.ask-question-tab {
+    background: none;
+    color: var(--chat-text-secondary);
+    border: none;
+    border-bottom: 2px solid transparent;
+    border-radius: 0;
+    cursor: pointer;
+    padding: 6px 12px;
+    font-size: var(--chat-font-base);
+    transition: all 0.15s;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-bottom: -9px;
+}
+
+.ask-question-tab:hover {
+    color: var(--chat-text-primary);
+}
+
+.ask-question-tab:focus {
+    outline: none;
+}
+
+.ask-question-tab:focus-visible {
+    outline: none;
+}
+
+.ask-question-tab.active {
+    color: var(--chat-text-primary);
+    border-bottom-color: var(--chat-bg-button);
+    font-weight: 500;
+}
+
+.ask-question-tab.has-selection {
+    position: relative;
+}
+
+.ask-question-tab-hint {
+    font-size: var(--chat-font-xs);
+    color: var(--chat-text-secondary);
+    margin-left: auto;
+}
+
+/* Other 内联输入框样式 */
+.ask-question-other-inline-input {
+    width: 100%;
+    padding: 4px 8px;
+    font-size: var(--chat-font-base);
+    color: var(--chat-text-input);
+    background-color: var(--chat-bg-input);
+    border: 1px solid var(--chat-border-input);
+    border-radius: 3px;
+    outline: none;
+    box-sizing: border-box;
+}
+
+.ask-question-other-inline-input:focus {
+    border-color: var(--chat-border-input);
+}
+
+.ask-question-other-inline-input::placeholder {
+    color: var(--chat-text-placeholder);
+}
+
+/* ==================== Permission 自定义输入框样式 ==================== */
+.permission-custom-input-wrapper {
+    display: flex;
+    align-items: center;
+    min-height: 24px;
+}
+
+.permission-custom-input {
+    flex: 1;
+    padding: 8px 16px;
+    font-size: var(--chat-font-base);
+    color: var(--chat-text-input);
+    background-color: transparent;
+    border: 1px solid var(--chat-border);
+    border-radius: 3px;
+    outline: none;
+    box-sizing: border-box;
+    min-width: 0;
+    transition: all 0.15s;
+}
+
+.permission-custom-input:hover {
+    background-color: transparent;
+    border-color: var(--chat-border);
+}
+
+.permission-custom-input:focus {
+    background-color: transparent;
+    border-color: var(--chat-border-focus);
+}
+
+.permission-custom-input::placeholder {
+    color: var(--chat-text-secondary);
+    opacity: 0.6;
+}
+
+/* ==================== QuickChat 旁路回答弹窗样式 ==================== */
+.quickchat-dialog-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: var(--chat-overlay);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+}
+
+.quickchat-dialog-modal {
+    background: var(--chat-bg-editor);
+    border: 1px solid var(--chat-border);
+    border-radius: 8px;
+    width: 95%;
+    max-height: 80vh;
+    display: flex;
+    flex-direction: column;
+    box-shadow: var(--chat-shadow-lg);
+}
+
+.quickchat-dialog-header {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--chat-border);
+    flex-shrink: 0;
+}
+
+.quickchat-dialog-icon {
+    font-size: var(--chat-font-lg);
+}
+
+.quickchat-dialog-title {
+    font-size: var(--chat-font-md);
+    font-weight: 600;
+    color: var(--chat-text-primary);
+    flex: 1;
+}
+
+.quickchat-dialog-body {
+    padding: 12px 16px;
+    overflow-y: auto;
+    flex: 1;
+    min-height: 0;
+}
+
+.quickchat-dialog-footer {
+    padding: 8px 16px 12px;
+    display: flex;
+    justify-content: flex-end;
+    border-top: 1px solid var(--chat-border);
+    flex-shrink: 0;
+}
+
+.quickchat-question {
+    font-size: var(--chat-font-base);
+    color: var(--chat-text-secondary);
+    padding: 4px 0 8px 0;
+    border-bottom: 1px solid var(--chat-border);
+    margin-bottom: 8px;
+}
+
+.quickchat-answer {
+    max-height: 400px;
+    overflow-y: auto;
+    padding: 8px 0;
+    font-size: var(--chat-font-base);
+    line-height: 1.6;
+}

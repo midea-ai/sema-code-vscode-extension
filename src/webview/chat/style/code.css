@@ -1,0 +1,296 @@
+/* CSS 变量已迁移到 tokens.css */
+
+/* Edit Block 样式 — 容器继承 .chat-block */
+
+/* 头部样式 */
+.edit-block-header {
+    cursor: pointer;
+    gap: var(--chat-spacing-xs);
+}
+
+/* 左侧可点击区域 - 打开文件 */
+.edit-title-left {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: var(--chat-font-base);
+    color: var(--chat-text-editor);
+    cursor: pointer;
+    flex-shrink: 0;
+    overflow: hidden;
+    position: relative;
+}
+
+.edit-title-left:hover {
+    opacity: 0.8;
+}
+
+/* 文件图标样式 */
+.edit-title-left > :first-child {
+    flex-shrink: 0;
+}
+
+/* 文件名样式 */
+.edit-title-left .file-name {
+    font-size: var(--chat-font-base);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    flex-shrink: 1;
+    min-width: 0;
+}
+
+/* 统计信息样式 */
+.edit-stats {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: var(--chat-font-base);
+    font-weight: 500;
+    flex-shrink: 0;
+}
+
+.edit-stats .additions {
+    color: var(--chat-color-success);
+}
+
+.edit-stats .removals {
+    color: var(--chat-color-error);
+    font-weight: 500;
+    font-size: var(--chat-font-base);
+}
+
+/* 折叠按钮 - 在增减号右侧，悬浮时显示 */
+.edit-toggle-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    color: var(--chat-color-muted);
+    flex-shrink: 0;
+    opacity: 0;
+    transition: opacity 0.15s;
+    margin-left: 0;
+    cursor: pointer;
+}
+
+.edit-block-header:hover .edit-toggle-btn {
+    opacity: 1;
+}
+
+/* 中间空白区域 - 占据剩余空间 */
+.edit-spacer {
+    flex: 1;
+    min-width: 20px;
+}
+
+/* 复制按钮 - 悬浮时显示，使用 opacity 避免布局变化 */
+.edit-copy-btn,
+.bash-copy-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 2px 8px;
+    background-color: transparent;
+    border: none;
+    border-radius: 2px;
+    color: var(--chat-color-muted);
+    cursor: pointer;
+    font-size: var(--chat-font-sm);
+    transition: all 0.15s;
+    flex-shrink: 0;
+    white-space: nowrap;
+    opacity: 0;
+}
+
+.edit-block-header:hover .edit-copy-btn,
+.bash-block-header:hover .bash-copy-btn {
+    opacity: 1;
+}
+
+.edit-copy-btn:hover,
+.bash-copy-btn:hover {
+    background-color: var(--chat-bg-hover);
+    color: var(--chat-color-muted-hover);
+}
+
+.edit-copy-btn:active,
+.bash-copy-btn:active {
+    background-color: var(--chat-bg-active);
+}
+
+.cell-info {
+    color: var(--chat-color-warning);
+    font-weight: 500;
+}
+
+/* 切换图标动画 */
+.toggle-icon {
+    transition: transform 0.2s;
+}
+
+.toggle-icon.expanded {
+    transform: rotate(90deg);
+}
+
+/* Read Block 样式 — 容器继承 .chat-block--borderless */
+
+.read-block-header {
+    cursor: pointer;
+    gap: var(--chat-spacing-sm);
+    transition: opacity 0.15s;
+}
+
+.read-block-header:hover .read-file-name {
+    color: var(--chat-text-link);
+    opacity: 1;
+}
+
+.read-file-name {
+    transition: color 0.2s, opacity 0.2s;
+}
+
+/* UpdateCodeDiff 样式 */
+.update-code-diff {
+    width: 100%;
+    max-height: 300px;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    background-color: var(--chat-bg-editor);
+    font-family: var(--vscode-editor-font-family, 'Menlo', 'Monaco', 'Courier New', monospace);
+    font-size: var(--chat-font-base);
+    line-height: 16px;
+}
+
+.update-code-diff-scroll {
+    flex: 1;
+    overflow-x: hidden;
+    overflow-y: auto;
+    min-height: 0;
+}
+
+
+.update-code-diff table {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
+}
+
+.update-code-diff colgroup col:nth-child(1) {
+    width: 28px;
+}
+
+.update-code-diff colgroup col:nth-child(2) {
+    width: 12px;
+}
+
+.update-code-diff colgroup col:nth-child(3) {
+    width: 100%;
+}
+
+.update-code-diff tbody {
+    border-spacing: 0;
+}
+
+/* 行样式 */
+.diff-row-separator {
+    background-color: var(--vscode-editorGutter-background, var(--chat-bg-editor));
+}
+
+.diff-row-separator td:nth-child(1) {
+    background-color: var(--vscode-editorGutter-background, var(--chat-bg-editor));
+    border-right: 1px solid var(--vscode-editorGroup-border, transparent);
+}
+
+.diff-row-separator td:nth-child(2) {
+    background-color: var(--vscode-editorGutter-background, var(--chat-bg-editor));
+    border-right: 1px solid var(--chat-border, transparent);
+}
+
+.diff-row-separator td:nth-child(3) {
+    height: 4px;
+    opacity: 0.5;
+    position: relative;
+}
+
+.diff-separator-pattern {
+    position: absolute;
+    inset: 0;
+    background: repeating-linear-gradient(
+        45deg,
+        transparent,
+        transparent 5px,
+        var(--vscode-editorLineNumber-foreground, #858585) 5px,
+        var(--vscode-editorLineNumber-foreground, #858585) 10px
+    );
+    opacity: 0.2;
+}
+
+.diff-row-meta {
+    background-color: var(--chat-bg-editor);
+    color: var(--chat-text-secondary);
+}
+
+.diff-row-meta td {
+    padding: 4px 16px;
+    font-style: italic;
+    font-size: var(--chat-font-xs);
+    opacity: 0.7;
+    border-top: 1px solid var(--chat-border);
+}
+
+.diff-row-added {
+    background-color: var(--vscode-diffEditor-insertedLineBackground, var(--chat-diff-added-bg));
+}
+
+.diff-row-added .diff-line-number,
+.diff-row-removed .diff-line-number {
+    color: var(--chat-text-editor);
+    opacity: 0.7;
+}
+
+.diff-row-removed {
+    background-color: var(--vscode-diffEditor-removedLineBackground, var(--chat-diff-removed-bg));
+}
+
+/* 单元格样式 */
+.diff-line-number {
+    user-select: none;
+    text-align: right;
+    padding-right: 0;
+    color: var(--chat-color-muted);
+    vertical-align: top;
+    opacity: 0.7;
+    font-weight: 100;
+    padding-top: 1px;
+}
+
+.diff-sign {
+    user-select: none;
+    text-align: center;
+    padding: 0;
+    color: var(--chat-color-muted);
+    vertical-align: top;
+    opacity: 0.7;
+    font-weight: 100;
+    padding-top: 1px;
+}
+
+.diff-content {
+    white-space: pre-wrap;
+    word-break: break-all;
+    padding-left: 8px;
+    color: var(--chat-text-editor);
+    vertical-align: top;
+}
+
+/* 高亮样式 */
+.diff-highlight {
+    -webkit-box-decoration-break: clone;
+    box-decoration-break: clone;
+    padding-top: 2px;
+    padding-bottom: 2px;
+}
+

@@ -1,0 +1,54 @@
+# 源代码文件（已编译到dist/）
+src/**
+*.ts
+*.tsx
+
+# 桌宠原生工程源码（独立编译并通过 GitHub Releases 分发，运行时由扩展按需下载）
+pet/**
+
+# 配置文件
+tsconfig*.json
+webpack.config.js
+.babelrc*
+.eslintrc*
+.prettierrc*
+
+# 开发依赖和构建文件
+# 排除所有 node_modules，但保留运行时必需的二进制（bin 目录）
+node_modules/**
+!node_modules/@vscode/ripgrep/bin/
+.vscode/**
+.git/**
+.gitignore
+
+# 文档和说明文件
+docs/**
+*.md
+!README.md
+
+# 测试文件
+test/**
+tests/**
+**/*.test.*
+**/*.spec.*
+
+# 其他不必要的文件
+imgs/sema.gif
+.DS_Store
+*.log
+npm-debug.log*
+.npm
+.nyc_output
+coverage/
+download-ripgrep.sh
+package-all.sh
+
+# 只保留必需的文件：
+# - package.json (插件配置)
+# - dist/ (编译后的代码)
+# - imgs/ (图标等资源)
+# - README.md (插件说明)
+
+*.vsix
+*.zip
+*.tar.gz
