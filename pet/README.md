@@ -3,20 +3,29 @@
 跟 `src/pet/` 扩展端配套的原生桌宠进程。
 
 - macOS：Swift + AppKit，见 `pet/macos/`
-- Windows：计划中，见 `pet/windows/`
+- Windows：Rust + windows-sys + Win32 API，见 `pet/windows/`
 
 桌宠和扩展是两个进程，通过 `127.0.0.1:24700` 通信。扩展激活时按 `runtime.json` → `/health` 探活 → spawn 本地二进制的顺序找桌宠。
 
 ## 构建
 
-要求：macOS 12+，Swift 5.7+。
+macOS 要求：macOS 12+，Swift 5.7+。
 
 ```sh
 cd pet/macos
 swift build -c release          # 产物：.build/release/SemaPet
 ```
 
+Windows 要求：MSVC Rust toolchain。
+
+```powershell
+cd pet/windows
+cargo build --release           # 产物：target\release\SemaPet.exe
+```
+
 ## 本地调试
+
+### macOS
 
 构建产物已经在 `.build/release/SemaPet`，直接跑：
 
@@ -29,6 +38,16 @@ cd pet/macos
 
 确认启动正常：
 - 右下角浮窗桌宠 + 状态栏 🐾 【直观可见】
+
+### Windows
+
+```powershell
+cd pet/windows
+cargo run
+```
+
+确认启动正常：
+- 桌面浮窗 + 系统托盘图标【直观可见】
 
 ### 协议手测
 
@@ -75,15 +94,15 @@ curl -s -X POST http://127.0.0.1:24700/session/unregister \
 
 F5 启动 Extension Development Host → 在 Sema Code 侧栏 → 配置 → 系统配置 → 基础设置勾选「启用桌宠」。
 
-- 本地已经跑了 SemaPet（`./.build/release/SemaPet`）→ launcher `ping /health` 通，直接复用，不会触发解压
-- 本地没跑 → launcher 从扩展的 `dist/pet/sema-pet-darwin-<arch>.zip` 解压到 `~/.sema/pet/bin/<arch>/SemaPet` → spawn
+- 本地已经跑了 SemaPet（macOS `./.build/release/SemaPet`，Windows `SemaPet.exe`）→ launcher `ping /health` 通，直接复用，不会触发解压
+- 本地没跑 → launcher 从扩展的 `dist/pet/sema-pet-<platform>-<arch>.zip` 解压到 `~/.sema/pet/bin/<platform>-<arch>/` → spawn
 - 想测解压路径，先 `rm -rf ~/.sema/pet/bin/` 再勾选
 
 > 桌宠开关状态存在 VS Code 的 globalState 里，不在 `~/.sema/pet/config.json`（旧设计已废弃，该文件现仅留 `windowPosition` 供桌宠自身记录）。
 
 ## 美术资源
 
-加载顺序：`~/.sema/pet/assets/<state>.gif` 存在就用用户文件，否则 fallback 到 bundle 内嵌资源。
+加载顺序：`~/.sema/pet/assets/<state>.gif` 存在就用用户文件，否则 fallback 到内嵌默认资源。macOS 默认资源来自 bundle，Windows 默认资源编译进 `SemaPet.exe` 并在启动时 seed 到用户 assets 目录。
 
 覆盖同名文件即可热替换，下次状态切换生效，无需重启。想跑一遍干净流程：
 
@@ -133,6 +152,24 @@ codesign -dv SemaPet 2>&1 | grep Signature    # Signature=adhoc
 
 ### Windows
 
-暂未实现。扩展 UI 端已自动禁用开关，不需要产物。规划见 `pet/windows/`。
+一键打 x64 zip：
 
-预留命名：`sema-pet-win32-x64.zip`。
+```powershell
+npm run pet:build
+```
+
+分架构构建：
+
+```powershell
+npm run pet:build:x64
+npm run pet:build:arm64
+```
+
+| 架构 | Rust target | 产物路径 |
+|---|---|---|
+| x64 | `x86_64-pc-windows-msvc` | `dist/pet/sema-pet-win32-x64.zip` |
+| arm64 | `aarch64-pc-windows-msvc` | `dist/pet/sema-pet-win32-arm64.zip` |
+
+zip 只包含 `SemaPet.exe`。`pet/windows/build-zips.ps1` 默认静态链接 CRT；正式发布前仍需用 `dumpbin /dependents SemaPet.exe` 或等价工具确认没有非系统运行时 DLL 依赖。
+
+Windows 注册时会保存扩展发送的 `clientPid`，并通过低频本地进程存活检查清理 stale session：`/session/register` 前会先 sweep 一次，运行中也会由 UI timer 定期 sweep；最后一个 session 被清理后桌宠自动退出。

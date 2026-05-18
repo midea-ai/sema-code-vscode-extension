@@ -21,6 +21,7 @@ use crate::focus_bridge::FocusBridge;
 use crate::gif_decoder::{decode_frames_from_file, scale_frame_to_canvas, DecodedFrame};
 use crate::hit_region::alpha_mask_to_runs;
 use crate::hit_window::HitWindow;
+use crate::process::is_process_alive;
 use crate::protocol::PetState;
 use crate::render_window::RenderWindow;
 use crate::state_machine::{now_ms, StateMachine};
@@ -36,6 +37,8 @@ const ANIMATION_TIMER_ID: usize = 1;
 const ANIMATION_TIMER_MS: u32 = 120;
 const BUBBLE_TIMER_ID: usize = 2;
 const BUBBLE_TIMER_MS: u32 = 500;
+const STALE_SWEEP_TIMER_ID: usize = 3;
+const STALE_SWEEP_TIMER_MS: u32 = 30_000;
 
 pub struct WindowCoordinator {
     render_window: Option<RenderWindow>,
@@ -107,6 +110,12 @@ impl WindowCoordinator {
         self.bubble_window = Some(bubble_window);
         self.tray = Some(Tray::install(self.notify_hwnd().unwrap()));
         self.restart_animation_timer(PetState::Idle);
+        SetTimer(
+            self.notify_hwnd().unwrap(),
+            STALE_SWEEP_TIMER_ID,
+            STALE_SWEEP_TIMER_MS,
+            None,
+        );
         self.sync_z_order();
     }
 
@@ -205,7 +214,35 @@ impl WindowCoordinator {
         match timer_id {
             ANIMATION_TIMER_ID => self.on_animation_timer(),
             BUBBLE_TIMER_ID => self.on_bubbles_changed(),
+            STALE_SWEEP_TIMER_ID => self.sweep_stale_sessions(),
             _ => {}
+        }
+    }
+
+    pub unsafe fn sweep_stale_sessions(&mut self) {
+        let (removed, empty) = {
+            let mut state = self.state_machine.lock().unwrap();
+            let removed = state.sweep_stale(is_process_alive);
+            let empty = state.is_empty();
+            (removed, empty)
+        };
+
+        if removed.is_empty() {
+            return;
+        }
+
+        {
+            let mut bubbles = self.bubble_store.lock().unwrap();
+            for session_id in &removed {
+                bubbles.clear_sticky_for_session(session_id);
+            }
+        }
+
+        self.on_state_changed();
+        self.on_bubbles_changed();
+
+        if empty {
+            self.quit();
         }
     }
 
@@ -237,6 +274,7 @@ impl WindowCoordinator {
         if let Some(hit) = &self.hit_window {
             KillTimer(hit.hwnd(), ANIMATION_TIMER_ID);
             KillTimer(hit.hwnd(), BUBBLE_TIMER_ID);
+            KillTimer(hit.hwnd(), STALE_SWEEP_TIMER_ID);
         }
         if let Some(bubble_window) = &self.bubble_window {
             bubble_window.hide();

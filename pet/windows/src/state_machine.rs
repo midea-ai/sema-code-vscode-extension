@@ -62,6 +62,25 @@ impl StateMachine {
         }
     }
 
+    pub fn sweep_stale<F>(&mut self, mut is_alive: F) -> Vec<String>
+    where
+        F: FnMut(u32) -> bool,
+    {
+        let mut removed = Vec::new();
+        self.sessions.retain(|session_id, session| {
+            let keep = session.client_pid.map(&mut is_alive).unwrap_or(true);
+            if !keep {
+                removed.push(session_id.clone());
+            }
+            keep
+        });
+        removed
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.sessions.is_empty()
+    }
+
     pub fn snapshot(&self, now_ms: u64) -> GlobalSnapshot {
         let mut sessions: Vec<_> = self.sessions.values().cloned().collect();
         sessions.sort_by(|a, b| {
@@ -112,4 +131,30 @@ fn project_name_from_cwd(cwd: &str) -> String {
         .filter(|name| !name.is_empty())
         .unwrap_or(cwd)
         .to_string()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::StateMachine;
+
+    #[test]
+    fn sweep_stale_removes_sessions_with_dead_client_pid() {
+        let mut machine = StateMachine::default();
+        machine.register("alive".into(), "C:\\work\\alpha".into(), Some(10), 100);
+        machine.register("stale".into(), "C:\\work\\beta".into(), Some(20), 100);
+        machine.register("unknown".into(), "C:\\work\\gamma".into(), None, 100);
+
+        let removed = machine.sweep_stale(|pid| pid == 10);
+        let snapshot = machine.snapshot(200);
+
+        assert_eq!(removed, vec!["stale"]);
+        assert_eq!(
+            snapshot
+                .sessions
+                .iter()
+                .map(|session| session.session_id.as_str())
+                .collect::<Vec<_>>(),
+            vec!["alive", "unknown"]
+        );
+    }
 }

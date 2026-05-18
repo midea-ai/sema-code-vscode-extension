@@ -12,6 +12,7 @@ use windows_sys::Win32::UI::WindowsAndMessaging::PostMessageW;
 
 use crate::bubble_store::{BubbleKind, BubbleStore, SayOptions};
 use crate::focus_bridge::FocusBridge;
+use crate::process::is_process_alive;
 use crate::protocol::{
     HealthResponse, RegisterPayload, SayPayload, StatePayload, UnregisterPayload, PET_HOST,
     PET_PORT, PET_SERVER_HEADER, PET_SERVER_HEADER_VALUE,
@@ -78,13 +79,27 @@ fn handle_connection(
                 Ok(payload) => payload,
                 Err(_) => return write_json(&mut stream, 400, r#"{"error":"bad json"}"#),
             };
-            state_machine.lock().unwrap().register(
+            let mut state = state_machine.lock().unwrap();
+            let removed = state.sweep_stale(is_process_alive);
+            state.register(
                 payload.session_id,
                 payload.cwd,
                 payload.client_pid,
                 now_ms(),
             );
-            unsafe { PostMessageW(notify_hwnd, WM_APP_STATE_CHANGED, 0, 0) };
+            drop(state);
+            if !removed.is_empty() {
+                let mut bubbles = bubble_store.lock().unwrap();
+                for session_id in &removed {
+                    bubbles.clear_sticky_for_session(session_id);
+                }
+            }
+            unsafe {
+                PostMessageW(notify_hwnd, WM_APP_STATE_CHANGED, 0, 0);
+                if !removed.is_empty() {
+                    PostMessageW(notify_hwnd, WM_APP_BUBBLES_CHANGED, 0, 0);
+                }
+            }
             write_json(&mut stream, 200, r#"{"ok":true}"#)
         }
         ("POST", "/session/unregister") => {

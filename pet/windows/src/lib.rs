@@ -7,6 +7,7 @@ pub mod gif_decoder;
 pub mod hit_region;
 pub mod hit_window;
 pub mod http_server;
+pub mod process;
 pub mod protocol;
 pub mod render_window;
 pub mod runtime;
