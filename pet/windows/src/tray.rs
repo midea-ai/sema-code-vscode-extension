@@ -203,45 +203,61 @@ pub unsafe fn draw_menu_item(lparam: isize) -> isize {
 
 pub fn paint_paw_icon_bgra(pixels: &mut [u8], size: i32) {
     pixels.fill(0);
-    let color = [0x33, 0x99, 0xff, 0xff];
+    let color = [0x8e, 0x8e, 0x8e, 0xff];
+    let scale = size as f32 / 23.0;
+    let paw_size = 11.0 * scale;
+    let gap = 1.0 * scale;
+    let total_width = 23.0 * scale;
+    let total_height = 16.0 * scale;
+    let left_x = (size as f32 - total_width) * 0.5;
+    let top_y = (size as f32 - total_height) * 0.5;
+    let left_y = top_y + 3.0 * scale;
+    let right_x = left_x + paw_size + gap;
+    let right_y = top_y;
+
+    paint_paw(pixels, size, left_x, left_y, paw_size, color);
+    paint_paw(pixels, size, right_x, right_y, paw_size, color);
+}
+
+fn paint_paw(pixels: &mut [u8], size: i32, x: f32, y: f32, paw_size: f32, color: [u8; 4]) {
     fill_circle(
         pixels,
         size,
-        size as f32 * 0.50,
-        size as f32 * 0.62,
-        size as f32 * 0.22,
+        x + paw_size * 0.50,
+        y + paw_size * 0.62,
+        paw_size * 0.22,
         color,
     );
     fill_circle(
         pixels,
         size,
-        size as f32 * 0.30,
-        size as f32 * 0.35,
-        size as f32 * 0.11,
+        x + paw_size * 0.30,
+        y + paw_size * 0.35,
+        paw_size * 0.11,
         color,
     );
     fill_circle(
         pixels,
         size,
-        size as f32 * 0.43,
-        size as f32 * 0.25,
-        size as f32 * 0.10,
+        x + paw_size * 0.43,
+        y + paw_size * 0.25,
+        paw_size * 0.10,
         color,
     );
     fill_circle(
         pixels,
         size,
-        size as f32 * 0.58,
-        size as f32 * 0.25,
-        size as f32 * 0.10,
+        x + paw_size * 0.58,
+        y + paw_size * 0.25,
+        paw_size * 0.10,
         color,
     );
     fill_circle(
         pixels,
         size,
-        size as f32 * 0.71,
-        size as f32 * 0.35,
-        size as f32 * 0.11,
+        x + paw_size * 0.71,
+        y + paw_size * 0.35,
+        paw_size * 0.11,
         color,
     );
 }
@@ -410,5 +426,41 @@ fn state_label(state: PetState) -> &'static str {
         PetState::Working => "working",
         PetState::Attention => "attention",
         PetState::Sleeping => "sleeping",
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::paint_paw_icon_bgra;
+
+    #[test]
+    fn paw_icon_painter_draws_gray_double_paws() {
+        let mut pixels = vec![0_u8; 32 * 32 * 4];
+
+        paint_paw_icon_bgra(&mut pixels, 32);
+
+        let opaque_pixels: Vec<&[u8]> = pixels
+            .chunks_exact(4)
+            .filter(|pixel| pixel[3] > 0)
+            .collect();
+
+        assert!(opaque_pixels.iter().all(|pixel| pixel[0] == 0x8e));
+        assert!(opaque_pixels.iter().all(|pixel| pixel[1] == 0x8e));
+        assert!(opaque_pixels.iter().all(|pixel| pixel[2] == 0x8e));
+        assert!(opaque_pixels.iter().all(|pixel| pixel[3] == 0xff));
+
+        let left_paw_pixels = pixels
+            .chunks_exact(4)
+            .enumerate()
+            .filter(|(index, pixel)| pixel[3] > 0 && index % 32 < 16)
+            .count();
+        let right_paw_pixels = pixels
+            .chunks_exact(4)
+            .enumerate()
+            .filter(|(index, pixel)| pixel[3] > 0 && index % 32 >= 16)
+            .count();
+
+        assert!(left_paw_pixels > 40);
+        assert!(right_paw_pixels > 40);
     }
 }
