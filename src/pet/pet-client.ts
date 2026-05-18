@@ -30,9 +30,10 @@ class PetClient {
   // 在 register 完成前事件订阅可能就开始推送，缓存最后一次 state，register 成功后重放，
   // 避免首次启用桌宠时丢失启动窗口期内的状态变化。
   private pendingState: PetState | null = null;
+  private pendingSays: SayPayload[] = [];
 
   async register(cwd: string): Promise<boolean> {
-    const payload = { sessionId: this.sessionId, cwd } satisfies RegisterPayload;
+    const payload = { sessionId: this.sessionId, cwd, clientPid: process.pid } satisfies RegisterPayload;
     for (let i = 0; i < REGISTER_RETRY; i++) {
       const ok = await this.post('/session/register', payload, REGISTER_TIMEOUT_MS);
       if (ok) {
@@ -45,6 +46,11 @@ class PetClient {
           void this.post('/state', {
             sessionId: this.sessionId, state: replay, ts: Date.now(),
           } satisfies StatePayload);
+        }
+        const pendingSays = this.pendingSays;
+        this.pendingSays = [];
+        for (const payload of pendingSays) {
+          void this.post('/say', payload);
         }
         return true;
       }
@@ -65,16 +71,23 @@ class PetClient {
   }
 
   say(text: string, opts: SayOptions = {}): void {
-    if (!this.registered || this.disposed) return;
-    void this.post('/say', {
+    if (this.disposed) return;
+    const payload = {
       sessionId: this.sessionId, text: truncateSay(text), ...opts,
-    } satisfies SayPayload);
+    } satisfies SayPayload;
+    if (!this.registered) {
+      this.pendingSays.push(payload);
+      if (this.pendingSays.length > 3) this.pendingSays.shift();
+      return;
+    }
+    void this.post('/say', payload);
   }
 
   async dispose(): Promise<void> {
     if (this.disposed) return;
     this.disposed = true;
     this.pendingState = null;
+    this.pendingSays = [];
     if (this.registered) {
       this.registered = false;
       await this.post('/session/unregister', { sessionId: this.sessionId });

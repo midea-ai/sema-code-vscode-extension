@@ -42,6 +42,7 @@ npm-debug.log*
 coverage/
 download-ripgrep.sh
 package-all.sh
+scripts/**
 
 # 只保留必需的文件：
 # - package.json (插件配置)
@@ -51,4 +52,5 @@ package-all.sh
 
 *.vsix
 *.zip
+!dist/pet/*.zip
 *.tar.gz
