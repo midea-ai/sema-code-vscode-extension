@@ -97,7 +97,7 @@ extension AppDelegate: StateMachineDelegate {
 // MARK: - HttpServerDelegate
 
 extension AppDelegate: HttpServerDelegate {
-    func httpHandleRegister(_ p: RegisterPayload) {
+    func httpHandleRegister(_ p: RegisterPayload) -> Bool {
         stateMachine.register(p)
     }
 

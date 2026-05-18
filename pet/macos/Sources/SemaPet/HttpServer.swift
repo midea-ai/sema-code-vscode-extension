@@ -2,7 +2,7 @@ import Foundation
 import Network
 
 protocol HttpServerDelegate: AnyObject {
-    func httpHandleRegister(_ p: RegisterPayload)
+    func httpHandleRegister(_ p: RegisterPayload) -> Bool
     func httpHandleUnregister(sessionId: String)
     func httpHandleState(_ p: StatePayload)
     func httpHandleSay(_ p: SayPayload)
@@ -121,8 +121,11 @@ private final class ConnectionContext {
             writeJson(200, ["ok": true])
         case ("POST", "/session/register"):
             if let p: RegisterPayload = decode(req.body) {
-                delegate?.httpHandleRegister(p)
-                writeJson(200, ["ok": true])
+                if delegate?.httpHandleRegister(p) ?? false {
+                    writeJson(200, ["ok": true])
+                } else {
+                    writeJson(409, ["ok": false, "error": "cwd already registered"])
+                }
             } else {
                 writeJson(400, ["error": "bad payload"])
             }
@@ -194,6 +197,7 @@ private final class ConnectionContext {
             case 200: return "OK"
             case 400: return "Bad Request"
             case 404: return "Not Found"
+            case 409: return "Conflict"
             case 500: return "Internal Server Error"
             default:  return "OK"
             }

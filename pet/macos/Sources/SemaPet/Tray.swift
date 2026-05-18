@@ -79,7 +79,8 @@ final class Tray: NSObject, NSMenuDelegate {
                 if lhs.state.priority != rhs.state.priority {
                     return lhs.state.priority > rhs.state.priority
                 }
-                return lhs.sessionId < rhs.sessionId
+                // 与 StateMachine 的 winner 选取保持一致：优先级相同时最近有事件的排在前。
+                return lhs.lastEventAt > rhs.lastEventAt
             }
             for s in sorted {
                 let title = format(session: s, dedupe: (basenameCounts[s.projectName] ?? 0) > 1)

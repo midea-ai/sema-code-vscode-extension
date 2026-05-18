@@ -52,11 +52,12 @@ final class FocusBridge {
     }
 
     func dispatchFocus(sessionId: String) {
+        // 先在 OS 层把对应的 VSCode 窗口激活到前台：webview 内的 focus 命令只能聚焦
+        // VSCode 内部面板，无法把应用窗口带到最前。
+        activateVSCodeWindow(sessionId: sessionId)
+
         queue.async {
-            guard var arr = self.waiters[sessionId], !arr.isEmpty else {
-                self.spawnFallback(sessionId: sessionId)
-                return
-            }
+            guard var arr = self.waiters[sessionId], !arr.isEmpty else { return }
             let w = arr.removeFirst()
             w.timer.cancel()
             if arr.isEmpty { self.waiters.removeValue(forKey: sessionId) }
@@ -68,13 +69,14 @@ final class FocusBridge {
         }
     }
 
-    private func spawnFallback(sessionId: String) {
+    /// 用 `code <cwd>` 把已打开该工作区的 VSCode 窗口带到前台；窗口已存在时会复用而非新开。
+    private func activateVSCodeWindow(sessionId: String) {
         guard let cwd = stateMachine?.cwd(for: sessionId) else { return }
         guard let codePath = locateVSCodeCLI() else { return }
         let task = Process()
         task.executableURL = URL(fileURLWithPath: codePath)
         task.arguments = [cwd]
-        do { try task.run() } catch { /* silent v1 */ }
+        do { try task.run() } catch { /* silent */ }
     }
 
     private func locateVSCodeCLI() -> String? {

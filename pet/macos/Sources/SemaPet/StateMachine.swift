@@ -34,8 +34,12 @@ final class StateMachine {
         sleepTimer?.cancel()
     }
 
-    func register(_ p: RegisterPayload) {
-        queue.async {
+    /// 返回是否注册成功；同一 cwd 已被其它会话占用时拒绝（返回 false）。
+    @discardableResult
+    func register(_ p: RegisterPayload) -> Bool {
+        queue.sync {
+            let occupiedByOther = sessions.contains { $0.key != p.sessionId && $0.value.cwd == p.cwd }
+            if occupiedByOther { return false }
             let s = PetSession(
                 sessionId: p.sessionId,
                 cwd: p.cwd,
@@ -43,8 +47,9 @@ final class StateMachine {
                 state: .idle,
                 lastEventAt: Date()
             )
-            self.sessions[p.sessionId] = s
-            self.emitSnapshotLocked()
+            sessions[p.sessionId] = s
+            emitSnapshotLocked()
+            return true
         }
     }
 
