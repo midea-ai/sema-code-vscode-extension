@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { FileChange, TokenInfo, AppProps, SelectedFile, TodoItem, Message, AgentMode } from './types';
+import { FileChange, TokenInfo, AppProps, SelectedFile, TodoItem, Message, AgentMode, SessionMeta } from './types';
 import { streamingStore } from './utils/StreamingStore';
 import InputBox, { InputBoxHandle } from './components/input/InputBox';
 import MessageItem from './MessageItem';
+import SessionTabs from './components/SessionTabs';
+import { SessionContext } from './SessionContext';
 
 import FileChangesPanel from './components/panels/FileChangesPanel';
 import TodosPanel from './components/panels/TodosPanel';
@@ -19,7 +21,19 @@ import { TOOL_NAME_RUN_SHELL } from '../../utils/tool';
 import { TASK_TYPE_SHELL, TASK_TYPE_AGENT } from '../config/BackgroundTaskConfig';
 import PreviewDialogs from './utils/PreviewDialogs';
 
-const App: React.FC<AppProps> = ({ vscode }) => {
+interface ChatSessionProps {
+    vscode: AppProps['vscode'];
+    sessionId: string;
+    active: boolean;
+    /** 上报本会话是否有待用户响应的权限/表单弹窗 */
+    onWaitingChange?: (sessionId: string, waiting: boolean) => void;
+}
+
+/**
+ * 单个会话视图。每个会话一个实例，自带独立 state；非 active 时隐藏但保持挂载，
+ * 后台事件持续更新其内存状态。
+ */
+const ChatSession: React.FC<ChatSessionProps> = ({ vscode, sessionId, active, onWaitingChange }) => {
     const [messages, setMessages] = useState<Message[]>([]);
     const [streamingAssistantId, setStreamingAssistantId] = useState<string | null>(null);
     const [streamingToolId, setStreamingToolId] = useState<string | null>(null);
@@ -42,6 +56,15 @@ const App: React.FC<AppProps> = ({ vscode }) => {
         | { type: 'quickchat';         data: { question: string; content: string }; isBackground: false };
     const [dialogQueue, setDialogQueue] = useState<DialogQueueItem[]>([]);
     const activeDialog = dialogQueue[0] ?? null;
+
+    // 队列中存在权限/表单/计划弹窗时，向 App 上报本会话处于「等待用户响应」状态
+    useEffect(() => {
+        const waiting = dialogQueue.some(
+            d => d.type === 'permission' || d.type === 'askForm' || d.type === 'planExit'
+        );
+        onWaitingChange?.(sessionId, waiting);
+    }, [dialogQueue, sessionId, onWaitingChange]);
+
     const [modelConfigReminder, setModelConfigReminder] = useState<string>('');
     const [spinnerAccumulatedSeconds, setSpinnerAccumulatedSeconds] = useState<number>(0);
     const [agentMode, setAgentMode] = useState<AgentMode>('Agent');
@@ -59,11 +82,8 @@ const App: React.FC<AppProps> = ({ vscode }) => {
     const prevMessagesLenRef = useRef<number>(0);
 
     const handleFileChange = useCallback(async (change: FileChange) => {
-        // console.log('app触发handleFileChange')
         try {
-            // 先添加到文件变更列表，后续当取得统计信息时再更新
             setFileChanges(prev => {
-                // 使用完整路径作为唯一标识
                 const existingIndex = prev.findIndex(c => c.fullPath === change.fullPath);
                 if (existingIndex >= 0) {
                     const updated = [...prev];
@@ -74,7 +94,6 @@ const App: React.FC<AppProps> = ({ vscode }) => {
                     };
                     return updated;
                 } else {
-                    // 新添加文件变更
                     return [...prev, {
                         ...change,
                         additions: 0,
@@ -84,32 +103,27 @@ const App: React.FC<AppProps> = ({ vscode }) => {
                 }
             });
 
-            // 如果有文件路径，调用后端获取详细统计信息
             if (change.fullPath) {
-                // console.log('app发送fileChangeStats请求')
-                // 调用后端方法获取文件统计信息
                 vscode.postMessage({
                     type: 'getFileChangeStats',
+                    sessionId,
                     filePath: change.fullPath
                 });
-                // 当收到响应时，我们将在 handleMessage 函数中处理
             }
         } catch (error) {
             console.error('handleFileChange error:', error);
         }
-    }, []);
+    }, [sessionId]);
 
     useEffect(() => {
         const handleMessage = (event: MessageEvent) => {
             const message = event.data;
+            // 仅处理本会话的消息；进程级消息（无 sessionId）所有会话均可处理
+            if (message.sessionId && message.sessionId !== sessionId) return;
 
             switch (message.type) {
                 case 'updateContent':
-                   // console.log('updateContent:', message)
-                    streamingStore.clear();
-                    // 会话已被替换，旧的 streaming 指针不能再指向新列表中的同 id 消息，
-                    // 否则切回历史时会让一条已持久化的消息被错误地标记为 streaming，
-                    // 订阅到已清空的 buffer，最终只渲染出 ⏺ 指示符。
+                    streamingStore.clear(sessionId);
                     streamingAssistantIdRef.current = null;
                     streamingToolIdRef.current = null;
                     setStreamingAssistantId(null);
@@ -136,9 +150,7 @@ const App: React.FC<AppProps> = ({ vscode }) => {
                     break;
                 }
                 case 'chunkUpdate': {
-                    // 只转发 delta 到 streamingStore，组件自行累积；completeUpdate 时设置最终内容
-                    streamingStore.emitText(message.id, { contentDelta: message.contentDelta, reasoningDelta: message.reasoningDelta });
-                    // 只在有 contentDelta 时才标记 streaming，避免 thinking 阶段提前渲染 AiResponseBlock
+                    streamingStore.emitText(sessionId, message.id, { contentDelta: message.contentDelta, reasoningDelta: message.reasoningDelta });
                     if (message.contentDelta !== undefined && streamingAssistantIdRef.current !== message.id) {
                         streamingAssistantIdRef.current = message.id;
                         setStreamingAssistantId(message.id);
@@ -164,8 +176,7 @@ const App: React.FC<AppProps> = ({ vscode }) => {
                     break;
                 }
                 case 'toolChunkUpdate': {
-                    // 只转发 delta 到 streamingStore，组件自行累积；updateMessage 时设置最终内容
-                    streamingStore.emitTool(message.id, message.contentDelta || '');
+                    streamingStore.emitTool(sessionId, message.id, message.contentDelta || '');
                     if (streamingToolIdRef.current !== message.id) {
                         streamingToolIdRef.current = message.id;
                         setStreamingToolId(message.id);
@@ -194,17 +205,13 @@ const App: React.FC<AppProps> = ({ vscode }) => {
                     setInputPlaceholder(message.message || '正在初始化 CLI，请稍候...');
                     break;
                 case 'fileChange':
-                    // 接收文件变更信息
                     handleFileChange(message.change);
                     break;
                 case 'fileChangeStats':
-                    // console.log('app接收fileChangeStats结果')
-                    // 接收文件变更统计信息
                     if (message.fullPath && message.stats) {
                         setFileChanges(prev => {
                             const existingIndex = prev.findIndex(c => c.fullPath === message.fullPath);
                             if (existingIndex >= 0) {
-                                // 更新现有文件的统计
                                 const updated = [...prev];
                                 updated[existingIndex] = {
                                     ...updated[existingIndex],
@@ -219,32 +226,26 @@ const App: React.FC<AppProps> = ({ vscode }) => {
                     }
                     break;
                 case 'clearFileChanges':
-                    // 清空文件变更列表
                     setFileChanges([]);
                     break;
                 case 'removeFileChange':
-                    // 移除单个文件变更
                     if (message.filePath) {
                         setFileChanges(prev => prev.filter(c => c.fullPath !== message.filePath));
                     }
                     break;
                 case 'todosUpdate':
-                    // 更新 todos 列表 - 直接使用 SemaCore 的格式
                     if (Array.isArray(message.todos)) {
                         setTodos(message.todos);
                     }
                     break;
                 case 'clearTodos':
-                    // 清空 todos 列表
                     setTodos([]);
                     break;
                 case 'updateModelInfo':
-                    // 更新模型信息（包含当前模型和可用模型列表）
                     setModelName(message.modelName || '');
                     setAvailableModels(message.availableModels || []);
                     break;
                 case 'modelUpdate':
-                    // 处理来自后端的模型更新事件（支持旧格式）
                     if (message.data) {
                         setModelName(message.data.modelName || '');
                         setAvailableModels(message.data.modelList || []);
@@ -278,15 +279,12 @@ const App: React.FC<AppProps> = ({ vscode }) => {
                     setDialogQueue(prev => prev.filter(d => d.type !== 'planExit'));
                     break;
                 case 'showModelConfigReminder':
-                    // 显示模型配置提醒
                     setModelConfigReminder(message.message || '');
                     break;
                 case 'resetTokenInfo':
-                    // 重置token信息（新会话时调用）
                     setTokenInfo({ useTokens: 0, maxTokens: 0, promptTokens: 0 });
                     break;
                 case 'agentModeUpdate':
-                    // 接收后端的模式更新（例如退出Plan模式后自动切换回Agent模式）
                     if (message.mode) {
                         setAgentMode(message.mode);
                     }
@@ -355,25 +353,17 @@ const App: React.FC<AppProps> = ({ vscode }) => {
 
         window.addEventListener('message', handleMessage);
 
-        // 在消息监听器设置完成后，通知后端前端已准备就绪
-        vscode.postMessage({
-            type: 'frontendReady'
-        });
-
-        // 请求模型信息
-        vscode.postMessage({
-            type: 'requestModelInfo'
-        });
+        // 消息监听器就位后，通知后端本会话视图已挂载，回放当前状态
+        vscode.postMessage({ type: 'webviewSessionReady', sessionId });
+        vscode.postMessage({ type: 'requestModelInfo' });
 
         return () => {
             window.removeEventListener('message', handleMessage);
         };
-    }, []);
+    }, [sessionId]);
 
-    // 保持 runningTasksRef 与 state 同步，供 handleMessage 闭包读取
     useEffect(() => { runningTasksRef.current = runningTasks; }, [runningTasks]);
 
-    // 只有 spinner 真正可见时才累计计时，隐藏时暂停
     const isSpinnerVisible = processingState === 'processing' && !progressMessage && !activeDialog;
 
     useEffect(() => {
@@ -390,16 +380,14 @@ const App: React.FC<AppProps> = ({ vscode }) => {
 
     useEffect(() => {
         scrollToBottom();
-        // 只在消息数量增加时应用代码高亮，避免全量遍历
-        if (window.hljs && outputContainerRef.current && messages.length > prevMessagesLenRef.current) {
+        if (active && window.hljs && outputContainerRef.current && messages.length > prevMessagesLenRef.current) {
             outputContainerRef.current.querySelectorAll('pre code:not(.hljs)').forEach((block) => {
                 window.hljs.highlightElement(block);
             });
         }
         prevMessagesLenRef.current = messages.length;
-    }, [messages]);
+    }, [messages, active]);
 
-    // 预览模式：首次渲染后对 mock 消息中的代码块应用高亮
     useEffect(() => {
         if (PREVIEW_MODE && window.hljs && outputContainerRef.current) {
             outputContainerRef.current.querySelectorAll('pre code:not(.hljs)').forEach((block) => {
@@ -408,7 +396,6 @@ const App: React.FC<AppProps> = ({ vscode }) => {
         }
     }, []);
 
-    // 当弹窗切换时滚动到底部，权限对话框还需应用代码高亮
     useEffect(() => {
         if (activeDialog && outputContainerRef.current) {
             setTimeout(() => {
@@ -457,27 +444,25 @@ const App: React.FC<AppProps> = ({ vscode }) => {
     }, []);
 
     const handleSend = (text: string, files: SelectedFile[]) => {
-        // 重置滚动状态，让新消息自动滚到底部
         userScrolledUpRef.current = false;
         if (processingState !== 'processing') {
-            // 只有在非处理状态时才重置计时
             setSpinnerAccumulatedSeconds(0);
             spinnerStartTimeRef.current = 0;
         }
         vscode.postMessage({
             type: 'sendInput',
+            sessionId,
             text: text,
             files: files
         });
     };
 
     const handleStop = () => {
-        console.log('[handleStop] fired, processingState =', processingState, 'dialogQueue len =', dialogQueue.length);
-        // 为队列中所有前台权限弹窗插入"已中断"记录到消息历史
         for (const item of dialogQueue) {
             if (!item.isBackground && item.type === 'permission') {
                 vscode.postMessage({
                     type: 'insertPermissionRequest',
+                    sessionId,
                     permissionData: {
                         agentId: item.data?.agentId || '',
                         toolName: item.data?.toolName || 'Unknown',
@@ -489,10 +474,8 @@ const App: React.FC<AppProps> = ({ vscode }) => {
             }
         }
 
-        // 中断前台 + 停掉所有后台任务，后端统一处理
-        vscode.postMessage({ type: 'interrupt' });
+        vscode.postMessage({ type: 'interrupt', sessionId });
 
-        // 中断后聚焦输入框
         setTimeout(() => {
             inputBoxRef.current?.focus();
         }, 50);
@@ -501,10 +484,10 @@ const App: React.FC<AppProps> = ({ vscode }) => {
     const handleBashPermission = (action: string) => {
         const permData = activeDialog?.data;
 
-        // 如果用户拒绝，将权限请求插入到消息历史中
         if (action !== 'agree' && action !== 'allow') {
             vscode.postMessage({
                 type: 'insertPermissionRequest',
+                sessionId,
                 permissionData: {
                     agentId: permData?.agentId || '',
                     toolName: permData?.toolName || 'Unknown',
@@ -516,12 +499,11 @@ const App: React.FC<AppProps> = ({ vscode }) => {
             });
         }
 
-        // 出队，显示下一个弹窗
         setDialogQueue(prev => prev.slice(1));
 
-        // 发送工具权限响应给后端
         vscode.postMessage({
             type: 'toolPermissionResponse',
+            sessionId,
             response: {
                 toolId: permData?.toolId || '',
                 toolName: permData?.toolName || TOOL_NAME_RUN_SHELL,
@@ -529,7 +511,6 @@ const App: React.FC<AppProps> = ({ vscode }) => {
             }
         });
 
-        // 拒绝后聚焦于输入框
         if (action === 'refuse') {
             setTimeout(() => {
                 inputBoxRef.current?.focus();
@@ -542,17 +523,15 @@ const App: React.FC<AppProps> = ({ vscode }) => {
     };
 
     const handleOpenConfig = () => {
-        vscode.postMessage({
-            type: 'openConfig'
-        });
+        vscode.postMessage({ type: 'openConfig' });
         setModelConfigReminder('');
     };
 
     const handleAgentModeChange = (mode: AgentMode) => {
-        const requireNewSession = mode === 'Design' || agentMode === 'Design';
         setAgentMode(mode);
         vscode.postMessage({
-            type: requireNewSession ? 'switchAgentModeWithNewSession' : 'updateAgentMode',
+            type: 'updateAgentMode',
+            sessionId,
             mode: mode
         });
     };
@@ -560,6 +539,7 @@ const App: React.FC<AppProps> = ({ vscode }) => {
     const handleAutoEditChange = (enable: boolean) => {
         vscode.postMessage({
             type: 'updateAutoEdit',
+            sessionId,
             enable
         });
     };
@@ -570,6 +550,7 @@ const App: React.FC<AppProps> = ({ vscode }) => {
 
         vscode.postMessage({
             type: 'insertAskFormRequest',
+            sessionId,
             askFormData: {
                 agentId: askData.agentId || '',
                 data: askData,
@@ -582,6 +563,7 @@ const App: React.FC<AppProps> = ({ vscode }) => {
 
         vscode.postMessage({
             type: 'askFormResponse',
+            sessionId,
             response: {
                 agentId: askData.agentId || '',
                 answers,
@@ -600,11 +582,11 @@ const App: React.FC<AppProps> = ({ vscode }) => {
     const handlePlanExitSubmit = (selected: 'startEditing' | 'clearContextAndStart') => {
         const exitData = activeDialog?.data;
 
-        // 出队，显示下一个弹窗
         setDialogQueue(prev => prev.slice(1));
 
         vscode.postMessage({
             type: 'planExitResponse',
+            sessionId,
             response: {
                 agentId: exitData?.agentId || '',
                 selected: selected
@@ -614,7 +596,6 @@ const App: React.FC<AppProps> = ({ vscode }) => {
 
     const renderedContent = useMemo(() => {
         if (!messages || messages.length === 0) {
-            // 预览模式：渲染 mock 消息，方便调试各组件样式对齐
             if (PREVIEW_MODE) {
                 return getPreviewMessages().map((message) => (
                     <div key={message.id} className="msg-wrap">
@@ -632,8 +613,6 @@ const App: React.FC<AppProps> = ({ vscode }) => {
                     </div>
                 ));
             }
-            // 只有在有模型配置信息且当前不在处理状态时才显示Welcome组件
-            // 处理中时隐藏Welcome，避免Linux上后端响应延迟导致Welcome和Spinner同时显示
             if (modelName && availableModels.length > 0 && processingState !== 'processing') {
                 if (agentMode === 'Design') {
                     return <DesignModeHint />;
@@ -643,7 +622,6 @@ const App: React.FC<AppProps> = ({ vscode }) => {
             return null;
         }
 
-        // 找到最后一个用户输入的索引
         let lastUserInputIndex = -1;
         for (let i = messages.length - 1; i >= 0; i--) {
             if (messages[i].type === 'user') {
@@ -670,110 +648,221 @@ const App: React.FC<AppProps> = ({ vscode }) => {
     }, [messages, modelName, availableModels, activeDialog, processingState, streamingAssistantId, streamingToolId, openAgentTaskId, agentMode]);
 
     return (
-        <>
-            <div id="output-container" ref={outputContainerRef}>
-                {renderedContent}
-                {progressMessage && (
-                    <div className="output-line ai-response-block" id="progress-message">
-                        {progressMessage}
-                    </div>
-                )}
-                {isSpinnerVisible && (
-                    <ProcessingSpinner
-                        accumulatedSeconds={spinnerAccumulatedSeconds}
-                        in_progress={todos.find(t => t.status === 'in_progress')?.progressText || ''}
-                        next_progress={todos.find(t => t.status === 'pending')?.title || ''}
-                    />
-                )}
-                {runningTasks.size > 0 && (() => {
-                    const tasks = Array.from(runningTasks.values());
-                    const bashCount = tasks.filter(t => t.type === TASK_TYPE_SHELL).length;
-                    const agentCount = tasks.filter(t => t.type === TASK_TYPE_AGENT).length;
-                    let label: string;
-                    if (bashCount > 0 && agentCount > 0) {
-                        label = `${tasks.length} background tasks`;
-                    } else if (agentCount > 0) {
-                        label = `${agentCount} background agent${agentCount > 1 ? 's' : ''}`;
-                    } else {
-                        label = `${bashCount} background bash${bashCount > 1 ? 'es' : ''}`;
-                    }
-                    return (
-                        <div
-                            className="running-tasks-bar"
-                            onClick={() => {
-                                const latestTaskId = tasks[tasks.length - 1]?.taskId;
-                                vscode.postMessage({ type: 'openConfig', page: 'task', taskId: latestTaskId });
-                            }}
-                        >
-                            <span className="running-task-dot" />
-                            <span className="running-task-label">{label}</span>
+        <SessionContext.Provider value={sessionId}>
+            <div className="chat-session" style={{ display: active ? 'flex' : 'none' }}>
+                <div id="output-container" ref={outputContainerRef}>
+                    {renderedContent}
+                    {progressMessage && (
+                        <div className="output-line ai-response-block" id="progress-message">
+                            {progressMessage}
                         </div>
-                    );
-                })()}
-                {pendingInputs.map(p => (
-                    <div key={p.inputId} className="user-input-block pending">
-                        <div className="user-input-content pending">{p.content}</div>
-                    </div>
-                ))}
-                {activeDialog?.type === 'quickchat' && (
-                    <QuickChatDialog
-                        data={activeDialog.data}
-                        onClose={() => setDialogQueue(prev => prev.slice(1))}
-                    />
-                )}
-                {activeDialog?.type === 'permission' && (
-                    <PermissionDialog
-                        permissionData={activeDialog.data}
-                        onPermissionSelect={handleBashPermission}
-                        onCancel={handleStop}
-                        vscode={vscode}
-                    />
-                )}
-                {activeDialog?.type === 'askForm' && (
-                    <AskFormDialog
-                        data={activeDialog.data}
-                        onSubmit={handleAskFormSubmit}
-                        onSkip={handleAskFormSkip}
-                        onCancel={handleStop}
-                    />
-                )}
-                {activeDialog?.type === 'planExit' && (
-                    <PlanExitDialog
-                        data={activeDialog.data}
-                        onSubmit={handlePlanExitSubmit}
-                        onCancel={handleStop}
-                        vscode={vscode}
-                    />
-                )}
-                {modelConfigReminder && (
-                    <ModelConfigReminder
-                        message={modelConfigReminder}
-                        onClose={handleCloseModelConfigReminder}
-                        onOpenConfig={handleOpenConfig}
-                    />
-                )}
-                {PREVIEW_MODE && <PreviewDialogs vscode={vscode} />}
+                    )}
+                    {isSpinnerVisible && (
+                        <ProcessingSpinner
+                            accumulatedSeconds={spinnerAccumulatedSeconds}
+                            in_progress={todos.find(t => t.status === 'in_progress')?.progressText || ''}
+                            next_progress={todos.find(t => t.status === 'pending')?.title || ''}
+                        />
+                    )}
+                    {runningTasks.size > 0 && (() => {
+                        const tasks = Array.from(runningTasks.values());
+                        const bashCount = tasks.filter(t => t.type === TASK_TYPE_SHELL).length;
+                        const agentCount = tasks.filter(t => t.type === TASK_TYPE_AGENT).length;
+                        let label: string;
+                        if (bashCount > 0 && agentCount > 0) {
+                            label = `${tasks.length} background tasks`;
+                        } else if (agentCount > 0) {
+                            label = `${agentCount} background agent${agentCount > 1 ? 's' : ''}`;
+                        } else {
+                            label = `${bashCount} background bash${bashCount > 1 ? 'es' : ''}`;
+                        }
+                        return (
+                            <div
+                                className="running-tasks-bar"
+                                onClick={() => {
+                                    const latestTaskId = tasks[tasks.length - 1]?.taskId;
+                                    vscode.postMessage({ type: 'openConfig', page: 'task', taskId: latestTaskId });
+                                }}
+                            >
+                                <span className="running-task-dot" />
+                                <span className="running-task-label">{label}</span>
+                            </div>
+                        );
+                    })()}
+                    {pendingInputs.map(p => (
+                        <div key={p.inputId} className="user-input-block pending">
+                            <div className="user-input-content pending">{p.content}</div>
+                        </div>
+                    ))}
+                    {activeDialog?.type === 'quickchat' && (
+                        <QuickChatDialog
+                            data={activeDialog.data}
+                            onClose={() => setDialogQueue(prev => prev.slice(1))}
+                        />
+                    )}
+                    {activeDialog?.type === 'permission' && (
+                        <PermissionDialog
+                            permissionData={activeDialog.data}
+                            onPermissionSelect={handleBashPermission}
+                            onCancel={handleStop}
+                            vscode={vscode}
+                        />
+                    )}
+                    {activeDialog?.type === 'askForm' && (
+                        <AskFormDialog
+                            data={activeDialog.data}
+                            onSubmit={handleAskFormSubmit}
+                            onSkip={handleAskFormSkip}
+                            onCancel={handleStop}
+                        />
+                    )}
+                    {activeDialog?.type === 'planExit' && (
+                        <PlanExitDialog
+                            data={activeDialog.data}
+                            onSubmit={handlePlanExitSubmit}
+                            onCancel={handleStop}
+                            vscode={vscode}
+                        />
+                    )}
+                    {modelConfigReminder && (
+                        <ModelConfigReminder
+                            message={modelConfigReminder}
+                            onClose={handleCloseModelConfigReminder}
+                            onOpenConfig={handleOpenConfig}
+                        />
+                    )}
+                    {PREVIEW_MODE && <PreviewDialogs vscode={vscode} />}
+                </div>
+                <TodosPanel todos={todos} onScrollToBottom={scrollToBottom} />
+                <FileChangesPanel changes={fileChanges} vscode={vscode} onScrollToBottom={scrollToBottom} />
+                <InputBox
+                    ref={inputBoxRef}
+                    vscode={vscode}
+                    disabled={inputDisabled}
+                    placeholder={inputPlaceholder}
+                    isGenerating={processingState === 'processing'}
+                    showBashPermission={!!activeDialog}
+                    onSend={handleSend}
+                    onStop={handleStop}
+                    tokenInfo={tokenInfo}
+                    modelName={modelName}
+                    availableModels={availableModels}
+                    agentMode={agentMode}
+                    onAgentModeChange={handleAgentModeChange}
+                    autoEdit={autoEdit}
+                    skipFileEditPermission={skipFileEditPermission}
+                    onAutoEditChange={handleAutoEditChange}
+                />
             </div>
-            <TodosPanel todos={todos} onScrollToBottom={scrollToBottom} />
-            <FileChangesPanel changes={fileChanges} vscode={vscode} onScrollToBottom={scrollToBottom} />
-            <InputBox
-                ref={inputBoxRef}
-                vscode={vscode}
-                disabled={inputDisabled}
-                placeholder={inputPlaceholder}
-                isGenerating={processingState === 'processing'}
-                showBashPermission={!!activeDialog}
-                onSend={handleSend}
-                onStop={handleStop}
-                tokenInfo={tokenInfo}
-                modelName={modelName}
-                availableModels={availableModels}
-                agentMode={agentMode}
-                onAgentModeChange={handleAgentModeChange}
-                autoEdit={autoEdit}
-                skipFileEditPermission={skipFileEditPermission}
-                onAutoEditChange={handleAutoEditChange}
+        </SessionContext.Provider>
+    );
+};
+
+/**
+ * 顶层应用：管理多会话 tab 与会话集合。
+ * 每个会话渲染一个常驻挂载的 ChatSession，非 active 时隐藏。
+ */
+const App: React.FC<AppProps> = ({ vscode }) => {
+    const [sessions, setSessions] = useState<SessionMeta[]>([]);
+    const [activeId, setActiveId] = useState<string | null>(null);
+    const [errorBanner, setErrorBanner] = useState<string>('');
+    const errorTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+    const showError = useCallback((msg: string) => {
+        setErrorBanner(msg);
+        if (errorTimerRef.current) clearTimeout(errorTimerRef.current);
+        errorTimerRef.current = setTimeout(() => setErrorBanner(''), 4000);
+    }, []);
+
+    useEffect(() => {
+        const handleMessage = (event: MessageEvent) => {
+            const message = event.data;
+            switch (message.type) {
+                case 'sessionOpened':
+                    setSessions(prev => {
+                        if (prev.some(s => s.id === message.sessionId)) {
+                            return prev.map(s => s.id === message.sessionId
+                                ? { ...s, title: message.title || s.title }
+                                : s);
+                        }
+                        return [...prev, { id: message.sessionId, title: message.title || '新会话', processing: false, waiting: false }];
+                    });
+                    setActiveId(message.sessionId);
+                    break;
+                case 'sessionClosed':
+                    streamingStore.clear(message.sessionId);
+                    setSessions(prev => prev.filter(s => s.id !== message.sessionId));
+                    setActiveId(prev => (prev === message.sessionId ? (message.nextActiveId ?? null) : prev));
+                    break;
+                case 'sessionCreateFailed':
+                    showError(message.error || '创建会话失败');
+                    break;
+                case 'sessionTitleUpdate':
+                    setSessions(prev => prev.map(s => s.id === message.sessionId
+                        ? { ...s, title: message.title || s.title }
+                        : s));
+                    break;
+                case 'switchToSession':
+                    setActiveId(message.sessionId);
+                    break;
+                case 'stateUpdate':
+                    if (message.sessionId) {
+                        setSessions(prev => prev.map(s => s.id === message.sessionId
+                            ? { ...s, processing: message.state === 'processing' }
+                            : s));
+                    }
+                    break;
+            }
+        };
+
+        window.addEventListener('message', handleMessage);
+        vscode.postMessage({ type: 'frontendReady' });
+
+        return () => {
+            window.removeEventListener('message', handleMessage);
+            if (errorTimerRef.current) clearTimeout(errorTimerRef.current);
+        };
+    }, []);
+
+    const handleSwitch = (id: string) => {
+        setActiveId(id);
+        vscode.postMessage({ type: 'switchSession', sessionId: id });
+    };
+
+    const handleClose = (id: string) => {
+        vscode.postMessage({ type: 'closeSession', sessionId: id });
+    };
+
+    const handleWaitingChange = useCallback((id: string, waiting: boolean) => {
+        setSessions(prev => prev.map(s =>
+            s.id === id && s.waiting !== waiting ? { ...s, waiting } : s
+        ));
+    }, []);
+
+    return (
+        <>
+            <SessionTabs
+                sessions={sessions}
+                activeId={activeId}
+                onSwitch={handleSwitch}
+                onClose={handleClose}
             />
+            {errorBanner && (
+                <div className="session-error-banner" onClick={() => setErrorBanner('')}>
+                    {errorBanner}
+                </div>
+            )}
+            <div className="sessions-host">
+                {sessions.map(s => (
+                    <ChatSession
+                        key={s.id}
+                        vscode={vscode}
+                        sessionId={s.id}
+                        active={s.id === activeId}
+                        onWaitingChange={handleWaitingChange}
+                    />
+                ))}
+            </div>
         </>
     );
 };

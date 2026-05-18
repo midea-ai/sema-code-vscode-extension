@@ -1,7 +1,9 @@
 import { pet } from './pet-client';
 
-interface EventSubscribable {
+/** 桌宠订阅的事件源（SemaSession 满足该接口） */
+interface PetEventSource {
   on(event: string, listener: (data: any) => void): unknown;
+  off(event: string, listener: (data: any) => void): unknown;
 }
 
 const ATTENTION_BUBBLES = {
@@ -15,11 +17,26 @@ function raiseAttention(message: string): void {
   pet.say(message, { kind: 'attention', sticky: true });
 }
 
-export function wirePetEvents(semaCore: EventSubscribable): void {
-  semaCore.on('input:processing',         () => pet.state('thinking'));
-  semaCore.on('message:complete',         (d: any) => { if (d?.hasToolCalls) pet.state('working'); });
-  semaCore.on('state:update',             (d: any) => { if (d?.state === 'idle') pet.state('idle'); });
-  semaCore.on('tool:permission:request',  () => raiseAttention(ATTENTION_BUBBLES.permission));
-  semaCore.on('pick:option:request',      () => raiseAttention(ATTENTION_BUBBLES.pick));
-  semaCore.on('plan:exit:request',        () => raiseAttention(ATTENTION_BUBBLES.plan));
+/**
+ * 把桌宠状态绑定到指定会话。返回解绑函数，切换 active 会话时调用。
+ */
+export function wirePetEvents(session: PetEventSource): () => void {
+  const handlers: Array<[string, (data: any) => void]> = [
+    ['input:processing',        () => pet.state('thinking')],
+    ['message:complete',        (d: any) => { if (d?.hasToolCalls) pet.state('working'); }],
+    ['state:update',            (d: any) => { if (d?.state === 'idle') pet.state('idle'); }],
+    ['tool:permission:request', () => raiseAttention(ATTENTION_BUBBLES.permission)],
+    ['pick:option:request',     () => raiseAttention(ATTENTION_BUBBLES.pick)],
+    ['plan:exit:request',       () => raiseAttention(ATTENTION_BUBBLES.plan)],
+  ];
+
+  for (const [event, fn] of handlers) {
+    session.on(event, fn);
+  }
+
+  return () => {
+    for (const [event, fn] of handlers) {
+      session.off(event, fn);
+    }
+  };
 }

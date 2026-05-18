@@ -1,6 +1,7 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useContext } from 'react';
 import { ToggleIcon } from '../components/ui/IconButton';
 import { streamingStore } from '../utils/StreamingStore';
+import { SessionContext } from '../SessionContext';
 
 interface ThoughtBlockProps {
     content: string;  // thinking 内容
@@ -17,9 +18,10 @@ const ThoughtBlock: React.FC<ThoughtBlockProps> = React.memo(({
     const [isExpanded, setIsExpanded] = useState(false);
     const streamReasoningRef = useRef('');
     const [streamReasoning, setStreamReasoning] = useState<string | undefined>(undefined);
+    const sessionId = useContext(SessionContext);
 
     useEffect(() => {
-        const unsub = streamingStore.subscribeText(messageId, (data) => {
+        const unsub = streamingStore.subscribeText(sessionId, messageId, (data) => {
             if (data.reasoningDelta !== undefined) {
                 streamReasoningRef.current += data.reasoningDelta;
                 setStreamReasoning(streamReasoningRef.current);
@@ -29,7 +31,7 @@ const ThoughtBlock: React.FC<ThoughtBlockProps> = React.memo(({
             unsub();
             streamReasoningRef.current = '';
         };
-    }, [messageId]);
+    }, [messageId, sessionId]);
 
     const handleToggle = () => {
         setIsExpanded(!isExpanded);

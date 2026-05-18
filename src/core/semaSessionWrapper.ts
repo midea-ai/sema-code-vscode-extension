@@ -1,4 +1,4 @@
-import { SemaCore } from 'sema-core';
+import { SemaSession } from 'sema-core';
 import {
     MessageCompleteData,
     StateUpdateData,
@@ -22,56 +22,18 @@ import {
     InputProcessingData,
     TaskStartData,
     TaskEndData,
-    TaskTransferData
+    TaskTransferData,
+    ConversationUsageData,
+    Usage
 } from 'sema-core/event';
-import type { AgentMode } from 'sema-core/types';
-export type { AgentMode };
-import {
-    SemaCoreConfig,
-    ModelConfig,
-    TaskConfig,
-    FetchModelsParams,
-    FetchModelsResult,
-    ApiTestParams,
-    ApiTestResult,
-    ModelUpdateData,
-    UpdatableCoreConfig,
-    ToolInfo,
-    MAIN_AGENT_ID,
-    MarketplacePluginsInfo,
-    PluginScopeKind,
-    AgentConfig,
-    SkillConfig,
-    CommandConfig,
-    MCPServerConfig,
-    MCPServerInfo,
-    MemoryConfig,
-    RuleConfig,
-    TaskListItem,
-    CronTask
-} from 'sema-core/types';
+import { MAIN_AGENT_ID } from 'sema-core/types';
+import type { TaskListItem, AgentMode } from 'sema-core/types';
 
-import { SystemConfigManager } from '../managers/SystemConfigManager';
 import { TOOL_NAME_SEARCH_FILES, TOOL_NAME_SEARCH_CONTENT, TOOL_NAME_SUB_AGENT } from '../utils/tool';
 
+export type { AgentMode };
+
 const SKIP_COMPLETE_TOOLS = new Set<string>([TOOL_NAME_SUB_AGENT]);
-
-
-export interface SemaWrapperCallbacks {
-    onSessionReady?: (data: SessionReadyData) => void;
-    onModelUpdate?: (data: ModelUpdateData) => void;
-    onStateChange?: (state: 'idle' | 'processing') => void;
-
-    onMessage?: (message: any) => void;
-    onTopicUpdate?: (topic: TopicUpdateData) => void;
-    onToolExecutionComplete?: (data: ToolExecutionCompleteData & { agentId?: string }) => void;
-    onFileReference?: (data: FileReferenceData) => void;
-    onTaskStart?: (data: TaskStartData) => void;
-    onTaskEnd?: (data: TaskEndData) => void;
-    onSessionCleared?: () => void;
-    onOpenAgentDetail?: (taskId: string) => void;
-    onUserResponded?: (kind: 'permission' | 'pick' | 'plan') => void;
-}
 
 export interface Message {
     id: string;
@@ -94,13 +56,38 @@ export interface TaskMessageContent {
     background?: boolean;
 }
 
-export class SemaCoreWrapper {
-    private semaCore: SemaCore;
+/**
+ * 会话级 wrapper 回调。
+ * 除 onMessage（携带 sessionId 的 webview 消息）外，其余回调首参均为 sessionId，便于上层路由。
+ */
+export interface SessionWrapperCallbacks {
+    onSessionReady?: (sessionId: string, data: SessionReadyData) => void;
+    onStateChange?: (sessionId: string, state: 'idle' | 'processing') => void;
+    /** webview 消息（已注入 sessionId） */
+    onMessage?: (message: any) => void;
+    onTopicUpdate?: (sessionId: string, topic: TopicUpdateData) => void;
+    onToolExecutionComplete?: (sessionId: string, data: ToolExecutionCompleteData & { agentId?: string }) => void;
+    onFileReference?: (sessionId: string, data: FileReferenceData) => void;
+    onTaskStart?: (sessionId: string, data: TaskStartData) => void;
+    onTaskEnd?: (sessionId: string, data: TaskEndData) => void;
+    onSessionCleared?: (sessionId: string) => void;
+    onOpenAgentDetail?: (sessionId: string, taskId: string) => void;
+    onUserResponded?: (sessionId: string) => void;
+    /** 标题变化（用于 tab 栏 / 历史保存） */
+    onTitleUpdate?: (sessionId: string, title: string) => void;
+}
+
+/**
+ * SemaSessionWrapper —— 会话级 wrapper
+ * 每个会话一个实例，包裹一个 SemaSession，承载该会话的消息历史、流式状态与事件订阅。
+ */
+export class SemaSessionWrapper {
+    public readonly sessionId: string;
+    private session: SemaSession;
+
     private currentState: 'idle' | 'processing' = 'idle';
     private sessionReady: boolean = false;
-    public currentSessionId: string | null = null;
     public title: string = '';
-    private systemConfigManager: SystemConfigManager;
 
     public messageHistory: Array<Message> = [];
     private streamingAssistantMap: Map<string, Message> = new Map();
@@ -108,22 +95,19 @@ export class SemaCoreWrapper {
     private streamingToolMap: Map<string, Message> = new Map();
     private taskAgentThrottleTimer: NodeJS.Timeout | null = null;
     private pendingTaskUpdates: Set<string> = new Set();
-    private _agentMode: AgentMode = 'Agent';
+    private _agentMode: AgentMode;
+    private _autoEdit: boolean = false;
+    private lastUsage: Usage | null = null;
+    private lastTodos: any[] = [];
 
-    constructor(workingDir: string, private callbacks: SemaWrapperCallbacks, systemConfigManager: SystemConfigManager) {
-        this.systemConfigManager = systemConfigManager;
-
-        const systemConfig = this.systemConfigManager.getSystemConfig();
-        const disabledTools = this.systemConfigManager.getDisabledTools();
-
-        const config: SemaCoreConfig = {
-            workingDir,
-            logLevel: 'error',
-            ...systemConfig,
-            disabledTools: disabledTools
-        };
-
-        this.semaCore = new SemaCore(config);
+    constructor(
+        session: SemaSession,
+        private callbacks: SessionWrapperCallbacks,
+        agentMode: AgentMode = 'Agent'
+    ) {
+        this.session = session;
+        this.sessionId = session.sessionId;
+        this._agentMode = agentMode;
         this.setupEventListeners();
     }
 
@@ -131,21 +115,185 @@ export class SemaCoreWrapper {
         return `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
     }
 
-    public async createSession(sessionId?: string): Promise<void> {
-        await this.semaCore.createSession(sessionId);
-    }
-
-    public processUserInput(content: string, orgContent?: string): void {
-        this.semaCore.processUserInput(content, orgContent);
-    }
-
-    public interruptSession(): void {
-        this.semaCore.interruptSession();
-    }
-
     private isSubAgent(agentId?: string): boolean {
         return !!agentId && agentId !== MAIN_AGENT_ID;
     }
+
+    // ─── 会话交互 ─────────────────────────────────────────────────────────────
+
+    public processUserInput(content: string, orgContent?: string): void {
+        this.session.processUserInput(content, orgContent);
+    }
+
+    public interruptSession(): void {
+        this.session.interrupt();
+    }
+
+    public respondToToolPermission(response: ToolPermissionResponse): void {
+        this.callbacks.onUserResponded?.(this.sessionId);
+        this.session.respondToToolPermission(response);
+    }
+
+    public respondToPickOption(response: PickOptionResponseData): void {
+        this.callbacks.onUserResponded?.(this.sessionId);
+        this.session.respondToPickOption(response);
+    }
+
+    public respondToPlanExit(response: PlanExitResponseData): void {
+        this.callbacks.onUserResponded?.(this.sessionId);
+        this.session.respondToPlanExit(response);
+    }
+
+    public updateAgentMode(mode: AgentMode): void {
+        this._agentMode = mode;
+        this.session.updateAgentMode(mode);
+    }
+
+    public getAgentMode(): AgentMode {
+        return this._agentMode;
+    }
+
+    public updateAutoEdit(enable: boolean): void {
+        this._autoEdit = enable;
+        this.session.updateAutoEdit(enable);
+    }
+
+    public watchTask(taskId: string, onDelta: (delta: string) => void): () => void {
+        return this.session.watchTask(taskId, onDelta);
+    }
+
+    public transferAgentToBackground(taskId: string): boolean {
+        const result = this.session.transferAgentToBackground(taskId);
+        if (result) {
+            const entry = this.taskAgentMap.get(taskId);
+            if (entry) {
+                const taskContent = entry.msg.content as TaskMessageContent;
+                taskContent.background = true;
+                this.sendUpdateMessage(entry.msg.id, taskContent);
+            }
+        }
+        return result;
+    }
+
+    public stopTask(taskId: string): void {
+        this.session.stopTask(taskId);
+    }
+
+    public stopAllTasks(): number {
+        return this.session.stopAllTasks();
+    }
+
+    public getTaskList(): TaskListItem[] {
+        return this.session.getTaskList();
+    }
+
+    // ─── 状态访问 ─────────────────────────────────────────────────────────────
+
+    public getCurrentState(): 'idle' | 'processing' {
+        return this.currentState;
+    }
+
+    public isReady(): boolean {
+        return this.sessionReady;
+    }
+
+    /**
+     * webview 侧 ChatSession 挂载后，回放当前会话完整状态，避免错过早于挂载的事件。
+     */
+    public sendInitialState(): void {
+        this.sendContentUpdate();
+        this.post(this.sessionReady
+            ? { type: 'enableInput' }
+            : { type: 'disableInput', message: '正在初始化 CLI，请稍候...' });
+        this.post({ type: 'agentModeUpdate', mode: this._agentMode });
+        this.post({ type: 'autoEditUpdate', enable: this._autoEdit });
+        this.post({ type: 'stateUpdate', state: this.currentState });
+        if (this.lastUsage) {
+            this.post({ type: 'updateTokenInfo', tokenInfo: this.lastUsage });
+        }
+        if (this.lastTodos.length > 0) {
+            this.post({ type: 'todosUpdate', todos: this.lastTodos });
+        }
+    }
+
+    // ─── 消息历史 ─────────────────────────────────────────────────────────────
+
+    public updateMessageHistory(message: Message[]): void {
+        this.messageHistory = message;
+        this.sendContentUpdate();
+    }
+
+    public updateTitle(title: string): void {
+        this.setTitle(title);
+    }
+
+    public clearMessageHistory(): void {
+        this.messageHistory = [];
+        this.setTitle('');
+        this.taskAgentMap.clear();
+        this.streamingToolMap.clear();
+        this.streamingAssistantMap.clear();
+        this.pendingTaskUpdates.clear();
+        if (this.taskAgentThrottleTimer) {
+            clearTimeout(this.taskAgentThrottleTimer);
+            this.taskAgentThrottleTimer = null;
+        }
+        this.sendContentUpdate();
+    }
+
+    public getMessageHistory(): Message[] {
+        return [...this.messageHistory];
+    }
+
+    private setTitle(title: string): void {
+        if (this.title === title) return;
+        this.title = title;
+        this.callbacks.onTitleUpdate?.(this.sessionId, title);
+    }
+
+    public insertPermissionRequestMessage(permissionData: any): void {
+        const message: Message = {
+            id: this.generateId(),
+            type: 'permission_request',
+            content: {
+                toolName: permissionData.toolName,
+                title: permissionData.title,
+                content: permissionData.content,
+                action: permissionData.action,
+                refuseMessage: permissionData.refuseMessage
+            },
+        };
+
+        if (this.isSubAgent(permissionData.agentId)) {
+            this.addMessageToTaskAgent(permissionData.agentId, message);
+            return;
+        }
+
+        this.messageHistory.push(message);
+        this.sendAppendMessages([message]);
+    }
+
+    public insertAskFormRequestMessage(askFormData: any): void {
+        const message: Message = {
+            id: this.generateId(),
+            type: 'askForm',
+            content: {
+                data: askFormData.data,
+                status: askFormData.status,
+                values: askFormData.values,
+            },
+        };
+
+        if (this.isSubAgent(askFormData.agentId)) {
+            this.addMessageToTaskAgent(askFormData.agentId, message);
+            return;
+        }
+
+        this.messageHistory.push(message);
+        this.sendAppendMessages([message]);
+    }
+
+    // ─── 事件订阅 ─────────────────────────────────────────────────────────────
 
     private setupEventListeners(): void {
         this.setupSessionListeners();
@@ -155,16 +303,25 @@ export class SemaCoreWrapper {
         this.setupMetaListeners();
         this.setupTaskAgentListeners();
         this.setupTaskListeners();
+        this.setupInteractionListeners();
     }
 
     private setupSessionListeners(): void {
-        this.semaCore.on<SessionReadyData>('session:ready', (data) => {
-            this.currentSessionId = data.sessionId;
+        this.session.on<SessionReadyData>('session:ready', (data) => {
             this.sessionReady = true;
-            this.callbacks.onSessionReady?.(data);
+            this.post({ type: 'enableInput' });
+            if (data.usage) {
+                this.lastUsage = data.usage;
+                this.post({ type: 'updateTokenInfo', tokenInfo: data.usage });
+            }
+            if (Array.isArray(data.todos) && data.todos.length > 0) {
+                this.lastTodos = data.todos;
+                this.post({ type: 'todosUpdate', todos: data.todos });
+            }
+            this.callbacks.onSessionReady?.(this.sessionId, data);
         });
 
-        this.semaCore.on<FileReferenceData>('file:reference', (data) => {
+        this.session.on<FileReferenceData>('file:reference', (data) => {
             if (data.references && data.references.length > 0) {
                 const msg: Message = {
                     id: this.generateId(),
@@ -176,11 +333,11 @@ export class SemaCoreWrapper {
                 };
                 this.messageHistory.push(msg);
                 this.sendAppendMessages([msg]);
-                this.callbacks.onFileReference?.(data);
+                this.callbacks.onFileReference?.(this.sessionId, data);
             }
         });
 
-        this.semaCore.on<SessionInterruptedData & { agentId?: string }>('session:interrupted', (data) => {
+        this.session.on<SessionInterruptedData & { agentId?: string }>('session:interrupted', (data) => {
             if (this.isSubAgent(data.agentId)) {
                 this.addMessageToTaskAgent(data.agentId!, {
                     id: this.generateId(),
@@ -212,7 +369,7 @@ export class SemaCoreWrapper {
             this.sendAppendMessages([interruptedMsg]);
         });
 
-        this.semaCore.on<SessionErrorData>('session:error', (data) => {
+        this.session.on<SessionErrorData>('session:error', (data) => {
             console.error('Session error:', data);
             const errorMessage = data.error?.message || 'Unknown error';
             const sessionErrorMsg: Message = {
@@ -228,9 +385,9 @@ export class SemaCoreWrapper {
             this.sendAppendMessages([sessionErrorMsg]);
         });
 
-        this.semaCore.on<{ sessionId: string | null }>('session:cleared', (_data) => {
+        this.session.on<{ sessionId: string | null }>('session:cleared', (_data) => {
             this.clearMessageHistory();
-            this.title = '新会话';
+            this.setTitle('新会话');
             this.messageHistory.push({
                 id: this.generateId(),
                 type: 'user',
@@ -241,13 +398,15 @@ export class SemaCoreWrapper {
                 type: 'system',
                 content: { type: 'clear', content: '(no content)' },
             });
+            this.lastTodos = [];
+            this.lastUsage = null;
             this.sendContentUpdate();
-            this.callbacks.onSessionCleared?.();
+            this.callbacks.onSessionCleared?.(this.sessionId);
         });
     }
 
     private setupInputListeners(): void {
-        this.semaCore.on<InputProcessingData>('input:processing', (data) => {
+        this.session.on<InputProcessingData>('input:processing', (data) => {
             const content = data.originalInput || data.input;
 
             const hasUserMessages = this.messageHistory.some(m => m.type === 'user');
@@ -256,7 +415,7 @@ export class SemaCoreWrapper {
                 if (title.length > 50) {
                     title = title.substring(0, 50) + '...';
                 }
-                this.title = title || '新对话';
+                this.setTitle(title || '新对话');
             }
 
             const userMsg: Message = {
@@ -268,17 +427,18 @@ export class SemaCoreWrapper {
             this.sendAppendMessages([userMsg]);
 
             // 通知前端清除 pending 状态
-            this.callbacks.onMessage?.({ type: 'inputProcessing', data });
+            this.post({ type: 'inputProcessing', data });
         });
     }
 
     private setupMessageListeners(): void {
-        this.semaCore.on<StateUpdateData>('state:update', (data) => {
+        this.session.on<StateUpdateData>('state:update', (data) => {
             this.currentState = data.state;
-            this.callbacks.onStateChange?.(data.state);
+            this.post({ type: 'stateUpdate', state: data.state });
+            this.callbacks.onStateChange?.(this.sessionId, data.state);
         });
 
-        this.semaCore.on<ThinkingChunkData & { id?: string; delta?: string }>('message:thinking:chunk', (data) => {
+        this.session.on<ThinkingChunkData & { id?: string; delta?: string }>('message:thinking:chunk', (data) => {
             const msgId = data.id || 'default-stream';
             const delta = data.delta ?? '';
             const existing = this.streamingAssistantMap.get(msgId);
@@ -299,7 +459,7 @@ export class SemaCoreWrapper {
             this.sendAppendMessages([newMessage]);
         });
 
-        this.semaCore.on<TextChunkData>('message:text:chunk', (data) => {
+        this.session.on<TextChunkData>('message:text:chunk', (data) => {
             const msgId = data.id || 'default-stream';
             const existing = this.streamingAssistantMap.get(msgId);
             if (existing) {
@@ -319,7 +479,7 @@ export class SemaCoreWrapper {
             this.sendChunkUpdate(msgId, { contentDelta: data.delta });
         });
 
-        this.semaCore.on<MessageCompleteData & { agentId?: string; id?: string }>('message:complete', (data) => {
+        this.session.on<MessageCompleteData & { agentId?: string; id?: string }>('message:complete', (data) => {
             if (!data.content && !data.reasoning && !data.hasToolCalls) {
                 if (data.id) this.streamingAssistantMap.delete(data.id);
                 return;
@@ -399,7 +559,7 @@ export class SemaCoreWrapper {
     }
 
     private setupToolListeners(): void {
-        this.semaCore.on<ToolExecutionChunkData & { agentId?: string }>('tool:execution:chunk', (data) => {
+        this.session.on<ToolExecutionChunkData & { agentId?: string }>('tool:execution:chunk', (data) => {
             if (this.isSubAgent(data.agentId)) {
                 return;
             }
@@ -427,8 +587,8 @@ export class SemaCoreWrapper {
             }
         });
 
-        this.semaCore.on<ToolExecutionCompleteData & { agentId?: string }>('tool:execution:complete', (data) => {
-            this.callbacks.onToolExecutionComplete?.(data);
+        this.session.on<ToolExecutionCompleteData & { agentId?: string }>('tool:execution:complete', (data) => {
+            this.callbacks.onToolExecutionComplete?.(this.sessionId, data);
 
             if (this.isSubAgent(data.agentId)) {
                 this.addMessageToTaskAgent(data.agentId!, {
@@ -465,7 +625,7 @@ export class SemaCoreWrapper {
             }
         });
 
-        this.semaCore.on<ToolExecutionErrorData & { agentId?: string }>('tool:execution:error', (data) => {
+        this.session.on<ToolExecutionErrorData & { agentId?: string }>('tool:execution:error', (data) => {
             console.error('Tool execution error:', data);
 
             const errorMessage: Message = {
@@ -491,14 +651,14 @@ export class SemaCoreWrapper {
     }
 
     private setupMetaListeners(): void {
-        this.semaCore.on<TopicUpdateData>('topic:update', (data) => {
+        this.session.on<TopicUpdateData>('topic:update', (data) => {
             if (data.title && data.title.trim() && this.title !== data.title) {
-                this.title = data.title;
-                this.callbacks.onTopicUpdate?.(data);
+                this.setTitle(data.title);
+                this.callbacks.onTopicUpdate?.(this.sessionId, data);
             }
         });
 
-        this.semaCore.on<CompactExecData>('compact:exec', (data) => {
+        this.session.on<CompactExecData>('compact:exec', (data) => {
             const finalContent = (data.errMsg && data.errMsg.trim() !== '')
                 ? `Compacted: ${data.errMsg}`
                 : `Compacted`;
@@ -527,10 +687,10 @@ export class SemaCoreWrapper {
             };
             this.messageHistory.push(compactMsg);
             this.sendContentUpdate();
-            this.callbacks.onSessionCleared?.();
+            this.callbacks.onSessionCleared?.(this.sessionId);
         });
 
-        this.semaCore.on<PlanImplementData>('plan:implement', (data) => {
+        this.session.on<PlanImplementData>('plan:implement', (data) => {
             const planMsg: Message = {
                 id: this.generateId(),
                 type: 'system',
@@ -543,20 +703,19 @@ export class SemaCoreWrapper {
             this.messageHistory.push(planMsg);
             this.sendAppendMessages([planMsg]);
         });
-
     }
 
     private setupTaskListeners(): void {
-        this.semaCore.on<TaskStartData>('task:start', (data) => {
-            this.callbacks.onTaskStart?.(data);
+        this.session.on<TaskStartData>('task:start', (data) => {
+            this.callbacks.onTaskStart?.(this.sessionId, data);
         });
 
-        this.semaCore.on<TaskTransferData>('task:transfer', (data) => {
-            this.callbacks.onTaskStart?.(data);
+        this.session.on<TaskTransferData>('task:transfer', (data) => {
+            this.callbacks.onTaskStart?.(this.sessionId, data);
         });
 
-        this.semaCore.on<TaskEndData>('task:end', (data) => {
-            this.callbacks.onTaskEnd?.(data);
+        this.session.on<TaskEndData>('task:end', (data) => {
+            this.callbacks.onTaskEnd?.(this.sessionId, data);
 
             if (data.summary) {
                 const taskEndMessage: Message = {
@@ -575,60 +734,76 @@ export class SemaCoreWrapper {
     }
 
     private setupTaskAgentListeners(): void {
-        this.semaCore.on<TaskAgentStartData>('task:agent:start', (data) => {
+        this.session.on<TaskAgentStartData>('task:agent:start', (data) => {
             this.handleTaskAgentStart(data);
         });
 
-        this.semaCore.on<TaskAgentEndData>('task:agent:end', (data) => {
+        this.session.on<TaskAgentEndData>('task:agent:end', (data) => {
             this.handleTaskAgentEnd(data);
         });
     }
 
-    private sendContentUpdate(): void {
-        this.callbacks.onMessage?.({
-            type: 'updateContent',
-            messages: [...this.messageHistory]
+    private setupInteractionListeners(): void {
+        this.session.on('tool:permission:request', (data: any) => {
+            this.post({ type: 'toolPermissionRequest', data });
         });
+        this.session.on('pick:option:request', (data: any) => {
+            this.post({ type: 'askFormRequest', data });
+        });
+        this.session.on('plan:exit:request', (data: any) => {
+            this.post({ type: 'planExitRequest', data });
+        });
+        this.session.on<ConversationUsageData>('conversation:usage', (data) => {
+            this.lastUsage = data.usage;
+            this.post({ type: 'updateTokenInfo', tokenInfo: data.usage });
+        });
+        this.session.on('todos:update', (data: any) => {
+            this.lastTodos = Array.isArray(data) ? data : [];
+            this.post({ type: 'todosUpdate', todos: data });
+        });
+        this.session.on('input:received', (data: any) => {
+            this.post({ type: 'inputReceived', data });
+        });
+        this.session.on('quickchat:response', (data: any) => {
+            this.post({ type: 'quickchatResponse', data });
+        });
+        this.session.on('autoEdit:update', (data: any) => {
+            this._autoEdit = !!data.enable;
+            this.post({ type: 'autoEditUpdate', enable: data.enable });
+        });
+    }
+
+    // ─── webview 消息发送（统一注入 sessionId）─────────────────────────────────
+
+    private post(message: any): void {
+        this.callbacks.onMessage?.({ ...message, sessionId: this.sessionId });
+    }
+
+    private sendContentUpdate(): void {
+        this.post({ type: 'updateContent', messages: [...this.messageHistory] });
     }
 
     private sendChunkUpdate(messageId: string, update: { contentDelta?: string; reasoningDelta?: string }): void {
-        this.callbacks.onMessage?.({
-            type: 'chunkUpdate',
-            id: messageId,
-            ...update
-        });
+        this.post({ type: 'chunkUpdate', id: messageId, ...update });
     }
 
     private sendCompleteUpdate(messageId: string, update: { content?: any; reasoning?: string }): void {
-        this.callbacks.onMessage?.({
-            type: 'completeUpdate',
-            id: messageId,
-            ...update
-        });
+        this.post({ type: 'completeUpdate', id: messageId, ...update });
     }
 
     private sendToolChunkUpdate(messageId: string, contentDelta: string): void {
-        this.callbacks.onMessage?.({
-            type: 'toolChunkUpdate',
-            id: messageId,
-            contentDelta
-        });
+        this.post({ type: 'toolChunkUpdate', id: messageId, contentDelta });
     }
 
     private sendAppendMessages(messages: Message[]): void {
-        this.callbacks.onMessage?.({
-            type: 'appendMessages',
-            messages
-        });
+        this.post({ type: 'appendMessages', messages });
     }
 
     private sendUpdateMessage(id: string, content: any): void {
-        this.callbacks.onMessage?.({
-            type: 'updateMessage',
-            id,
-            content
-        });
+        this.post({ type: 'updateMessage', id, content });
     }
+
+    // ─── Task Agent ───────────────────────────────────────────────────────────
 
     private handleTaskAgentStart(data: TaskAgentStartData): void {
         const userMessage: Message = {
@@ -703,10 +878,6 @@ export class SemaCoreWrapper {
      * 生成任务摘要
      * 规则：最近的2个工具调用标题 + '\nUsed N tools'
      * 若工具不足2个，显示 prompt 内容 + 工具调用标题
-     *
-     * 工具显示格式：
-     * - search_files、search_content → Search(${title})
-     * - 其他 → ${toolName}(${title})
      */
     private generateTaskSummary(taskContent: TaskMessageContent): string {
         const toolMessages = taskContent.taskMessages.filter(m => m.type === 'tool');
@@ -731,425 +902,30 @@ export class SemaCoreWrapper {
         return `${toolTitles}\nUsed ${toolCount} tools`;
     }
 
-    public respondToToolPermission(response: ToolPermissionResponse): void {
-        this.callbacks.onUserResponded?.('permission');
-        this.semaCore.respondToToolPermission(response);
+    public openAgentDetail(taskId: string): void {
+        this.callbacks.onOpenAgentDetail?.(this.sessionId, taskId);
     }
 
-    public respondToPickOption(response: PickOptionResponseData): void {
-        this.callbacks.onUserResponded?.('pick');
-        this.semaCore.respondToPickOption(response);
-    }
-
-    public respondToPlanExit(response: PlanExitResponseData): void {
-        this.callbacks.onUserResponded?.('plan');
-        this.semaCore.respondToPlanExit(response);
-    }
-
-    public updateMessageHistory(message: Message[]): void {
-        this.messageHistory = message;
-        this.sendContentUpdate();
-    }
-
-    public updateTitle(title: string): void {
-        this.title = title;
-    }
-
-    public clearMessageHistory(): void {
-        this.messageHistory = [];
-        this.title = '';
-        this.taskAgentMap.clear();
-        this.streamingToolMap.clear();
-        this.streamingAssistantMap.clear();
-        this.pendingTaskUpdates.clear();
-        if (this.taskAgentThrottleTimer) {
-            clearTimeout(this.taskAgentThrottleTimer);
-            this.taskAgentThrottleTimer = null;
-        }
-        this.sendContentUpdate();
-    }
-
-    public getMessageHistory(): any[] {
-        return [...this.messageHistory];
-    }
-
-    // ===== 模型管理相关方法 =====
-
-    public async addModel(config: ModelConfig, skipValidation?: boolean): Promise<ModelUpdateData> {
-        const result = await this.semaCore.addModel(config, skipValidation);
-        this.callbacks.onModelUpdate?.(result);
-        return result;
-    }
-
-    public async deleteModel(modelName: string): Promise<ModelUpdateData> {
-        const result = await this.semaCore.delModel(modelName);
-        this.callbacks.onModelUpdate?.(result);
-        return result;
-    }
-
-    public async switchModel(modelName: string): Promise<ModelUpdateData> {
-        const result = await this.semaCore.switchModel(modelName);
-        this.callbacks.onModelUpdate?.(result);
-        return result;
-    }
-
-    public async applyTaskModel(config: TaskConfig): Promise<ModelUpdateData> {
-        const result = await this.semaCore.applyTaskModel(config);
-        this.callbacks.onModelUpdate?.(result);
-        return result;
-    }
-
-    public async getModelData(): Promise<ModelUpdateData> {
-        return await this.semaCore.getModelData();
-    }
-
-    // ===== 独立工具函数 =====
-
-    public async fetchAvailableModels(params: FetchModelsParams): Promise<FetchModelsResult> {
-        const result = await this.semaCore.fetchAvailableModels(params);
-        return result;
-    }
-
-    public async testApiConnection(params: ApiTestParams): Promise<ApiTestResult> {
-        const result = await this.semaCore.testApiConnection(params);
-        return result;
-    }
-
-    public getModelAdapter(provider: string, modelName: string, baseURL: string): string | undefined {
-        const result = this.semaCore.getModelAdapter(provider, modelName, baseURL);
-        return result;
-    }
-
-    // ===== 工具管理相关方法 =====
-
-    public getToolInfos(): ToolInfo[] {
-        const toolInfos = this.semaCore.getToolInfos();
-        return toolInfos;
-    }
-
-    public async updateDisabledTools(disabledTools: string[] | null): Promise<void> {
-        await this.systemConfigManager.saveDisabledTools(disabledTools);
-        this.semaCore.updateDisabledTools(disabledTools);
-    }
-
-    public getCurrentState(): 'idle' | 'processing' {
-        return this.currentState;
-    }
-
-    public isReady(): boolean {
-        return this.sessionReady;
-    }
-
-    public async waitForReady(timeout: number = 5000): Promise<boolean> {
-        return new Promise((resolve) => {
-            if (this.isReady()) {
-                resolve(true);
-                return;
-            }
-
-            let timeoutId: NodeJS.Timeout;
-            const readyHandler = () => {
-                clearTimeout(timeoutId);
-                this.semaCore.off('session:ready', readyHandler);
-                resolve(true);
-            };
-
-            this.semaCore.on('session:ready', readyHandler);
-
-            timeoutId = setTimeout(() => {
-                this.semaCore.off('session:ready', readyHandler);
-                resolve(false);
-            }, timeout);
-        });
-    }
-
-    public getSemaCore(): SemaCore {
-        return this.semaCore;
-    }
-
-    public async updateSystemConfig(config: UpdatableCoreConfig): Promise<void> {
-        await this.systemConfigManager.saveSystemConfig(config);
-        this.semaCore.updateCoreConfig(config);
-    }
-
-    public async updateAgentMode(mode: AgentMode): Promise<void> {
-        this._agentMode = mode;
-        this.semaCore.updateAgentMode(mode);
-    }
-
-    public getAgentMode(): AgentMode {
-        return this._agentMode;
-    }
-
-    public updateAutoEdit(enable: boolean): void {
-        this.semaCore.updateAutoEdit(enable);
-    }
-
-    public async updateSystemConfigByKey<K extends keyof UpdatableCoreConfig>(
-        key: K,
-        value: UpdatableCoreConfig[K]
-    ): Promise<void> {
-        await this.systemConfigManager.saveSystemConfigByKey(key, value);
-        this.semaCore.updateCoreConfByKey(key, value);
-    }
+    // ─── 资源释放 ─────────────────────────────────────────────────────────────
 
     /**
-     * 保存扩展端本地副作用字段（如 enablePet），仅落 globalState，不推 sema-core
+     * 释放 wrapper 本地状态。SemaSession 的销毁由 SessionPool.closeSession 统一处理，
+     * 这里不再调用 session.dispose()，避免重复释放。
      */
-    public async saveLocalSystemConfigByKey(key: string, value: any): Promise<void> {
-        await this.systemConfigManager.saveSystemConfigByKeyRaw(key, value);
-    }
-
-    public getSystemConfig(): UpdatableCoreConfig {
-        return this.systemConfigManager.getSystemConfig();
-    }
-
-    public insertPermissionRequestMessage(permissionData: any): void {
-        const message: Message = {
-            id: this.generateId(),
-            type: 'permission_request',
-            content: {
-                toolName: permissionData.toolName,
-                title: permissionData.title,
-                content: permissionData.content,
-                action: permissionData.action,
-                refuseMessage: permissionData.refuseMessage
-            },
-        };
-
-        if (this.isSubAgent(permissionData.agentId)) {
-            this.addMessageToTaskAgent(permissionData.agentId, message);
-            return;
-        }
-
-        this.messageHistory.push(message);
-        this.sendAppendMessages([message]);
-    }
-
-    public insertAskFormRequestMessage(askFormData: any): void {
-        const message: Message = {
-            id: this.generateId(),
-            type: 'askForm',
-            content: {
-                data: askFormData.data,
-                status: askFormData.status,
-                values: askFormData.values,
-            },
-        };
-
-        if (this.isSubAgent(askFormData.agentId)) {
-            this.addMessageToTaskAgent(askFormData.agentId, message);
-            return;
-        }
-
-        this.messageHistory.push(message);
-        this.sendAppendMessages([message]);
-    }
-
-    // ===== 插件市场管理相关方法 =====
-
-    public async addMarketplaceFromGit(repo: string): Promise<MarketplacePluginsInfo> {
-        return await this.semaCore.addMarketplaceFromGit(repo);
-    }
-
-    public async addMarketplaceFromDirectory(dirPath: string): Promise<MarketplacePluginsInfo> {
-        return await this.semaCore.addMarketplaceFromDirectory(dirPath);
-    }
-
-    public async updateMarketplace(marketplaceName: string): Promise<MarketplacePluginsInfo> {
-        return await this.semaCore.updateMarketplace(marketplaceName);
-    }
-
-    public async removeMarketplace(marketplaceName: string): Promise<MarketplacePluginsInfo> {
-        return await this.semaCore.removeMarketplace(marketplaceName);
-    }
-
-    public async installPlugin(pluginName: string, marketplaceName: string, scope: PluginScopeKind, projectPath?: string): Promise<MarketplacePluginsInfo> {
-        return await this.semaCore.installPlugin(pluginName, marketplaceName, scope, projectPath);
-    }
-
-    public async uninstallPlugin(pluginName: string, marketplaceName: string, scope: PluginScopeKind, projectPath?: string): Promise<MarketplacePluginsInfo> {
-        return await this.semaCore.uninstallPlugin(pluginName, marketplaceName, scope, projectPath);
-    }
-
-    public async enablePlugin(pluginName: string, marketplaceName: string, scope: PluginScopeKind, projectPath?: string): Promise<MarketplacePluginsInfo> {
-        return await this.semaCore.enablePlugin(pluginName, marketplaceName, scope, projectPath);
-    }
-
-    public async disablePlugin(pluginName: string, marketplaceName: string, scope: PluginScopeKind, projectPath?: string): Promise<MarketplacePluginsInfo> {
-        return await this.semaCore.disablePlugin(pluginName, marketplaceName, scope, projectPath);
-    }
-
-    public async updatePlugin(pluginName: string, marketplaceName: string, scope: PluginScopeKind, projectPath?: string): Promise<MarketplacePluginsInfo> {
-        return await this.semaCore.updatePlugin(pluginName, marketplaceName, scope, projectPath);
-    }
-
-    public async refreshMarketplacePluginsInfo(): Promise<MarketplacePluginsInfo> {
-        return await this.semaCore.refreshMarketplacePluginsInfo();
-    }
-
-    public async getMarketplacePluginsInfo(): Promise<MarketplacePluginsInfo> {
-        return await this.semaCore.getMarketplacePluginsInfo();
-    }
-
-    // ===== agent管理相关方法 =====
-
-    public getAgentsInfo(refresh?: boolean): Promise<AgentConfig[]> {
-        return this.semaCore.getAgentsInfo(true, refresh);
-    }
-
-    public addAgentConf(agentConf: AgentConfig): Promise<AgentConfig[]> {
-        return this.semaCore.addAgentConf(agentConf);
-    }
-
-    public removeAgentConf(name: string): Promise<AgentConfig[]> {
-        return this.semaCore.removeAgentConf(name);
-    }
-
-    // ===== skill管理相关方法 =====
-
-    public getSkillsInfo(refresh?: boolean): Promise<SkillConfig[]> {
-        return this.semaCore.getSkillsInfo(true, refresh);
-    }
-
-    public removeSkillConf(name: string): Promise<SkillConfig[]> {
-        return this.semaCore.removeSkillConf(name);
-    }
-
-    // ===== design 相关方法 =====
-
-    public getDesignSkillsInfo(refresh?: boolean) {
-        return this.semaCore.getDesignSkillsInfo(refresh);
-    }
-
-    public getDesignSystemsInfo(refresh?: boolean) {
-        return this.semaCore.getDesignSystemsInfo(refresh);
-    }
-
-    // ===== command管理相关方法 =====
-
-    public getCommandsInfo(refresh?: boolean): Promise<CommandConfig[]> {
-        return this.semaCore.getCommandsInfo(true, refresh);
-    }
-
-    public addCommandConf(commandConf: CommandConfig): Promise<CommandConfig[]> {
-        return this.semaCore.addCommandConf(commandConf);
-    }
-
-    public removeCommandConf(name: string): Promise<CommandConfig[]> {
-        return this.semaCore.removeCommandConf(name);
-    }
-
-    // ===== MCP 管理相关方法 =====
-
-    public getMCPServerInfo(): Promise<MCPServerInfo[]> {
-        return this.semaCore.getMCPServerInfo();
-    }
-
-    public refreshMCPServerInfo(): Promise<MCPServerInfo[]> {
-        return this.semaCore.refreshMCPServerInfo();
-    }
-
-    public addMCPServer(mcpConfig: MCPServerConfig): Promise<MCPServerInfo[]> {
-        return this.semaCore.addMCPServer(mcpConfig);
-    }
-
-    public removeMCPServer(name: string): Promise<MCPServerInfo[]> {
-        return this.semaCore.removeMCPServer(name);
-    }
-
-    public reconnectMCPServer(name: string): Promise<MCPServerInfo[]> {
-        return this.semaCore.reconnectMCPServer(name);
-    }
-
-    public disableMCPServer(name: string): Promise<MCPServerInfo[]> {
-        return this.semaCore.disableMCPServer(name);
-    }
-
-    public enableMCPServer(name: string): Promise<MCPServerInfo[]> {
-        return this.semaCore.enableMCPServer(name);
-    }
-
-    public updateMCPUseTools(name: string, toolNames: string[]): Promise<MCPServerInfo[]> {
-        return this.semaCore.updateMCPUseTools(name, toolNames);
-    }
-
-    // ===== Task 管理相关方法 =====
-
-    public watchTask(taskId: string, onDelta: (delta: string) => void): () => void {
-        return this.semaCore.watchTask(taskId, onDelta);
-    }
-
-    public transferAgentToBackground(taskId: string): boolean {
-        const result = this.semaCore.transferAgentToBackground(taskId);
-        if (result) {
-            const entry = this.taskAgentMap.get(taskId);
-            if (entry) {
-                const taskContent = entry.msg.content as TaskMessageContent;
-                taskContent.background = true;
-                this.sendUpdateMessage(entry.msg.id, taskContent);
-            }
-        }
-        return result;
-    }
-
-    public stopTask(taskId: string): void {
-        this.semaCore.stopTask(taskId);
-    }
-
-    public stopAllTasks(): number {
-        return this.semaCore.stopAllTasks();
-    }
-
-    public openAgentDetail(taskId: string): void {
-        this.callbacks.onOpenAgentDetail?.(taskId);
-    }
-
-    public getTaskList(): TaskListItem[] {
-        return this.semaCore.getTaskList();
-    }
-
-    // ===== Cron 管理相关方法 =====
-
-    public async getCronTasks(): Promise<CronTask[]> {
-        return this.semaCore.getCronTasks();
-    }
-
-    public deleteCronTask(id: string): boolean {
-        return this.semaCore.deleteCronTask(id);
-    }
-
-    public enableCronTask(id: string): boolean {
-        return this.semaCore.enableCronTask(id);
-    }
-
-    public disableCronTask(id: string): boolean {
-        return this.semaCore.disableCronTask(id);
-    }
-
-    // ===== Mem 管理相关方法 =====
-
-    public getMemoryInfo(refresh?: boolean): Promise<MemoryConfig | null> {
-        return this.semaCore.getMemoryInfo(refresh);
-    }
-
-    // ===== Rule 管理相关方法 =====
-
-    public getRuleInfo(refresh?: boolean): Promise<RuleConfig | null> {
-        return this.semaCore.getRuleInfo(refresh);
-    }
-
-
     public dispose(): void {
         try {
-            this.semaCore.dispose();
-            this.clearMessageHistory();
-            this.currentState = 'idle';
-            this.sessionReady = false;
-            this.currentSessionId = null;
+            if (this.taskAgentThrottleTimer) {
+                clearTimeout(this.taskAgentThrottleTimer);
+                this.taskAgentThrottleTimer = null;
+            }
+            this.messageHistory = [];
+            this.streamingAssistantMap.clear();
+            this.streamingToolMap.clear();
+            this.taskAgentMap.clear();
+            this.pendingTaskUpdates.clear();
             this.callbacks = {};
         } catch (error) {
-            console.error('Error disposing SemaCoreWrapper:', error);
+            console.error('Error disposing SemaSessionWrapper:', error);
         }
     }
 }

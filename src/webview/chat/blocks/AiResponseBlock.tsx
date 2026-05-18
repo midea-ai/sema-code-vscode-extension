@@ -1,8 +1,9 @@
 // 简化的 AiResponseBlock - 只支持基本Markdown功能
-import React, { useEffect, useRef, useState, useMemo } from 'react';
+import React, { useContext, useEffect, useRef, useState, useMemo } from 'react';
 import { renderMarkdownToHtml, hasMarkdownFormatting } from '../utils/markdown';
 import { getResponseDot } from '../utils/symbols';
 import { streamingStore } from '../utils/StreamingStore';
+import { SessionContext } from '../SessionContext';
 import '../style/markdown.css';
 
 interface AiResponseBlockProps {
@@ -18,6 +19,7 @@ const AiResponseBlock: React.FC<AiResponseBlockProps> = React.memo(({
     isStreaming = false,
     vscode
 }) => {
+    const sessionId = useContext(SessionContext);
     const contentRef = useRef<HTMLDivElement>(null);
     // 流式累积文本（ref 存最新值，state 驱动渲染）
     const streamBufferRef = useRef<string>('');
@@ -132,14 +134,14 @@ const AiResponseBlock: React.FC<AiResponseBlockProps> = React.memo(({
         streamBufferRef.current = '';
         setStreamContent('');
 
-        const unsub = streamingStore.subscribeText(messageId, (data) => {
+        const unsub = streamingStore.subscribeText(sessionId, messageId, (data) => {
             if (data.contentDelta) {
                 streamBufferRef.current += data.contentDelta;
                 setStreamContent(streamBufferRef.current);
             }
         });
         return unsub;
-    }, [isStreaming, messageId]);
+    }, [isStreaming, messageId, sessionId]);
 
     // 决定当前要渲染的文本：流式阶段优先用累积的 streamContent；
     // 若 streamContent 为空（例如会话切换导致 streamingStore.clear 后切回，buffer 已丢），

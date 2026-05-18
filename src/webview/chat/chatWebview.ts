@@ -2,29 +2,28 @@ import * as vscode from 'vscode';
 import * as crypto from 'crypto';
 import { FileStateDiffManager } from '../../managers/FileStateDiffManager';
 import { FileOperationManager } from '../../managers/FileOperationManager';
-import { SemaCoreWrapper, AgentMode } from '../../core/semaCoreWrapper';
+import { SemaProcessWrapper } from '../../core/semaProcessWrapper';
+import type { SessionController } from '../../core/semaSidebarProvider';
 import { transformCommandToPrompt } from '../../utils/prompt';
 
 /**
- * ChatWebviewProvider - 管理聊天界面 Webview，直接处理所有消息
+ * ChatWebviewProvider - 管理聊天界面 Webview（单 webview，多会话按 sessionId 路由）
  */
 export class ChatWebviewProvider {
     private view?: vscode.WebviewView;
 
     constructor(
         private readonly extensionUri: vscode.Uri,
-        private readonly coreManager: SemaCoreWrapper,
+        private readonly processWrapper: SemaProcessWrapper,
         private readonly fileStateDiffManager: FileStateDiffManager,
         private readonly fileOperationManager: FileOperationManager,
         private readonly onOpenConfig: (page?: string, taskId?: string) => void,
         private readonly context: vscode.ExtensionContext,
-        private readonly onSwitchAgentModeWithNewSession: (mode: AgentMode) => Promise<void>
+        private readonly sessionController: SessionController
     ) { }
 
     private static readonly INPUT_HISTORY_KEY = 'sema.inputHistory';
     private static readonly INPUT_HISTORY_MAX = 50;
-
-    private listenersRegistered = false;
 
     public setWebviewView(webviewView: vscode.WebviewView) {
         this.view = webviewView;
@@ -35,47 +34,51 @@ export class ChatWebviewProvider {
         };
         this.view.webview.html = this.getHtmlContent(this.view.webview);
 
-        if (!this.listenersRegistered) {
-            this.setupEventListeners();
-            this.listenersRegistered = true;
-        }
-
         this.view.webview.onDidReceiveMessage(async (msg) => {
-            const handlers: Record<string, () => Promise<void>> = {
+            const sid: string | undefined = msg.sessionId;
+            const handlers: Record<string, () => Promise<void> | void> = {
+                // ── 会话生命周期 ──
                 frontendReady: () => this.onFrontendReady(),
-                sendInput: () => this.handleUserInput(msg.text, msg.files),
-                openConfig: () => Promise.resolve(this.onOpenConfig(msg.page, msg.taskId)),
-                interrupt: () => this.interrupt(),
+                createSession: () => { void this.sessionController.createSession(msg.mode); },
+                switchSession: () => this.sessionController.switchSession(msg.sessionId),
+                closeSession: () => this.sessionController.closeSession(msg.sessionId),
+                webviewSessionReady: () => this.sessionController.getSessionWrapper(msg.sessionId)?.sendInitialState(),
+
+                // ── 会话级交互 ──
+                sendInput: () => this.handleUserInput(sid, msg.text, msg.files),
+                interrupt: () => this.interrupt(sid),
+                toolPermissionResponse: () => this.sessionController.getSessionWrapper(sid!)?.respondToToolPermission(msg.response),
+                askFormResponse: () => this.sessionController.getSessionWrapper(sid!)?.respondToPickOption(msg.response),
+                planExitResponse: () => this.handlePlanExitResponse(sid, msg.response),
+                insertPermissionRequest: () => this.sessionController.getSessionWrapper(sid!)?.insertPermissionRequestMessage(msg.permissionData),
+                insertAskFormRequest: () => this.sessionController.getSessionWrapper(sid!)?.insertAskFormRequestMessage(msg.askFormData),
+                updateAgentMode: () => this.sessionController.getSessionWrapper(sid!)?.updateAgentMode(msg.mode),
+                updateAutoEdit: () => this.sessionController.getSessionWrapper(sid!)?.updateAutoEdit(msg.enable),
+                transferAgentToBackground: () => { this.sessionController.getSessionWrapper(sid!)?.transferAgentToBackground(msg.taskId); },
+
+                // ── 进程级 / 工具类 ──
+                openConfig: () => this.onOpenConfig(msg.page, msg.taskId),
                 openFile: () => this.fileOperationManager.openFileAtLine(msg.filePath, msg.line, msg.endLine),
                 requestWorkspaceFiles: () => this.sendWorkspaceFiles(msg.reqId),
                 searchWorkspaceFiles: () => this.searchWorkspaceFiles(msg.query || '', msg.reqId),
                 requestModelInfo: () => this.sendModelInfo(),
                 switchModel: () => this.switchModel(msg.modelName),
-                restoreFromSnapshots: () => this.restoreFromSnapshots(msg.filePaths),
-                restoreFromSnapshot: () => this.restoreFromSnapshot(msg.filePath),
+                restoreFromSnapshots: () => this.restoreFromSnapshots(sid, msg.filePaths),
+                restoreFromSnapshot: () => this.restoreFromSnapshot(sid, msg.filePath),
                 showFileDiff: () => this.fileStateDiffManager.showFileDiff(msg.filePath, msg.minLine),
                 showPermissionDiff: () => this.fileStateDiffManager.showPermissionDiff(msg.filePath, msg.diffContent),
-                getFileChangeStats: () => this.getFileChangeStats(msg.filePath),
+                getFileChangeStats: () => this.getFileChangeStats(sid, msg.filePath),
                 searchContentInFiles: () => this.searchContentInFiles(msg.content),
                 requestClipboardFiles: () => this.requestClipboardFiles(),
-                toolPermissionResponse: () => Promise.resolve(this.handleToolPermissionResponse(msg.response)),
-                askFormResponse: () => Promise.resolve(this.coreManager.respondToPickOption(msg.response)),
-                planExitResponse: () => this.handlePlanExitResponse(msg.response),
                 verifyFilePath: () => this.verifyFilePath(msg.filePath, msg.tempId, msg.originalCode, msg.lineInfo),
                 resolveImagePath: () => this.resolveImagePath(msg.filePath, msg.tempId),
-                openExternal: () => Promise.resolve(this.openExternal(msg.url)),
-                insertPermissionRequest: () => Promise.resolve(this.coreManager.insertPermissionRequestMessage(msg.permissionData)),
-                insertAskFormRequest: () => Promise.resolve(this.coreManager.insertAskFormRequestMessage(msg.askFormData)),
-                updateAgentMode: () => this.coreManager.updateAgentMode(msg.mode),
-                switchAgentModeWithNewSession: () => this.onSwitchAgentModeWithNewSession(msg.mode),
-                updateAutoEdit: () => Promise.resolve(this.coreManager.updateAutoEdit(msg.enable)),
+                openExternal: () => this.openExternal(msg.url),
                 requestSystemConfig: () => this.sendSystemConfig(),
                 requestCommands: () => this.sendCommands(),
                 requestSkills: () => this.sendSkills(),
                 openBashOutput: () => this.fileOperationManager.openBashOutputAsDocument(msg.content, msg.command, msg.toolId),
-                transferAgentToBackground: async () => { this.coreManager.transferAgentToBackground(msg.taskId); },
-                requestInputHistory: () => Promise.resolve(this.sendInputHistory()),
-                saveInputHistory: () => Promise.resolve(this.appendInputHistory(msg.item)),
+                requestInputHistory: () => this.sendInputHistory(),
+                saveInputHistory: () => this.appendInputHistory(msg.item),
             };
             await handlers[msg.type]?.();
         });
@@ -85,57 +88,29 @@ export class ChatWebviewProvider {
         this.view?.webview.postMessage(message);
     }
 
-    public clearSessionPanels(): void {
-        this.postMessage({ type: 'closePermissionPanel' });
-        this.postMessage({ type: 'closeAskFormPanel' });
-        this.postMessage({ type: 'closePlanExitPanel' });
-        this.postMessage({ type: 'clearPendingInputs' });
-        this.postMessage({ type: 'clearTodos' });
-        this.postMessage({ type: 'clearFileChanges' });
+    /** 清空指定会话的面板（权限/表单/计划/待办/文件变更等） */
+    public clearSessionPanels(sessionId: string): void {
+        this.postMessage({ type: 'closePermissionPanel', sessionId });
+        this.postMessage({ type: 'closeAskFormPanel', sessionId });
+        this.postMessage({ type: 'closePlanExitPanel', sessionId });
+        this.postMessage({ type: 'clearPendingInputs', sessionId });
+        this.postMessage({ type: 'clearTodos', sessionId });
+        this.postMessage({ type: 'clearFileChanges', sessionId });
     }
 
-    // ─── Direct semaCore event listeners ─────────────────────────────────────
-
-    private setupEventListeners(): void {
-        this.coreManager.getSemaCore().on('tool:permission:request', (data: any) => {
-            this.postMessage({ type: 'toolPermissionRequest', data });
-        });
-        this.coreManager.getSemaCore().on('pick:option:request', (data: any) => {
-            this.postMessage({ type: 'askFormRequest', data });
-        });
-        this.coreManager.getSemaCore().on('plan:exit:request', (data: any) => {
-            this.postMessage({ type: 'planExitRequest', data });
-        });
-        this.coreManager.getSemaCore().on('conversation:usage', (data: any) => {
-            this.postMessage({ type: 'updateTokenInfo', tokenInfo: data.usage });
-        });
-        this.coreManager.getSemaCore().on('todos:update', (data: any) => {
-            this.postMessage({ type: 'todosUpdate', todos: data });
-        });
-        this.coreManager.getSemaCore().on('input:received', (data: any) => {
-            this.postMessage({ type: 'inputReceived', data });
-        });
-        this.coreManager.getSemaCore().on('quickchat:response', (data: any) => {
-            this.postMessage({ type: 'quickchatResponse', data });
-        });
-        this.coreManager.getSemaCore().on('autoEdit:update', (data: any) => {
-            this.postMessage({ type: 'autoEditUpdate', enable: data.enable });
-        });
-    }
-
-    // ─── Message handlers ────────────────────────────────────────────────────
+    // ─── 消息 handlers ────────────────────────────────────────────────────────
 
     private async onFrontendReady(): Promise<void> {
-        await this.coreManager.createSession();
+        await this.sessionController.createSession();
         await this.checkConfiguration();
     }
 
-    private async handleUserInput(text: string, files?: Array<any>): Promise<void> {
+    private async handleUserInput(sessionId: string | undefined, text: string, files?: Array<any>): Promise<void> {
+        const wrapper = sessionId ? this.sessionController.getSessionWrapper(sessionId) : undefined;
+        if (!wrapper) return;
         try {
-
             let content = text;
             if (files && files.length > 0) {
-                // 文本中已写出的 @path 不再重复拼接（避免双轨重复）
                 const fileContext = files
                     .map((file: any) =>
                         file.startLine && file.endLine
@@ -149,31 +124,52 @@ export class ChatWebviewProvider {
 
             const transformedContent = transformCommandToPrompt(content);
             if (transformedContent && transformedContent !== content) {
-                await this.coreManager.processUserInput(transformedContent, content);
+                wrapper.processUserInput(transformedContent, content);
             } else {
-                await this.coreManager.processUserInput(content);
+                wrapper.processUserInput(content);
             }
         } catch (error) {
             this.postMessage({
                 type: 'error',
+                sessionId,
                 message: error instanceof Error ? error.message : '处理用户输入时发生错误'
             });
         }
     }
 
-    private async interrupt(): Promise<void> {
-        console.log('[interrupt] received from webview');
+    private interrupt(sessionId: string | undefined): void {
+        if (!sessionId) return;
+        const wrapper = this.sessionController.getSessionWrapper(sessionId);
+        if (!wrapper) return;
         try {
-            this.postMessage({ type: 'closePermissionPanel' });
-            this.postMessage({ type: 'closeAskFormPanel' });
-            this.postMessage({ type: 'closePlanExitPanel' });
-            this.postMessage({ type: 'clearPendingInputs' });
-            this.coreManager.interruptSession();
-            const stopped = this.coreManager.stopAllTasks();
-            console.log('[interrupt] interruptSession called, stopAllTasks returned', stopped);
+            this.postMessage({ type: 'closePermissionPanel', sessionId });
+            this.postMessage({ type: 'closeAskFormPanel', sessionId });
+            this.postMessage({ type: 'closePlanExitPanel', sessionId });
+            this.postMessage({ type: 'clearPendingInputs', sessionId });
+            wrapper.interruptSession();
+            wrapper.stopAllTasks();
         } catch (error) {
             console.error('Error interrupting session:', error);
         }
+    }
+
+    private async handlePlanExitResponse(sessionId: string | undefined, response: any): Promise<void> {
+        if (!sessionId) return;
+        const wrapper = this.sessionController.getSessionWrapper(sessionId);
+        if (!wrapper) return;
+
+        if (response.selected === 'clearContextAndStart') {
+            wrapper.clearMessageHistory();
+            this.postMessage({ type: 'closePermissionPanel', sessionId });
+            this.postMessage({ type: 'closeAskFormPanel', sessionId });
+            this.postMessage({ type: 'closePlanExitPanel', sessionId });
+            this.postMessage({ type: 'clearPendingInputs', sessionId });
+            this.postMessage({ type: 'clearTodos', sessionId });
+            this.postMessage({ type: 'resetTokenInfo', sessionId });
+        }
+        wrapper.respondToPlanExit(response);
+        wrapper.updateAgentMode('Agent');
+        this.postMessage({ type: 'agentModeUpdate', sessionId, mode: 'Agent' });
     }
 
     private async sendWorkspaceFiles(reqId?: number): Promise<void> {
@@ -196,7 +192,7 @@ export class ChatWebviewProvider {
 
     private async sendSystemConfig(): Promise<void> {
         try {
-            const config = this.coreManager.getSystemConfig();
+            const config = this.processWrapper.getSystemConfig();
             this.postMessage({
                 type: 'systemConfigUpdate',
                 skipFileEditPermission: config.skipFileEditPermission || false
@@ -208,7 +204,7 @@ export class ChatWebviewProvider {
 
     private async sendModelInfo(): Promise<void> {
         try {
-            const modelData = await this.coreManager.getModelData();
+            const modelData = await this.processWrapper.getModelData();
             this.postMessage({
                 type: 'updateModelInfo',
                 modelName: modelData.modelName || '',
@@ -221,28 +217,28 @@ export class ChatWebviewProvider {
 
     private async switchModel(modelName: string): Promise<void> {
         try {
-            await this.coreManager.switchModel(modelName);
+            await this.processWrapper.switchModel(modelName);
         } catch (error) {
             this.postMessage({ type: 'error', message: `切换模型失败: ${error instanceof Error ? error.message : '未知错误'}` });
         }
     }
 
-    private async restoreFromSnapshots(filePaths: string[]): Promise<void> {
+    private async restoreFromSnapshots(sessionId: string | undefined, filePaths: string[]): Promise<void> {
         await this.fileStateDiffManager.revertAllChanges(filePaths);
-        this.postMessage({ type: 'clearFileChanges' });
+        this.postMessage({ type: 'clearFileChanges', sessionId });
     }
 
-    private async restoreFromSnapshot(filePath: string): Promise<void> {
+    private async restoreFromSnapshot(sessionId: string | undefined, filePath: string): Promise<void> {
         if (!filePath) return;
         await this.fileStateDiffManager.revertAllChanges([filePath]);
-        this.postMessage({ type: 'removeFileChange', filePath });
+        this.postMessage({ type: 'removeFileChange', sessionId, filePath });
     }
 
-    private async getFileChangeStats(filePath: string): Promise<void> {
+    private async getFileChangeStats(sessionId: string | undefined, filePath: string): Promise<void> {
         if (!filePath) return;
         try {
             const stats = await this.fileStateDiffManager.getFileChangeStats(filePath);
-            this.postMessage({ type: 'fileChangeStats', fullPath: filePath, stats });
+            this.postMessage({ type: 'fileChangeStats', sessionId, fullPath: filePath, stats });
         } catch (error) {
             console.error('Failed to get file change stats:', error);
         }
@@ -266,27 +262,6 @@ export class ChatWebviewProvider {
             console.error('Failed to read clipboard files:', error);
             this.postMessage({ type: 'clipboardFilesResult', paths: [] });
         }
-    }
-
-    private handleToolPermissionResponse(response: any): void {
-        this.coreManager.respondToToolPermission(response);
-    }
-
-    private async handlePlanExitResponse(response: any): Promise<void> {
-        if (response.selected === 'clearContextAndStart') {
-            this.coreManager.clearMessageHistory();
-
-            this.postMessage({ type: 'closePermissionPanel' });
-            this.postMessage({ type: 'closeAskFormPanel' });
-            this.postMessage({ type: 'closePlanExitPanel' });
-            this.postMessage({ type: 'clearPendingInputs' });
-            this.postMessage({ type: 'clearTodos' });
-
-            this.postMessage({ type: 'resetTokenInfo' });
-        }
-        this.coreManager.respondToPlanExit(response);
-        await this.coreManager.updateAgentMode('Agent');
-        this.postMessage({ type: 'agentModeUpdate', mode: 'Agent' });
     }
 
     private async resolveImagePath(filePath: string, tempId: string): Promise<void> {
@@ -341,7 +316,7 @@ export class ChatWebviewProvider {
 
     private async sendCommands(): Promise<void> {
         try {
-            const commands = await this.coreManager.getCommandsInfo();
+            const commands = await this.processWrapper.getCommandsInfo();
             this.postMessage({ type: 'customCommandsLoaded', commands });
         } catch (error) {
             console.error('Error loading commands:', error);
@@ -350,7 +325,7 @@ export class ChatWebviewProvider {
 
     private async sendSkills(): Promise<void> {
         try {
-            const skills = await this.coreManager.getSkillsInfo();
+            const skills = await this.processWrapper.getSkillsInfo();
             this.postMessage({ type: 'skillsLoaded', skills });
         } catch (error) {
             console.error('Error loading skills:', error);
@@ -359,12 +334,7 @@ export class ChatWebviewProvider {
 
     private async checkConfiguration(): Promise<void> {
         try {
-            const isReady = await this.coreManager.waitForReady(5000);
-            if (!isReady) {
-                console.warn('SemaCore 初始化超时，无法检查配置状态');
-                return;
-            }
-            const modelData = await this.coreManager.getModelData();
+            const modelData = await this.processWrapper.getModelData();
             if (!modelData.modelList || modelData.modelList.length === 0) {
                 this.postMessage({ type: 'showModelConfigReminder', message: 'Code Agent Model 尚未配置，请先配置模型信息' });
             }

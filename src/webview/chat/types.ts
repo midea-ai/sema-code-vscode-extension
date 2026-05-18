@@ -40,6 +40,15 @@ export interface AppProps {
     vscode: VscodeApi;
 }
 
+/** tab 栏中的会话元信息 */
+export interface SessionMeta {
+    id: string;
+    title: string;
+    processing: boolean;
+    /** 是否有待处理的权限/表单弹窗（等待用户响应） */
+    waiting: boolean;
+}
+
 export interface SelectedFile {
     path: string;
     name: string;

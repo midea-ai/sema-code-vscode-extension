@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
-import type { AgentMode } from '../core/semaCoreWrapper';
+import type { AgentMode } from 'sema-core/types';
+import type { SemaSessionWrapper } from '../core/semaSessionWrapper';
 
 /**
  * 会话数据结构
@@ -25,12 +26,16 @@ export class SessionHistoryManager {
     private static readonly MAX_SESSIONS = 50;
     private context: vscode.ExtensionContext;
     private projectPath: string;
-    private semaWrapper: any;
+    private getActiveSessionId: () => string | null;
 
-    constructor(context: vscode.ExtensionContext, workingDir: string, semaWrapper: any) {
+    constructor(
+        context: vscode.ExtensionContext,
+        workingDir: string,
+        getActiveSessionId: () => string | null
+    ) {
         this.context = context;
         this.projectPath = workingDir;
-        this.semaWrapper = semaWrapper;
+        this.getActiveSessionId = getActiveSessionId;
     }
 
     /**
@@ -91,17 +96,20 @@ export class SessionHistoryManager {
     }
 
     /**
-     * 保存会话到历史记录
+     * 保存指定会话到历史记录
      */
-    public async saveSession(messageHistory?: any[]): Promise<void> {
-        const sessionId = this.semaWrapper.currentSessionId;
-        const title = this.semaWrapper.title;
+    public async saveSession(wrapper?: SemaSessionWrapper): Promise<void> {
+        if (!wrapper) {
+            return;
+        }
+        const sessionId = wrapper.sessionId;
+        const title = wrapper.title;
 
         if (!sessionId || !title) {
             return;
         }
 
-        const rawMessages = messageHistory || this.semaWrapper.messageHistory || [];
+        const rawMessages = wrapper.getMessageHistory() || [];
 
         if (rawMessages.length === 0) {
             return;
@@ -117,7 +125,7 @@ export class SessionHistoryManager {
         const sessions = await this.getSessions();
         const existingIndex = sessions.findIndex(s => s.id === sessionId);
 
-        const agentMode: AgentMode = this.semaWrapper.getAgentMode?.() ?? 'Agent';
+        const agentMode: AgentMode = wrapper.getAgentMode?.() ?? 'Agent';
 
         if (existingIndex !== -1) {
             // 更新现有会话（保留创建时间）
@@ -154,7 +162,7 @@ export class SessionHistoryManager {
      * 获取当前激活的会话ID
      */
     public getCurrentSessionId(): string | null {
-        return this.semaWrapper.currentSessionId;
+        return this.getActiveSessionId();
     }
 
     /**
@@ -162,7 +170,7 @@ export class SessionHistoryManager {
      */
     public async getAllSessions(): Promise<Session[]> {
         const sessions = await this.getSessions();
-        const currentSessionId = this.semaWrapper.currentSessionId;
+        const currentSessionId = this.getActiveSessionId();
         return [...sessions].sort((a, b) => {
             if (a.id === currentSessionId) { return -1; }
             if (b.id === currentSessionId) { return 1; }
@@ -176,7 +184,7 @@ export class SessionHistoryManager {
     public async getSessionsWithActiveId(): Promise<{ sessions: Session[]; currentSessionId: string | null }> {
         return {
             sessions: await this.getAllSessions(),
-            currentSessionId: this.semaWrapper.currentSessionId
+            currentSessionId: this.getActiveSessionId()
         };
     }
 

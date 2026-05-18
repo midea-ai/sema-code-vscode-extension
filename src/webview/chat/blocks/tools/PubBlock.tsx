@@ -1,5 +1,6 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useContext } from 'react';
 import { ToggleIcon } from '../../components/ui/IconButton';
+import { SessionContext } from '../../SessionContext';
 import { ToolContent } from '../../types';
 import { CONTINUATION_SYMBOL } from '../../utils/symbols';
 import { streamingStore } from '../../utils/StreamingStore';
@@ -14,11 +15,12 @@ interface PubBlockProps {
 }
 
 const PubBlock: React.FC<PubBlockProps> = React.memo(({ content, messageId, vscode }) => {
+    const sessionId = useContext(SessionContext);
     const streamContentRef = useRef('');
     const [streamContent, setStreamContent] = useState('');
 
     useEffect(() => {
-        const unsub = streamingStore.subscribeTool(messageId, (delta: string) => {
+        const unsub = streamingStore.subscribeTool(sessionId, messageId, (delta: string) => {
             streamContentRef.current += delta;
             setStreamContent(streamContentRef.current);
         });
@@ -26,7 +28,7 @@ const PubBlock: React.FC<PubBlockProps> = React.memo(({ content, messageId, vsco
             unsub();
             streamContentRef.current = '';
         };
-    }, [messageId]);
+    }, [messageId, sessionId]);
 
     // 完成后清除本地 streaming 状态，回归 props 的最终内容
     useEffect(() => {

@@ -1024,3 +1024,104 @@ code, pre, .code {
 .model-config-reminder-button.secondary:hover {
     background-color: var(--chat-bg-hover);
 }
+/* ==================== 多会话 tab 栏 ==================== */
+.session-tabs {
+    display: flex;
+    align-items: center;
+    flex-shrink: 0;
+    height: 30px;
+    border-bottom: 1px solid var(--chat-border, var(--vscode-editorGroup-border));
+    background-color: var(--chat-bg-primary);
+}
+
+.session-tabs-list {
+    display: flex;
+    flex: 1;
+    min-width: 0;
+    overflow-x: auto;
+    overflow-y: hidden;
+    height: 100%;
+}
+
+.session-tabs-list::-webkit-scrollbar {
+    height: 0;
+}
+
+.session-tab {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding: 0 8px;
+    height: 100%;
+    max-width: 160px;
+    cursor: pointer;
+    font-size: var(--chat-font-base);
+    color: var(--chat-text-secondary, var(--vscode-descriptionForeground));
+    border-right: 1px solid var(--chat-border, var(--vscode-editorGroup-border));
+    white-space: nowrap;
+}
+
+.session-tab:hover {
+    background-color: var(--chat-bg-hover, var(--vscode-toolbar-hoverBackground));
+}
+
+.session-tab.active {
+    color: var(--chat-text-primary);
+    background-color: var(--chat-bg-hover, var(--vscode-tab-activeBackground));
+}
+
+.session-tab-title {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.session-tab-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background-color: var(--vscode-charts-green, #4caf50);
+    flex-shrink: 0;
+}
+
+/* 等待用户响应权限/表单弹窗时显示橙色 */
+.session-tab-dot.waiting {
+    background-color: #ffba49;
+}
+
+.session-tab-close {
+    flex-shrink: 0;
+    opacity: 0.6;
+    padding: 0 2px;
+    border-radius: 3px;
+}
+
+.session-tab-close:hover {
+    opacity: 1;
+    background-color: var(--chat-bg-hover, var(--vscode-toolbar-hoverBackground));
+}
+
+.sessions-host {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+}
+
+.chat-session {
+    flex: 1;
+    min-height: 0;
+    width: 100%;
+    flex-direction: column;
+}
+
+.session-error-banner {
+    flex-shrink: 0;
+    padding: 6px 10px;
+    font-size: var(--chat-font-base);
+    color: var(--vscode-inputValidation-warningForeground, #fff);
+    background-color: var(--vscode-inputValidation-warningBackground, #6b5e00);
+    border-bottom: 1px solid var(--vscode-inputValidation-warningBorder, #b89500);
+    cursor: pointer;
+}

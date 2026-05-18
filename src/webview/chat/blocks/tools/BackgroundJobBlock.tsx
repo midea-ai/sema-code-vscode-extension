@@ -1,5 +1,6 @@
-import React, { useState, useMemo, useEffect, useRef } from 'react';
+import React, { useState, useMemo, useEffect, useRef, useContext } from 'react';
 import { ToggleIcon } from '../../components/ui/IconButton';
+import { SessionContext } from '../../SessionContext';
 import { ToolContent } from '../../types';
 import { streamingStore } from '../../utils/StreamingStore';
 
@@ -47,12 +48,13 @@ const processTerminalOutput = (text: string): string[] => {
 };
 
 const BackgroundJobBlock: React.FC<BackgroundJobBlockProps> = ({ content: toolContent, messageId, vscode }) => {
+    const sessionId = useContext(SessionContext);
     const [isExpanded, setIsExpanded] = useState(true);
     const streamContentRef = useRef('');
     const [streamContent, setStreamContent] = useState('');
 
     useEffect(() => {
-        const unsub = streamingStore.subscribeTool(messageId, (delta: string) => {
+        const unsub = streamingStore.subscribeTool(sessionId, messageId, (delta: string) => {
             streamContentRef.current += delta;
             setStreamContent(streamContentRef.current);
         });
@@ -60,7 +62,7 @@ const BackgroundJobBlock: React.FC<BackgroundJobBlockProps> = ({ content: toolCo
             unsub();
             streamContentRef.current = '';
         };
-    }, [messageId]);
+    }, [messageId, sessionId]);
 
     // 完成后清除本地 streaming 状态，回归 props 的最终内容
     useEffect(() => {

@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import * as os from 'os';
+import type { AgentMode } from 'sema-core/types';
 
 import { SessionHistoryManager } from '../managers/SessionHistoryManager';
 import { FileStateDiffManager } from '../managers/FileStateDiffManager';
@@ -9,12 +10,21 @@ import { SystemConfigManager } from '../managers/SystemConfigManager';
 import { ChatWebviewProvider } from '../webview/chat/chatWebview';
 import { ConfigWebviewProvider } from '../webview/config/configWebview';
 import { SessionHistoryWebviewProvider } from '../webview/sessionHistory/sessionHistoryWebview';
-import { SemaCoreWrapper, AgentMode } from './semaCoreWrapper';
+import { SemaProcessWrapper, MAX_SESSIONS } from './semaProcessWrapper';
+import { SemaSessionWrapper, SessionWrapperCallbacks, Message } from './semaSessionWrapper';
 import { TOOL_NAME_VIEW_FILE } from '../utils/tool';
 import { pet } from '../pet/pet-client';
 import { ensurePetRunning, killPet } from '../pet/pet-launcher';
 import { wirePetEvents } from '../pet/pet-events';
 
+/** chatWebview 用于驱动会话生命周期的控制接口 */
+export interface SessionController {
+    getActiveSessionId(): string | null;
+    getSessionWrapper(sessionId: string): SemaSessionWrapper | undefined;
+    createSession(agentMode?: AgentMode): Promise<{ ok: boolean; error?: string }>;
+    switchSession(sessionId: string): void;
+    closeSession(sessionId: string): Promise<void>;
+}
 
 export class SemaSidebarProvider implements vscode.WebviewViewProvider {
     private workingDir: string;
@@ -23,13 +33,17 @@ export class SemaSidebarProvider implements vscode.WebviewViewProvider {
     private configWebviewProvider!: ConfigWebviewProvider;
     private sessionHistoryWebviewProvider!: SessionHistoryWebviewProvider;
 
-    private coreManager: SemaCoreWrapper;
+    private processWrapper: SemaProcessWrapper;
+    private sessions: Map<string, SemaSessionWrapper> = new Map();
+    private activeSessionId: string | null = null;
+
     private sessionHistoryManager: SessionHistoryManager;
     private fileStateDiffManager: FileStateDiffManager;
     private fileOperationManager: FileOperationManager;
     private systemConfigManager: SystemConfigManager;
 
-    private saveSessionTimer?: NodeJS.Timeout;
+    private saveSessionTimers: Map<string, NodeJS.Timeout> = new Map();
+    private petUnwire: (() => void) | null = null;
 
     constructor(private readonly context: vscode.ExtensionContext) {
         const workspaceFolders = vscode.workspace.workspaceFolders;
@@ -42,41 +56,45 @@ export class SemaSidebarProvider implements vscode.WebviewViewProvider {
         );
         this.systemConfigManager = new SystemConfigManager(this.context);
 
-        this.coreManager = new SemaCoreWrapper(
+        this.processWrapper = new SemaProcessWrapper(
             this.workingDir,
+            this.systemConfigManager,
             {
-                onSessionReady:           this.handleSessionReady,
-                onMessage:                this.handleMessage,
-                onModelUpdate:            this.handleModelUpdate,
-                onStateChange:            this.handleStateChange,
-                onTopicUpdate:            this.handleTopicUpdate,
-                onToolExecutionComplete:  this.handleToolExecutionComplete,
-                onFileReference:          this.handleFileReference,
-                onTaskStart:              this.handleTaskStart,
-                onTaskEnd:                this.handleTaskEnd,
-                onSessionCleared:         this.handleSessionCleared,
-                onOpenAgentDetail:        (taskId: string) => {
-                    this.chatWebviewProvider.postMessage({ type: 'openAgentDetail', taskId });
+                onModelUpdate: this.handleModelUpdate,
+                onOpenAgentDetail: (taskId: string) => {
+                    this.chatWebviewProvider.postMessage({
+                        type: 'openAgentDetail',
+                        sessionId: this.activeSessionId,
+                        taskId,
+                    });
                 },
-                onUserResponded:          () => {
-                    if (this.isPetEnabled()) pet.state('working');
-                },
-            },
-            this.systemConfigManager
+            }
         );
+
+        const sessionController: SessionController = {
+            getActiveSessionId: () => this.activeSessionId,
+            getSessionWrapper: (sessionId) => this.sessions.get(sessionId),
+            createSession: (agentMode) => this.createNewSession({ agentMode }),
+            switchSession: (sessionId) => this.switchActiveSession(sessionId),
+            closeSession: (sessionId) => this.closeSession(sessionId),
+        };
 
         this.chatWebviewProvider = new ChatWebviewProvider(
             this.context.extensionUri,
-            this.coreManager,
+            this.processWrapper,
             this.fileStateDiffManager,
             this.fileOperationManager,
             (page?: string, taskId?: string) => this.openConfigPanel(page, taskId),
             this.context,
-            (mode: AgentMode) => this.switchAgentModeWithNewSession(mode)
+            sessionController
         );
 
-        this.sessionHistoryManager = new SessionHistoryManager(context, this.workingDir, this.coreManager);
-        this.configWebviewProvider = new ConfigWebviewProvider(this.coreManager, this.fileOperationManager);
+        this.sessionHistoryManager = new SessionHistoryManager(
+            context,
+            this.workingDir,
+            () => this.activeSessionId
+        );
+        this.configWebviewProvider = new ConfigWebviewProvider(this.processWrapper, this.fileOperationManager);
         this.configWebviewProvider.setOnSystemConfigChanged((key, value) => {
             if (key === 'skipFileEditPermission') {
                 this.chatWebviewProvider.postMessage({
@@ -103,43 +121,154 @@ export class SemaSidebarProvider implements vscode.WebviewViewProvider {
         this.chatWebviewProvider.setWebviewView(webviewView);
     }
 
-    public async newSession() {
+    // ─── 会话回调（所有 SemaSessionWrapper 共用一份）──────────────────────────
+
+    private get sessionCallbacks(): SessionWrapperCallbacks {
+        return {
+            onSessionReady: this.handleSessionReady,
+            onMessage: this.handleMessage,
+            onStateChange: this.handleStateChange,
+            onTopicUpdate: this.handleTopicUpdate,
+            onToolExecutionComplete: this.handleToolExecutionComplete,
+            onFileReference: this.handleFileReference,
+            onTaskStart: this.handleTaskStart,
+            onTaskEnd: this.handleTaskEnd,
+            onSessionCleared: this.handleSessionCleared,
+            onOpenAgentDetail: (sessionId, taskId) => {
+                this.chatWebviewProvider.postMessage({ type: 'openAgentDetail', sessionId, taskId });
+            },
+            onUserResponded: () => {
+                if (this.isPetEnabled()) pet.state('working');
+            },
+            onTitleUpdate: this.handleTitleUpdate,
+        };
+    }
+
+    // ─── 会话生命周期 ─────────────────────────────────────────────────────────
+
+    /**
+     * 创建一个新会话。超限或 core 拒绝时向前端发送 sessionCreateFailed。
+     */
+    public async createNewSession(opts: {
+        agentMode?: AgentMode;
+        sessionId?: string;
+        historyContent?: Message[];
+        title?: string;
+    } = {}): Promise<{ ok: boolean; error?: string }> {
+        if (this.sessions.size >= MAX_SESSIONS) {
+            const error = `最多同时打开 ${MAX_SESSIONS} 个会话，请先关闭已有会话`;
+            this.chatWebviewProvider.postMessage({ type: 'sessionCreateFailed', error });
+            return { ok: false, error };
+        }
+
         try {
-            await this.startFreshSession();
+            if (this.sessions.size === 0) {
+                await this.fileStateDiffManager.createSnapshot();
+            }
+
+            const result = await this.processWrapper.createSession({
+                sessionId: opts.sessionId,
+                agentMode: opts.agentMode,
+            });
+
+            if (!result.ok) {
+                this.chatWebviewProvider.postMessage({ type: 'sessionCreateFailed', error: result.error });
+                return { ok: false, error: result.error };
+            }
+
+            const wrapper = new SemaSessionWrapper(
+                result.session,
+                this.sessionCallbacks,
+                opts.agentMode ?? 'Agent'
+            );
+            this.sessions.set(wrapper.sessionId, wrapper);
+
+            if (opts.historyContent && opts.historyContent.length > 0) {
+                if (opts.title) wrapper.updateTitle(opts.title);
+                wrapper.updateMessageHistory(opts.historyContent);
+            }
+
+            this.activeSessionId = wrapper.sessionId;
+            this.processWrapper.setActiveSession(wrapper.sessionId);
+
+            this.chatWebviewProvider.postMessage({
+                type: 'sessionOpened',
+                sessionId: wrapper.sessionId,
+                title: wrapper.title || '新会话',
+            });
+
+            this.rewirePetForActive();
+            this.sessionHistoryWebviewProvider?.refreshSessionList();
+            return { ok: true };
+        } catch (error) {
+            const msg = error instanceof Error ? error.message : '创建会话失败';
+            console.error('Error creating session:', error);
+            this.chatWebviewProvider.postMessage({ type: 'sessionCreateFailed', error: msg });
+            return { ok: false, error: msg };
+        }
+    }
+
+    public switchActiveSession(sessionId: string): void {
+        if (!this.sessions.has(sessionId)) return;
+        this.activeSessionId = sessionId;
+        this.processWrapper.setActiveSession(sessionId);
+        this.rewirePetForActive();
+    }
+
+    public async closeSession(sessionId: string): Promise<void> {
+        const wrapper = this.sessions.get(sessionId);
+        if (!wrapper) return;
+
+        try {
+            await this.sessionHistoryManager.saveSession(wrapper);
+        } catch (error) {
+            console.error('Error saving session before close:', error);
+        }
+
+        wrapper.dispose();
+        this.processWrapper.closeSession(sessionId);
+        this.sessions.delete(sessionId);
+
+        const timer = this.saveSessionTimers.get(sessionId);
+        if (timer) {
+            clearTimeout(timer);
+            this.saveSessionTimers.delete(sessionId);
+        }
+
+        if (this.activeSessionId === sessionId) {
+            const next = this.sessions.keys().next().value ?? null;
+            this.activeSessionId = next ?? null;
+            if (next) this.processWrapper.setActiveSession(next);
+        }
+
+        this.chatWebviewProvider.postMessage({
+            type: 'sessionClosed',
+            sessionId,
+            nextActiveId: this.activeSessionId,
+        });
+
+        this.rewirePetForActive();
+        this.sessionHistoryWebviewProvider?.refreshSessionList();
+    }
+
+    public getSessionWrapper(sessionId: string): SemaSessionWrapper | undefined {
+        return this.sessions.get(sessionId);
+    }
+
+    public getActiveSessionId(): string | null {
+        return this.activeSessionId;
+    }
+
+    /** 兼容旧命令：开始新对话 = 打开一个新会话 tab */
+    public async newSession(): Promise<void> {
+        try {
+            await this.createNewSession({});
         } catch (error) {
             console.error('Error starting new session:', error);
-            this.chatWebviewProvider.postMessage({ type: 'enableInput' });
         }
     }
 
-    public async switchAgentModeWithNewSession(mode: AgentMode) {
-        try {
-            await this.startFreshSession();
-            await this.coreManager.updateAgentMode(mode);
-            this.chatWebviewProvider.postMessage({ type: 'agentModeUpdate', mode });
-        } catch (error) {
-            console.error('Error switching agent mode with new session:', error);
-            this.chatWebviewProvider.postMessage({ type: 'enableInput' });
-        }
-    }
-
-    private async startFreshSession() {
-        clearTimeout(this.saveSessionTimer);
-        await this.sessionHistoryManager.saveSession();
-
-        this.coreManager.clearMessageHistory();
-        this.chatWebviewProvider.clearSessionPanels();
-        this.chatWebviewProvider.postMessage({ type: 'resetTokenInfo' });
-        this.chatWebviewProvider.postMessage({ type: 'disableInput', message: '正在初始化 CLI，请稍候...' });
-
-        await this.fileStateDiffManager.createSnapshot();
-        await this.coreManager.createSession();
-        this.chatWebviewProvider.postMessage({ type: 'autoEditUpdate', enable: false });
-
-        this.sessionHistoryWebviewProvider.refreshSessionList();
-    }
-
-    public async openHistoryPanel() {
+    public async openHistoryPanel(): Promise<void> {
         try {
             await this.sessionHistoryWebviewProvider.show(this.context.extensionUri);
         } catch (error) {
@@ -152,13 +281,23 @@ export class SemaSidebarProvider implements vscode.WebviewViewProvider {
         this.configWebviewProvider.show(this.context.extensionUri, page, taskId);
     }
 
-    public getSemaCore() {
-        return this.coreManager.getSemaCore();
-    }
+    // ─── 桌宠 ─────────────────────────────────────────────────────────────────
 
     public isPetEnabled(): boolean {
-        const cfg = this.coreManager.getSystemConfig() as Record<string, any>;
+        const cfg = this.processWrapper.getSystemConfig() as Record<string, any>;
         return !!cfg.enablePet;
+    }
+
+    /** 把桌宠事件订阅切到当前 active 会话 */
+    private rewirePetForActive(): void {
+        if (!this.isPetEnabled()) return;
+        this.petUnwire?.();
+        this.petUnwire = null;
+        if (!this.activeSessionId) return;
+        const session = this.processWrapper.getSession(this.activeSessionId);
+        if (session) {
+            this.petUnwire = wirePetEvents(session);
+        }
     }
 
     public async startPet(): Promise<void> {
@@ -168,10 +307,7 @@ export class SemaSidebarProvider implements vscode.WebviewViewProvider {
                 vscode.window.setStatusBarMessage('Sema Pet: 启动失败（解压失败 / 端口被占？）', 5000);
                 return;
             }
-            // 先订阅事件再 register：避免启动窗口期（register 重试最坏可达数秒）内的状态变化丢失。
-            // pet-client 会把 register 前的最后一次 state 缓存下来，register 成功后重放。
-            const semaCore = this.getSemaCore?.();
-            if (semaCore) wirePetEvents(semaCore);
+            this.rewirePetForActive();
             const registered = await pet.register(this.workingDir);
             if (!registered) {
                 vscode.window.setStatusBarMessage('Sema Pet: 注册会话失败，桌宠不会显示当前项目', 5000);
@@ -187,6 +323,8 @@ export class SemaSidebarProvider implements vscode.WebviewViewProvider {
 
     public async stopPet(): Promise<void> {
         try {
+            this.petUnwire?.();
+            this.petUnwire = null;
             await pet.dispose();
             killPet();
             vscode.window.setStatusBarMessage('Sema Pet 已关闭', 3000);
@@ -196,25 +334,13 @@ export class SemaSidebarProvider implements vscode.WebviewViewProvider {
     }
 
     public rewirePetEventsIfEnabled(): void {
-        if (!this.isPetEnabled()) return;
-        const semaCore = this.getSemaCore?.();
-        if (semaCore) wirePetEvents(semaCore);
+        this.rewirePetForActive();
     }
 
-    // ─── Core event handlers ──────────────────────────────────────────────────
+    // ─── 会话事件 handlers ────────────────────────────────────────────────────
 
-    private handleSessionReady = async (data: any): Promise<void> => {
+    private handleSessionReady = async (_sessionId: string, data: any): Promise<void> => {
         try {
-            this.chatWebviewProvider.postMessage({ type: 'enableInput' });
-
-            if (data.usage) {
-                this.chatWebviewProvider.postMessage({ type: 'updateTokenInfo', tokenInfo: data.usage });
-            }
-
-            if (Array.isArray(data.todos) && data.todos.length > 0) {
-                this.chatWebviewProvider.postMessage({ type: 'todosUpdate', todos: data.todos });
-            }
-
             if (data.readFileTimestamps && typeof data.readFileTimestamps === 'object') {
                 for (const filePath of Object.keys(data.readFileTimestamps)) {
                     await this.fileStateDiffManager.addFileToSnapshotIfNew(filePath);
@@ -222,7 +348,6 @@ export class SemaSidebarProvider implements vscode.WebviewViewProvider {
             }
         } catch (error) {
             console.error('Error handling session ready:', error);
-            this.chatWebviewProvider.postMessage({ type: 'enableInput' });
         }
     };
 
@@ -235,24 +360,23 @@ export class SemaSidebarProvider implements vscode.WebviewViewProvider {
         this.configWebviewProvider.refreshConfigPage();
     };
 
-    private handleStateChange = async (state: 'idle' | 'processing'): Promise<void> => {
-        this.chatWebviewProvider.postMessage({ type: 'stateUpdate', state });
+    private handleStateChange = (sessionId: string, state: 'idle' | 'processing'): void => {
         if (state === 'idle') {
-            this.debouncedSaveSession();
+            this.debouncedSaveSession(sessionId);
         }
     };
 
-    private handleTopicUpdate = (_topic: any): void => {
-        this.debouncedSaveSession();
+    private handleTopicUpdate = (sessionId: string, _topic: any): void => {
+        this.debouncedSaveSession(sessionId);
     };
 
-    private handleToolExecutionComplete = (data: any): void => {
+    private handleToolExecutionComplete = (_sessionId: string, data: any): void => {
         if (data.toolName === TOOL_NAME_VIEW_FILE) {
             this.fileStateDiffManager.addFileToSnapshotIfNew(data.title);
         }
     };
 
-    private handleFileReference = (data: any): void => {
+    private handleFileReference = (_sessionId: string, data: any): void => {
         if (data.references && Array.isArray(data.references)) {
             for (const ref of data.references) {
                 if (ref.type === 'file' && ref.name) {
@@ -262,75 +386,89 @@ export class SemaSidebarProvider implements vscode.WebviewViewProvider {
         }
     };
 
-    private handleTaskStart = (data: any): void => {
+    private handleTaskStart = (sessionId: string, data: any): void => {
         this.configWebviewProvider.pushTaskStart(data);
-        this.chatWebviewProvider.postMessage({ type: 'taskStart', data });
+        this.chatWebviewProvider.postMessage({ type: 'taskStart', sessionId, data });
     };
 
-    private handleTaskEnd = (data: any): void => {
+    private handleTaskEnd = (sessionId: string, data: any): void => {
         this.configWebviewProvider.pushTaskEnd(data);
-        this.chatWebviewProvider.postMessage({ type: 'taskEnd', data });
+        this.chatWebviewProvider.postMessage({ type: 'taskEnd', sessionId, data });
     };
 
-    private handleSessionCleared = (): void => {
+    private handleSessionCleared = (sessionId: string): void => {
         this.fileStateDiffManager.createSnapshot();
-        this.chatWebviewProvider.clearSessionPanels();
+        this.chatWebviewProvider.clearSessionPanels(sessionId);
     };
 
-    // ─── Session management ───────────────────────────────────────────────────
+    private handleTitleUpdate = (sessionId: string, title: string): void => {
+        this.chatWebviewProvider.postMessage({ type: 'sessionTitleUpdate', sessionId, title });
+    };
+
+    // ─── 历史会话 ─────────────────────────────────────────────────────────────
 
     private async loadHistorySession(sessionId: string): Promise<void> {
         try {
+            // 已打开则直接切换到对应 tab
+            if (this.sessions.has(sessionId)) {
+                this.switchActiveSession(sessionId);
+                this.chatWebviewProvider.postMessage({ type: 'switchToSession', sessionId });
+                return;
+            }
+
             const session = await this.sessionHistoryManager.getSession(sessionId);
             if (!session) {
                 vscode.window.showErrorMessage('会话不存在或已被删除');
                 return;
             }
-
-            clearTimeout(this.saveSessionTimer);
-            await this.sessionHistoryManager.saveSession();
-
-            this.coreManager.clearMessageHistory();
-            this.chatWebviewProvider.clearSessionPanels();
-
-            if (session.content && session.content.length > 0) {
-                try {
-                    await this.fileStateDiffManager.createSnapshot();
-                    await this.coreManager.createSession(sessionId);
-                    this.chatWebviewProvider.postMessage({ type: 'autoEditUpdate', enable: false });
-                    await this.coreManager.updateMessageHistory(session.content);
-                    this.coreManager.updateTitle(session.title);
-
-                    const targetMode: AgentMode = session.agentMode ?? 'Agent';
-                    await this.coreManager.updateAgentMode(targetMode);
-                    this.chatWebviewProvider.postMessage({ type: 'agentModeUpdate', mode: targetMode });
-                } catch (error) {
-                    console.error('Failed to load session:', error);
-                    vscode.window.showErrorMessage(`加载会话失败：${error instanceof Error ? error.message : '未知错误'}`);
-                }
-            } else {
+            if (!session.content || session.content.length === 0) {
                 vscode.window.showErrorMessage('无法加载会话：会话数据为空');
+                return;
             }
+
+            // 失败时（如会话数超限）由 createNewSession 内部发送 sessionCreateFailed，
+            // 前端会在页面上展示错误，这里不再弹出 VS Code 通知。
+            await this.createNewSession({
+                sessionId,
+                agentMode: session.agentMode ?? 'Agent',
+                historyContent: session.content,
+                title: session.title,
+            });
         } catch (error) {
             console.error('Error loading history session:', error);
             vscode.window.showErrorMessage(`加载会话失败：${error instanceof Error ? error.message : '未知错误'}`);
         }
     }
 
-    private debouncedSaveSession(): void {
-        clearTimeout(this.saveSessionTimer);
-        this.saveSessionTimer = setTimeout(async () => {
+    private debouncedSaveSession(sessionId: string): void {
+        const existing = this.saveSessionTimers.get(sessionId);
+        if (existing) clearTimeout(existing);
+        const timer = setTimeout(async () => {
+            this.saveSessionTimers.delete(sessionId);
             try {
-                await this.sessionHistoryManager.saveSession();
-                this.sessionHistoryWebviewProvider?.refreshSessionList();
+                const wrapper = this.sessions.get(sessionId);
+                if (wrapper) {
+                    await this.sessionHistoryManager.saveSession(wrapper);
+                    this.sessionHistoryWebviewProvider?.refreshSessionList();
+                }
             } catch (error) {
                 console.error('Error saving session:', error);
             }
         }, 300);
+        this.saveSessionTimers.set(sessionId, timer);
     }
 
     public dispose(): void {
-        clearTimeout(this.saveSessionTimer);
-        this.coreManager.dispose();
+        for (const timer of this.saveSessionTimers.values()) {
+            clearTimeout(timer);
+        }
+        this.saveSessionTimers.clear();
+        this.petUnwire?.();
+        this.petUnwire = null;
+        for (const wrapper of this.sessions.values()) {
+            wrapper.dispose();
+        }
+        this.sessions.clear();
+        void this.processWrapper.dispose();
     }
 }
