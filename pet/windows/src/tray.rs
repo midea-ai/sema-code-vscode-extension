@@ -4,16 +4,19 @@ use std::ptr::null_mut;
 
 use windows_sys::Win32::Foundation::{HWND, POINT};
 use windows_sys::Win32::Graphics::Gdi::{
-    CreateBitmap, CreateDIBSection, DeleteObject, BITMAPINFO, BITMAPINFOHEADER, DIB_RGB_COLORS,
-    HBITMAP,
+    CreateBitmap, CreateDIBSection, DeleteObject, DrawTextW, Ellipse, FillRect, GetStockObject,
+    GetSysColor, GetSysColorBrush, SelectObject, SetBkMode, SetTextColor, BITMAPINFO,
+    BITMAPINFOHEADER, COLOR_HIGHLIGHT, COLOR_HIGHLIGHTTEXT, COLOR_MENU, COLOR_MENUTEXT,
+    DIB_RGB_COLORS, DT_LEFT, DT_SINGLELINE, DT_VCENTER, HBITMAP, NULL_PEN, TRANSPARENT,
 };
+use windows_sys::Win32::UI::Controls::{DRAWITEMSTRUCT, MEASUREITEMSTRUCT, ODS_SELECTED};
 use windows_sys::Win32::UI::Shell::{
     Shell_NotifyIconW, NIF_ICON, NIF_MESSAGE, NIF_TIP, NIM_ADD, NIM_DELETE, NOTIFYICONDATAW,
 };
 use windows_sys::Win32::UI::WindowsAndMessaging::{
     AppendMenuW, CreateIconIndirect, CreatePopupMenu, DestroyIcon, DestroyMenu, GetCursorPos,
-    SetForegroundWindow, TrackPopupMenu, HICON, HMENU, ICONINFO, MF_GRAYED, MF_SEPARATOR,
-    MF_STRING, TPM_RETURNCMD, TPM_RIGHTBUTTON,
+    SetForegroundWindow, TrackPopupMenu, HICON, HMENU, ICONINFO, MF_GRAYED, MF_OWNERDRAW,
+    MF_SEPARATOR, MF_STRING, TPM_RETURNCMD, TPM_RIGHTBUTTON,
 };
 
 use crate::protocol::PetState;
@@ -40,6 +43,12 @@ pub enum MenuItemKind {
 pub struct MenuItem {
     pub label: String,
     pub kind: MenuItemKind,
+    pub state: Option<PetState>,
+}
+
+struct MenuDrawData {
+    label: Vec<u16>,
+    state: Option<PetState>,
 }
 
 pub struct Tray {
@@ -105,17 +114,14 @@ pub fn build_menu_items(sessions: &[SessionSnapshot]) -> Vec<MenuItem> {
         items.push(MenuItem {
             label: "No active sessions".to_string(),
             kind: MenuItemKind::Disabled,
+            state: None,
         });
     } else {
         for session in sessions {
             items.push(MenuItem {
-                label: format!(
-                    "{} {} - {}",
-                    state_prefix(session.state),
-                    session.project_name,
-                    state_label(session.state)
-                ),
+                label: format!("{} - {}", session.project_name, state_label(session.state)),
                 kind: MenuItemKind::Command(MenuAction::FocusSession(session.session_id.clone())),
+                state: Some(session.state),
             });
         }
     }
@@ -123,12 +129,75 @@ pub fn build_menu_items(sessions: &[SessionSnapshot]) -> Vec<MenuItem> {
     items.push(MenuItem {
         label: String::new(),
         kind: MenuItemKind::Separator,
+        state: None,
     });
     items.push(MenuItem {
         label: "Exit Sema Pet".to_string(),
         kind: MenuItemKind::Command(MenuAction::Quit),
+        state: None,
     });
     items
+}
+
+pub unsafe fn measure_menu_item(lparam: isize) -> isize {
+    let measure = &mut *(lparam as *mut MEASUREITEMSTRUCT);
+    let data = measure.itemData as *const MenuDrawData;
+    if data.is_null() {
+        return 0;
+    }
+    let label_len = (*data).label.len().saturating_sub(1) as u32;
+    measure.itemHeight = 24;
+    measure.itemWidth = 34 + label_len.saturating_mul(7).max(80);
+    1
+}
+
+pub unsafe fn draw_menu_item(lparam: isize) -> isize {
+    let draw = &*(lparam as *const DRAWITEMSTRUCT);
+    let data = draw.itemData as *const MenuDrawData;
+    if data.is_null() {
+        return 0;
+    }
+
+    let selected = draw.itemState & ODS_SELECTED != 0;
+    let background = if selected {
+        COLOR_HIGHLIGHT
+    } else {
+        COLOR_MENU
+    };
+    FillRect(draw.hDC, &draw.rcItem, GetSysColorBrush(background));
+
+    if let Some(state) = (*data).state {
+        let dot_color = state_color(state);
+        let brush = windows_sys::Win32::Graphics::Gdi::CreateSolidBrush(dot_color);
+        let old_brush = SelectObject(draw.hDC, brush);
+        let old_pen = SelectObject(draw.hDC, GetStockObject(NULL_PEN));
+        let center_y = draw.rcItem.top + (draw.rcItem.bottom - draw.rcItem.top) / 2;
+        let left = draw.rcItem.left + 11;
+        Ellipse(draw.hDC, left, center_y - 4, left + 8, center_y + 4);
+        SelectObject(draw.hDC, old_pen);
+        SelectObject(draw.hDC, old_brush);
+        DeleteObject(brush);
+    }
+
+    SetBkMode(draw.hDC, TRANSPARENT as i32);
+    let text_color = if selected {
+        system_color_ref(COLOR_HIGHLIGHTTEXT)
+    } else {
+        system_color_ref(COLOR_MENUTEXT)
+    };
+    SetTextColor(draw.hDC, text_color);
+
+    let mut text_rect = draw.rcItem;
+    text_rect.left += 28;
+    text_rect.right -= 10;
+    DrawTextW(
+        draw.hDC,
+        (*data).label.as_ptr(),
+        -1,
+        &mut text_rect,
+        DT_LEFT | DT_SINGLELINE | DT_VCENTER,
+    );
+    1
 }
 
 pub fn paint_paw_icon_bgra(pixels: &mut [u8], size: i32) {
@@ -188,12 +257,22 @@ unsafe fn show_menu_for_sessions(
 
     let items = build_menu_items(sessions);
     let mut command_actions = Vec::new();
+    let mut draw_data: Vec<Box<MenuDrawData>> = Vec::new();
     for item in &items {
         match &item.kind {
             MenuItemKind::Command(action) => {
                 let command_id = FIRST_COMMAND_ID + command_actions.len() as u32;
-                let label = wide(&item.label);
-                AppendMenuW(menu, MF_STRING, command_id as usize, label.as_ptr());
+                if item.state.is_some() {
+                    draw_data.push(Box::new(MenuDrawData {
+                        label: wide(&item.label),
+                        state: item.state,
+                    }));
+                    let data = draw_data.last().unwrap().as_ref() as *const MenuDrawData;
+                    AppendMenuW(menu, MF_OWNERDRAW, command_id as usize, data as *const u16);
+                } else {
+                    let label = wide(&item.label);
+                    AppendMenuW(menu, MF_STRING, command_id as usize, label.as_ptr());
+                }
                 command_actions.push(action.clone());
             }
             MenuItemKind::Disabled => {
@@ -306,13 +385,21 @@ fn fill_circle(pixels: &mut [u8], size: i32, cx: f32, cy: f32, radius: f32, colo
     }
 }
 
-fn state_prefix(state: PetState) -> &'static str {
+fn state_color(state: PetState) -> u32 {
     match state {
-        PetState::Attention => "\u{1F7E0}",
-        PetState::Working => "\u{1F7E2}",
-        PetState::Thinking => "\u{1F7E1}",
-        PetState::Idle | PetState::Sleeping => "\u{26AA}",
+        PetState::Attention => color_ref(0xff, 0x9f, 0x1c),
+        PetState::Working => color_ref(0x31, 0xd1, 0x58),
+        PetState::Thinking => color_ref(0x3b, 0x82, 0xf6),
+        PetState::Idle | PetState::Sleeping => color_ref(0x9c, 0xa3, 0xaf),
     }
+}
+
+fn color_ref(red: u8, green: u8, blue: u8) -> u32 {
+    red as u32 | ((green as u32) << 8) | ((blue as u32) << 16)
+}
+
+unsafe fn system_color_ref(index: i32) -> u32 {
+    GetSysColor(index)
 }
 
 fn state_label(state: PetState) -> &'static str {

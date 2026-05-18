@@ -84,11 +84,13 @@
     }
   },
   "scripts": {
-    "compile": "webpack && mkdir -p dist/pet && cp -f pet/macos/.build/arm64-apple-macosx/release/sema-pet-darwin-arm64.zip dist/pet/ 2>/dev/null || echo '⚠️  dist/pet/sema-pet-darwin-arm64.zip 缺失（先跑 npm run pet:build）' && cp -f pet/macos/.build/x86_64-apple-macosx/release/sema-pet-darwin-x64.zip dist/pet/ 2>/dev/null || echo '⚠️  dist/pet/sema-pet-darwin-x64.zip 缺失（先跑 npm run pet:build）'",
-    "pet:build": "bash pet/macos/build-zips.sh",
-    "pet:build:arm64": "bash pet/macos/build-zips.sh arm64",
-    "pet:build:x64": "bash pet/macos/build-zips.sh x64",
-    "pet:build:windows": "powershell -ExecutionPolicy Bypass -File pet/windows/build-zips.ps1"
+    "compile": "webpack && node pet/stage-zips.js",
+    "pet:build": "node pet/build.js",
+    "pet:build:arm64": "node pet/build.js arm64",
+    "pet:build:x64": "node pet/build.js x64",
+    "pet:build:windows": "powershell -ExecutionPolicy Bypass -File pet/windows/build-zips.ps1",
+    "pet:build:windows:x64": "powershell -ExecutionPolicy Bypass -File pet/windows/build-zips.ps1 -Target x86_64-pc-windows-msvc",
+    "pet:build:windows:arm64": "powershell -ExecutionPolicy Bypass -File pet/windows/build-zips.ps1 -Target aarch64-pc-windows-msvc"
   },
   "devDependencies": {
     "@babel/core": "^7.28.5",

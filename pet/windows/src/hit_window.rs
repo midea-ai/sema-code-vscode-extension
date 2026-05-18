@@ -6,9 +6,9 @@ use windows_sys::Win32::Foundation::{HINSTANCE, HWND};
 use windows_sys::Win32::UI::WindowsAndMessaging::{
     CreateWindowExW, DefWindowProcW, GetWindowLongPtrW, LoadCursorW, RegisterClassW, SetCursor,
     SetWindowLongPtrW, SetWindowPos, ShowWindow, CREATESTRUCTW, GWLP_USERDATA, HTCLIENT, IDC_ARROW,
-    SWP_NOACTIVATE, SWP_NOZORDER, SW_SHOW, WM_LBUTTONDOWN, WM_LBUTTONUP, WM_MOUSEMOVE, WM_NCCREATE,
-    WM_NCHITTEST, WM_RBUTTONUP, WM_SETCURSOR, WM_TIMER, WNDCLASSW, WS_EX_TOOLWINDOW, WS_EX_TOPMOST,
-    WS_POPUP,
+    SWP_NOACTIVATE, SWP_NOZORDER, SW_SHOW, WM_DRAWITEM, WM_LBUTTONDOWN, WM_LBUTTONUP,
+    WM_MEASUREITEM, WM_MOUSEMOVE, WM_NCCREATE, WM_NCHITTEST, WM_RBUTTONUP, WM_SETCURSOR, WM_TIMER,
+    WNDCLASSW, WS_EX_TOOLWINDOW, WS_EX_TOPMOST, WS_POPUP,
 };
 
 use crate::window_coordinator::WindowCoordinator;
@@ -115,7 +115,8 @@ unsafe extern "system" fn hit_wnd_proc(
                 (*coordinator).on_tray_callback(lparam);
                 return 0;
             }
-            WM_LBUTTONDOWN | WM_MOUSEMOVE | WM_LBUTTONUP | WM_RBUTTONUP => {
+            WM_MEASUREITEM | WM_DRAWITEM | WM_LBUTTONDOWN | WM_MOUSEMOVE | WM_LBUTTONUP
+            | WM_RBUTTONUP => {
                 return (*coordinator).on_hit_window_message(hwnd, msg, wparam, lparam);
             }
             WM_TIMER => {

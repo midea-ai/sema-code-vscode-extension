@@ -18,11 +18,17 @@ use windows_sys::Win32::UI::WindowsAndMessaging::{
 use crate::bubble_store::{BubbleItem, BubbleKind};
 use crate::window_coordinator::WindowCoordinator;
 
-pub const BUBBLE_WIDTH: i32 = 260;
-const BUBBLE_HEIGHT: i32 = 34;
-const BUBBLE_GAP: i32 = 8;
+pub const BUBBLE_WIDTH: i32 = 240;
+const BUBBLE_MAX_WIDTH: i32 = BUBBLE_WIDTH;
+const BUBBLE_HEIGHT: i32 = 26;
+const BUBBLE_GAP: i32 = 4;
 const BUBBLE_RADIUS: i32 = 8;
-const TEXT_PADDING_X: i32 = 12;
+const TEXT_PADDING_X: i32 = 10;
+const TEXT_PADDING_Y: i32 = 6;
+const TEXT_MAX_WIDTH: i32 = 220;
+const TEXT_FONT_HEIGHT: i32 = -12;
+const PET_LOGICAL_SIZE: i32 = 128;
+const BUBBLE_ANCHOR_GAP: i32 = 4;
 
 const CLASS_NAME: &[u16] = &[
     'S' as u16, 'e' as u16, 'm' as u16, 'a' as u16, 'P' as u16, 'e' as u16, 't' as u16, 'B' as u16,
@@ -80,8 +86,8 @@ impl BubbleWindow {
             return;
         };
 
-        let x = pet_x - (BUBBLE_WIDTH - 128) / 2;
-        let y = pet_y - bitmap.height - 10;
+        let x = pet_x + (PET_LOGICAL_SIZE - bitmap.width) / 2;
+        let y = pet_y - bitmap.height - BUBBLE_ANCHOR_GAP;
         self.move_to(x, y, bitmap.width, bitmap.height);
         update_layered_bitmap(self.hwnd, bitmap.width, bitmap.height, &bitmap.bgra);
         ShowWindow(self.hwnd, SW_SHOW);
@@ -109,23 +115,25 @@ pub fn render_bubbles_bitmap(bubbles: &[BubbleItem]) -> Option<LayeredBitmap> {
         return None;
     }
 
-    let count = bubbles.len().min(3) as i32;
+    let visible_bubbles: Vec<_> = bubbles.iter().take(3).collect();
+    let count = visible_bubbles.len() as i32;
+    let bubble_width = bubble_bitmap_width(&visible_bubbles);
     let height = count * BUBBLE_HEIGHT + (count - 1) * BUBBLE_GAP;
-    let mut bgra = vec![0_u8; (BUBBLE_WIDTH * height * 4) as usize];
+    let mut bgra = vec![0_u8; (bubble_width * height * 4) as usize];
 
-    for (index, bubble) in bubbles.iter().take(3).enumerate() {
+    for (index, bubble) in visible_bubbles.iter().enumerate() {
         let y = index as i32 * (BUBBLE_HEIGHT + BUBBLE_GAP);
         let color = match bubble.kind {
-            BubbleKind::Attention => [0x00, 0x88, 0xff, 0xdd],
-            BubbleKind::Info => [0x20, 0x20, 0x20, 0xcc],
+            BubbleKind::Attention => [0x00, 0x87, 0xf5, 0xea],
+            BubbleKind::Info => [0x00, 0x00, 0x00, 0xd9],
         };
         fill_rounded_rect(
             &mut bgra,
-            BUBBLE_WIDTH,
+            bubble_width,
             height,
             0,
             y,
-            BUBBLE_WIDTH,
+            bubble_width,
             BUBBLE_HEIGHT,
             BUBBLE_RADIUS,
             color,
@@ -133,14 +141,32 @@ pub fn render_bubbles_bitmap(bubbles: &[BubbleItem]) -> Option<LayeredBitmap> {
     }
 
     unsafe {
-        draw_bubble_text(&mut bgra, BUBBLE_WIDTH, height, bubbles);
+        draw_bubble_text(&mut bgra, bubble_width, height, bubbles);
     }
 
     Some(LayeredBitmap {
-        width: BUBBLE_WIDTH,
+        width: bubble_width,
         height,
         bgra,
     })
+}
+
+fn bubble_bitmap_width(bubbles: &[&BubbleItem]) -> i32 {
+    let widest_text = bubbles
+        .iter()
+        .map(|bubble| estimate_text_width(&bubble.text))
+        .max()
+        .unwrap_or(1)
+        .min(TEXT_MAX_WIDTH);
+    (widest_text + TEXT_PADDING_X * 2).clamp(1, BUBBLE_MAX_WIDTH)
+}
+
+fn estimate_text_width(text: &str) -> i32 {
+    let units: i32 = text
+        .chars()
+        .map(|ch| if ch.is_ascii() { 7 } else { 12 })
+        .sum();
+    units.max(1)
 }
 
 unsafe fn draw_bubble_text(bgra: &mut [u8], width: i32, height: i32, bubbles: &[BubbleItem]) {
@@ -176,7 +202,7 @@ unsafe fn draw_bubble_text(bgra: &mut [u8], width: i32, height: i32, bubbles: &[
     std::ptr::copy_nonoverlapping(bgra.as_ptr(), bits as *mut u8, bgra.len());
     let old_bitmap = SelectObject(memory_dc, bitmap);
     let font = CreateFontW(
-        -15,
+        TEXT_FONT_HEIGHT,
         0,
         0,
         0,
@@ -199,9 +225,9 @@ unsafe fn draw_bubble_text(bgra: &mut [u8], width: i32, height: i32, bubbles: &[
         let top = index as i32 * (BUBBLE_HEIGHT + BUBBLE_GAP);
         let mut rect = RECT {
             left: TEXT_PADDING_X,
-            top,
+            top: top + TEXT_PADDING_Y,
             right: width - TEXT_PADDING_X,
-            bottom: top + BUBBLE_HEIGHT,
+            bottom: top + BUBBLE_HEIGHT - TEXT_PADDING_Y,
         };
         let text = wide(&bubble.text);
         DrawTextW(

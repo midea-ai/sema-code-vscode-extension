@@ -3,14 +3,15 @@ use std::path::{Path, PathBuf};
 use std::ptr::null_mut;
 use std::sync::{Arc, Mutex};
 
-use windows_sys::Win32::Foundation::{HINSTANCE, HWND, POINT};
+use windows_sys::Win32::Foundation::{HINSTANCE, HWND, LPARAM, POINT, RECT};
 use windows_sys::Win32::Graphics::Gdi::{
-    ClientToScreen, CombineRgn, CreateRectRgn, DeleteObject, SetWindowRgn, RGN_OR,
+    ClientToScreen, CombineRgn, CreateRectRgn, DeleteObject, EnumDisplayMonitors, GetMonitorInfoW,
+    SetWindowRgn, HDC, HMONITOR, MONITORINFO, RGN_OR,
 };
 use windows_sys::Win32::UI::Input::KeyboardAndMouse::{ReleaseCapture, SetCapture};
 use windows_sys::Win32::UI::WindowsAndMessaging::{
     KillTimer, MessageBoxW, PostQuitMessage, SetTimer, SetWindowPos, SWP_NOACTIVATE, SWP_NOSIZE,
-    WM_LBUTTONDOWN, WM_LBUTTONUP, WM_MOUSEMOVE, WM_RBUTTONUP,
+    WM_DRAWITEM, WM_LBUTTONDOWN, WM_LBUTTONUP, WM_MEASUREITEM, WM_MOUSEMOVE, WM_RBUTTONUP,
 };
 
 use crate::bubble_store::BubbleStore;
@@ -24,11 +25,13 @@ use crate::protocol::PetState;
 use crate::render_window::RenderWindow;
 use crate::state_machine::{now_ms, StateMachine};
 use crate::test_sprite::TestSprite;
-use crate::tray::{MenuAction, Tray};
+use crate::tray::{draw_menu_item, measure_menu_item, MenuAction, Tray};
 use crate::vscode_launcher::{launch_vscode_for_cwd, should_launch_vscode_for_focus_attempt};
 
 const SIZE: i32 = 128;
 const DRAG_THRESHOLD: i32 = 4;
+const MIN_VISIBLE_SIZE: i32 = 32;
+const MONITORINFOF_PRIMARY_FLAG: u32 = 1;
 const ANIMATION_TIMER_ID: usize = 1;
 const ANIMATION_TIMER_MS: u32 = 120;
 const BUBBLE_TIMER_ID: usize = 2;
@@ -119,6 +122,8 @@ impl WindowCoordinator {
         lparam: isize,
     ) -> isize {
         match msg {
+            WM_MEASUREITEM => measure_menu_item(lparam),
+            WM_DRAWITEM => draw_menu_item(lparam),
             WM_LBUTTONDOWN => {
                 let point = cursor_point_from_lparam(hwnd, lparam);
                 self.mouse_down = Some(point);
@@ -410,14 +415,110 @@ fn test_frame_for_state(state: PetState) -> DecodedFrame {
     }
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct WorkArea {
+    pub left: i32,
+    pub top: i32,
+    pub right: i32,
+    pub bottom: i32,
+}
+
 pub fn initial_position_from_config(config: &PetConfig, default: POINT) -> POINT {
-    match config.window_position {
-        Some(position) => POINT {
-            x: position.x,
-            y: position.y,
-        },
-        None => default,
+    initial_position_from_config_with_work_areas(config, default, &monitor_work_areas())
+}
+
+pub fn initial_position_from_config_with_work_areas(
+    config: &PetConfig,
+    default: POINT,
+    work_areas: &[WorkArea],
+) -> POINT {
+    let Some(position) = config.window_position else {
+        return default;
+    };
+    let configured = POINT {
+        x: position.x,
+        y: position.y,
+    };
+    if work_areas.is_empty()
+        || rect_has_visible_intersection(configured.x, configured.y, SIZE, SIZE, work_areas)
+    {
+        return configured;
     }
+
+    default_position_for_work_area(work_areas[0], SIZE)
+}
+
+pub fn rect_has_visible_intersection(
+    x: i32,
+    y: i32,
+    width: i32,
+    height: i32,
+    work_areas: &[WorkArea],
+) -> bool {
+    work_areas.iter().any(|area| {
+        let visible_width = (x + width).min(area.right) - x.max(area.left);
+        let visible_height = (y + height).min(area.bottom) - y.max(area.top);
+        visible_width >= MIN_VISIBLE_SIZE && visible_height >= MIN_VISIBLE_SIZE
+    })
+}
+
+pub fn default_position_for_work_area(area: WorkArea, size: i32) -> POINT {
+    POINT {
+        x: area.right - size - 24,
+        y: area.bottom - size - 48,
+    }
+}
+
+fn monitor_work_areas() -> Vec<WorkArea> {
+    let mut areas: Vec<WorkArea> = Vec::new();
+    unsafe {
+        EnumDisplayMonitors(
+            null_mut(),
+            null_mut(),
+            Some(enum_monitor_proc),
+            &mut areas as *mut Vec<WorkArea> as LPARAM,
+        );
+    }
+    areas
+}
+
+unsafe extern "system" fn enum_monitor_proc(
+    monitor: HMONITOR,
+    _hdc: HDC,
+    _rect: *mut RECT,
+    lparam: LPARAM,
+) -> i32 {
+    let areas = &mut *(lparam as *mut Vec<WorkArea>);
+    let mut info = MONITORINFO {
+        cbSize: std::mem::size_of::<MONITORINFO>() as u32,
+        rcMonitor: RECT {
+            left: 0,
+            top: 0,
+            right: 0,
+            bottom: 0,
+        },
+        rcWork: RECT {
+            left: 0,
+            top: 0,
+            right: 0,
+            bottom: 0,
+        },
+        dwFlags: 0,
+    };
+    if GetMonitorInfoW(monitor, &mut info) != 0 {
+        let area = WorkArea {
+            left: info.rcWork.left,
+            top: info.rcWork.top,
+            right: info.rcWork.right,
+            bottom: info.rcWork.bottom,
+        };
+        if info.dwFlags & MONITORINFOF_PRIMARY_FLAG != 0 {
+            areas.insert(0, area);
+        } else {
+            areas.push(area);
+        }
+    }
+    1
 }
 
 unsafe fn cursor_point_from_lparam(hwnd: HWND, lparam: isize) -> POINT {
