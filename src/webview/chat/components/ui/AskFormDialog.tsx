@@ -10,6 +10,11 @@ export type PickOptionQuestion =
 const DEFAULT_TEXT_MAX_LENGTH = 100;
 const DEFAULT_TEXTAREA_MAX_LENGTH = 500;
 
+/** Other 选项相关常量 —— 纯前端概念，后端无感知 */
+const OTHER_LABEL = 'Other';
+const OTHER_SELECT_SENTINEL = '__ask_form_other__';
+const OTHER_INPUT_MAX_LENGTH = 200;
+
 export interface PickOptionRequestData {
     agentId: string;
     questions: PickOptionQuestion[];
@@ -33,12 +38,65 @@ interface AskFormDialogProps {
 
 const MULTI_SEPARATOR = '; ';
 
+type ChoiceQuestion = Extract<PickOptionQuestion, { type: 'radio' | 'checkbox' | 'select' }>;
+
+function isChoiceQuestion(q: PickOptionQuestion): q is ChoiceQuestion {
+    return q.type === 'radio' || q.type === 'checkbox' || q.type === 'select';
+}
+
 function buildInitialValues(questions: PickOptionQuestion[]): AskFormValues {
     const v: AskFormValues = {};
     for (const q of questions) {
         v[q.id] = q.type === 'checkbox' ? [] : '';
     }
     return v;
+}
+
+interface AskFormState {
+    /** 仅保存「真实选项」：radio/select 为选项字符串，checkbox 为选项数组（不含 Other 文本） */
+    values: AskFormValues;
+    /** 每题是否选中了 Other */
+    otherActive: Record<string, boolean>;
+    /** 每题 Other 输入框文本 */
+    otherText: Record<string, string>;
+}
+
+/**
+ * 把外部传入的 values 拆成「真实选项」与「Other 状态」。
+ * 凡是不在 q.options 中的值，都识别为 Other 答案（用于回显已回答的表单）。
+ */
+function buildInitialState(questions: PickOptionQuestion[], initialValues?: AskFormValues): AskFormState {
+    const values: AskFormValues = {};
+    const otherActive: Record<string, boolean> = {};
+    const otherText: Record<string, string> = {};
+
+    for (const q of questions) {
+        const raw = initialValues ? initialValues[q.id] : undefined;
+
+        if (q.type === 'checkbox') {
+            const arr = Array.isArray(raw) ? raw : [];
+            const real = arr.filter(x => q.options.includes(x));
+            const others = arr.filter(x => !q.options.includes(x));
+            values[q.id] = real;
+            if (others.length > 0) {
+                otherActive[q.id] = true;
+                otherText[q.id] = others.join(MULTI_SEPARATOR);
+            }
+        } else if (q.type === 'radio' || q.type === 'select') {
+            const s = typeof raw === 'string' ? raw : '';
+            if (s && !q.options.includes(s)) {
+                values[q.id] = '';
+                otherActive[q.id] = true;
+                otherText[q.id] = s;
+            } else {
+                values[q.id] = s;
+            }
+        } else {
+            values[q.id] = typeof raw === 'string' ? raw : '';
+        }
+    }
+
+    return { values, otherActive, otherText };
 }
 
 function isAnswered(q: PickOptionQuestion, value: string | string[] | undefined): boolean {
@@ -69,9 +127,12 @@ const AskFormDialog: React.FC<AskFormDialogProps> = ({
     initialValues,
     status,
 }) => {
-    const [values, setValues] = useState<AskFormValues>(() =>
-        initialValues ? { ...initialValues } : buildInitialValues(data.questions)
+    const [{ values: initValues, otherActive: initActive, otherText: initText }] = useState<AskFormState>(() =>
+        buildInitialState(data.questions, initialValues)
     );
+    const [values, setValues] = useState<AskFormValues>(initValues);
+    const [otherActive, setOtherActive] = useState<Record<string, boolean>>(initActive);
+    const [otherText, setOtherText] = useState<Record<string, string>>(initText);
     const [errors, setErrors] = useState<Record<string, string>>({});
     const containerRef = useRef<HTMLDivElement>(null);
 
@@ -95,112 +156,206 @@ const AskFormDialog: React.FC<AskFormDialogProps> = ({
         return () => node.removeEventListener('keydown', onKey);
     }, [readonly, onCancel]);
 
+    const clearError = (id: string) => {
+        setErrors(prev => {
+            if (!prev[id]) return prev;
+            const next = { ...prev };
+            delete next[id];
+            return next;
+        });
+    };
+
     const updateValue = (id: string, val: string | string[]) => {
         setValues(prev => ({ ...prev, [id]: val }));
-        if (errors[id]) {
-            setErrors(prev => {
-                const next = { ...prev };
-                delete next[id];
-                return next;
-            });
+        clearError(id);
+    };
+
+    const setOtherActiveFor = (id: string, active: boolean) => {
+        setOtherActive(prev => ({ ...prev, [id]: active }));
+        clearError(id);
+    };
+
+    const setOtherTextFor = (id: string, text: string) => {
+        setOtherText(prev => ({ ...prev, [id]: text }));
+        clearError(id);
+    };
+
+    /** 把「真实选项 + Other 文本」合并成最终答案 —— 提交、校验、格式化都基于它 */
+    const computeFinalValues = (): AskFormValues => {
+        const result: AskFormValues = {};
+        for (const q of data.questions) {
+            const ot = (otherText[q.id] || '').trim();
+            if (q.type === 'checkbox') {
+                const real = (values[q.id] as string[]) || [];
+                result[q.id] = otherActive[q.id] && ot ? [...real, ot] : [...real];
+            } else if (q.type === 'radio' || q.type === 'select') {
+                result[q.id] = otherActive[q.id] ? ot : ((values[q.id] as string) || '');
+            } else {
+                result[q.id] = values[q.id];
+            }
         }
+        return result;
     };
 
     const handleSubmit = () => {
+        const finalValues = computeFinalValues();
         const newErrors: Record<string, string> = {};
         for (const q of data.questions) {
-            if (q.required && !isAnswered(q, values[q.id])) {
-                newErrors[q.id] = '此项为必填';
+            if (q.required && !isAnswered(q, finalValues[q.id])) {
+                newErrors[q.id] = isChoiceQuestion(q) && otherActive[q.id]
+                    ? '请填写 Other 内容'
+                    : '此项为必填';
             }
         }
         if (Object.keys(newErrors).length > 0) {
             setErrors(newErrors);
             return;
         }
-        onSubmit(formatAskFormAnswers(data.questions, values), values);
+        onSubmit(formatAskFormAnswers(data.questions, finalValues), finalValues);
     };
 
     const handleSkip = () => {
-        onSkip(formatAskFormAnswers(data.questions, values), values);
+        const finalValues = computeFinalValues();
+        onSkip(formatAskFormAnswers(data.questions, finalValues), finalValues);
     };
+
+    const renderOtherInput = (q: PickOptionQuestion) => (
+        <div className="ask-form-other-input">
+            <input
+                type="text"
+                className="ask-form-text"
+                value={otherText[q.id] || ''}
+                placeholder="请输入其他内容..."
+                disabled={readonly}
+                maxLength={OTHER_INPUT_MAX_LENGTH}
+                onChange={(e) => setOtherTextFor(q.id, e.target.value.slice(0, OTHER_INPUT_MAX_LENGTH))}
+            />
+        </div>
+    );
 
     const renderQuestion = (q: PickOptionQuestion) => {
         const value = values[q.id];
         const err = errors[q.id];
         const disabled = readonly;
+        const otherSelected = !!otherActive[q.id];
 
         let body: React.ReactNode;
         switch (q.type) {
             case 'radio':
                 body = (
-                    <div className="ask-form-options ask-form-options-inline">
-                        {q.options.map((opt, i) => {
-                            const checked = value === opt;
-                            return (
-                                <button
-                                    key={i}
-                                    type="button"
-                                    className={`ask-form-chip ${checked ? 'selected' : ''} ${disabled ? 'disabled' : ''}`}
-                                    disabled={disabled}
-                                    onClick={() => {
-                                        if (disabled) return;
-                                        updateValue(q.id, opt);
-                                    }}
-                                >
-                                    {opt}
-                                </button>
-                            );
-                        })}
-                    </div>
+                    <>
+                        <div className="ask-form-options ask-form-options-inline">
+                            {q.options.map((opt, i) => {
+                                const checked = !otherSelected && value === opt;
+                                return (
+                                    <button
+                                        key={i}
+                                        type="button"
+                                        className={`ask-form-chip ${checked ? 'selected' : ''} ${disabled ? 'disabled' : ''}`}
+                                        disabled={disabled}
+                                        onClick={() => {
+                                            if (disabled) return;
+                                            setOtherActiveFor(q.id, false);
+                                            updateValue(q.id, opt);
+                                        }}
+                                    >
+                                        {opt}
+                                    </button>
+                                );
+                            })}
+                            <button
+                                type="button"
+                                className={`ask-form-chip ${otherSelected ? 'selected' : ''} ${disabled ? 'disabled' : ''}`}
+                                disabled={disabled}
+                                onClick={() => {
+                                    if (disabled) return;
+                                    setOtherActiveFor(q.id, true);
+                                    setValues(prev => ({ ...prev, [q.id]: '' }));
+                                }}
+                            >
+                                {OTHER_LABEL}
+                            </button>
+                        </div>
+                        {otherSelected ? renderOtherInput(q) : null}
+                    </>
                 );
                 break;
             case 'checkbox': {
                 const arr = (value as string[]) || [];
                 const max = q.maxSelections;
+                const count = arr.length + (otherSelected ? 1 : 0);
+                const reachedMax = !!max && count >= max;
+                const otherItemDisabled = disabled || (reachedMax && !otherSelected);
                 body = (
-                    <div className="ask-form-options ask-form-options-inline">
-                        {q.options.map((opt, i) => {
-                            const checked = arr.includes(opt);
-                            const reachedMax = !!max && arr.length >= max && !checked;
-                            const itemDisabled = disabled || reachedMax;
-                            return (
-                                <button
-                                    key={i}
-                                    type="button"
-                                    className={`ask-form-chip ${checked ? 'selected' : ''} ${itemDisabled ? 'disabled' : ''}`}
-                                    disabled={itemDisabled}
-                                    onClick={() => {
-                                        if (itemDisabled) return;
-                                        const next = checked ? arr.filter(x => x !== opt) : [...arr, opt];
-                                        updateValue(q.id, next);
-                                    }}
-                                >
-                                    {opt}
-                                </button>
-                            );
-                        })}
-                        {max ? (
-                            <div className="ask-form-hint ask-form-hint-row">
-                                最多选择 {max} 项（已选 {arr.length}/{max}）
-                            </div>
-                        ) : null}
-                    </div>
+                    <>
+                        <div className="ask-form-options ask-form-options-inline">
+                            {q.options.map((opt, i) => {
+                                const checked = arr.includes(opt);
+                                const itemDisabled = disabled || (reachedMax && !checked);
+                                return (
+                                    <button
+                                        key={i}
+                                        type="button"
+                                        className={`ask-form-chip ${checked ? 'selected' : ''} ${itemDisabled ? 'disabled' : ''}`}
+                                        disabled={itemDisabled}
+                                        onClick={() => {
+                                            if (itemDisabled) return;
+                                            const next = checked ? arr.filter(x => x !== opt) : [...arr, opt];
+                                            updateValue(q.id, next);
+                                        }}
+                                    >
+                                        {opt}
+                                    </button>
+                                );
+                            })}
+                            <button
+                                type="button"
+                                className={`ask-form-chip ${otherSelected ? 'selected' : ''} ${otherItemDisabled ? 'disabled' : ''}`}
+                                disabled={otherItemDisabled}
+                                onClick={() => {
+                                    if (otherItemDisabled) return;
+                                    setOtherActiveFor(q.id, !otherSelected);
+                                }}
+                            >
+                                {OTHER_LABEL}
+                            </button>
+                            {max ? (
+                                <div className="ask-form-hint ask-form-hint-row">
+                                    最多选择 {max} 项（已选 {count}/{max}）
+                                </div>
+                            ) : null}
+                        </div>
+                        {otherSelected ? renderOtherInput(q) : null}
+                    </>
                 );
                 break;
             }
             case 'select':
                 body = (
-                    <select
-                        className="ask-form-select"
-                        value={(value as string) || ''}
-                        disabled={disabled}
-                        onChange={(e) => updateValue(q.id, e.target.value)}
-                    >
-                        <option value="">请选择...</option>
-                        {q.options.map((opt, i) => (
-                            <option key={i} value={opt}>{opt}</option>
-                        ))}
-                    </select>
+                    <>
+                        <select
+                            className="ask-form-select"
+                            value={otherSelected ? OTHER_SELECT_SENTINEL : ((value as string) || '')}
+                            disabled={disabled}
+                            onChange={(e) => {
+                                const v = e.target.value;
+                                if (v === OTHER_SELECT_SENTINEL) {
+                                    setOtherActiveFor(q.id, true);
+                                    setValues(prev => ({ ...prev, [q.id]: '' }));
+                                } else {
+                                    setOtherActiveFor(q.id, false);
+                                    updateValue(q.id, v);
+                                }
+                            }}
+                        >
+                            <option value="">请选择...</option>
+                            {q.options.map((opt, i) => (
+                                <option key={i} value={opt}>{opt}</option>
+                            ))}
+                            <option value={OTHER_SELECT_SENTINEL}>{OTHER_LABEL}...</option>
+                        </select>
+                        {otherSelected ? renderOtherInput(q) : null}
+                    </>
                 );
                 break;
             case 'text': {

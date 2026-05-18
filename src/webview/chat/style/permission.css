@@ -499,6 +499,11 @@ body.vscode-light .ask-form-dialog {
     pointer-events: none;
 }
 
+.ask-form-other-input {
+    width: 100%;
+    margin-top: 6px;
+}
+
 .ask-form-error {
     font-size: var(--chat-font-xs);
     color: var(--chat-color-error, #f14c4c);
