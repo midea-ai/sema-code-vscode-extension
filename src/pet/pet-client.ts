@@ -13,7 +13,7 @@ const REGISTER_TIMEOUT_MS = 2000;     // 首次 register 桌宠刚 spawn 完可�
 const REGISTER_RETRY = 3;
 const REGISTER_RETRY_INTERVAL_MS = 200;
 const LONG_POLL_TIMEOUT_MS = 30000;
-const POLL_INTERVAL_MS = 200;
+const POLL_INTERVAL_MS = 20;
 const SAY_MAX_CHARS = 40;
 
 function truncateSay(text: string): string {
