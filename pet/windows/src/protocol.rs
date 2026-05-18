@@ -51,7 +51,7 @@ pub struct UnregisterPayload {
 pub struct StatePayload {
     pub session_id: String,
     pub state: PetState,
-    pub ts: u64,
+    pub ts: Option<u64>,
 }
 
 #[derive(Debug, Deserialize)]

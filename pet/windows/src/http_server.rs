@@ -131,7 +131,7 @@ fn handle_connection(
             state_machine.lock().unwrap().update_state(
                 &payload.session_id,
                 payload.state,
-                payload.ts,
+                payload.ts.unwrap_or_else(now_ms),
             );
             bubble_store
                 .lock()
