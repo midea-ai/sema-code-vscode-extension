@@ -256,7 +256,7 @@ const AskFormDialog: React.FC<AskFormDialogProps> = ({
                                         onClick={() => {
                                             if (disabled) return;
                                             setOtherActiveFor(q.id, false);
-                                            updateValue(q.id, opt);
+                                            updateValue(q.id, checked ? '' : opt);
                                         }}
                                     >
                                         {opt}
