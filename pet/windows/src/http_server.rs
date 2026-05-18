@@ -22,6 +22,7 @@ use crate::window_messages::{WM_APP_BUBBLES_CHANGED, WM_APP_QUIT, WM_APP_STATE_C
 
 const COMMAND_TIMEOUT: Duration = Duration::from_secs(25);
 const CODE_PAGE_GBK: u32 = 936;
+const MAX_ACTIVE_CONNECTIONS: usize = 32;
 
 pub struct HttpServerHandle {
     _thread: thread::JoinHandle<()>,
@@ -35,12 +36,18 @@ pub fn start_http_server(
 ) -> std::io::Result<HttpServerHandle> {
     let listener = TcpListener::bind((PET_HOST, PET_PORT))?;
     let notify_hwnd_value = notify_hwnd as isize;
+    let connection_limit = Arc::new(ConnectionLimit::new(MAX_ACTIVE_CONNECTIONS));
     let thread = thread::spawn(move || {
-        for stream in listener.incoming().flatten() {
+        for mut stream in listener.incoming().flatten() {
+            let Some(connection_guard) = connection_limit.try_acquire() else {
+                let _ = write_json(&mut stream, 503, r#"{"error":"server busy"}"#);
+                continue;
+            };
             let state_machine = Arc::clone(&state_machine);
             let bubble_store = Arc::clone(&bubble_store);
             let focus_bridge = Arc::clone(&focus_bridge);
             thread::spawn(move || {
+                let _connection_guard = connection_guard;
                 let _ = handle_connection(
                     stream,
                     state_machine,
@@ -75,9 +82,8 @@ fn handle_connection(
             write_json(&mut stream, 200, &body)
         }
         ("POST", "/session/register") => {
-            let payload: RegisterPayload = match serde_json::from_str(&parsed.body) {
-                Ok(payload) => payload,
-                Err(_) => return write_json(&mut stream, 400, r#"{"error":"bad json"}"#),
+            let Some(payload) = parse_json::<RegisterPayload>(&mut stream, &parsed)? else {
+                return Ok(());
             };
             let mut state = state_machine.lock().unwrap();
             let removed = state.sweep_stale(is_process_alive);
@@ -103,9 +109,8 @@ fn handle_connection(
             write_json(&mut stream, 200, r#"{"ok":true}"#)
         }
         ("POST", "/session/unregister") => {
-            let payload: UnregisterPayload = match serde_json::from_str(&parsed.body) {
-                Ok(payload) => payload,
-                Err(_) => return write_json(&mut stream, 400, r#"{"error":"bad json"}"#),
+            let Some(payload) = parse_json::<UnregisterPayload>(&mut stream, &parsed)? else {
+                return Ok(());
             };
             let empty = state_machine
                 .lock()
@@ -120,9 +125,8 @@ fn handle_connection(
             write_json(&mut stream, 200, r#"{"ok":true}"#)
         }
         ("POST", "/state") => {
-            let payload: StatePayload = match serde_json::from_str(&parsed.body) {
-                Ok(payload) => payload,
-                Err(_) => return write_json(&mut stream, 400, r#"{"error":"bad json"}"#),
+            let Some(payload) = parse_json::<StatePayload>(&mut stream, &parsed)? else {
+                return Ok(());
             };
             state_machine.lock().unwrap().update_state(
                 &payload.session_id,
@@ -140,15 +144,14 @@ fn handle_connection(
             write_json(&mut stream, 200, r#"{"ok":true}"#)
         }
         ("POST", "/say") => {
-            let payload: SayPayload = match serde_json::from_str(&parsed.body) {
-                Ok(payload) => payload,
-                Err(_) => return write_json(&mut stream, 400, r#"{"error":"bad json"}"#),
+            let Some(payload) = parse_json::<SayPayload>(&mut stream, &parsed)? else {
+                return Ok(());
             };
             bubble_store.lock().unwrap().add(
                 &payload.session_id,
                 &payload.text,
                 SayOptions {
-                    kind: BubbleKind::from(payload.kind),
+                    kind: payload.kind.unwrap_or(BubbleKind::Info),
                     ttl_ms: payload.ttl_ms,
                     sticky: payload.sticky.unwrap_or(false),
                 },
@@ -167,6 +170,19 @@ fn handle_connection(
             write_json(&mut stream, 200, &body)
         }
         _ => write_json(&mut stream, 404, r#"{"error":"not found"}"#),
+    }
+}
+
+fn parse_json<T: serde::de::DeserializeOwned>(
+    stream: &mut TcpStream,
+    request: &HttpRequest,
+) -> std::io::Result<Option<T>> {
+    match serde_json::from_str(&request.body) {
+        Ok(payload) => Ok(Some(payload)),
+        Err(_) => {
+            write_json(stream, 400, r#"{"error":"bad json"}"#)?;
+            Ok(None)
+        }
     }
 }
 
@@ -268,6 +284,7 @@ fn write_json(stream: &mut TcpStream, status: u16, body: &str) -> std::io::Resul
         200 => "OK",
         400 => "Bad Request",
         404 => "Not Found",
+        503 => "Service Unavailable",
         _ => "Internal Server Error",
     };
     write!(
@@ -276,6 +293,42 @@ fn write_json(stream: &mut TcpStream, status: u16, body: &str) -> std::io::Resul
         body.as_bytes().len(),
         body
     )
+}
+
+struct ConnectionLimit {
+    active: Mutex<usize>,
+    max: usize,
+}
+
+impl ConnectionLimit {
+    fn new(max: usize) -> Self {
+        Self {
+            active: Mutex::new(0),
+            max,
+        }
+    }
+
+    fn try_acquire(self: &Arc<Self>) -> Option<ConnectionGuard> {
+        let mut active = self.active.lock().unwrap();
+        if *active >= self.max {
+            return None;
+        }
+        *active += 1;
+        Some(ConnectionGuard {
+            limit: Arc::clone(self),
+        })
+    }
+}
+
+struct ConnectionGuard {
+    limit: Arc<ConnectionLimit>,
+}
+
+impl Drop for ConnectionGuard {
+    fn drop(&mut self) {
+        let mut active = self.limit.active.lock().unwrap();
+        *active = active.saturating_sub(1);
+    }
 }
 
 struct HttpRequest {

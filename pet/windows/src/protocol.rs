@@ -1,9 +1,14 @@
 use serde::{Deserialize, Serialize};
 
+use crate::bubble_store::BubbleKind;
+
 pub const PET_HOST: &str = "127.0.0.1";
 pub const PET_PORT: u16 = 24700;
 pub const PET_SERVER_HEADER: &str = "x-sema-pet";
 pub const PET_SERVER_HEADER_VALUE: &str = "server";
+pub const SAY_DEFAULT_TTL_MS: u64 = 5000;
+pub const SAY_MAX_VISIBLE: usize = 3;
+pub const SAY_MAX_CHARS: usize = 40;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Deserialize, Serialize)]
 #[serde(rename_all = "lowercase")]
@@ -54,7 +59,7 @@ pub struct StatePayload {
 pub struct SayPayload {
     pub session_id: String,
     pub text: String,
-    pub kind: Option<String>,
+    pub kind: Option<BubbleKind>,
     pub ttl_ms: Option<u64>,
     pub sticky: Option<bool>,
 }

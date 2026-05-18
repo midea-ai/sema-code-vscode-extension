@@ -1,5 +1,6 @@
 use std::fs;
-use std::io;
+use std::fs::OpenOptions;
+use std::io::{self, ErrorKind, Write};
 use std::path::{Path, PathBuf};
 
 use crate::protocol::PetState;
@@ -34,8 +35,10 @@ pub fn seed_missing_defaults(assets_dir: &Path) -> io::Result<()> {
         PetState::Sleeping,
     ] {
         let path = state_asset_path(assets_dir, state);
-        if !path.exists() {
-            fs::write(path, default_asset_bytes(state))?;
+        match OpenOptions::new().write(true).create_new(true).open(&path) {
+            Ok(mut file) => file.write_all(default_asset_bytes(state))?,
+            Err(error) if error.kind() == ErrorKind::AlreadyExists => {}
+            Err(error) => return Err(error),
         }
     }
     Ok(())

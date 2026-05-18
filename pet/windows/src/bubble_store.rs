@@ -1,4 +1,9 @@
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+use serde::Deserialize;
+
+use crate::protocol::{SAY_DEFAULT_TTL_MS, SAY_MAX_CHARS, SAY_MAX_VISIBLE};
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "lowercase")]
 pub enum BubbleKind {
     #[default]
     Info,
@@ -37,7 +42,7 @@ impl BubbleStore {
             expires_at: if options.sticky {
                 None
             } else {
-                Some(now_ms.saturating_add(options.ttl_ms.unwrap_or(5000)))
+                Some(now_ms.saturating_add(options.ttl_ms.unwrap_or(SAY_DEFAULT_TTL_MS)))
             },
             sticky: options.sticky,
         });
@@ -58,26 +63,17 @@ impl BubbleStore {
     }
 
     fn trim_to_limit(&mut self) {
-        if self.items.len() <= 3 {
+        if self.items.len() <= SAY_MAX_VISIBLE {
             return;
         }
-        let drain_count = self.items.len() - 3;
+        let drain_count = self.items.len() - SAY_MAX_VISIBLE;
         self.items.drain(0..drain_count);
-    }
-}
-
-impl From<Option<String>> for BubbleKind {
-    fn from(value: Option<String>) -> Self {
-        match value.as_deref() {
-            Some("attention") => Self::Attention,
-            _ => Self::Info,
-        }
     }
 }
 
 fn truncate_text(text: &str) -> String {
     let mut chars = text.chars();
-    let truncated: String = chars.by_ref().take(40).collect();
+    let truncated: String = chars.by_ref().take(SAY_MAX_CHARS).collect();
     if chars.next().is_some() {
         format!("{truncated}...")
     } else {

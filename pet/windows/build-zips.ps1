@@ -1,7 +1,7 @@
 param(
   [string]$Target = "x86_64-pc-windows-msvc",
-  [switch]$StaticCrt,
-  [switch]$DynamicCrt
+  [ValidateSet("static", "dynamic")]
+  [string]$Crt = "static"
 )
 
 $ErrorActionPreference = "Stop"
@@ -20,7 +20,7 @@ $Arch = switch ($Target) {
 $StageDir = Join-Path $ScriptDir "target\package\sema-pet-win32-$Arch"
 $ZipPath = Join-Path $DistDir "sema-pet-win32-$Arch.zip"
 
-if ($DynamicCrt) {
+if ($Crt -eq "dynamic") {
   Remove-Item Env:\RUSTFLAGS -ErrorAction SilentlyContinue
 } else {
   $env:RUSTFLAGS = "-C target-feature=+crt-static"

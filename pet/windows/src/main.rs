@@ -8,9 +8,11 @@ use sema_pet_windows::bubble_window::BubbleWindow;
 use sema_pet_windows::focus_bridge::FocusBridge;
 use sema_pet_windows::hit_window::HitWindow;
 use sema_pet_windows::http_server::start_http_server;
+use sema_pet_windows::paths::PetPaths;
 use sema_pet_windows::render_window::RenderWindow;
 use sema_pet_windows::runtime::{RuntimeFile, RuntimeInfo};
 use sema_pet_windows::state_machine::StateMachine;
+use sema_pet_windows::win32::wide;
 use sema_pet_windows::window_coordinator::WindowCoordinator;
 use windows_sys::Win32::System::LibraryLoader::GetModuleHandleW;
 use windows_sys::Win32::UI::HiDpi::{
@@ -32,14 +34,15 @@ fn main() {
         let state_machine = Arc::new(Mutex::new(StateMachine::default()));
         let bubble_store = Arc::new(Mutex::new(BubbleStore::default()));
         let focus_bridge = Arc::new(FocusBridge::default());
-        let pet_home = pet_home_dir();
-        let _ = seed_missing_defaults(&pet_home.join("assets"));
+        let paths = PetPaths::current_user();
+        let assets_dir = paths.assets_dir();
+        let _ = seed_missing_defaults(&assets_dir);
         let mut coordinator = Box::new(WindowCoordinator::new(
             Arc::clone(&state_machine),
             Arc::clone(&bubble_store),
             Arc::clone(&focus_bridge),
-            pet_home.join("config.json"),
-            pet_home.join("assets"),
+            paths.config_file(),
+            assets_dir,
         ));
         let coordinator_ptr = coordinator.as_mut() as *mut WindowCoordinator;
         coordinator.create_windows(instance, coordinator_ptr);
@@ -57,7 +60,7 @@ fn main() {
                 }
             };
         let _runtime_file = RuntimeFile::write(
-            &pet_home.join("runtime.json"),
+            &paths.runtime_file(),
             RuntimeInfo {
                 port: sema_pet_windows::protocol::PET_PORT,
                 pid: std::process::id(),
@@ -72,16 +75,4 @@ fn main() {
             DispatchMessageW(&msg);
         }
     }
-}
-
-fn wide(value: &str) -> Vec<u16> {
-    value.encode_utf16().chain(std::iter::once(0)).collect()
-}
-
-fn pet_home_dir() -> std::path::PathBuf {
-    std::env::var_os("USERPROFILE")
-        .map(std::path::PathBuf::from)
-        .unwrap_or_else(std::env::temp_dir)
-        .join(".sema")
-        .join("pet")
 }

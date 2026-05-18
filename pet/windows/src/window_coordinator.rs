@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::ptr::null_mut;
 use std::sync::{Arc, Mutex};
 
@@ -14,6 +14,7 @@ use windows_sys::Win32::UI::WindowsAndMessaging::{
     WM_DRAWITEM, WM_LBUTTONDOWN, WM_LBUTTONUP, WM_MEASUREITEM, WM_MOUSEMOVE, WM_RBUTTONUP,
 };
 
+use crate::assets::state_asset_path;
 use crate::bubble_store::BubbleStore;
 use crate::bubble_window::BubbleWindow;
 use crate::config::PetConfig;
@@ -24,10 +25,12 @@ use crate::hit_window::HitWindow;
 use crate::process::is_process_alive;
 use crate::protocol::PetState;
 use crate::render_window::RenderWindow;
+use crate::state_machine::SessionSnapshot;
 use crate::state_machine::{now_ms, StateMachine};
 use crate::test_sprite::TestSprite;
 use crate::tray::{draw_menu_item, measure_menu_item, MenuAction, Tray};
 use crate::vscode_launcher::{launch_vscode_for_cwd, should_launch_vscode_for_focus_attempt};
+use crate::win32::wide;
 
 const SIZE: i32 = 128;
 const DRAG_THRESHOLD: i32 = 4;
@@ -57,6 +60,8 @@ pub struct WindowCoordinator {
     frames: HashMap<PetState, Vec<DecodedFrame>>,
     current_state: PetState,
     current_frame_index: usize,
+    last_bubbles: Vec<crate::bubble_store::BubbleItem>,
+    last_bubble_position: Option<(i32, i32)>,
 }
 
 impl WindowCoordinator {
@@ -85,6 +90,8 @@ impl WindowCoordinator {
             frames: HashMap::new(),
             current_state: PetState::Idle,
             current_frame_index: 0,
+            last_bubbles: Vec::new(),
+            last_bubble_position: None,
         }
     }
 
@@ -198,8 +205,17 @@ impl WindowCoordinator {
 
     pub unsafe fn on_bubbles_changed(&mut self) {
         let bubbles = self.bubble_store.lock().unwrap().visible(now_ms());
-        if let Some(bubble_window) = &self.bubble_window {
-            bubble_window.update(&bubbles, self.position.x, self.position.y);
+        let bubble_position = Some((self.position.x, self.position.y));
+        let should_update =
+            self.last_bubbles != bubbles || self.last_bubble_position != bubble_position;
+        if should_update {
+            self.last_bubbles = bubbles.clone();
+            self.last_bubble_position = bubble_position;
+        }
+        if should_update {
+            if let Some(bubble_window) = &self.bubble_window {
+                bubble_window.update(&bubbles, self.position.x, self.position.y);
+            }
         }
         if let Some(hit) = &self.hit_window {
             if bubbles.is_empty() {
@@ -335,28 +351,20 @@ impl WindowCoordinator {
             CombineRgn(region, region, rect_region, RGN_OR);
             DeleteObject(rect_region);
         }
-        SetWindowRgn(hwnd, region, 1);
+        if SetWindowRgn(hwnd, region, 1) == 0 {
+            DeleteObject(region);
+        }
     }
 
     unsafe fn focus_winner_or_show_probe(&self) {
         let snapshot = self.state_machine.lock().unwrap().snapshot(now_ms());
         if let Some(session_id) = snapshot.winner_session_id {
-            let cwd = snapshot
-                .sessions
-                .iter()
-                .find(|session| session.session_id == session_id)
-                .map(|session| session.cwd.clone());
-            let had_waiter = self.focus_bridge.enqueue_focus(session_id);
-            if should_launch_vscode_for_focus_attempt(had_waiter) {
-                if let Some(cwd) = cwd {
-                    let _ = launch_vscode_for_cwd(&cwd);
-                }
-            }
+            self.focus_session(session_id, &snapshot.sessions);
             return;
         }
 
         let title = wide("Sema Pet");
-        let text = wide("Windows pet Phase 2 probe: no registered session.");
+        let text = wide("No active Sema Pet session.");
         MessageBoxW(null_mut(), text.as_ptr(), title.as_ptr(), 0);
     }
 
@@ -372,16 +380,7 @@ impl WindowCoordinator {
             .sessions;
         match tray.show_menu(&sessions, point) {
             Some(MenuAction::FocusSession(session_id)) => {
-                let cwd = sessions
-                    .iter()
-                    .find(|session| session.session_id == session_id)
-                    .map(|session| session.cwd.clone());
-                let had_waiter = self.focus_bridge.enqueue_focus(session_id);
-                if should_launch_vscode_for_focus_attempt(had_waiter) {
-                    if let Some(cwd) = cwd {
-                        let _ = launch_vscode_for_cwd(&cwd);
-                    }
-                }
+                self.focus_session(session_id, &sessions);
             }
             Some(MenuAction::Quit) => {
                 PostQuitMessage(0);
@@ -394,6 +393,19 @@ impl WindowCoordinator {
         let config = PetConfig::load(&self.config_path)
             .with_window_position(self.position.x, self.position.y);
         let _ = config.save(&self.config_path);
+    }
+
+    fn focus_session(&self, session_id: String, sessions: &[SessionSnapshot]) {
+        let cwd = sessions
+            .iter()
+            .find(|session| session.session_id == session_id)
+            .map(|session| session.cwd.clone());
+        let had_waiter = self.focus_bridge.enqueue_focus(session_id);
+        if should_launch_vscode_for_focus_attempt(had_waiter) {
+            if let Some(cwd) = cwd {
+                let _ = launch_vscode_for_cwd(&cwd);
+            }
+        }
     }
 
     unsafe fn restart_animation_timer(&mut self, state: PetState) {
@@ -431,16 +443,6 @@ impl WindowCoordinator {
         self.frames.insert(state, frames);
         self.frames.get(&state).unwrap()
     }
-}
-
-fn state_asset_path(assets_dir: &Path, state: PetState) -> PathBuf {
-    assets_dir.join(match state {
-        PetState::Idle => "idle.gif",
-        PetState::Thinking => "thinking.gif",
-        PetState::Working => "working.gif",
-        PetState::Attention => "attention.gif",
-        PetState::Sleeping => "sleeping.gif",
-    })
 }
 
 fn test_frame_for_state(state: PetState) -> DecodedFrame {
@@ -565,8 +567,4 @@ unsafe fn cursor_point_from_lparam(hwnd: HWND, lparam: isize) -> POINT {
     let mut point = POINT { x, y };
     ClientToScreen(hwnd, &mut point);
     point
-}
-
-fn wide(value: &str) -> Vec<u16> {
-    value.encode_utf16().chain(std::iter::once(0)).collect()
 }

@@ -21,6 +21,7 @@ use windows_sys::Win32::UI::WindowsAndMessaging::{
 
 use crate::protocol::PetState;
 use crate::state_machine::SessionSnapshot;
+use crate::win32::wide;
 use crate::window_messages::WM_APP_TRAY_CALLBACK;
 
 const TRAY_UID: u32 = 1;
@@ -410,8 +411,4 @@ fn state_label(state: PetState) -> &'static str {
         PetState::Attention => "attention",
         PetState::Sleeping => "sleeping",
     }
-}
-
-fn wide(value: &str) -> Vec<u16> {
-    value.encode_utf16().chain(std::iter::once(0)).collect()
 }

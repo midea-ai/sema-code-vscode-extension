@@ -1,5 +1,4 @@
 use std::mem::zeroed;
-use std::os::windows::ffi::OsStrExt;
 use std::path::Path;
 use std::ptr::null_mut;
 
@@ -9,6 +8,8 @@ use windows_sys::Win32::Graphics::GdiPlus::{
     GdipImageGetFrameCount, GdipImageSelectActiveFrame, GdiplusShutdown, GdiplusStartup,
     GdiplusStartupInput, ImageLockModeRead, Rect,
 };
+
+use crate::win32::wide_path;
 
 const OK: i32 = 0;
 const PIXEL_FORMAT_32BPP_PARGB: i32 = 0x000e200b;
@@ -197,11 +198,4 @@ impl Drop for GdiPlusSession {
             GdiplusShutdown(self.token);
         }
     }
-}
-
-fn wide_path(path: &Path) -> Vec<u16> {
-    path.as_os_str()
-        .encode_wide()
-        .chain(std::iter::once(0))
-        .collect()
 }

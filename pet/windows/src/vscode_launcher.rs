@@ -10,16 +10,10 @@ const CREATE_NO_WINDOW: u32 = 0x08000000;
 
 pub fn launch_vscode_for_cwd(cwd: &str) -> bool {
     let cwd_path = Path::new(cwd);
-    if !cwd_path.exists() {
-        return false;
-    }
 
     let local_app_data = env::var_os("LOCALAPPDATA").map(PathBuf::from);
     let path_env = env::var_os("PATH").and_then(|value| value.into_string().ok());
     for candidate in vscode_launch_candidates(local_app_data.as_deref(), path_env.as_deref()) {
-        if !candidate.exists() {
-            continue;
-        }
         let mut command = Command::new(&candidate);
         command.arg(cwd_path);
         #[cfg(windows)]

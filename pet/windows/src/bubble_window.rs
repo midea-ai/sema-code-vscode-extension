@@ -1,8 +1,8 @@
 use std::ffi::c_void;
 use std::mem::{size_of, zeroed};
-use std::ptr::{null, null_mut};
+use std::ptr::null_mut;
 
-use windows_sys::Win32::Foundation::{HINSTANCE, HWND, POINT, RECT, SIZE};
+use windows_sys::Win32::Foundation::{HINSTANCE, HWND, RECT};
 use windows_sys::Win32::Graphics::Gdi::{
     CreateCompatibleDC, CreateDIBSection, CreateFontW, DeleteDC, DeleteObject, DrawTextW,
     SelectObject, SetBkMode, SetTextColor, BITMAPINFO, BITMAPINFOHEADER, BI_RGB, DIB_RGB_COLORS,
@@ -10,12 +10,13 @@ use windows_sys::Win32::Graphics::Gdi::{
 };
 use windows_sys::Win32::UI::WindowsAndMessaging::{
     CreateWindowExW, DefWindowProcW, LoadCursorW, RegisterClassW, SetWindowPos, ShowWindow,
-    UpdateLayeredWindow, CREATESTRUCTW, GWLP_USERDATA, HTTRANSPARENT, IDC_ARROW, SWP_NOACTIVATE,
-    SWP_NOZORDER, SW_HIDE, SW_SHOW, ULW_ALPHA, WM_NCCREATE, WM_NCHITTEST, WNDCLASSW, WS_EX_LAYERED,
-    WS_EX_TOOLWINDOW, WS_EX_TOPMOST, WS_EX_TRANSPARENT, WS_POPUP,
+    CREATESTRUCTW, GWLP_USERDATA, HTTRANSPARENT, IDC_ARROW, SWP_NOACTIVATE, SWP_NOZORDER, SW_HIDE,
+    SW_SHOW, WM_NCCREATE, WM_NCHITTEST, WNDCLASSW, WS_EX_LAYERED, WS_EX_TOOLWINDOW, WS_EX_TOPMOST,
+    WS_EX_TRANSPARENT, WS_POPUP,
 };
 
 use crate::bubble_store::{BubbleItem, BubbleKind};
+use crate::win32::wide;
 use crate::window_coordinator::WindowCoordinator;
 
 pub const BUBBLE_WIDTH: i32 = 240;
@@ -89,7 +90,7 @@ impl BubbleWindow {
         let x = pet_x + (PET_LOGICAL_SIZE - bitmap.width) / 2;
         let y = pet_y - bitmap.height - BUBBLE_ANCHOR_GAP;
         self.move_to(x, y, bitmap.width, bitmap.height);
-        update_layered_bitmap(self.hwnd, bitmap.width, bitmap.height, &bitmap.bgra);
+        crate::layered_bitmap::update(self.hwnd, bitmap.width, bitmap.height, &bitmap.bgra);
         ShowWindow(self.hwnd, SW_SHOW);
     }
 
@@ -171,7 +172,14 @@ fn estimate_text_width(text: &str) -> i32 {
 
 unsafe fn draw_bubble_text(bgra: &mut [u8], width: i32, height: i32, bubbles: &[BubbleItem]) {
     let screen_dc = windows_sys::Win32::Graphics::Gdi::GetDC(null_mut());
+    if screen_dc.is_null() {
+        return;
+    }
     let memory_dc = CreateCompatibleDC(screen_dc);
+    if memory_dc.is_null() {
+        windows_sys::Win32::Graphics::Gdi::ReleaseDC(null_mut(), screen_dc);
+        return;
+    }
     let mut bits: *mut c_void = null_mut();
     let bitmap_info = BITMAPINFO {
         bmiHeader: BITMAPINFOHEADER {
@@ -217,6 +225,13 @@ unsafe fn draw_bubble_text(bgra: &mut [u8], width: i32, height: i32, bubbles: &[
         0,
         wide("Segoe UI").as_ptr(),
     );
+    if font.is_null() {
+        SelectObject(memory_dc, old_bitmap);
+        DeleteObject(bitmap);
+        DeleteDC(memory_dc);
+        windows_sys::Win32::Graphics::Gdi::ReleaseDC(null_mut(), screen_dc);
+        return;
+    }
     let old_font = SelectObject(memory_dc, font);
     SetBkMode(memory_dc, TRANSPARENT as i32);
     SetTextColor(memory_dc, 0x00ffffff);
@@ -243,63 +258,6 @@ unsafe fn draw_bubble_text(bgra: &mut [u8], width: i32, height: i32, bubbles: &[
     SelectObject(memory_dc, old_font);
     SelectObject(memory_dc, old_bitmap);
     DeleteObject(font);
-    DeleteObject(bitmap);
-    DeleteDC(memory_dc);
-    windows_sys::Win32::Graphics::Gdi::ReleaseDC(null_mut(), screen_dc);
-}
-
-unsafe fn update_layered_bitmap(hwnd: HWND, width: i32, height: i32, bgra: &[u8]) {
-    let screen_dc = windows_sys::Win32::Graphics::Gdi::GetDC(null_mut());
-    let memory_dc = CreateCompatibleDC(screen_dc);
-    let mut bits: *mut c_void = null_mut();
-    let bitmap_info = BITMAPINFO {
-        bmiHeader: BITMAPINFOHEADER {
-            biSize: size_of::<BITMAPINFOHEADER>() as u32,
-            biWidth: width,
-            biHeight: -height,
-            biPlanes: 1,
-            biBitCount: 32,
-            biCompression: BI_RGB,
-            ..zeroed()
-        },
-        ..zeroed()
-    };
-    let bitmap = CreateDIBSection(
-        memory_dc,
-        &bitmap_info,
-        DIB_RGB_COLORS,
-        &mut bits,
-        null_mut(),
-        0,
-    );
-    std::ptr::copy_nonoverlapping(bgra.as_ptr(), bits as *mut u8, bgra.len());
-    let old_bitmap = SelectObject(memory_dc, bitmap);
-
-    let src = POINT { x: 0, y: 0 };
-    let size = SIZE {
-        cx: width,
-        cy: height,
-    };
-    let blend = windows_sys::Win32::Graphics::Gdi::BLENDFUNCTION {
-        BlendOp: windows_sys::Win32::Graphics::Gdi::AC_SRC_OVER as u8,
-        BlendFlags: 0,
-        SourceConstantAlpha: 255,
-        AlphaFormat: windows_sys::Win32::Graphics::Gdi::AC_SRC_ALPHA as u8,
-    };
-
-    UpdateLayeredWindow(
-        hwnd,
-        screen_dc,
-        null(),
-        &size,
-        memory_dc,
-        &src,
-        0,
-        &blend,
-        ULW_ALPHA,
-    );
-
-    SelectObject(memory_dc, old_bitmap);
     DeleteObject(bitmap);
     DeleteDC(memory_dc);
     windows_sys::Win32::Graphics::Gdi::ReleaseDC(null_mut(), screen_dc);
@@ -367,8 +325,4 @@ unsafe extern "system" fn bubble_wnd_proc(
     }
 
     DefWindowProcW(hwnd, msg, wparam, lparam)
-}
-
-fn wide(value: &str) -> Vec<u16> {
-    value.encode_utf16().chain(std::iter::once(0)).collect()
 }
