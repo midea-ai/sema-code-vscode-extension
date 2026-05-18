@@ -15,7 +15,7 @@ import { SemaSessionWrapper, SessionWrapperCallbacks, Message } from './semaSess
 import { TOOL_NAME_VIEW_FILE } from '../utils/tool';
 import { pet } from '../pet/pet-client';
 import { ensurePetRunning, killPet } from '../pet/pet-launcher';
-import { wirePetEvents } from '../pet/pet-events';
+import { wirePetEvents, setPetSessionState } from '../pet/pet-events';
 
 /** chatWebview 用于驱动会话生命周期的控制接口 */
 export interface SessionController {
@@ -43,7 +43,8 @@ export class SemaSidebarProvider implements vscode.WebviewViewProvider {
     private systemConfigManager: SystemConfigManager;
 
     private saveSessionTimers: Map<string, NodeJS.Timeout> = new Map();
-    private petUnwire: (() => void) | null = null;
+    /** 每个会话的桌宠事件解绑函数。桌宠监听所有会话，而非仅当前活跃会话。 */
+    private petUnwires: Map<string, () => void> = new Map();
 
     constructor(private readonly context: vscode.ExtensionContext) {
         const workspaceFolders = vscode.workspace.workspaceFolders;
@@ -137,8 +138,8 @@ export class SemaSidebarProvider implements vscode.WebviewViewProvider {
             onOpenAgentDetail: (sessionId, taskId) => {
                 this.chatWebviewProvider.postMessage({ type: 'openAgentDetail', sessionId, taskId });
             },
-            onUserResponded: () => {
-                if (this.isPetEnabled()) pet.state('working');
+            onUserResponded: (sessionId) => {
+                if (this.isPetEnabled()) setPetSessionState(sessionId, 'working');
             },
             onTitleUpdate: this.handleTitleUpdate,
         };
@@ -197,7 +198,7 @@ export class SemaSidebarProvider implements vscode.WebviewViewProvider {
                 title: wrapper.title || '新会话',
             });
 
-            this.rewirePetForActive();
+            this.wirePetForSession(wrapper.sessionId);
             this.sessionHistoryWebviewProvider?.refreshSessionList();
             return { ok: true };
         } catch (error) {
@@ -212,7 +213,7 @@ export class SemaSidebarProvider implements vscode.WebviewViewProvider {
         if (!this.sessions.has(sessionId)) return;
         this.activeSessionId = sessionId;
         this.processWrapper.setActiveSession(sessionId);
-        this.rewirePetForActive();
+        // 桌宠监听所有会话，切换活跃会话无需重新绑定。
     }
 
     public async closeSession(sessionId: string): Promise<void> {
@@ -247,7 +248,7 @@ export class SemaSidebarProvider implements vscode.WebviewViewProvider {
             nextActiveId: this.activeSessionId,
         });
 
-        this.rewirePetForActive();
+        this.unwirePetForSession(sessionId);
         this.sessionHistoryWebviewProvider?.refreshSessionList();
     }
 
@@ -288,15 +289,32 @@ export class SemaSidebarProvider implements vscode.WebviewViewProvider {
         return !!cfg.enablePet;
     }
 
-    /** 把桌宠事件订阅切到当前 active 会话 */
-    private rewirePetForActive(): void {
+    /** 给指定会话挂载桌宠事件（桌宠监听所有会话）。 */
+    private wirePetForSession(sessionId: string): void {
         if (!this.isPetEnabled()) return;
-        this.petUnwire?.();
-        this.petUnwire = null;
-        if (!this.activeSessionId) return;
-        const session = this.processWrapper.getSession(this.activeSessionId);
+        if (this.petUnwires.has(sessionId)) return;
+        const session = this.processWrapper.getSession(sessionId);
         if (session) {
-            this.petUnwire = wirePetEvents(session);
+            this.petUnwires.set(sessionId, wirePetEvents(sessionId, session));
+        }
+    }
+
+    /** 解绑指定会话的桌宠事件。 */
+    private unwirePetForSession(sessionId: string): void {
+        const unwire = this.petUnwires.get(sessionId);
+        if (unwire) {
+            unwire();
+            this.petUnwires.delete(sessionId);
+        }
+    }
+
+    /** 解绑全部会话，再按当前桌宠开关重新挂载所有会话。 */
+    private rewireAllPetEvents(): void {
+        for (const unwire of this.petUnwires.values()) unwire();
+        this.petUnwires.clear();
+        if (!this.isPetEnabled()) return;
+        for (const sessionId of this.sessions.keys()) {
+            this.wirePetForSession(sessionId);
         }
     }
 
@@ -307,7 +325,7 @@ export class SemaSidebarProvider implements vscode.WebviewViewProvider {
                 vscode.window.setStatusBarMessage('Sema Pet: 启动失败（解压失败 / 端口被占？）', 5000);
                 return;
             }
-            this.rewirePetForActive();
+            this.rewireAllPetEvents();
             const registered = await pet.register(this.workingDir);
             if (!registered) {
                 vscode.window.setStatusBarMessage('Sema Pet: 注册会话失败，桌宠不会显示当前项目', 5000);
@@ -323,8 +341,8 @@ export class SemaSidebarProvider implements vscode.WebviewViewProvider {
 
     public async stopPet(): Promise<void> {
         try {
-            this.petUnwire?.();
-            this.petUnwire = null;
+            for (const unwire of this.petUnwires.values()) unwire();
+            this.petUnwires.clear();
             await pet.dispose();
             killPet();
             vscode.window.setStatusBarMessage('Sema Pet 已关闭', 3000);
@@ -334,7 +352,7 @@ export class SemaSidebarProvider implements vscode.WebviewViewProvider {
     }
 
     public rewirePetEventsIfEnabled(): void {
-        this.rewirePetForActive();
+        this.rewireAllPetEvents();
     }
 
     // ─── 会话事件 handlers ────────────────────────────────────────────────────
@@ -463,8 +481,8 @@ export class SemaSidebarProvider implements vscode.WebviewViewProvider {
             clearTimeout(timer);
         }
         this.saveSessionTimers.clear();
-        this.petUnwire?.();
-        this.petUnwire = null;
+        for (const unwire of this.petUnwires.values()) unwire();
+        this.petUnwires.clear();
         for (const wrapper of this.sessions.values()) {
             wrapper.dispose();
         }
