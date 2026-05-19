@@ -3,7 +3,7 @@
 跟 `src/pet/` 扩展端配套的原生桌宠进程。
 
 - macOS：Swift + AppKit，见 `pet/macos/`
-- Windows：计划中，见 `pet/windows/`
+- Windows：Rust + windows-sys + Win32 API，见 `pet/windows/`
 
 桌宠和扩展是两个进程，通过 `127.0.0.1:24700` 通信。扩展激活时按 `runtime.json` → `/health` 探活 → spawn 本地二进制的顺序找桌宠。
 
@@ -28,16 +28,55 @@ SemaPet/
 └── Tray.swift          # 状态栏 🐾 菜单：会话列表、切换会话、退出
 ```
 
+Windows 端是 Rust crate，源码全在 `pet/windows/src/`：
+
+```
+src/
+├── main.rs             # 进程入口，初始化各组件并启动消息循环
+├── lib.rs              # crate 根，导出所有公开模块
+├── protocol.rs         # 通信数据模型：PetState 枚举、各请求 payload、常量
+├── state_machine.rs    # 多会话状态机，按 priority 合并算出桌宠当前显示状态
+├── http_server.rs      # 本地 HTTP 服务，监听 24700，路由 /health /session/* /state /say /command
+├── focus_bridge.rs     # /command 长轮询的 waiter 队列，挂起连接直到有指令或超时
+├── runtime.rs          # 读写 runtime.json（port/pid），供扩展探活定位桌宠
+├── config.rs           # config.json 读写，目前仅存 windowPosition
+├── paths.rs            # ~/.sema/pet 下各路径常量与目录创建
+├── assets.rs           # GIF 资源加载，用户目录优先 fallback 内嵌资源，带缓存
+├── gif_decoder.rs      # GIF 解码器，处理动画帧
+├── render_window.rs    # 承载桌宠的无边框浮动窗口（Layered Window）
+├── hit_window.rs       # 透明命中测试窗口，捕获鼠标点击
+├── hit_region.rs       # 命中测试区域管理，支持不规则形状
+├── bubble_window.rs    # 气泡窗口，/say 消息显示，最多 3 条跟随桌宠
+├── bubble_store.rs     # 气泡消息存储，管理气泡生命周期
+├── layered_bitmap.rs   # 分层位图渲染，支持 Alpha 通道混合
+├── tray.rs             # 系统托盘图标和菜单：会话列表、切换会话、退出
+├── window_coordinator.rs # 窗口协调器，管理多个窗口的显示、位置和交互
+├── window_messages.rs  # 自定义窗口消息常量，用于窗口间通信
+├── process.rs          # 进程管理，检测进程存活
+├── vscode_launcher.rs  # VS Code 启动器，从桌宠启动 VS Code 实例
+├── win32.rs            # Win32 API 封装（字符串转换等）
+└── test_sprite.rs      # 开发测试用精灵，正式版未使用
+```
+
 ## 构建
 
-要求：macOS 12+，Swift 5.7+。
+macOS 要求：macOS 12+，Swift 5.7+。
 
 ```sh
 cd pet/macos
 swift build -c release          # 产物：.build/release/SemaPet
 ```
 
+Windows 要求：MSVC Rust toolchain。
+
+```powershell
+cd pet/windows
+cargo build --release           # 产物：target\release\SemaPet.exe
+```
+
 ## 本地调试
+
+### macOS
 
 构建产物已经在 `.build/release/SemaPet`，直接跑：
 
@@ -50,6 +89,16 @@ cd pet/macos
 
 确认启动正常：
 - 右下角浮窗桌宠 + 状态栏 🐾 【直观可见】
+
+### Windows
+
+```powershell
+cd pet/windows
+cargo run
+```
+
+确认启动正常：
+- 桌面浮窗 + 系统托盘图标【直观可见】
 
 ### 协议手测
 
@@ -92,25 +141,32 @@ curl -s -X POST http://127.0.0.1:24700/session/unregister \
 
 最后一个 session 注销后桌宠自动退出。
 
+> Windows 端额外通过 `clientPid` 做 stale session 清理：VS Code 崩溃/强杀后未正常 unregister 的孤儿 session 会被定期 sweep 清理。
+
 ### 扩展并连本地桌宠
 
 F5 启动 Extension Development Host → 在 Sema Code 侧栏 → 配置 → 系统配置 → 基础设置勾选「启用桌宠」。
 
-- 本地已经跑了 SemaPet（`./.build/release/SemaPet`）→ launcher `ping /health` 通，直接复用，不会触发解压
-- 本地没跑 → launcher 从扩展的 `dist/pet/sema-pet-darwin-<arch>.zip` 解压到 `~/.sema/pet/bin/<arch>/SemaPet` → spawn
+- 本地已经跑了 SemaPet（macOS `./.build/release/SemaPet`，Windows `SemaPet.exe`）→ launcher `ping /health` 通，直接复用，不会触发解压
+- 本地没跑 → launcher 从扩展的 `dist/pet/sema-pet-<platform>-<arch>.zip` 解压到 `~/.sema/pet/bin/<platform>-<arch>/` → spawn
 - 想测解压路径，先 `rm -rf ~/.sema/pet/bin/` 再勾选
 
 > 桌宠开关状态存在 VS Code 的 globalState 里，不在 `~/.sema/pet/config.json`（旧设计已废弃，该文件现仅留 `windowPosition` 供桌宠自身记录）。
 
 ## 美术资源
 
-加载顺序：`~/.sema/pet/assets/<state>.gif` 存在就用用户文件，否则 fallback 到 bundle 内嵌资源。
+加载顺序：`~/.sema/pet/assets/<state>.gif` 存在就用用户文件，否则 fallback 到内嵌默认资源。macOS 默认资源维护在 `pet/macos/Assets/` 并打进 bundle；Windows 默认资源维护在 `pet/windows/Assets/`，编译进 `SemaPet.exe` 并在启动时 seed 到用户 assets 目录。
 
 覆盖同名文件即可热替换，下次状态切换生效，无需重启。想跑一遍干净流程：
 
 ```sh
+# macOS
 rm -rf ~/.sema/pet/assets
 ./.build/release/SemaPet        # 启动会 seed 默认资源
+
+# Windows
+Remove-Item -Recurse -Force ~\.sema\pet\assets
+cargo run                        # 启动会 seed 默认资源
 ```
 
 ## 常见问题
@@ -154,6 +210,22 @@ codesign -dv SemaPet 2>&1 | grep Signature    # Signature=adhoc
 
 ### Windows
 
-暂未实现。扩展 UI 端已自动禁用开关，不需要产物。规划见 `pet/windows/`。
+一键打 x64 zip：
 
-预留命名：`sema-pet-win32-x64.zip`。
+```powershell
+npm run pet:build
+```
+
+分架构构建：
+
+```powershell
+npm run pet:build:x64
+npm run pet:build:arm64
+```
+
+| 架构 | Rust target | 产物路径 |
+|---|---|---|
+| x64 | `x86_64-pc-windows-msvc` | `dist/pet/sema-pet-win32-x64.zip` |
+| arm64 | `aarch64-pc-windows-msvc` | `dist/pet/sema-pet-win32-arm64.zip` |
+
+zip 只包含 `SemaPet.exe`。`pet/windows/build-zips.ps1` 默认静态链接 CRT。

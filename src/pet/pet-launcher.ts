@@ -44,10 +44,10 @@ export function killPet(): void {
  *   2. 本地无二进制 或 bundled zip 指纹与已安装不一致（升级）→ 从扩展内置 zip 解压
  *   3. spawn 二进制 → ping 等待就绪
  *
- * 桌宠当前仅支持 macOS，其他平台直接返回 false（UI 端已禁用开关）。
+ * 桌宠当前仅支持 macOS / Windows，其他平台直接返回 false（UI 端已禁用开关）。
  */
 export async function ensurePetRunning(extensionPath: string): Promise<boolean> {
-  if (process.platform !== 'darwin') return false;
+  if (process.platform !== 'darwin' && process.platform !== 'win32') return false;
   if (await ping()) return true;
 
   const bundledZip = path.join(extensionPath, 'dist', 'pet', ZIP_NAME);
@@ -65,7 +65,8 @@ function readInstalledMeta(): InstalledMeta | null {
 }
 
 function needsInstall(bundledZip: string): boolean {
-  if (!fs.existsSync(BIN_PATH) || !fs.existsSync(RESOURCE_BUNDLE_PATH)) return true;
+  if (!fs.existsSync(BIN_PATH)) return true;
+  if (process.platform === 'darwin' && !fs.existsSync(RESOURCE_BUNDLE_PATH)) return true;
   let stat: fs.Stats;
   try { stat = fs.statSync(bundledZip); } catch { return false; }
   const meta = readInstalledMeta();
@@ -118,6 +119,7 @@ async function spawnBinary(): Promise<boolean> {
   const child = spawn(BIN_PATH, [], {
     detached: true,
     stdio: 'ignore',
+    windowsHide: true,
     env: { ...process.env, SEMA_PET_PORT: String(PET_PORT) },
   });
   child.unref();

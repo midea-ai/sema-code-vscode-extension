@@ -11,6 +11,7 @@ export type PetState = 'idle' | 'thinking' | 'working' | 'attention' | 'sleeping
 export interface RegisterPayload {
   sessionId: string;
   cwd: string;
+  clientPid?: number;
 }
 
 export interface UnregisterPayload {
