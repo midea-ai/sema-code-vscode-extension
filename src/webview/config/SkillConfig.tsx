@@ -426,7 +426,8 @@ const SkillConfig: React.FC<SkillConfigProps> = ({ vscode }) => {
                     <div className="section-groups">
                         {LOCATE_ORDER.map(scope => {
                             const sectionSkills = groupedSkills[scope] || [];
-                            if (sectionSkills.length === 0) return null;
+                            // 项目级 / 用户级 始终显示；插件级为空时隐藏
+                            if (sectionSkills.length === 0 && scope === 'plugin') return null;
 
                             const isCollapsed = collapsedSections.has(scope);
                             const toggleCollapse = () => setCollapsedSections(prev => {
@@ -462,9 +463,6 @@ const SkillConfig: React.FC<SkillConfigProps> = ({ vscode }) => {
                                 </div>
                             );
                         })}
-                        {LOCATE_ORDER.every(s => (groupedSkills[s] || []).length === 0) && (
-                            <div className="section-empty">暂无 Skill</div>
-                        )}
                     </div>
                 ) : null}
             </div>

@@ -257,7 +257,8 @@ const CommandConfig: React.FC<CommandConfigProps> = ({ vscode }) => {
                     <div className="section-groups">
                         {ALL_SECTIONS.map(scope => {
                             const sectionCommands = groupedCommands[scope] || [];
-                            if (sectionCommands.length === 0) return null;
+                            // 项目级 / 用户级 始终显示；插件级为空时隐藏
+                            if (sectionCommands.length === 0 && scope === 'plugin') return null;
 
                             const isCollapsed = collapsedSections.has(scope);
                             const toggleCollapse = () => setCollapsedSections(prev => {
@@ -293,9 +294,6 @@ const CommandConfig: React.FC<CommandConfigProps> = ({ vscode }) => {
                                 </div>
                             );
                         })}
-                        {ALL_SECTIONS.every(s => (groupedCommands[s] || []).length === 0) && (
-                            <div className="section-empty">暂无 Command</div>
-                        )}
                     </div>
                 ) : null}
             </div>

@@ -344,7 +344,8 @@ const AgentConfig: React.FC<AgentConfigProps> = ({ vscode }) => {
                     <div className="section-groups">
                         {ALL_SECTIONS.map(scope => {
                             const sectionAgents = groupedAgents[scope] || [];
-                            if (sectionAgents.length === 0) return null;
+                            // 项目级 / 用户级 始终显示；内置、插件级为空时隐藏
+                            if (sectionAgents.length === 0 && scope !== 'project' && scope !== 'user') return null;
 
                             const isCollapsed = collapsedSections.has(scope);
                             const toggleCollapse = () => setCollapsedSections(prev => {

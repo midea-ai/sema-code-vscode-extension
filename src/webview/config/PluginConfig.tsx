@@ -517,6 +517,12 @@ const PluginConfig: React.FC<PluginConfigProps> = ({ vscode }) => {
         return groups;
     }, [data.plugins]);
 
+    // 已安装 Tab 统计：仅统计状态已开启的插件
+    const enabledPluginCount = useMemo(
+        () => data.plugins.filter(p => p.status).length,
+        [data.plugins]
+    );
+
     useEffect(() => {
         const handleMessage = (event: MessageEvent) => {
             const message = event.data;
@@ -672,8 +678,8 @@ const PluginConfig: React.FC<PluginConfigProps> = ({ vscode }) => {
                     onClick={() => setActiveTab('installed')}
                 >
                     已安装
-                    {data.plugins.length > 0 && (
-                        <span className="section-tab-count">{data.plugins.length}</span>
+                    {enabledPluginCount > 0 && (
+                        <span className="section-tab-count">{enabledPluginCount}</span>
                     )}
                 </div>
                 <div
