@@ -7,6 +7,27 @@
 
 桌宠和扩展是两个进程，通过 `127.0.0.1:24700` 通信。扩展激活时按 `runtime.json` → `/health` 探活 → spawn 本地二进制的顺序找桌宠。
 
+## 源码结构
+
+macOS 端是 Swift Package，源码全在 `pet/macos/Sources/SemaPet/`：
+
+```
+SemaPet/
+├── App.swift           # 进程入口（@main），AppDelegate 装配并连线所有组件
+├── Protocol.swift      # 通信数据模型：PetState 枚举、各请求 payload、PetConstants 常量
+├── StateMachine.swift  # 多会话状态机，按 priority 合并算出桌宠当前显示状态
+├── HttpServer.swift    # 本地 HTTP 服务，监听 24700，路由 /health /session/* /state /say /command
+├── FocusBridge.swift   # /command 长轮询的 waiter 队列，挂起连接直到有指令或超时
+├── Runtime.swift       # 读写 runtime.json（port/pid），供扩展探活定位桌宠
+├── Config.swift        # config.json 读写，目前仅存 windowPosition
+├── Paths.swift         # ~/.sema/pet 下各路径常量与目录创建
+├── Assets.swift        # GIF 资源加载，用户目录优先 fallback 内嵌资源，带缓存
+├── PetWindow.swift     # 承载桌宠的无边框浮动 NSPanel，恢复/校验窗口位置
+├── PetView.swift       # 桌宠视图：GIF 显示、拖拽、点击、alpha 命中测试、右键菜单
+├── BubblePanel.swift   # 顶部气泡面板，/say 消息落这里，最多 3 条跟随桌宠
+└── Tray.swift          # 状态栏 🐾 菜单：会话列表、切换会话、退出
+```
+
 ## 构建
 
 macOS 要求：macOS 12+，Swift 5.7+。
