@@ -43,7 +43,7 @@ package_platform() {
     rm -rf ripgrep-*
   fi
 
-  # 桌宠 zip：清空 dist/pet/，只放当前平台那一份（linux 无桌宠，留空）
+  # 桌宠 zip：清空 dist/pet/，只放当前平台那一份
   rm -f "$PET_DIR"/*.zip
   local PET_ZIP="sema-pet-${TARGET}.zip"
   if [[ -f "$PET_STASH/$PET_ZIP" ]]; then

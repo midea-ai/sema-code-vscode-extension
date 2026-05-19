@@ -8,6 +8,7 @@
 //
 // macOS：swift toolchain 自带 x86_64 target，一台 Apple Silicon 即可出两架构。
 // Windows：'all' 仅打 x64；arm64 需显式指定。
+// Linux：仅 x64；GTK 动态链接系统库，走 host glibc target，不能 musl 静态编译。
 // 跨平台拉取全部平台 zip 用 pet/fetch-zips.js（npm run pet:fetch）。
 
 const { spawnSync } = require('child_process');
@@ -100,6 +101,37 @@ function buildWindows(arch) {
   console.log(`✓ dist/pet/${zipName}`);
 }
 
+// ---------- Linux ----------
+function buildLinux(arch) {
+  if (arch !== 'x64') {
+    console.error(`Linux 桌宠目前仅支持 x64，收到: ${arch}`);
+    process.exit(1);
+  }
+  const AdmZip = require('adm-zip');
+  // GTK 动态链接系统库，不能 musl 静态编译；显式指定 glibc target 避免歧义。
+  const rustTarget = 'x86_64-unknown-linux-gnu';
+  const linuxDir = path.join(repoRoot, 'pet', 'linux');
+  const exePath = path.join(linuxDir, 'target', rustTarget, 'release', 'SemaPet');
+  const zipName = `sema-pet-linux-${arch}.zip`;
+
+  console.log(`▶︎ building ${zipName}`);
+  run('cargo', ['build', '--release', '--target', rustTarget], { cwd: linuxDir });
+
+  if (!fs.existsSync(exePath)) {
+    console.error(`未找到构建产物: ${exePath}`);
+    process.exit(1);
+  }
+
+  // 单文件 ELF，adm-zip 安全；放在 zip 根，名为 SemaPet。
+  // 不保留可执行位无妨，扩展端 launcher 解压后会 chmod +x。
+  const zipPath = path.join(distPetDir, zipName);
+  fs.rmSync(zipPath, { force: true });
+  const zip = new AdmZip();
+  zip.addLocalFile(exePath);
+  zip.writeZip(zipPath);
+  console.log(`✓ dist/pet/${zipName}`);
+}
+
 const requested = normalizeTarget(process.argv[2] || 'all');
 
 fs.mkdirSync(distPetDir, { recursive: true });
@@ -110,8 +142,11 @@ if (process.platform === 'darwin') {
 } else if (process.platform === 'win32') {
   const arches = requested === 'all' ? ['x64'] : [requested];
   for (const arch of arches) buildWindows(arch);
+} else if (process.platform === 'linux') {
+  const arches = requested === 'all' ? ['x64'] : [requested];
+  for (const arch of arches) buildLinux(arch);
 } else {
-  console.error(`桌宠构建仅支持 macOS 和 Windows，当前平台: ${process.platform}`);
+  console.error(`桌宠构建仅支持 macOS、Windows 和 Linux，当前平台: ${process.platform}`);
   process.exit(1);
 }
 

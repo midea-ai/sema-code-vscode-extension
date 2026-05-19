@@ -20,6 +20,7 @@ const ZIPS = [
   'sema-pet-darwin-arm64.zip',
   'sema-pet-darwin-x64.zip',
   'sema-pet-win32-x64.zip',
+  'sema-pet-linux-x64.zip',
 ];
 
 function download(url, dest) {
@@ -62,7 +63,7 @@ async function main() {
     await download(`${RELEASE_BASE}/${name}`, path.join(distPetDir, name));
     console.log('✓');
   }
-  console.log('✅ 完成。3 个桌宠 zip 已落 dist/pet/，下一步 npm run compile');
+  console.log(`✅ 完成。${ZIPS.length} 个桌宠 zip 已落 dist/pet/，下一步 npm run compile`);
 }
 
 main().catch((err) => {

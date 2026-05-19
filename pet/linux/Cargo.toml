@@ -1,0 +1,32 @@
+[package]
+name = "sema-pet-linux"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "SemaPet"
+path = "src/main.rs"
+
+[lib]
+name = "sema_pet_linux"
+path = "src/lib.rs"
+
+[dependencies]
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+libc = "0.2"
+gtk = { version = "0.18", features = ["v3_24"] }
+gdk = "0.18"
+gdk-pixbuf = "0.18"
+glib = "0.18"
+cairo-rs = "0.18"
+pango = "0.18"
+pangocairo = "0.18"
+ksni = "0.2"
+
+[profile.release]
+# 注意：不设 panic = "abort"。HTTP worker 线程 panic 不应拖垮整进程。
+opt-level = "z"
+lto = true
+codegen-units = 1
+strip = true

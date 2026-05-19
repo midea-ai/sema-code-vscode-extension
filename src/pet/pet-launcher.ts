@@ -44,10 +44,16 @@ export function killPet(): void {
  *   2. 本地无二进制 或 bundled zip 指纹与已安装不一致（升级）→ 从扩展内置 zip 解压
  *   3. spawn 二进制 → ping 等待就绪
  *
- * 桌宠当前仅支持 macOS / Windows，其他平台直接返回 false（UI 端已禁用开关）。
+ * 桌宠当前支持 macOS / Windows / Linux，其他平台直接返回 false（UI 端已禁用开关）。
  */
 export async function ensurePetRunning(extensionPath: string): Promise<boolean> {
-  if (process.platform !== 'darwin' && process.platform !== 'win32') return false;
+  if (
+    process.platform !== 'darwin' &&
+    process.platform !== 'win32' &&
+    process.platform !== 'linux'
+  ) {
+    return false;
+  }
   if (await ping()) return true;
 
   const bundledZip = path.join(extensionPath, 'dist', 'pet', ZIP_NAME);

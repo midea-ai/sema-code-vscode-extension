@@ -4,6 +4,7 @@
 
 - macOS：Swift + AppKit，见 `pet/macos/`
 - Windows：Rust + windows-sys + Win32 API，见 `pet/windows/`
+- Linux：Rust + GTK3，见 `pet/linux/`
 
 桌宠和扩展是两个进程，通过 `127.0.0.1:24700` 通信。扩展激活时按 `runtime.json` → `/health` 探活 → spawn 本地二进制的顺序找桌宠。
 
@@ -58,6 +59,25 @@ src/
 └── test_sprite.rs      # 开发测试用精灵，正式版未使用
 ```
 
+Linux 端是 Rust crate，从 Windows 端 fork 而来，源码全在 `pet/linux/src/`。`protocol.rs`、`state_machine.rs`、`focus_bridge.rs`、`bubble_store.rs`、`hit_region.rs`、`config.rs`、`runtime.rs`、`assets.rs` 与 Windows 完全同源（纯 std + serde，原样复制）；`http_server.rs`、`paths.rs`、`process.rs`、`vscode_launcher.rs` 做了平台适配。GTK 相关模块：
+
+```
+src/
+├── main.rs             # 进程入口，gtk::init 后装配组件并跑 gtk::main
+├── lib.rs              # crate 根，导出所有公开模块
+├── messages.rs         # UiMessage 枚举：HTTP/托盘线程通过 glib channel 通知 UI 线程
+├── http_server.rs      # 本地 HTTP 服务，监听 24700；PostMessageW 换成 glib::Sender
+├── gif_animation.rs    # GIF 动画，基于 gdk-pixbuf 的 PixbufAnimation 原生解码
+├── pet_window.rs       # 承载桌宠的透明异形 GTK 窗口，input shape 做点击穿透 + 拖拽
+├── bubble_window.rs    # 单个透明点击穿透气泡窗，cairo + Pango 绘制
+├── bubble_store.rs     # 气泡消息存储，管理气泡生命周期
+├── bubble_stack.rs     # 管理最多 3 个气泡窗，跟随桌宠定位
+├── tray.rs             # ksni 实现的 StatusNotifierItem 托盘：会话列表、切换会话、退出
+└── app.rs              # 协调器：持有桌宠窗/气泡栈/托盘，处理 UiMessage、窗口定位
+```
+
+> 不规则窗口在 Linux 只需一个窗口：用 `input_shape_combine_region` 直接给桌宠窗设命中区域，无需 Windows 那样独立的 hit window。托盘走 D-Bus 的 StatusNotifierItem 协议，X11/Wayland 通用；GNOME 原生无 SNI host，需装 AppIndicator 扩展才显示托盘图标，但右键桌宠始终能出同一份菜单。
+
 ## 构建
 
 macOS 要求：macOS 12+，Swift 5.7+。
@@ -73,6 +93,30 @@ Windows 要求：MSVC Rust toolchain。
 cd pet/windows
 cargo build --release           # 产物：target\release\SemaPet.exe
 ```
+
+Linux 要求：glibc 系统 + Rust toolchain + GTK3 开发包。GTK 动态链接系统库，无法 musl 静态编译。
+
+```sh
+# Debian/Ubuntu 安装依赖（含 gdk-pixbuf / cairo / pango / glib）
+sudo apt install libgtk-3-dev pkg-config
+
+cd pet/linux
+cargo build --release           # 产物：target/release/SemaPet
+```
+
+**支持范围**：产物动态链接 glibc 与 GTK3，由两条硬约束决定支持哪些发行版：
+
+- **glibc 向前兼容、不向后兼容** —— 在 glibc X 上编出的产物只能跑在 glibc ≥ X 的系统。
+- **GTK 3.24** —— crate 用 `v3_24` feature 编译，会引用 GTK 3.24 符号。
+
+| Ubuntu | glibc | GTK3 | 支持 |
+|---|---|---|---|
+| 18.04 LTS | 2.27 | 3.22 | ❌ glibc 与 GTK 双双过低 |
+| 20.04 LTS | 2.31 | 3.24.18 | ✅ 推荐构建基线 |
+| 22.04 LTS | 2.35 | 3.24.33 | ✅ |
+| 24.04 LTS | 2.39 | 3.24.41 | ✅ |
+
+**在 Ubuntu 20.04 上构建**，产物即可覆盖 20.04 / 22.04 / 24.04 LTS（及 Debian 11+ 等 glibc ≥ 2.31、GTK ≥ 3.24 的发行版）。用尽量老的 LTS 构建以最大化兼容面 —— 在 22.04 上编出的产物跑不了 20.04。运行时机器需装 GTK 运行时包（`libgtk-3-0` 及 gdk-pixbuf/cairo/pango/glib 运行时库），20.04+ 桌面默认都有。
 
 ## 本地调试
 
@@ -99,6 +143,19 @@ cargo run
 
 确认启动正常：
 - 桌面浮窗 + 系统托盘图标【直观可见】
+
+### Linux
+
+```sh
+cd pet/linux
+cargo run
+```
+
+确认启动正常：
+- 桌面浮窗桌宠【直观可见】
+- 系统托盘图标（GNOME 需装 AppIndicator 扩展才显示；右键桌宠永远能出菜单）
+
+> Wayland 下普通 GTK 窗口不能自定位、置顶仅是 hint，桌宠位置/层级由合成器决定，属已知降级；X11 下效果完整。
 
 ### 协议手测
 
@@ -155,7 +212,7 @@ F5 启动 Extension Development Host → 在 Sema Code 侧栏 → 配置 → 系
 
 ## 美术资源
 
-加载顺序：`~/.sema/pet/assets/<state>.gif` 存在就用用户文件，否则 fallback 到内嵌默认资源。两平台共用一份默认资源，统一维护在 `pet/macos/Assets/`：macOS 打进 bundle，Windows 通过 `include_bytes!` 编译进 `SemaPet.exe` 并在启动时 seed 到用户 assets 目录。
+加载顺序：`~/.sema/pet/assets/<state>.gif` 存在就用用户文件，否则 fallback 到内嵌默认资源。三平台共用一份默认资源，统一维护在 `pet/macos/Assets/`：macOS 打进 bundle，Windows / Linux 通过 `include_bytes!` 编译进 `SemaPet` 并在启动时 seed 到用户 assets 目录。
 
 覆盖同名文件即可热替换，下次状态切换生效，无需重启。想跑一遍干净流程：
 
@@ -177,10 +234,13 @@ cargo run                        # 启动会 seed 默认资源
 | 浮窗不见 | 多屏时可能在屏外，删 `config.json` 的 `windowPosition` 字段重置 |
 | Gatekeeper 拦 | `xattr -dr com.apple.quarantine ./.build/release/SemaPet` |
 | GIF 错帧 | `rm -rf ~/.sema/pet/assets` 让进程重新 seed |
+| Linux 起不来 / 报缺 .so | 缺 GTK 运行时库，装 `libgtk-3-0`（及 gdk-pixbuf/cairo/pango/glib 运行时包）；`ldd ./SemaPet` 看缺哪个 |
+| Linux 托盘图标不显示 | GNOME 原生无 SNI host，装 AppIndicator 扩展；或直接右键桌宠出菜单 |
+| Linux 桌宠不透明 / 位置不对 | Wayland 下定位/置顶受协议限制属已知降级；X11 需有合成器才透明，无合成器会显示黑底 |
 
 ## 打包桌宠
 
-桌宠各平台 zip 统一发布到 GitHub 的 `pet-assets` Release —— 一个固定 tag、无版本号、只保留最新一份，与扩展版本号无关。zip 命名严格对齐 `process.platform-process.arch`：`sema-pet-darwin-arm64.zip` / `sema-pet-darwin-x64.zip` / `sema-pet-win32-x64.zip`。
+桌宠各平台 zip 统一发布到 GitHub 的 `pet-assets` Release —— 一个固定 tag、无版本号、只保留最新一份，与扩展版本号无关。zip 命名严格对齐 `process.platform-process.arch`：`sema-pet-darwin-arm64.zip` / `sema-pet-darwin-x64.zip` / `sema-pet-win32-x64.zip` / `sema-pet-linux-x64.zip`。
 
 得到桌宠 zip 有两条路，产物落点都是 `dist/pet/`：
 
@@ -189,7 +249,7 @@ cargo run                        # 启动会 seed 默认资源
 | `npm run pet:fetch` | 从 `pet-assets` Release 拉全平台最新 zip | 日常发布扩展 |
 | `npm run pet:build` | 现场编译**当前平台**桌宠 | 改了桌宠源码、需要更新 Release |
 
-`pet/build-zips.js` 按 `process.platform` 分派：macOS 走 `swift`，Windows 走 `cargo`；`pet/fetch-zips.js` 走 https 下载。两者互斥，别在同一次发布里混用。
+`pet/build-zips.js` 按 `process.platform` 分派：macOS 走 `swift`，Windows / Linux 走 `cargo`；`pet/fetch-zips.js` 走 https 下载。两者互斥，别在同一次发布里混用。
 
 ### 改了桌宠源码后：重新构建并更新 Release
 
@@ -213,6 +273,14 @@ node pet/build-zips.js arm64       # 如需 arm64（aarch64-pc-windows-msvc）
 
 默认静态链接 CRT（`RUSTFLAGS=-C target-feature=+crt-static`），zip 只含 `SemaPet.exe`。
 
+**Linux**（在 Linux 机器上）—— Rust + GTK3 工程，**无法在 macOS 上交叉编译**：
+
+```sh
+npm run pet:build                  # 仅 x64
+```
+
+走 host glibc target（`x86_64-unknown-linux-gnu`），**不用 musl、不静态链接**——GTK 必须动态链接系统库。zip 只含 `SemaPet`。
+
 **上传**：把 `dist/pet/` 下对应的 zip 手动拖到 `pet-assets` Release（覆盖同名旧文件）。三平台的 zip 都汇集在这一个 Release，之后任何人 `npm run pet:fetch` 就能拿到最新版。
 
 ### 验证 zip（可选）
@@ -234,4 +302,4 @@ Expand-Archive dist\pet\sema-pet-win32-x64.zip -DestinationPath tmp-pet   # 应�
 
 ### 扩展怎么消费 zip
 
-`npm run compile` 只做 webpack，不碰桌宠 zip —— zip 由 `pet:fetch` / `pet:build` 直接放进 `dist/pet/`。`.vscodeignore` 含 `!dist/pet/*.zip`，而 `package-all.sh` 打包时会清空 `dist/pet/` 只放当前平台那一份（如 `darwin-arm64` 包只含 `sema-pet-darwin-arm64.zip`，`linux` 无桌宠），运行时 launcher 直接取用。完整发布流程见 `src/README.md`。
+`npm run compile` 只做 webpack，不碰桌宠 zip —— zip 由 `pet:fetch` / `pet:build` 直接放进 `dist/pet/`。`.vscodeignore` 含 `!dist/pet/*.zip`，而 `package-all.sh` 打包时会清空 `dist/pet/` 只放当前平台那一份（如 `darwin-arm64` 包只含 `sema-pet-darwin-arm64.zip`，`linux-x64` 包只含 `sema-pet-linux-x64.zip`），运行时 launcher 直接取用。完整发布流程见 `src/README.md`。
