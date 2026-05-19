@@ -1053,6 +1053,8 @@ code, pre, .code {
     gap: 5px;
     padding: 0 8px;
     height: 100%;
+    flex: 1 1 0;
+    min-width: 60px;
     max-width: 160px;
     cursor: pointer;
     font-size: var(--chat-font-base);
@@ -1071,6 +1073,8 @@ code, pre, .code {
 }
 
 .session-tab-title {
+    flex: 1 1 0;
+    min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;

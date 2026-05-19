@@ -10,9 +10,13 @@ interface SessionTabsProps {
 
 /**
  * 会话 tab 栏：切换 / 关闭会话。
+ * 仅在多会话时显示；单会话无需 tab。
  * 新建会话入口统一放在 VSCode 视图标题栏的 $(add) 图标。
  */
 const SessionTabs: React.FC<SessionTabsProps> = ({ sessions, activeId, onSwitch, onClose }) => {
+    if (sessions.length <= 1) {
+        return null;
+    }
     return (
         <div className="session-tabs">
             <div className="session-tabs-list">
@@ -27,13 +31,11 @@ const SessionTabs: React.FC<SessionTabsProps> = ({ sessions, activeId, onSwitch,
                             <span className={`session-tab-dot${s.waiting ? ' waiting' : ''}`} />
                         )}
                         <span className="session-tab-title">{s.title || '新会话'}</span>
-                        {sessions.length > 1 && (
-                            <span
-                                className="session-tab-close"
-                                title="关闭会话"
-                                onClick={(e) => { e.stopPropagation(); onClose(s.id); }}
-                            >×</span>
-                        )}
+                        <span
+                            className="session-tab-close"
+                            title="关闭会话"
+                            onClick={(e) => { e.stopPropagation(); onClose(s.id); }}
+                        >×</span>
                     </div>
                 ))}
             </div>
