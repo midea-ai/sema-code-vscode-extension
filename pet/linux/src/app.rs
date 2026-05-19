@@ -355,7 +355,8 @@ impl App {
     fn focus_winner(app: &Rc<RefCell<App>>) {
         let snapshot = {
             let a = app.borrow();
-            a.state_machine.lock().unwrap().snapshot(now_ms())
+            let guard = a.state_machine.lock().unwrap();
+            guard.snapshot(now_ms())
         };
         if let Some(session_id) = snapshot.winner_session_id {
             App::do_focus(app, &session_id, &snapshot.sessions);
@@ -365,11 +366,8 @@ impl App {
     fn focus_session_by_id(app: &Rc<RefCell<App>>, session_id: &str) {
         let sessions = {
             let a = app.borrow();
-            a.state_machine
-                .lock()
-                .unwrap()
-                .snapshot(now_ms())
-                .sessions
+            let guard = a.state_machine.lock().unwrap();
+            guard.snapshot(now_ms()).sessions
         };
         App::do_focus(app, session_id, &sessions);
     }

@@ -1,7 +1,6 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use gdk::prelude::*;
 use gtk::prelude::*;
 
 use crate::bubble_store::{BubbleItem, BubbleKind};

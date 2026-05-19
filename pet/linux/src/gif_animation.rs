@@ -1,5 +1,6 @@
 use std::time::{Duration, SystemTime};
 
+use gdk::prelude::PixbufAnimationExtManual;
 use gdk_pixbuf::{InterpType, Pixbuf, PixbufAnimation};
 
 /// 桌宠逻辑画布边长。GIF 帧统一缩放到这个方框内（保持比例）。
@@ -42,7 +43,7 @@ impl GifAnimation {
         let Some(iter) = self.iter.as_ref() else {
             return false;
         };
-        let changed = iter.advance(Some(SystemTime::now()));
+        let changed = iter.advance(SystemTime::now());
         if changed {
             self.scaled = scale_to_fit(&iter.pixbuf(), CANVAS);
         }
@@ -83,6 +84,6 @@ fn ensure_alpha(pixbuf: &Pixbuf) -> Pixbuf {
     } else {
         pixbuf
             .add_alpha(false, 0, 0, 0)
-            .unwrap_or_else(|| pixbuf.clone())
+            .unwrap_or_else(|_| pixbuf.clone())
     }
 }
