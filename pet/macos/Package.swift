@@ -8,7 +8,6 @@ let package = Package(
         .executableTarget(
             name: "SemaPet",
             path: ".",
-            exclude: ["build-zips.sh"],
             sources: ["Sources"],
             resources: [.copy("Assets")]
         )

@@ -155,7 +155,7 @@ F5 启动 Extension Development Host → 在 Sema Code 侧栏 → 配置 → 系
 
 ## 美术资源
 
-加载顺序：`~/.sema/pet/assets/<state>.gif` 存在就用用户文件，否则 fallback 到内嵌默认资源。macOS 默认资源维护在 `pet/macos/Assets/` 并打进 bundle；Windows 默认资源维护在 `pet/windows/Assets/`，编译进 `SemaPet.exe` 并在启动时 seed 到用户 assets 目录。
+加载顺序：`~/.sema/pet/assets/<state>.gif` 存在就用用户文件，否则 fallback 到内嵌默认资源。两平台共用一份默认资源，统一维护在 `pet/macos/Assets/`：macOS 打进 bundle，Windows 通过 `include_bytes!` 编译进 `SemaPet.exe` 并在启动时 seed 到用户 assets 目录。
 
 覆盖同名文件即可热替换，下次状态切换生效，无需重启。想跑一遍干净流程：
 
@@ -180,52 +180,58 @@ cargo run                        # 启动会 seed 默认资源
 
 ## 打包桌宠
 
-桌宠 zip 跟扩展一起发布（具体集成流程见 `src/README.md`）。这里只讲怎么得到桌宠 zip。
+桌宠各平台 zip 统一发布到 GitHub 的 `pet-assets` Release —— 一个固定 tag、无版本号、只保留最新一份，与扩展版本号无关。zip 命名严格对齐 `process.platform-process.arch`：`sema-pet-darwin-arm64.zip` / `sema-pet-darwin-x64.zip` / `sema-pet-win32-x64.zip`。
 
-两架构 zip 各 ~130KB，命名严格对齐 `process.platform-process.arch`。
+得到桌宠 zip 有两条路，产物落点都是 `dist/pet/`：
 
-### macOS
+| 命令 | 作用 | 场景 |
+|---|---|---|
+| `npm run pet:fetch` | 从 `pet-assets` Release 拉全平台最新 zip | 日常发布扩展 |
+| `npm run pet:build` | 现场编译**当前平台**桌宠 | 改了桌宠源码、需要更新 Release |
 
-一键打 arm64 + x64 两个 zip：
+`pet/build-zips.js` 按 `process.platform` 分派：macOS 走 `swift`，Windows 走 `cargo`；`pet/fetch-zips.js` 走 https 下载。两者互斥，别在同一次发布里混用。
+
+### 改了桌宠源码后：重新构建并更新 Release
+
+桌宠源码不常动，一份 zip 能复用很多个扩展版本。改动后才需要走这一节。
+
+**macOS**（在 Mac 上）：
 
 ```sh
-bash pet/macos/build-zips.sh
+npm run pet:build                  # arm64 + x64，产物落 dist/pet/
+node pet/build-zips.js arm64       # 只打单架构（本机测试快）
 ```
 
-脚本每个架构都走完整 `swift build -c release` → `codesign -s -`（ad-hoc，必须，**不签 Apple Silicon 上会被内核直接 Killed: 9**）→ `zip -y`。swift toolchain 自带 x86_64 target，一台 Apple Silicon mac 就能同时出两架构产物，无需找 Intel 机器。
+构建链：`swift build -c release` → `codesign -s -`（ad-hoc，**必须**，不签在 Apple Silicon 上会被内核直接 Killed: 9）→ `zip -yr`（`-y` 存符号链接、`-x '*.DS_Store'` 排除 Finder 垃圾文件）。swift toolchain 自带 x86_64 target，一台 Apple Silicon mac 就能同时出两架构产物，无需 Intel 机器。
 
-| 架构 | 构建命令 | 产物路径 |
-|---|---|---|
-| arm64 | `swift build -c release --arch arm64` | `pet/macos/.build/arm64-apple-macosx/release/sema-pet-darwin-arm64.zip` |
-| x64 | `swift build -c release --arch x86_64` | `pet/macos/.build/x86_64-apple-macosx/release/sema-pet-darwin-x64.zip` |
+**Windows**（在 Windows 机器上）—— Rust + MSVC 工程，**无法在 macOS 上交叉编译**：
 
-手动验证 zip（可选）：
+```powershell
+npm run pet:build                  # 默认 x64
+node pet/build-zips.js arm64       # 如需 arm64（aarch64-pc-windows-msvc）
+```
+
+默认静态链接 CRT（`RUSTFLAGS=-C target-feature=+crt-static`），zip 只含 `SemaPet.exe`。
+
+**上传**：把 `dist/pet/` 下对应的 zip 手动拖到 `pet-assets` Release（覆盖同名旧文件）。三平台的 zip 都汇集在这一个 Release，之后任何人 `npm run pet:fetch` 就能拿到最新版。
+
+### 验证 zip（可选）
+
+macOS：
 
 ```sh
 cd pet/macos/.build/arm64-apple-macosx/release    # x64 换 x86_64-apple-macosx/release
-unzip -l sema-pet-darwin-arm64.zip            # 应该只有一行：SemaPet
+unzip -l sema-pet-darwin-arm64.zip            # SemaPet + SemaPet_SemaPet.bundle
 file SemaPet                                  # Mach-O 64-bit executable arm64 / x86_64
 codesign -dv SemaPet 2>&1 | grep Signature    # Signature=adhoc
 ```
 
-### Windows
-
-一键打 x64 zip：
+Windows（PowerShell）：
 
 ```powershell
-npm run pet:build
+Expand-Archive dist\pet\sema-pet-win32-x64.zip -DestinationPath tmp-pet   # 应只有 SemaPet.exe
 ```
 
-分架构构建：
+### 扩展怎么消费 zip
 
-```powershell
-npm run pet:build:x64
-npm run pet:build:arm64
-```
-
-| 架构 | Rust target | 产物路径 |
-|---|---|---|
-| x64 | `x86_64-pc-windows-msvc` | `dist/pet/sema-pet-win32-x64.zip` |
-| arm64 | `aarch64-pc-windows-msvc` | `dist/pet/sema-pet-win32-arm64.zip` |
-
-zip 只包含 `SemaPet.exe`。`pet/windows/build-zips.ps1` 默认静态链接 CRT。
+`npm run compile` 只做 webpack，不碰桌宠 zip —— zip 由 `pet:fetch` / `pet:build` 直接放进 `dist/pet/`。`.vscodeignore` 含 `!dist/pet/*.zip`，而 `package-all.sh` 打包时会清空 `dist/pet/` 只放当前平台那一份（如 `darwin-arm64` 包只含 `sema-pet-darwin-arm64.zip`，`linux` 无桌宠），运行时 launcher 直接取用。完整发布流程见 `src/README.md`。

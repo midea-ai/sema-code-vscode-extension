@@ -84,13 +84,9 @@
     }
   },
   "scripts": {
-    "compile": "webpack && node pet/stage-zips.js",
-    "pet:build": "node pet/build.js",
-    "pet:build:arm64": "node pet/build.js arm64",
-    "pet:build:x64": "node pet/build.js x64",
-    "pet:build:windows": "powershell -ExecutionPolicy Bypass -File pet/windows/build-zips.ps1",
-    "pet:build:windows:x64": "powershell -ExecutionPolicy Bypass -File pet/windows/build-zips.ps1 -Target x86_64-pc-windows-msvc",
-    "pet:build:windows:arm64": "powershell -ExecutionPolicy Bypass -File pet/windows/build-zips.ps1 -Target aarch64-pc-windows-msvc"
+    "compile": "webpack",
+    "pet:build": "node pet/build-zips.js",
+    "pet:fetch": "node pet/fetch-zips.js"
   },
   "devDependencies": {
     "@babel/core": "^7.28.5",

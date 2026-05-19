@@ -5,11 +5,12 @@ use std::path::{Path, PathBuf};
 
 use crate::protocol::PetState;
 
-const DEFAULT_IDLE: &[u8] = include_bytes!("../Assets/idle.gif");
-const DEFAULT_THINKING: &[u8] = include_bytes!("../Assets/thinking.gif");
-const DEFAULT_WORKING: &[u8] = include_bytes!("../Assets/working.gif");
-const DEFAULT_ATTENTION: &[u8] = include_bytes!("../Assets/attention.gif");
-const DEFAULT_SLEEPING: &[u8] = include_bytes!("../Assets/sleeping.gif");
+// 资源与 macOS 共用一份，统一放在 pet/macos/Assets/。
+const DEFAULT_IDLE: &[u8] = include_bytes!("../../macos/Assets/idle.gif");
+const DEFAULT_THINKING: &[u8] = include_bytes!("../../macos/Assets/thinking.gif");
+const DEFAULT_WORKING: &[u8] = include_bytes!("../../macos/Assets/working.gif");
+const DEFAULT_ATTENTION: &[u8] = include_bytes!("../../macos/Assets/attention.gif");
+const DEFAULT_SLEEPING: &[u8] = include_bytes!("../../macos/Assets/sleeping.gif");
 
 pub fn state_asset_path(assets_dir: &Path, state: PetState) -> PathBuf {
     assets_dir.join(state_asset_name(state))
