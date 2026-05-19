@@ -27,7 +27,7 @@ const SystemConfig: React.FC<SystemConfigProps> = ({ vscode }) => {
     const [savedConfig, setSavedConfig] = useState<SystemConfigData>(defaultConfig); // 已保存的配置
     const [message, setMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
     const [platform, setPlatform] = useState<string>('');
-    const petSupported = platform === 'darwin' || platform === 'win32';
+    const petSupported = platform === 'darwin' || platform === 'win32' || platform === 'linux';
 
     // 字符计数状态
     const [systemPromptCount, setSystemPromptCount] = useState(0);
@@ -207,7 +207,7 @@ const SystemConfig: React.FC<SystemConfigProps> = ({ vscode }) => {
                             className="checkbox-label"
                             title={petSupported
                                 ? '启用后将下载并启动桌面 Pet（Sema Pet）。本地已有二进制时直接使用，否则从 GitHub releases 自动下载'
-                                : '桌宠暂仅支持 macOS / Windows'}
+                                : '桌宠暂仅支持 macOS / Windows / Linux'}
                             style={petSupported ? undefined : { opacity: 0.5, cursor: 'not-allowed' }}
                         >
                             <input
@@ -217,7 +217,7 @@ const SystemConfig: React.FC<SystemConfigProps> = ({ vscode }) => {
                                 onChange={(e) => handleChange('enablePet', e.target.checked)}
                             />
                             <span className="checkmark"></span>
-                            启用桌宠{petSupported ? '' : '（暂仅支持 macOS / Windows）'}
+                            启用桌宠{petSupported ? '' : '（暂仅支持 macOS / Windows / Linux）'}
                         </label>
                     </div>
                 </div>
