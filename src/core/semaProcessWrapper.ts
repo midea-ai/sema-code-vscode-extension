@@ -36,8 +36,8 @@ export const MAX_SESSIONS = 5;
 export interface ProcessWrapperCallbacks {
     /** 模型配置变化（addModel / switchModel 等触发） */
     onModelUpdate?: (data: ModelUpdateData) => void;
-    /** 配置页任务面板请求查看子代理详情 */
-    onOpenAgentDetail?: (taskId: string) => void;
+    /** 配置页任务面板请求查看子代理详情，sessionId 为任务所属会话 */
+    onOpenAgentDetail?: (taskId: string, sessionId?: string) => void;
 }
 
 /**
@@ -373,7 +373,18 @@ export class SemaProcessWrapper {
 
     /** 配置页任务面板：查看子代理详情 */
     public openAgentDetail(taskId: string): void {
-        this.callbacks.onOpenAgentDetail?.(taskId);
+        this.callbacks.onOpenAgentDetail?.(taskId, this.findSessionIdByTask(taskId));
+    }
+
+    /** 根据 taskId 查找其所属会话 */
+    private findSessionIdByTask(taskId: string): string | undefined {
+        for (const sessionId of this.semaCore.listSessions()) {
+            const session = this.semaCore.getSession(sessionId);
+            if (session?.getTaskList().some(t => t.taskId === taskId)) {
+                return sessionId;
+            }
+        }
+        return undefined;
     }
 
     // ===== 资源释放 =====

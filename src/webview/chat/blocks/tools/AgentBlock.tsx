@@ -1,6 +1,7 @@
-import React, { useState, useCallback, useEffect, useRef } from 'react';
+import React, { useState, useCallback, useEffect, useRef, useContext } from 'react';
 import { DiffContent, FileChange, Message, ToolContent, VscodeApi } from '../../types';
 import TaskDetailModal from '../../TaskDetailModal';
+import { SessionContext } from '../../SessionContext';
 import { countDiffChanges } from '../../utils/diffParser';
 import { TOOL_NAME_EDIT_NOTEBOOK, TOOL_NAME_PATCH_FILE, TOOL_NAME_WRITE_FILE } from '../../../../utils/tool';
 
@@ -98,6 +99,7 @@ const extractFileChange = (message: Message): FileChange | null => {
 const AgentBlock: React.FC<AgentBlockProps> = React.memo(({ content, vscode, forceClose, externalOpen, onExternalClose, onFileChange }) => {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const reportedChangeKeysRef = useRef<Set<string>>(new Set());
+    const sessionId = useContext(SessionContext);
 
     // 当有权限请求时自动关闭详情弹窗
     useEffect(() => {
@@ -185,7 +187,7 @@ const AgentBlock: React.FC<AgentBlockProps> = React.memo(({ content, vscode, for
                         <button
                             className="task-detail-btn"
                             onClick={() => {
-                                vscode.postMessage({ type: 'transferAgentToBackground', taskId: content.taskId });
+                                vscode.postMessage({ type: 'transferAgentToBackground', sessionId, taskId: content.taskId });
                             }}
                         >
                             转后台

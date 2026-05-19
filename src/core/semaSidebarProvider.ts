@@ -62,10 +62,16 @@ export class SemaSidebarProvider implements vscode.WebviewViewProvider {
             this.systemConfigManager,
             {
                 onModelUpdate: this.handleModelUpdate,
-                onOpenAgentDetail: (taskId: string) => {
+                onOpenAgentDetail: (taskId: string, sessionId?: string) => {
+                    const targetSessionId = sessionId ?? this.activeSessionId;
+                    // 任务不属于当前活跃会话时，先切换活跃会话
+                    if (targetSessionId && targetSessionId !== this.activeSessionId) {
+                        this.switchActiveSession(targetSessionId);
+                        this.chatWebviewProvider.postMessage({ type: 'switchToSession', sessionId: targetSessionId });
+                    }
                     this.chatWebviewProvider.postMessage({
                         type: 'openAgentDetail',
-                        sessionId: this.activeSessionId,
+                        sessionId: targetSessionId,
                         taskId,
                     });
                 },
