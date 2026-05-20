@@ -1,4 +1,5 @@
 import DOMPurify from 'dompurify';
+import katex from 'katex';
 
 /**
  * 简化的Markdown渲染，只支持：
@@ -17,6 +18,11 @@ export function renderMarkdownToHtml(content: string, vscode?: any): string {
   const inlineCodePlaceholders: string[] = [];
   const imagePlaceholders: string[] = [];
   const urlPlaceholders: string[] = [];
+  const mathPlaceholders: string[] = [];
+  // 公式占位用纯 ASCII + 随机盐：要让占位串能"穿过" DOMPurify（不会被解析器吞掉），
+  // 同时避免和用户原文里的字符串碰撞。\x00 那一套占位走的是 sanitize 之前恢复，公式不行。
+  const mathSalt = Math.random().toString(36).slice(2, 10);
+  const mathToken = (i: number) => `__KATEX_${mathSalt}_${i}__`;
 
   // 步骤1: 提取代码块
   processedContent = processedContent.replace(/```([\s\S]*?)```/g, (match, code) => {
@@ -65,6 +71,42 @@ export function renderMarkdownToHtml(content: string, vscode?: any): string {
     inlineCodePlaceholders.push(codeHtml);
     return placeholder;
   });
+
+  // 步骤3.3: 提取块级公式 $$...$$（必须早于行内 $...$，否则会被抢吃成 ""）
+  processedContent = processedContent.replace(/\$\$([\s\S]+?)\$\$/g, (_match, expr) => {
+    const i = mathPlaceholders.length;
+    mathPlaceholders.push(
+      `<div class="md-math-block">${katex.renderToString(expr.trim(), {
+        displayMode: true,
+        throwOnError: false,
+        strict: 'ignore',
+        trust: false,
+      })}</div>`
+    );
+    return mathToken(i);
+  });
+
+  // 步骤3.4: 提取行内公式 $...$
+  //   (?<![\\$])  起始 $ 前不是 \ 或 $（避开 \$ 转义、$$ 块级残留）
+  //   \$(?!\s)     起始 $ 后不能紧跟空白
+  //   ([^\n$]+?)   内容不跨行、不含 $（非贪婪）
+  //   (?<!\s)\$    收尾 $ 前不能紧跟空白
+  //   (?!\d)       收尾 $ 后不能紧跟数字（避开 "$5,$10 packs" 这种货币误识别）
+  processedContent = processedContent.replace(
+    /(?<![\\$])\$(?!\s)([^\n$]+?)(?<!\s)\$(?!\d)/g,
+    (_match, expr) => {
+      const i = mathPlaceholders.length;
+      mathPlaceholders.push(
+        `<span class="md-math-inline">${katex.renderToString(expr, {
+          displayMode: false,
+          throwOnError: false,
+          strict: 'ignore',
+          trust: false,
+        })}</span>`
+      );
+      return mathToken(i);
+    }
+  );
 
   // 步骤3.5 / 3.6: 图片、本地 URL 仅在非流式（vscode 已传入）阶段提取并渲染
   // 流式阶段（vscode=undefined）整体跳过，保留原始 markdown 文本，避免：
@@ -156,6 +198,13 @@ export function renderMarkdownToHtml(content: string, vscode?: any): string {
       'src', 'alt', 'data-img-path', 'data-img-url', 'data-img-temp-id', 'data-md-original',
       'data-url'
     ],
+  });
+
+  // 步骤12: 恢复公式占位
+  // KaTeX 输出含大量 span/style 和 MathML，加进 DOMPurify 白名单会显著扩大攻击面，
+  // 因此让 KaTeX HTML 绕过 sanitize 直接注入。KaTeX 自身已用 trust:false 关掉 \href 等危险命令。
+  mathPlaceholders.forEach((html, i) => {
+    processedContent = processedContent.split(mathToken(i)).join(html);
   });
 
   return processedContent;
@@ -388,6 +437,8 @@ export function hasMarkdownFormatting(content: string): boolean {
     /^\|.+\|$/m,           // 表格行
     /!\[[^\]]*\]\([^)\s]+?\)/, // 图片
     /https?:\/\/(?:localhost|127\.0\.0\.1|0\.0\.0\.0|\[::1\])/i, // 本地 loopback URL
+    /\$\$[\s\S]+?\$\$/,    // 块级公式
+    /(?<![\\$])\$(?!\s)[^\n$]+?(?<!\s)\$(?!\d)/, // 行内公式
   ];
 
   return markdownPatterns.some(pattern => pattern.test(content));

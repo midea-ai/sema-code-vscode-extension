@@ -360,7 +360,7 @@ export class ChatWebviewProvider {
     <meta http-equiv="Content-Security-Policy" content="default-src 'none';
         style-src ${webview.cspSource} 'unsafe-inline' https://cdnjs.cloudflare.com;
         script-src 'nonce-${nonce}' https://cdnjs.cloudflare.com;
-        font-src ${webview.cspSource};
+        font-src ${webview.cspSource} data:;
         img-src ${webview.cspSource} https: data:;">
     <title>Code Assistant</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css">

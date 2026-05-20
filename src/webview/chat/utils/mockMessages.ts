@@ -16,7 +16,7 @@ import {
 } from '../../../utils/tool';
 
 /** 手动切换预览范围：null = 全部，['xx'] = 指定组件，[] = 关闭 */
-export const PREVIEW_COMPONENTS: string[] | null = [];
+export const PREVIEW_COMPONENTS: string[] | null = ['AssistantMarkdown'];
 
 let id = 0;
 const nextId = () => `mock-${++id}`;
@@ -323,7 +323,17 @@ export function getConfig(path: string) {
             id: nextId(),
             type: 'assistant',
             content: {
-                content: 'Lint 检查通过，没有发现任何问题。',
+                content: `### 4.1 多租户隔离模型
+
+当 Sema Core 被嵌入多租户环境时（例如一个同时服务多个用户的 Agent 平台），多个引擎实例必须在同一进程内并发运行。传统的全局单例设计中，$n$ 个 Agent 实例 $\\mathcal{A} = \\{A_1, A_2, \\ldots, A_n\\}$ 共享状态空间 $\\mathcal{S}$，任意 $A_i$ 的状态写入 $A_i \\xrightarrow{w} \\mathcal{S}$ 都可能被 $A_j\\ (j \\neq i)$ 的读操作 $A_j \\xrightarrow{r} \\mathcal{S}$ 观测到，产生不可预期的状态污染——一个用户的对话历史泄露到另一个用户的上下文中，或一个实例的中断操作意外终止了另一个实例的任务。
+
+Sema Core 采用 Node.js 的 **AsyncLocalStorage（ALS）** 机制实现按实例的状态隔离。每个引擎实例 $E_i$ 拥有独立的资源束：
+
+$$\\mathcal{R}_i = \\langle \\text{EventBus}_i,\\ \\text{StateManager}_i,\\ \\text{MCPManager}_i,\\ \\text{Config}_i \\rangle$$
+
+Bash 层针对管道组合和命令注入两类风险分别处理：
+
+$$P_{\\text{Bash}}(c) = \\text{allow} \\iff \\begin{cases} \\text{head}(c) \\in \\mathcal{W} & c \\text{ 为单一命令} \\\\ \\forall i:\\ \\text{head}(c_i) \\in \\mathcal{W} & c = c_1 \\mid \\cdots \\mid c_p \\text{ 为管道} \\end{cases}$$`,
             },
         },
         {

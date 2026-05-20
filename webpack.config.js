@@ -81,6 +81,10 @@ const chatWebviewConfig = {
       {
         test: /\.css$/,
         use: ['style-loader', 'css-loader']
+      },
+      {
+        test: /\.(woff2?|ttf|eot)$/,
+        type: 'asset/inline'
       }
     ]
   },

@@ -94,6 +94,7 @@
     "@babel/preset-react": "^7.28.5",
     "@babel/preset-typescript": "^7.28.5",
     "@types/adm-zip": "^0.5.8",
+    "@types/katex": "^0.16.8",
     "@types/node": "^18.x",
     "@types/react": "^18.2.0",
     "@types/react-dom": "^18.2.0",
@@ -114,6 +115,7 @@
     "adm-zip": "^0.5.16",
     "diff": "^8.0.2",
     "dompurify": "^3.3.1",
+    "katex": "^0.16.47",
     "sema-core": "^2.0.0",
     "turndown": "^7.2.4"
   }

@@ -10,8 +10,25 @@
 
 /* 粗体样式 - 用于标题和 **加粗** 文本 */
 .markdown-content strong {
-  font-weight: 600;
+  font-weight: 700;
   color: var(--chat-text-editor);
+}
+
+/* 数学公式样式 */
+.markdown-content .md-math-block {
+  margin: 0.6em 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  max-width: 100%;
+}
+
+.markdown-content .md-math-block .katex-display {
+  margin: 0;
+}
+
+.markdown-content .md-math-inline {
+  display: inline-block;
+  vertical-align: baseline;
 }
 
 /* 内联代码样式 - `代码` 变色 */

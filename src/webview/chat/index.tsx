@@ -7,6 +7,7 @@ import './style/styles.css';
 import './style/input.css';
 import './style/tools.css';
 import './style/permission.css';
+import 'katex/dist/katex.min.css';
 
 // 在整个应用中只获取一次 VSCode API
 const vscode = window.acquireVsCodeApi();
