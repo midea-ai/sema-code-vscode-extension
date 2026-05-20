@@ -114,6 +114,17 @@ export function renderMarkdownToHtml(content: string, vscode?: any): string {
   //   - 图片无法走 resolveImagePath 解析、退化为 broken icon
   //   - 半截 URL 提前可点
   if (vscode) {
+    // 原始 <img> 标签占位 - 收编到与 markdown 图片同一套渲染逻辑，统一点击跳转
+    // 必须早于 ![]() 处理（markdown 语法不会写出 <img>，先后顺序无歧义）
+    processedContent = processedContent.replace(/<img\b[^>]*?>/gi, (match) => {
+      const srcMatch = match.match(/\bsrc=["']([^"']+)["']/i);
+      if (!srcMatch) return match;
+      const altMatch = match.match(/\balt=["']([^"']*)["']/i);
+      const placeholder = `\x00IMG_${imagePlaceholders.length}\x00`;
+      imagePlaceholders.push(createImageHtml(srcMatch[1].trim(), altMatch?.[1] ?? '', vscode, match));
+      return placeholder;
+    });
+
     // 图片占位 - ![alt](path) 语法，路径分本地/远程两支处理
     processedContent = processedContent.replace(/!\[([^\]]*)\]\(([^)\s]+?)\)/g, (match, alt, src) => {
       const placeholder = `\x00IMG_${imagePlaceholders.length}\x00`;
@@ -436,6 +447,7 @@ export function hasMarkdownFormatting(content: string): boolean {
     /```[\s\S]*?```/,      // 代码块
     /^\|.+\|$/m,           // 表格行
     /!\[[^\]]*\]\([^)\s]+?\)/, // 图片
+    /<img\b[^>]*?>/i,          // 原始 <img> 标签
     /https?:\/\/(?:localhost|127\.0\.0\.1|0\.0\.0\.0|\[::1\])/i, // 本地 loopback URL
     /\$\$[\s\S]+?\$\$/,    // 块级公式
     /(?<![\\$])\$(?!\s)[^\n$]+?(?<!\s)\$(?!\d)/, // 行内公式
