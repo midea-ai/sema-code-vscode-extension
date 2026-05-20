@@ -435,8 +435,20 @@ return ""
 end try`;
                 const { stdout } = await execFileAsync('osascript', ['-e', script], { timeout: 1500 });
                 absolutePaths = stdout.split('\n').map(s => s.trim()).filter(Boolean);
+            } else if (process.platform === 'win32') {
+                const script = [
+                    'Add-Type -AssemblyName System.Windows.Forms',
+                    '$files = [System.Windows.Forms.Clipboard]::GetFileDropList()',
+                    'foreach ($file in $files) { [Console]::WriteLine($file) }'
+                ].join('; ');
+                const { stdout } = await execFileAsync(
+                    'powershell.exe',
+                    ['-NoProfile', '-Sta', '-Command', script],
+                    { timeout: 1500, windowsHide: true }
+                );
+                absolutePaths = stdout.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
             }
-            // TODO: Windows / Linux 剪贴板文件路径读取
+            // TODO: Linux 剪贴板文件路径读取
 
             return absolutePaths.map(abs => vscode.workspace.asRelativePath(vscode.Uri.file(abs), false));
         } catch (error) {
