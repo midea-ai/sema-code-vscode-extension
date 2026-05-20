@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { ToggleIcon, CheckIcon } from '../ui/IconButton';
+import { getTodoStatusIcon } from '../../utils/symbols';
 
 interface TodoItem {
     id: string;
@@ -49,14 +50,12 @@ const TodosPanel: React.FC<TodosPanelProps> = ({ todos, onScrollToBottom }) => {
                             : todo.title;
 
                         // 根据状态设置不同的图标和样式
-                        let statusIcon = '○'; // pending
+                        const statusIcon = getTodoStatusIcon(todo.status);
                         let statusClass = 'pending';
 
                         if (todo.status === 'completed') {
-                            statusIcon = '●';
                             statusClass = 'completed';
                         } else if (todo.status === 'in_progress') {
-                            statusIcon = '◐';
                             statusClass = 'in-progress';
                         }
 

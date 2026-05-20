@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { renderMarkdownToHtml } from '../../utils/markdown';
+import { getSelectionPointer } from '../../utils/symbols';
 
 import '../../style/markdown.css';
 
@@ -168,7 +169,7 @@ const PlanExitDialog: React.FC<PlanExitDialogProps> = ({
                                 }
                             }}
                         >
-                            {selectedIndex === index && '❯ '}{key === 'cancel' ? '拒绝' : data.options[key]}
+                            {selectedIndex === index && getSelectionPointer()}{key === 'cancel' ? '拒绝' : data.options[key]}
                         </button>
                     ))}
                 </div>

@@ -16,7 +16,7 @@ import {
 } from '../../../utils/tool';
 
 /** 手动切换预览范围：null = 全部，['xx'] = 指定组件，[] = 关闭 */
-export const PREVIEW_COMPONENTS: string[] | null = ['AssistantMarkdown'];
+export const PREVIEW_COMPONENTS: string[] | null = [];
 
 let id = 0;
 const nextId = () => `mock-${++id}`;

@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { renderMarkdownToHtml } from '../../utils/markdown';
+import { getSelectionPointer } from '../../utils/symbols';
 import '../../style/markdown.css';
 
 interface QuickChatDialogProps {
@@ -17,9 +18,10 @@ const QuickChatDialog: React.FC<QuickChatDialogProps> = ({ data, onClose }) => {
 
     // 代码高亮
     useEffect(() => {
-        if (bodyRef.current && window.hljs) {
+        const hljs = (window as any).hljs;
+        if (bodyRef.current && hljs) {
             bodyRef.current.querySelectorAll('pre code:not(.hljs)').forEach((block) => {
-                window.hljs.highlightElement(block);
+                hljs.highlightElement(block);
             });
         }
     }, [data.content]);
@@ -47,7 +49,7 @@ const QuickChatDialog: React.FC<QuickChatDialogProps> = ({ data, onClose }) => {
                         className="bash-permission-btn bash-permission-btn-reject selected"
                         onClick={onClose}
                     >
-                        ❯ 关闭 (Enter)
+                        {getSelectionPointer()}关闭 (Enter)
                     </button>
                 </div>
             </div>

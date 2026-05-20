@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { getSelectionPointer } from '../../utils/symbols';
 
 interface PermissionOptionsProps {
     options: {
@@ -43,7 +44,7 @@ const PermissionOptions: React.FC<PermissionOptionsProps> = ({
 
     // 格式化文本，提取反引号中的内容并加粗
     const formatAllowText = (text: string, showPrefix: boolean) => {
-        const prefix = showPrefix ? '❯ ' : '';
+        const prefix = showPrefix ? getSelectionPointer() : '';
         const match = text.match(/`([^`]+)`/);
         if (match) {
             const content = match[1];
@@ -185,7 +186,7 @@ const PermissionOptions: React.FC<PermissionOptionsProps> = ({
                 >
                     {btn.key === 'allow'
                         ? formatAllowText(btn.label, selectedIndex === index)
-                        : <>{selectedIndex === index && '❯ '}{btn.label}</>
+                        : <>{selectedIndex === index && getSelectionPointer()}{btn.label}</>
                     }
                 </button>
             ))}
