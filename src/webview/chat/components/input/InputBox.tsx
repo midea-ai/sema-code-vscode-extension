@@ -230,10 +230,24 @@ const InputBox = forwardRef<InputBoxHandle, InputBoxProps>(({
         composingRef.current = true;
     };
 
+    const getClipboardPlainText = (clipboardData: DataTransfer): string => {
+        const plainText = clipboardData.getData('text/plain');
+        if (plainText) return plainText;
+
+        const html = clipboardData.getData('text/html');
+        if (html) {
+            const doc = new DOMParser().parseFromString(html, 'text/html');
+            return doc.body?.textContent || '';
+        }
+
+        return '';
+    };
+
     const handlePaste: React.ClipboardEventHandler<HTMLDivElement> = async (e) => {
+        const pastedText = getClipboardPlainText(e.clipboardData);
         // 剪贴板里是"复制的文件"（Finder / Explorer / VSCode 文件树）—— webview 沙箱拿不到路径，
         // 必须交给扩展端读系统剪贴板，回传后插入 @mention
-        if (e.clipboardData.files && e.clipboardData.files.length > 0) {
+        if (!pastedText && e.clipboardData.files && e.clipboardData.files.length > 0) {
             e.preventDefault();
             vscode.postMessage({ type: 'requestClipboardFiles' });
             const paths = await new Promise<string[]>((resolve) => {
@@ -255,9 +269,8 @@ const InputBox = forwardRef<InputBoxHandle, InputBoxProps>(({
             return;
         }
 
-        e.preventDefault();
-        const pastedText = e.clipboardData.getData('text');
         if (!pastedText) return;
+        e.preventDefault();
 
         const el = inputBoxRef.current;
         if (!el) return;
