@@ -11,29 +11,28 @@ use gtk::prelude::*;
 
 use crate::assets::state_asset_path;
 use crate::bubble_store::{BubbleItem, BubbleStore};
-use crate::bubble_window::BubbleWindow;
 use crate::config::PetConfig;
 use crate::focus_bridge::FocusBridge;
 use crate::gif_animation::GifAnimation;
 use crate::messages::UiMessage;
-use crate::pet_window::PetWindow;
+use crate::pet_window::{PetWindow, CANVAS_HEIGHT, CANVAS_WIDTH, PET_AREA};
 use crate::process::is_process_alive;
 use crate::protocol::PetState;
 use crate::state_machine::{now_ms, SessionSnapshot, StateMachine};
-use crate::tray::{build_menu_entries, MenuEntry, PetTray};
+use crate::tray::{build_menu_entries, MenuAction, MenuEntry, PetTray};
 use crate::vscode_launcher::{launch_vscode_for_cwd, should_launch_vscode_for_focus_attempt};
+use crate::x11_activate::raise_window_for_cwd;
 
-const SIZE: i32 = 128;
 const DRAG_THRESHOLD: i32 = 4;
 const MIN_VISIBLE_SIZE: i32 = 32;
 const BUBBLE_SWEEP_MS: u64 = 500;
 const STALE_SWEEP_SECS: u64 = 30;
 
-/// 协调器：持有桌宠窗 / 气泡窗 / 托盘句柄，把 HTTP、定时器、输入事件
+/// 协调器：持有桌宠窗 / 托盘句柄，把 HTTP、定时器、输入事件
 /// 汇集到一处处理。对应 Windows 端的 WindowCoordinator。
+/// 气泡画在桌宠窗内部（Wayland 协议不允许客户端定位独立 toplevel）。
 pub struct App {
     pet: PetWindow,
-    bubble: BubbleWindow,
     position: (i32, i32),
     mouse_down: Option<(f64, f64)>,
     drag_origin: Option<(i32, i32)>,
@@ -151,6 +150,15 @@ fn wire_pet_input(app: &Rc<RefCell<App>>) {
             glib::Propagation::Stop
         });
     }
+    // 兜底：手动 move_() 后 X server 会回发 ConfigureNotify，同步内部 position
+    // 防止外界（合成器/工具）异步重定位时本地 position 漂移。保存交给 button_release。
+    {
+        let app = Rc::clone(app);
+        window.connect_configure_event(move |_w, event| {
+            App::on_configure(&app, event);
+            false
+        });
+    }
 }
 
 fn spawn_tray(
@@ -176,7 +184,6 @@ impl App {
         let position = initial_position(&config);
         App {
             pet: PetWindow::new(),
-            bubble: BubbleWindow::new(),
             position,
             mouse_down: None,
             drag_origin: None,
@@ -207,12 +214,15 @@ impl App {
                 a.drag_origin = Some(position);
                 a.dragging = false;
             }
-            3 => App::show_menu(app),
+            3 => App::show_menu(app, event),
             _ => {}
         }
     }
 
     fn on_motion(app: &Rc<RefCell<App>>, event: &gdk::EventMotion) {
+        // X11 下用手动 move_ 而非 begin_move_drag：begin_move_drag 会让 WM
+        // grab 鼠标，期间 motion / button_release 都收不到，状态机难对齐；
+        // 主进程强制 GDK_BACKEND=x11，X11 协议本就允许 client 自行 move toplevel。
         let mut a = app.borrow_mut();
         let (Some(start), Some(origin)) = (a.mouse_down, a.drag_origin) else {
             return;
@@ -245,8 +255,16 @@ impl App {
         }
     }
 
-    fn show_menu(app: &Rc<RefCell<App>>) {
-        let (sessions, ui_tx) = {
+    fn on_configure(app: &Rc<RefCell<App>>, event: &gdk::EventConfigure) {
+        let (x, y) = event.position();
+        let mut a = app.borrow_mut();
+        if a.position != (x, y) {
+            a.position = (x, y);
+        }
+    }
+
+    fn show_menu(app: &Rc<RefCell<App>>, event: &gdk::EventButton) {
+        let (sessions, ui_tx, parent) = {
             let a = app.borrow();
             let sessions = a
                 .state_machine
@@ -254,32 +272,79 @@ impl App {
                 .unwrap()
                 .snapshot(now_ms())
                 .sessions;
-            (sessions, a.ui_tx.clone())
+            (sessions, a.ui_tx.clone(), a.pet.widget().clone())
         };
 
-        let menu = gtk::Menu::new();
+        // 用 GtkPopover 而非 GtkMenu：父窗口是 Dock type hint + skip_taskbar，
+        // GtkMenu 在这种父窗口下 popup_at_pointer 走 toplevel + GdkSeat::grab
+        // 路径，X server 不给 Dock 子代建立全屏 pointer grab，外部点击根本路由
+        // 不到菜单。GtkPopover 是嵌在父 widget 内部的浮层，set_modal(true) 时
+        // GTK 自己接管 outside-click dismiss，不依赖 X server 级 grab。
+        let popover = gtk::Popover::new(Some(&parent));
+        popover.set_modal(true);
+        popover.set_position(gtk::PositionType::Top);
+        popover.set_pointing_to(&gdk::Rectangle::new(
+            event.x() as i32,
+            event.y() as i32,
+            1,
+            1,
+        ));
+
+        // 行索引 → 触发动作的查表，row-activated 时按索引找。
+        let actions: Rc<RefCell<Vec<Option<MenuAction>>>> = Rc::new(RefCell::new(Vec::new()));
+        let listbox = gtk::ListBox::new();
+        listbox.set_selection_mode(gtk::SelectionMode::None);
+
         for entry in build_menu_entries(&sessions) {
+            let row = gtk::ListBoxRow::new();
             match entry {
                 MenuEntry::Item { label, action } => {
-                    let item = gtk::MenuItem::with_label(&label);
-                    let ui_tx = ui_tx.clone();
-                    item.connect_activate(move |_| {
-                        let _ = ui_tx.send(action.to_message());
-                    });
-                    menu.append(&item);
+                    let lbl = gtk::Label::new(Some(&label));
+                    lbl.set_xalign(0.0);
+                    lbl.set_margin_start(12);
+                    lbl.set_margin_end(12);
+                    lbl.set_margin_top(6);
+                    lbl.set_margin_bottom(6);
+                    row.add(&lbl);
+                    actions.borrow_mut().push(Some(action));
                 }
                 MenuEntry::Disabled(label) => {
-                    let item = gtk::MenuItem::with_label(&label);
-                    item.set_sensitive(false);
-                    menu.append(&item);
+                    let lbl = gtk::Label::new(Some(&label));
+                    lbl.set_xalign(0.0);
+                    lbl.set_margin_start(12);
+                    lbl.set_margin_end(12);
+                    lbl.set_margin_top(6);
+                    lbl.set_margin_bottom(6);
+                    lbl.set_sensitive(false);
+                    row.set_selectable(false);
+                    row.set_activatable(false);
+                    row.add(&lbl);
+                    actions.borrow_mut().push(None);
                 }
                 MenuEntry::Separator => {
-                    menu.append(&gtk::SeparatorMenuItem::new());
+                    let sep = gtk::Separator::new(gtk::Orientation::Horizontal);
+                    row.set_selectable(false);
+                    row.set_activatable(false);
+                    row.add(&sep);
+                    actions.borrow_mut().push(None);
                 }
             }
+            listbox.add(&row);
         }
-        menu.show_all();
-        menu.popup_at_pointer(None);
+
+        let popover_ref = popover.clone();
+        let actions_ref = Rc::clone(&actions);
+        listbox.connect_row_activated(move |_, row| {
+            let idx = row.index() as usize;
+            if let Some(Some(action)) = actions_ref.borrow().get(idx) {
+                let _ = ui_tx.send(action.to_message());
+            }
+            popover_ref.popdown();
+        });
+
+        popover.add(&listbox);
+        popover.show_all();
+        popover.popup();
     }
 
     // ---- UiMessage 分发 ----
@@ -316,8 +381,7 @@ impl App {
             return;
         }
         a.last_bubbles = bubbles.clone();
-        let (x, y) = a.position;
-        a.bubble.update(&bubbles, x, y);
+        a.pet.show_bubbles(&bubbles);
     }
 
     fn on_stale_sweep(app: &Rc<RefCell<App>>) {
@@ -345,8 +409,7 @@ impl App {
         }
     }
 
-    fn quit(app: &Rc<RefCell<App>>) {
-        app.borrow().bubble.hide();
+    fn quit(_app: &Rc<RefCell<App>>) {
         gtk::main_quit();
     }
 
@@ -381,7 +444,15 @@ impl App {
                 .map(|session| session.cwd.clone());
             (Arc::clone(&a.focus_bridge), cwd)
         };
+        // 与 macOS 行为对齐：三件套同时做。
+        //   1) X11 _NET_ACTIVE_WINDOW 把目标窗口 raise 并取消最小化（弥补 Linux `code` CLI
+        //      不会 raise 已开窗口的行为差异）。命中失败安静回退。
+        //   2) spawn `code <cwd>`：负责 VS Code 没在跑时拉起新实例。
+        //   3) 发 focus 命令：通知扩展端 focus 编辑器组/侧栏。
         let had_waiter = focus_bridge.enqueue_focus(session_id.to_string());
+        if let Some(cwd) = cwd.as_deref() {
+            let _ = raise_window_for_cwd(cwd);
+        }
         if should_launch_vscode_for_focus_attempt(had_waiter) {
             if let Some(cwd) = cwd {
                 let _ = launch_vscode_for_cwd(&cwd);
@@ -429,7 +500,6 @@ impl App {
     fn move_to(&mut self, x: i32, y: i32) {
         self.position = (x, y);
         self.pet.widget().move_(x, y);
-        self.bubble.update(&self.last_bubbles, x, y);
     }
 
     fn set_state(&mut self, state: PetState) {
@@ -521,7 +591,13 @@ fn initial_position(config: &PetConfig) -> (i32, i32) {
     match config.window_position {
         Some(position) => {
             if work_areas.is_empty()
-                || rect_has_visible_intersection(position.x, position.y, SIZE, SIZE, &work_areas)
+                || rect_has_visible_intersection(
+                    position.x,
+                    position.y,
+                    CANVAS_WIDTH,
+                    CANVAS_HEIGHT,
+                    &work_areas,
+                )
             {
                 (position.x, position.y)
             } else {
@@ -547,7 +623,14 @@ fn rect_has_visible_intersection(
 }
 
 fn default_position_for_work_area(area: WorkArea) -> (i32, i32) {
-    (area.right - SIZE - 24, area.bottom - SIZE - 48)
+    // 让桌宠（不是画布）右下角距工作区右下 (24, 48)，与原 128 画布行为视觉一致。
+    // 桌宠在画布右下角的相对位置：水平居中 + 垂直贴底。
+    let pet_right_in_canvas = (CANVAS_WIDTH + PET_AREA) / 2;
+    let pet_bottom_in_canvas = CANVAS_HEIGHT;
+    (
+        area.right - 24 - pet_right_in_canvas,
+        area.bottom - 48 - pet_bottom_in_canvas,
+    )
 }
 
 fn monitor_work_areas() -> Vec<WorkArea> {

@@ -5,7 +5,6 @@
 pub mod app;
 pub mod assets;
 pub mod bubble_store;
-pub mod bubble_window;
 pub mod config;
 pub mod focus_bridge;
 pub mod gif_animation;
@@ -20,3 +19,4 @@ pub mod runtime;
 pub mod state_machine;
 pub mod tray;
 pub mod vscode_launcher;
+pub mod x11_activate;

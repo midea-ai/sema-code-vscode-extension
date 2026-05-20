@@ -20,7 +20,10 @@ impl MenuAction {
     }
 }
 
-/// 与平台无关的菜单条目描述。
+/// 与平台无关的菜单条目描述。GTK 菜单与 SNI 托盘菜单走不同渲染路径
+/// （前者本地 GTK 主题，后者由 host 渲染），无法做到图标位置/间距一致。
+/// 选择两边都不画状态色圆点，仅靠 label 文本 "项目 — working" 传达状态，
+/// 保持视觉统一。
 #[derive(Debug, Clone)]
 pub enum MenuEntry {
     Item { label: String, action: MenuAction },
@@ -29,15 +32,23 @@ pub enum MenuEntry {
 }
 
 /// 按当前会话列表构造菜单条目，GTK 右键菜单与托盘菜单共用同一份。
+/// 会话按 (priority desc, last_event_at desc) 排序，与 mac 端一致。
 pub fn build_menu_entries(sessions: &[SessionSnapshot]) -> Vec<MenuEntry> {
     let mut entries = Vec::new();
 
     if sessions.is_empty() {
-        entries.push(MenuEntry::Disabled("No active sessions".to_string()));
+        entries.push(MenuEntry::Disabled("暂无活跃会话".to_string()));
     } else {
-        for session in sessions {
+        let mut sorted: Vec<&SessionSnapshot> = sessions.iter().collect();
+        sorted.sort_by(|a, b| {
+            b.state
+                .priority()
+                .cmp(&a.state.priority())
+                .then(b.last_event_at.cmp(&a.last_event_at))
+        });
+        for session in sorted {
             entries.push(MenuEntry::Item {
-                label: format!("{} - {}", session.project_name, state_label(session.state)),
+                label: format!("{} — {}", session.project_name, state_label(session.state)),
                 action: MenuAction::FocusSession(session.session_id.clone()),
             });
         }
@@ -45,7 +56,7 @@ pub fn build_menu_entries(sessions: &[SessionSnapshot]) -> Vec<MenuEntry> {
 
     entries.push(MenuEntry::Separator);
     entries.push(MenuEntry::Item {
-        label: "Exit Sema Pet".to_string(),
+        label: "退出桌宠".to_string(),
         action: MenuAction::Quit,
     });
     entries
@@ -78,7 +89,8 @@ impl ksni::Tray for PetTray {
     }
 
     fn icon_pixmap(&self) -> Vec<ksni::Icon> {
-        vec![paw_icon(32)]
+        // 提供多档分辨率，让不同 DE / 缩放率自行挑选，避免单档被强缩糊掉。
+        [22, 32, 48, 64].iter().map(|&size| paw_icon(size)).collect()
     }
 
     fn menu(&self) -> Vec<ksni::MenuItem<Self>> {
@@ -117,14 +129,18 @@ impl ksni::Tray for PetTray {
 }
 
 /// 生成爪印图标，ARGB32 像素数据（ksni 要求的格式）。
+/// 白色 + 撑满图标尺寸，对齐 mac 端的视觉。
 fn paw_icon(size: i32) -> ksni::Icon {
     let mut data = vec![0_u8; (size * size * 4) as usize];
-    let color = [0xff_u8, 0x8e, 0x8e, 0x8e]; // ARGB，灰色爪印
-    let scale = size as f32 / 23.0;
-    let paw_size = 11.0 * scale;
+    let color = [0xff_u8, 0xff, 0xff, 0xff]; // ARGB，白色爪印
+    // 双爪逻辑尺寸 16×11（宽×高，含 1px 间隙），让它填满整个图标。
+    let logical_w = 16.0;
+    let logical_h = 11.0;
+    let scale = (size as f32 / logical_w).min(size as f32 / logical_h);
+    let paw_size = 7.5 * scale;
     let gap = 1.0 * scale;
-    let total_width = 23.0 * scale;
-    let total_height = 16.0 * scale;
+    let total_width = paw_size * 2.0 + gap;
+    let total_height = 11.0 * scale;
     let left_x = (size as f32 - total_width) * 0.5;
     let top_y = (size as f32 - total_height) * 0.5;
     let left_y = top_y + 3.0 * scale;
@@ -143,11 +159,11 @@ fn paw_icon(size: i32) -> ksni::Icon {
 
 fn paint_paw(data: &mut [u8], size: i32, x: f32, y: f32, paw_size: f32, color: [u8; 4]) {
     let pads = [
-        (0.50, 0.62, 0.22),
-        (0.30, 0.35, 0.11),
-        (0.43, 0.25, 0.10),
-        (0.58, 0.25, 0.10),
-        (0.71, 0.35, 0.11),
+        (0.50, 0.62, 0.30),
+        (0.22, 0.30, 0.16),
+        (0.40, 0.18, 0.15),
+        (0.60, 0.18, 0.15),
+        (0.78, 0.30, 0.16),
     ];
     for (fx, fy, fr) in pads {
         fill_circle(
@@ -175,3 +191,4 @@ fn fill_circle(data: &mut [u8], size: i32, cx: f32, cy: f32, radius: f32, color:
         }
     }
 }
+

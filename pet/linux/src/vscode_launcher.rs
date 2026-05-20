@@ -24,6 +24,10 @@ pub fn launch_vscode_for_cwd(cwd: &str) -> bool {
 }
 
 pub fn should_launch_vscode_for_focus_attempt(_has_long_poll_waiter: bool) -> bool {
+    // 与 macOS FocusBridge::activateVSCodeWindow 对齐：每次聚焦都 spawn `code <cwd>`。
+    // mac 上 `code` CLI 会直接把已开的窗口（含最小化）提到前台；Linux 上 `code` CLI
+    // 不做 raise（甚至弹"已就绪"toast），所以 do_focus 还会同时调 X11 _NET_ACTIVE_WINDOW
+    // 来弥补。两者一起跑，效果对齐 macOS。
     true
 }
 

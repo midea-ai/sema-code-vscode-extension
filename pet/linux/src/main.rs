@@ -14,8 +14,20 @@ use sema_pet_linux::runtime::{RuntimeFile, RuntimeInfo};
 use sema_pet_linux::state_machine::{now_ms, StateMachine};
 
 fn main() {
+    // 必须 X11/Xwayland：桌宠靠 override-redirect 绕过 WM 实现 always-on-top
+    // （类比 Windows WS_EX_TOPMOST / macOS NSWindow.Level.floating）；
+    // Wayland 协议根本没有 OR 概念，应用也不能强制置顶。无条件强制 x11，
+    // 没有 X server / XWayland 就让 GTK init 报错，而不是悄悄退化到 Wayland
+    // 然后被 VS Code 等窗口盖住。用户显式设过 GDK_BACKEND 才尊重其意图。
+    if std::env::var_os("GDK_BACKEND").is_none() {
+        std::env::set_var("GDK_BACKEND", "x11");
+    }
+
     if gtk::init().is_err() {
-        eprintln!("Sema Pet: 无法初始化 GTK（缺少桌面环境或 GTK 运行时库？）");
+        eprintln!(
+            "Sema Pet: 无法初始化 GTK（需要 X11 或 XWayland —— \
+             桌宠依赖 X11 override-redirect 强制置顶，纯 Wayland 不支持）"
+        );
         std::process::exit(1);
     }
 

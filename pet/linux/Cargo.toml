@@ -23,6 +23,7 @@ cairo-rs = "0.18"
 pango = "0.18"
 pangocairo = "0.18"
 ksni = "0.2"
+xcb = "1.4"
 
 [profile.release]
 # 注意：不设 panic = "abort"。HTTP worker 线程 panic 不应拖垮整进程。
