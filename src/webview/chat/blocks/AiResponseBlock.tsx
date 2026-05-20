@@ -4,6 +4,7 @@ import { renderMarkdownToHtml, hasMarkdownFormatting } from '../utils/markdown';
 import { getResponseDot } from '../utils/symbols';
 import { streamingStore } from '../utils/StreamingStore';
 import { SessionContext } from '../SessionContext';
+import { CopyIcon, CheckIcon } from '../components/ui/IconButton';
 import '../style/markdown.css';
 
 interface AiResponseBlockProps {
@@ -21,9 +22,12 @@ const AiResponseBlock: React.FC<AiResponseBlockProps> = React.memo(({
 }) => {
     const sessionId = useContext(SessionContext);
     const contentRef = useRef<HTMLDivElement>(null);
+    const actionsRef = useRef<HTMLDivElement>(null);
     // 流式累积文本（ref 存最新值，state 驱动渲染）
     const streamBufferRef = useRef<string>('');
     const [streamContent, setStreamContent] = useState<string>('');
+    // 点击块时切换显示底部 actions（复制等）
+    const [showActions, setShowActions] = useState(false);
 
     // 合并文件路径验证和点击事件监听，只依赖 vscode
     useEffect(() => {
@@ -95,23 +99,33 @@ const AiResponseBlock: React.FC<AiResponseBlockProps> = React.memo(({
                         endLine: endLine
                     });
                 }
-            } else if (target.tagName === 'IMG') {
+                return;
+            }
+            if (target.tagName === 'IMG') {
                 const imgPath = target.getAttribute('data-img-path');
                 const imgUrl = target.getAttribute('data-img-url');
                 if (imgPath) {
                     event.preventDefault();
                     vscode.postMessage({ type: 'openFile', filePath: imgPath, line: 1 });
+                    return;
                 } else if (imgUrl) {
                     event.preventDefault();
                     vscode.postMessage({ type: 'openExternal', url: imgUrl });
+                    return;
                 }
-            } else if (target.tagName === 'A' && target.classList.contains('md-url-link')) {
+            }
+            if (target.tagName === 'A' && target.classList.contains('md-url-link')) {
                 event.preventDefault();
                 const url = target.getAttribute('data-url');
                 if (url) {
                     vscode.postMessage({ type: 'openExternal', url });
                 }
+                return;
             }
+            // 用户正在选择文字时不切换 actions
+            const selection = window.getSelection();
+            if (selection && selection.toString().length > 0) return;
+            setShowActions(prev => !prev);
         };
 
         contentRef.current.addEventListener('click', handleFilePathClick);
@@ -150,6 +164,25 @@ const AiResponseBlock: React.FC<AiResponseBlockProps> = React.memo(({
     const trimmedContent = displayText.replace(/^\n+|\n+$/g, '');
     const needsMarkdown = hasMarkdownFormatting(trimmedContent);
 
+    const [copied, setCopied] = useState(false);
+    const copyTimerRef = useRef<number | null>(null);
+    const handleCopy = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        const text = trimmedContent;
+        if (!text) return;
+        navigator.clipboard.writeText(text).then(() => {
+            setCopied(true);
+            if (copyTimerRef.current) window.clearTimeout(copyTimerRef.current);
+            copyTimerRef.current = window.setTimeout(() => {
+                setShowActions(false);
+                setCopied(false);
+            }, 1000);
+        }).catch(() => { /* ignore */ });
+    };
+    useEffect(() => () => {
+        if (copyTimerRef.current) window.clearTimeout(copyTimerRef.current);
+    }, []);
+
     const htmlContent = useMemo(() => {
         if (!needsMarkdown || !trimmedContent) return null;
         // 流式阶段不传 vscode，避免对未完成内容发起文件路径验证请求
@@ -160,6 +193,15 @@ const AiResponseBlock: React.FC<AiResponseBlockProps> = React.memo(({
     if (!trimmedContent && !isStreaming) {
         return null;
     }
+
+    const canShowActions = !isStreaming && !!trimmedContent && showActions;
+
+    // actions 出现时若超出视口（例如响应已触底），把它带回可见区域
+    useEffect(() => {
+        if (canShowActions && actionsRef.current) {
+            actionsRef.current.scrollIntoView({ block: 'nearest' });
+        }
+    }, [canShowActions]);
 
     return (
         <div className="ai-resp-block">
@@ -174,6 +216,18 @@ const AiResponseBlock: React.FC<AiResponseBlockProps> = React.memo(({
                     <span style={{ whiteSpace: 'pre-wrap' }}>{trimmedContent}</span>
                 )}
             </div>
+            {canShowActions && (
+                <div className="ai-resp-actions" ref={actionsRef}>
+                    <button
+                        className="ai-resp-action-btn"
+                        title={copied ? '已复制' : '复制原始内容'}
+                        onClick={handleCopy}
+                    >
+                        {copied ? <CheckIcon /> : <CopyIcon />}
+                        <span className="ai-resp-action-label">{copied ? '已复制' : '复制'}</span>
+                    </button>
+                </div>
+            )}
         </div>
     );
 }, (prev, next) => {

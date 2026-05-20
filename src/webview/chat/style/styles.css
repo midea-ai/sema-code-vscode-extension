@@ -262,10 +262,58 @@ code, pre, .code {
 
 .ai-resp-block {
     display: flex;
+    flex-direction: column;
     margin: var(--chat-block-margin);
     width: var(--chat-block-max-width);
     max-width: var(--chat-block-max-width);
     box-sizing: border-box;
+}
+
+/* AI 响应底部操作栏 - 点击块时显示，未展开时不渲染、不占空间 */
+.ai-resp-actions {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-top: 6px;
+    padding-left: 8px;
+}
+
+.ai-resp-action-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    height: 22px;
+    padding: 0 10px;
+    background-color: var(--chat-bg-hover);
+    border: none;
+    border-radius: 4px;
+    color: var(--chat-color-muted);
+    cursor: pointer;
+    font-size: var(--chat-font-sm);
+    line-height: 1;
+    transition: background-color 0.15s, color 0.15s;
+}
+
+.ai-resp-action-btn > svg {
+    width: 12px;
+    height: 12px;
+    flex-shrink: 0;
+    display: block;
+}
+
+.ai-resp-action-label {
+    line-height: 12px;
+    display: inline-block;
+}
+
+.ai-resp-action-btn:hover {
+    background-color: var(--chat-bg-hover);
+    color: var(--chat-color-muted-hover);
+}
+
+.ai-resp-action-btn:active {
+    background-color: var(--chat-bg-active);
 }
 
 .output-line.ai-response {
