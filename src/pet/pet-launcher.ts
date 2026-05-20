@@ -122,11 +122,18 @@ async function spawnBinary(): Promise<boolean> {
     try { spawnSync('xattr', ['-dr', 'com.apple.quarantine', BIN_PATH]); } catch {}
   }
 
+  // Linux 下强制 GDK_BACKEND=x11：Wayland 协议禁止应用强制置顶，桌宠会被
+  // VS Code 等任意窗口盖住；走 XWayland 后才能让 _NET_WM_STATE_ABOVE / Dock
+  // 类型 hint 生效。在 spawn env 上注入比依赖二进制内 set_var 更可靠，
+  // 老版本二进制也能受益。无 XWayland 的纯 Wayland 环境下进程会启动失败 —
+  // 这是 Wayland 协议层的限制，没有客户端能绕开。
+  const extraEnv: NodeJS.ProcessEnv =
+    process.platform === 'linux' ? { GDK_BACKEND: 'x11' } : {};
   const child = spawn(BIN_PATH, [], {
     detached: true,
     stdio: 'ignore',
     windowsHide: true,
-    env: { ...process.env, SEMA_PET_PORT: String(PET_PORT) },
+    env: { ...process.env, ...extraEnv, SEMA_PET_PORT: String(PET_PORT) },
   });
   child.unref();
 
