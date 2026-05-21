@@ -21,6 +21,7 @@ const BIN_NAME = process.platform === 'win32' ? 'SemaPet.exe' : 'SemaPet';
 const BIN_PATH = path.join(BIN_DIR, BIN_NAME);
 const RESOURCE_BUNDLE_PATH = path.join(BIN_DIR, 'SemaPet_SemaPet.bundle');
 const INSTALLED_META_PATH = path.join(BIN_DIR, '.installed-meta.json');
+const SPAWN_READY_TIMEOUT_MS = 15000;  // 冷启动首启较慢，放宽就绪等待上限
 
 interface InstalledMeta {
   zipSize: number;
@@ -137,9 +138,14 @@ async function spawnBinary(): Promise<boolean> {
   });
   child.unref();
 
-  for (let i = 0; i < 30; i++) {
-    await new Promise(r => setTimeout(r, 50));
+  // 冷启动（首次安装后第一次跑）较慢：dyld/Gatekeeper 扫描、GTK/AppKit 与窗口
+  // 初始化都要时间。老的 ~1.5s 上限会让首启没来得及就绪就放弃、进而漏掉注册
+  // （桌宠进程是 detached 的，仍会在后台起来并显示，但项目没注册进去 → 活跃会话为空）。
+  // 放宽到 ~15s，等桌宠真正起来后再注册。
+  const deadline = Date.now() + SPAWN_READY_TIMEOUT_MS;
+  while (Date.now() < deadline) {
     if (await ping()) return true;
+    await new Promise(r => setTimeout(r, 200));
   }
   return false;
 }

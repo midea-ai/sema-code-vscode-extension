@@ -27,31 +27,16 @@ class PetClient {
   private registered = false;
   private disposed = false;
   private polling = false;
-  // 在 register 完成前事件订阅可能就开始推送，缓存最后一次 state，register 成功后重放，
-  // 避免首次启用桌宠时丢失启动窗口期内的状态变化。
-  private pendingState: PetState | null = null;
-  private pendingSays: SayPayload[] = [];
 
   async register(cwd: string): Promise<boolean> {
-    const payload = { sessionId: this.sessionId, cwd, clientPid: process.pid } satisfies RegisterPayload;
+    const payload = {
+      sessionId: this.sessionId, cwd, clientPid: process.pid,
+    } satisfies RegisterPayload;
     for (let i = 0; i < REGISTER_RETRY; i++) {
-      const ok = await this.post('/session/register', payload, REGISTER_TIMEOUT_MS);
-      if (ok) {
+      if (await this.post('/session/register', payload, REGISTER_TIMEOUT_MS)) {
         this.registered = true;
         this.disposed = false;
         this.startLongPoll();
-        if (this.pendingState) {
-          const replay = this.pendingState;
-          this.pendingState = null;
-          void this.post('/state', {
-            sessionId: this.sessionId, state: replay, ts: Date.now(),
-          } satisfies StatePayload);
-        }
-        const pendingSays = this.pendingSays;
-        this.pendingSays = [];
-        for (const payload of pendingSays) {
-          void this.post('/say', payload);
-        }
         return true;
       }
       await new Promise(r => setTimeout(r, REGISTER_RETRY_INTERVAL_MS));
@@ -59,35 +44,25 @@ class PetClient {
     return false;
   }
 
+  // 注册前的事件一律不缓存、不重放：桌宠就绪并注册成功后，后续状态变化才会送达。
+  // （桌宠是否就绪由 ensurePetRunning 的就绪等待保证，注册不会抢在桌宠起来之前。）
   state(state: PetState): void {
-    if (this.disposed) return;
-    if (!this.registered) {
-      this.pendingState = state;
-      return;
-    }
+    if (this.disposed || !this.registered) return;
     void this.post('/state', {
       sessionId: this.sessionId, state, ts: Date.now(),
     } satisfies StatePayload);
   }
 
   say(text: string, opts: SayOptions = {}): void {
-    if (this.disposed) return;
-    const payload = {
+    if (this.disposed || !this.registered) return;
+    void this.post('/say', {
       sessionId: this.sessionId, text: truncateSay(text), ...opts,
-    } satisfies SayPayload;
-    if (!this.registered) {
-      this.pendingSays.push(payload);
-      if (this.pendingSays.length > 3) this.pendingSays.shift();
-      return;
-    }
-    void this.post('/say', payload);
+    } satisfies SayPayload);
   }
 
   async dispose(): Promise<void> {
     if (this.disposed) return;
     this.disposed = true;
-    this.pendingState = null;
-    this.pendingSays = [];
     if (this.registered) {
       this.registered = false;
       await this.post('/session/unregister', { sessionId: this.sessionId });

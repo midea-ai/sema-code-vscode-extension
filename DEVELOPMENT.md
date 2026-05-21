@@ -1,13 +1,5 @@
 # Sema Code VSCode Extension 开发文档
 
-## 目录
-
-- [开发环境搭建](#开发环境搭建)
-- [构建系统](#构建系统)
-- [打包与发布](#打包与发布)
-- [调试指南](#调试指南)
-
-
 ## 开发环境搭建
 
 ### 前置要求
@@ -26,48 +18,27 @@ cd sema-code-vscode-extension
 # 2. 安装依赖
 npm install
 
-# 3. 编译项目
+# 3. 准备桌宠 zip（→ dist/pet/）—— 二选一
+npm run pet:fetch     # 从 pet-assets Release 拉全平台最新 zip（发布扩展用）
+npm run pet:build     # 现场编译当前平台桌宠（改了桌宠源码 / F5 调试用）
+#   详细说明见 pet/README.md
+#   准备好的 zip 落在 dist/pet/，各平台对应：
+#     dist/pet/sema-pet-darwin-arm64.zip   # macOS Apple Silicon
+#     dist/pet/sema-pet-darwin-x64.zip     # macOS Intel
+#     dist/pet/sema-pet-win32-x64.zip      # Windows x64
+#   （pet:build 只产出当前平台那一份；pet:fetch 三份齐全）
+
+# 4. 编译项目
 npm run compile
 
-# 4. 在 VSCode 中按 F5 启动调试
+# 5. 在 VSCode 中按 F5 启动调试
 #    这将打开一个新的 Extension Development Host 窗口
 ```
 
+> 发布扩展走 `npm run pet:fetch`：桌宠 zip 以 `pet-assets` Release 上的为准，三平台齐全。
+> `npm run pet:build` 只编译当前平台（Mac 上出不了 Windows 桌宠），用于改桌宠源码后本地验证。
+
 ## 构建系统
-
-### Webpack 配置
-
-项目使用 4 个独立的 Webpack 配置，分别构建不同的目标产物：
-
-| 配置 | 目标 | 入口 | 产物 |
-|||||
-| `extensionConfig` | Node.js | `src/extension.ts` | `dist/extension.js` |
-| `chatWebviewConfig` | Web | `src/webview/chat/index.tsx` | `dist/webview/chat.js` |
-| `configWebviewConfig` | Web | `src/webview/config/index.tsx` | `dist/webview/config.js` |
-| `sessionHistoryWebviewConfig` | Web | `src/webview/sessionHistory/index.tsx` | `dist/webview/sessionHistory.js` |
-
-### 编译差异
-
-- **Extension 代码**：使用 `ts-loader` + `tsconfig.json`，目标为 CommonJS
-- **Webview 代码**：使用 `babel-loader` + `.babelrc.json`，支持 JSX/TSX 转译
-- **外部模块**：`vscode` 和 `@vscode/ripgrep` 标记为 externals，不打包
-
-### 产物结构
-
-```
-dist/
-├── extension.js              # Extension Host 代码
-└── webview/
-    ├── chat.js               # 聊天界面
-    ├── config.js             # 配置面板
-    └── sessionHistory.js     # 会话历史面板
-```
-
-
-
-
-## 打包与发布
-
 ### 多平台打包
 
 ```bash
@@ -81,31 +52,13 @@ dist/
 # sema-vscode-extension-win32-x64-<version>.vsix
 ```
 
-### 发布到 Marketplace
-
-```bash
-# 需要先登录或使用 PAT
-vsce login <publisher>
-
-# 发布所有平台包
-for vsix in sema-vscode-extension-*.vsix; do
-    vsce publish --packagePath "$vsix"
-done
-```
+> package-all.sh 给每个平台 vsix 只塞它自己那一份桌宠 zip（linux 无桌宠），`dist/pet/` 在打包结束后恢复成全部 zip。
 
 ### .vscodeignore
 
 打包时排除开发相关文件（源码、配置文件等），仅包含 `dist/` 产物和必要资源。
 
-
-
 ## 调试指南
-
-### 调试 Webview
-
-- 在 Extension Development Host 窗口中，按 `Ctrl+Shift+P`
-- 执行 `Developer: Open Webview Developer Tools`
-- 可以在浏览器开发者工具中调试 React 组件
 
 ### 预览模式（Preview Mode）
 
