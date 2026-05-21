@@ -75,7 +75,8 @@ fn handle_connection(
             };
             let mut state = state_machine.lock().unwrap();
             let removed = state.sweep_stale(is_process_alive);
-            state.register(payload.session_id, payload.cwd, payload.client_pid, now_ms());
+            let registered =
+                state.register(payload.session_id, payload.cwd, payload.client_pid, now_ms());
             drop(state);
             if !removed.is_empty() {
                 let mut bubbles = bubble_store.lock().unwrap();
@@ -87,7 +88,12 @@ fn handle_connection(
             if !removed.is_empty() {
                 let _ = ui_tx.send(UiMessage::BubblesChanged);
             }
-            write_json(&mut stream, 200, r#"{"ok":true}"#)
+            if registered {
+                write_json(&mut stream, 200, r#"{"ok":true}"#)
+            } else {
+                // 同一 cwd 已被别的会话占用：回 409，扩展端 register() 据此判定失败。
+                write_json(&mut stream, 409, r#"{"ok":false,"error":"cwd already registered"}"#)
+            }
         }
         ("POST", "/session/unregister") => {
             let Some(payload) = parse_json::<UnregisterPayload>(&mut stream, &parsed)? else {
@@ -217,6 +223,7 @@ fn write_json(stream: &mut TcpStream, status: u16, body: &str) -> std::io::Resul
         200 => "OK",
         400 => "Bad Request",
         404 => "Not Found",
+        409 => "Conflict",
         503 => "Service Unavailable",
         _ => "Internal Server Error",
     };

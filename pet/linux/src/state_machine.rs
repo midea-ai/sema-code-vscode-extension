@@ -29,13 +29,23 @@ pub struct StateMachine {
 }
 
 impl StateMachine {
+    /// 返回是否注册成功；同一 cwd 已被「其它」会话占用时拒绝（返回 false），
+    /// 与 mac StateMachine.register 对齐 —— 扩展端据此回退（HTTP 409 → register 失败）。
+    /// 同一 session_id 重新注册不受自己占用影响，照常覆盖更新。
     pub fn register(
         &mut self,
         session_id: String,
         cwd: String,
         client_pid: Option<u32>,
         now_ms: u64,
-    ) {
+    ) -> bool {
+        let occupied_by_other = self
+            .sessions
+            .iter()
+            .any(|(id, session)| id != &session_id && session.cwd == cwd);
+        if occupied_by_other {
+            return false;
+        }
         let project_name = project_name_from_cwd(&cwd);
         self.sessions.insert(
             session_id.clone(),
@@ -48,6 +58,7 @@ impl StateMachine {
                 client_pid,
             },
         );
+        true
     }
 
     pub fn unregister(&mut self, session_id: &str) -> bool {

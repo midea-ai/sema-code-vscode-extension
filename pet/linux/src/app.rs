@@ -19,7 +19,7 @@ use crate::pet_window::{PetWindow, CANVAS_HEIGHT, CANVAS_WIDTH, PET_AREA};
 use crate::process::is_process_alive;
 use crate::protocol::PetState;
 use crate::state_machine::{now_ms, SessionSnapshot, StateMachine};
-use crate::tray::{build_menu_entries, MenuAction, MenuEntry, PetTray};
+use crate::tray::{build_menu_entries, MenuEntry, PetTray};
 use crate::vscode_launcher::{launch_vscode_for_cwd, should_launch_vscode_for_focus_attempt};
 use crate::x11_activate::raise_window_for_cwd;
 
@@ -27,6 +27,7 @@ const DRAG_THRESHOLD: i32 = 4;
 const MIN_VISIBLE_SIZE: i32 = 32;
 const BUBBLE_SWEEP_MS: u64 = 500;
 const STALE_SWEEP_SECS: u64 = 30;
+const SLEEP_TICK_SECS: u64 = 30;
 
 /// 协调器：持有桌宠窗 / 托盘句柄，把 HTTP、定时器、输入事件
 /// 汇集到一处处理。对应 Windows 端的 WindowCoordinator。
@@ -49,6 +50,12 @@ pub struct App {
     current_state: PetState,
     anim_generation: u64,
     last_bubbles: Vec<BubbleItem>,
+    /// 当前打开的右键菜单。强制单例：每次 show_menu 都会先 popdown 旧的，
+    /// 避免多次右键累积出 N 个面板。
+    current_menu: Option<gtk::Menu>,
+    /// 菜单打开期间铺在全屏的透明点击遮罩。GtkMenu 的 seat grab 在本机 WM 下
+    /// 不覆盖整屏（菜单外、桌面上的点击关不了菜单），用它接管那些点击。
+    menu_backdrop: Option<gtk::Window>,
 }
 
 /// 装配并启动桌宠：建窗口、起托盘、接线信号与定时器。调用方随后跑 `gtk::main()`。
@@ -119,6 +126,17 @@ pub fn start(
         let app = Rc::clone(&app);
         glib::timeout_add_local(Duration::from_secs(STALE_SWEEP_SECS), move || {
             App::on_stale_sweep(&app);
+            glib::ControlFlow::Continue
+        });
+    }
+
+    // idle → sleeping 自动切换：周期性重算状态，对齐 mac StateMachine.startSleepTimer。
+    // 全部会话 idle 满阈值（state_machine SLEEPING_AFTER_MS）后，无需任何事件即可切到
+    // sleeping —— on_state_changed 仅在状态真正变化时才切动画，未变时只刷新托盘，开销很低。
+    {
+        let app = Rc::clone(&app);
+        glib::timeout_add_local(Duration::from_secs(SLEEP_TICK_SECS), move || {
+            App::on_state_changed(&app);
             glib::ControlFlow::Continue
         });
     }
@@ -200,6 +218,8 @@ impl App {
             current_state: PetState::Idle,
             anim_generation: 0,
             last_bubbles: Vec::new(),
+            current_menu: None,
+            menu_backdrop: None,
         }
     }
 
@@ -264,7 +284,18 @@ impl App {
     }
 
     fn show_menu(app: &Rc<RefCell<App>>, event: &gdk::EventButton) {
-        let (sessions, ui_tx, parent) = {
+        // 1) 单例：旧菜单 + 旧遮罩先收掉，避免连续右键叠出多个面板。
+        {
+            let mut a = app.borrow_mut();
+            if let Some(old) = a.current_menu.take() {
+                old.popdown();
+            }
+            if let Some(bd) = a.menu_backdrop.take() {
+                bd.close();
+            }
+        }
+
+        let (sessions, ui_tx) = {
             let a = app.borrow();
             let sessions = a
                 .state_machine
@@ -272,79 +303,67 @@ impl App {
                 .unwrap()
                 .snapshot(now_ms())
                 .sessions;
-            (sessions, a.ui_tx.clone(), a.pet.widget().clone())
+            (sessions, a.ui_tx.clone())
         };
 
-        // 用 GtkPopover 而非 GtkMenu：父窗口是 Dock type hint + skip_taskbar，
-        // GtkMenu 在这种父窗口下 popup_at_pointer 走 toplevel + GdkSeat::grab
-        // 路径，X server 不给 Dock 子代建立全屏 pointer grab，外部点击根本路由
-        // 不到菜单。GtkPopover 是嵌在父 widget 内部的浮层，set_modal(true) 时
-        // GTK 自己接管 outside-click dismiss，不依赖 X server 级 grab。
-        let popover = gtk::Popover::new(Some(&parent));
-        popover.set_modal(true);
-        popover.set_position(gtk::PositionType::Top);
-        popover.set_pointing_to(&gdk::Rectangle::new(
-            event.x() as i32,
-            event.y() as i32,
-            1,
-            1,
-        ));
-
-        // 行索引 → 触发动作的查表，row-activated 时按索引找。
-        let actions: Rc<RefCell<Vec<Option<MenuAction>>>> = Rc::new(RefCell::new(Vec::new()));
-        let listbox = gtk::ListBox::new();
-        listbox.set_selection_mode(gtk::SelectionMode::None);
-
+        // 2) gtk::Menu：对齐 mac 的 NSMenu.popUp，GTK 自管 ESC / 键盘导航 / item 点击。
+        let menu = gtk::Menu::new();
         for entry in build_menu_entries(&sessions) {
-            let row = gtk::ListBoxRow::new();
             match entry {
                 MenuEntry::Item { label, action } => {
-                    let lbl = gtk::Label::new(Some(&label));
-                    lbl.set_xalign(0.0);
-                    lbl.set_margin_start(12);
-                    lbl.set_margin_end(12);
-                    lbl.set_margin_top(6);
-                    lbl.set_margin_bottom(6);
-                    row.add(&lbl);
-                    actions.borrow_mut().push(Some(action));
+                    let item = gtk::MenuItem::with_label(&label);
+                    let tx = ui_tx.clone();
+                    item.connect_activate(move |_| {
+                        let _ = tx.send(action.to_message());
+                    });
+                    menu.append(&item);
                 }
                 MenuEntry::Disabled(label) => {
-                    let lbl = gtk::Label::new(Some(&label));
-                    lbl.set_xalign(0.0);
-                    lbl.set_margin_start(12);
-                    lbl.set_margin_end(12);
-                    lbl.set_margin_top(6);
-                    lbl.set_margin_bottom(6);
-                    lbl.set_sensitive(false);
-                    row.set_selectable(false);
-                    row.set_activatable(false);
-                    row.add(&lbl);
-                    actions.borrow_mut().push(None);
+                    let item = gtk::MenuItem::with_label(&label);
+                    item.set_sensitive(false);
+                    menu.append(&item);
                 }
                 MenuEntry::Separator => {
-                    let sep = gtk::Separator::new(gtk::Orientation::Horizontal);
-                    row.set_selectable(false);
-                    row.set_activatable(false);
-                    row.add(&sep);
-                    actions.borrow_mut().push(None);
+                    menu.append(&gtk::SeparatorMenuItem::new());
                 }
             }
-            listbox.add(&row);
+        }
+        menu.show_all();
+
+        // 3) 全屏透明遮罩接管「菜单外」的点击。GtkMenu 的 seat grab 在本机 WM 下
+        //    不覆盖整屏：点小猫能关（pet 主窗本进程收事件→GTK 关菜单），但点桌面
+        //    其他位置关不掉（那些点击不进本进程事件队列）。遮罩铺满全屏、置顶且
+        //    透明，吃下这些点击并关菜单。点击落在遮罩 = 菜单外 = 关闭。
+        let backdrop = build_menu_backdrop();
+        {
+            let menu = menu.clone();
+            backdrop.connect_button_press_event(move |_w, _e| {
+                menu.popdown();
+                glib::Propagation::Stop
+            });
+        }
+        backdrop.show();
+
+        // selection-done 覆盖「点 item / 点遮罩 / 点小猫 / ESC」所有关闭路径,
+        // 统一收遮罩 + 清状态。
+        {
+            let app = Rc::clone(app);
+            let backdrop = backdrop.clone();
+            menu.connect_selection_done(move |_| {
+                backdrop.close();
+                let mut a = app.borrow_mut();
+                a.current_menu = None;
+                a.menu_backdrop = None;
+            });
         }
 
-        let popover_ref = popover.clone();
-        let actions_ref = Rc::clone(&actions);
-        listbox.connect_row_activated(move |_, row| {
-            let idx = row.index() as usize;
-            if let Some(Some(action)) = actions_ref.borrow().get(idx) {
-                let _ = ui_tx.send(action.to_message());
-            }
-            popover_ref.popdown();
-        });
+        // 遮罩先 show、菜单后 popup：两者都是 override-redirect 窗口，按 map 顺序
+        // 堆叠 → 菜单稳定盖在遮罩之上，菜单项正常可点。
+        menu.popup_at_pointer(Some(event));
 
-        popover.add(&listbox);
-        popover.show_all();
-        popover.popup();
+        let mut a = app.borrow_mut();
+        a.current_menu = Some(menu);
+        a.menu_backdrop = Some(backdrop);
     }
 
     // ---- UiMessage 分发 ----
@@ -555,6 +574,62 @@ impl App {
             .with_window_position(self.position.0, self.position.1);
         let _ = config.save(&self.config_path);
     }
+}
+
+/// 菜单的全屏点击遮罩：透明、置顶、不抢焦点，铺满所有显示器的并集区域。
+/// 仅用于捕获「菜单外」的点击来关闭菜单（见 show_menu）。
+fn build_menu_backdrop() -> gtk::Window {
+    let backdrop = gtk::Window::new(gtk::WindowType::Popup);
+    backdrop.set_decorated(false);
+    backdrop.set_resizable(false);
+    backdrop.set_skip_taskbar_hint(true);
+    backdrop.set_skip_pager_hint(true);
+    backdrop.set_keep_above(true);
+    backdrop.set_accept_focus(false);
+    backdrop.set_app_paintable(true);
+    if let Some(screen) = gdk::Screen::default() {
+        if let Some(rgba) = screen.rgba_visual() {
+            backdrop.set_visual(Some(&rgba));
+        }
+    }
+    // 全透明绘制：用户无感，只接收点击。
+    backdrop.connect_draw(|_w, cr| {
+        cr.set_operator(cairo::Operator::Source);
+        cr.set_source_rgba(0.0, 0.0, 0.0, 0.0);
+        let _ = cr.paint();
+        glib::Propagation::Proceed
+    });
+    backdrop.add_events(gdk::EventMask::BUTTON_PRESS_MASK);
+
+    let (x, y, w, h) = all_monitors_bounds();
+    backdrop.set_default_size(w, h);
+    backdrop.move_(x, y);
+    backdrop.resize(w, h);
+    backdrop
+}
+
+/// 所有显示器几何（含任务栏区域）的并集外接矩形：(x, y, width, height)。
+/// 遮罩要盖住整屏，所以用 geometry 而非 workarea。
+fn all_monitors_bounds() -> (i32, i32, i32, i32) {
+    let Some(display) = gdk::Display::default() else {
+        return (0, 0, 1920, 1080);
+    };
+    let (mut min_x, mut min_y) = (i32::MAX, i32::MAX);
+    let (mut max_x, mut max_y) = (i32::MIN, i32::MIN);
+    for index in 0..display.n_monitors() {
+        let Some(monitor) = display.monitor(index) else {
+            continue;
+        };
+        let geo = monitor.geometry();
+        min_x = min_x.min(geo.x());
+        min_y = min_y.min(geo.y());
+        max_x = max_x.max(geo.x() + geo.width());
+        max_y = max_y.max(geo.y() + geo.height());
+    }
+    if min_x == i32::MAX {
+        return (0, 0, 1920, 1080);
+    }
+    (min_x, min_y, max_x - min_x, max_y - min_y)
 }
 
 fn fallback_pixbuf(state: PetState) -> Pixbuf {

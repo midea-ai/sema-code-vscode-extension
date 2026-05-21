@@ -2,6 +2,12 @@
 
 跟 `src/pet/` 扩展端配套的原生桌宠进程。桌宠和扩展是两个进程，通过 `127.0.0.1:24700` 通信。扩展激活时按 `runtime.json` → `/health` 探活 → spawn 本地二进制的顺序找桌宠。
 
+三平台各自原生实现，产物统一叫 `SemaPet`：
+
+- **macOS**：Swift + AppKit，产物 `.build/release/SemaPet`
+- **Windows**：Rust + windows-sys + Win32 API，产物 `target\release\SemaPet.exe`
+- **Linux**：Rust + GTK3，产物 `target/release/SemaPet`
+
 ## macOS
 
 技术栈：Swift + AppKit，源码在 `pet/macos/`。要求 macOS 12+，Swift 5.7+。
