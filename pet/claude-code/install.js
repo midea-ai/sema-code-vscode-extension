@@ -9,7 +9,7 @@
 // 做两件事：
 //   1. 把 hook.js + lib/ 拷到稳定路径 ~/.sema/pet/claude-code/，
 //      让全局 hooks 不依赖本仓库 checkout 位置（改了脚本要重跑本命令同步）。
-//   2. 幂等地把 7 个 hook 合并进 ~/.claude/settings.json，只动自己写的那几条。
+//   2. 幂等地把桌宠 hook 合并进 ~/.claude/settings.json，只动自己写的那几条。
 
 'use strict';
 
@@ -23,15 +23,18 @@ const STABLE_DIR = path.join(PET_DIR, 'claude-code');
 const HOOK_PATH = path.join(STABLE_DIR, 'hook.js');
 const SETTINGS_PATH = path.join(os.homedir(), '.claude', 'settings.json');
 
-// Claude Code hook 事件 → hook.js 的事件参数。matcher 仅工具事件需要。
+// Claude Code hook 事件 → hook.js 指令（见 hook.js 顶部）。args 是该事件要跑的一条或多条
+// 指令；多个 hook 可共用同一指令，hook.js 不认识 Claude 的 hook 名。matcher 仅工具/权限事件需要。
+//
+// attention 走 PermissionRequest（弹窗显示前同步触发，无延迟），不用 Notification（权限通知有
+// ~60s idle 延迟）。中断/拒绝后回落缺收尾 hook 信号，属已知不支持，详见 README「不支持的情况」。
 const HOOKS = [
-  { event: 'SessionStart', arg: 'session-start' },
-  { event: 'UserPromptSubmit', arg: 'prompt-submit' },
-  { event: 'PreToolUse', arg: 'pre-tool', matcher: '*' },
-  { event: 'PostToolUse', arg: 'post-tool', matcher: '*' },
-  { event: 'Notification', arg: 'notification' },
-  { event: 'Stop', arg: 'stop' },
-  { event: 'SessionEnd', arg: 'session-end' },
+  { event: 'SessionStart', args: ['register'] },
+  { event: 'UserPromptSubmit', args: ['state working'] },
+  { event: 'PostToolUse', args: ['state working'], matcher: '*' },
+  { event: 'PermissionRequest', args: ['state attention', 'say 需要你确认'], matcher: '*' },
+  { event: 'Stop', args: ['state idle'] },
+  { event: 'SessionEnd', args: ['unregister'] },
 ];
 
 // 命令里用绝对 node 路径 + 稳定 hook 路径，统一正斜杠（Windows 的 node 也认）。
@@ -103,9 +106,9 @@ function install() {
   const settings = readSettings();
   stripOurs(settings);
   settings.hooks = settings.hooks || {};
-  for (const { event, arg, matcher } of HOOKS) {
+  for (const { event, args, matcher } of HOOKS) {
     settings.hooks[event] = settings.hooks[event] || [];
-    const group = { hooks: [{ type: 'command', command: toCmd(arg) }] };
+    const group = { hooks: args.map((a) => ({ type: 'command', command: toCmd(a) })) };
     if (matcher) group.matcher = matcher;
     settings.hooks[event].push(group);
   }
