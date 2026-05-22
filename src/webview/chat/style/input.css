@@ -260,7 +260,7 @@
 /* contentEditable 占位符：仅当编辑器为空时显示 */
 .input-editable[contenteditable="true"]:empty::before {
     content: attr(data-placeholder);
-    color: var(--chat-color-muted);
+    color: var(--chat-text-placeholder);
     pointer-events: none;
 }
 

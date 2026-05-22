@@ -25,7 +25,7 @@
     --chat-text-input: var(--vscode-input-foreground);
     --chat-text-link: var(--vscode-textLink-foreground);
     --chat-text-link-active: var(--vscode-textLink-activeForeground);
-    --chat-text-placeholder: var(--vscode-input-placeholderForeground);
+    --chat-text-placeholder: var(--vscode-input-placeholderForeground, var(--vscode-descriptionForeground));
     --chat-text-terminal-green: var(--vscode-terminal-ansiGreen);
     --chat-text-terminal-cyan: var(--vscode-terminal-ansiBrightCyan);
     --chat-text-symbol: var(--vscode-symbolIcon-variableForeground);
