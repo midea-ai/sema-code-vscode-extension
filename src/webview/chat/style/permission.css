@@ -298,7 +298,7 @@ body.vscode-light .bash-permission-content {
 }
 
 body.vscode-light .ask-form-dialog {
-    background-color: var(--chat-bg-primary);
+    background-color: var(--chat-bg-light);
 }
 
 .ask-form-dialog:focus,

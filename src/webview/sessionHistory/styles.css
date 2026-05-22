@@ -42,8 +42,8 @@ body {
 
 .session-item {
     padding: 16px;
-    background-color: var(--vscode-input-background);
-    border: 1px solid var(--vscode-input-border);
+    background-color: var(--vscode-editorWidget-background, var(--vscode-input-background));
+    border: 1px solid var(--vscode-input-border, var(--vscode-panel-border));
     border-radius: 6px;
     cursor: pointer;
     transition: all 0.2s;
