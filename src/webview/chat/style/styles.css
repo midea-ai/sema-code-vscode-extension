@@ -135,29 +135,50 @@ code, pre, .code {
     margin-bottom: 12px;
 }
 
+/* 用户输入轮次：作为粘性吸顶的定位容器，覆盖到下一条用户输入前 */
+.turn-group {
+    display: block;
+}
+
+/* 用户输入块所在 msg-wrap 在本轮内吸顶 */
+.msg-wrap--sticky-user {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    /* 覆盖 .msg-wrap 默认的 content-visibility:auto，保证吸顶时始终参与布局 */
+    content-visibility: visible;
+    /* 顶部留白（不透明）：吸顶时上方不贴边、不透出下方内容，同时隔断子元素 margin 折叠 */
+    padding-top: 8px;
+    /* 边框外（上/左/右）用 chat 页面背景色 B，不透明 */
+    background: var(--chat-page-bg);
+}
+
+/* 吸顶头部底部的透明度过渡：内容滚到下方时柔和淡出，而非被硬边切断（同样用页面背景色 B） */
+.msg-wrap--sticky-user::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: -10px;
+    height: 10px;
+    background: linear-gradient(to bottom, var(--chat-page-bg), transparent);
+    pointer-events: none;
+}
+
 /* 用户输入块组件 */
 .user-input-block {
-    display: flex;
-    align-items: flex-start;
-    padding: 8px 10px;
-    margin: var(--chat-block-margin);
+    position: relative;
+    padding: 8px 10px 10px;
+    /* 左右往外一点（去掉 max-width 让它更宽）；顶部留白由 wrap padding-top 提供，这里只留底部空间 */
+    margin: 0 4px 8px;
+    border-radius: var(--chat-radius-md);
+    /* 细边框，让输入块更分明 */
     border: 1px solid var(--chat-border-input);
-    border-radius: var(--chat-radius-sm);
-    background-color: var(--chat-bg-primary);
-    max-width: var(--chat-block-max-width);
-
-    /* 严格限制为3行，允许滚动 */
-    line-height: 1.4;
-    /* 设置合适的行高 */
-    max-height: calc(1.4em * 3 + 16px);
-    /* 3行文本高度 + 内边距 */
-    min-height: calc(1.4em * 1 + 16px);
-    /* 最小高度为1行 */
-
+    /* 块自身底色：在不透明面板底色上叠一层很淡的半透明灰，暗色提亮/亮色压暗，
+       两个主题都和页面背景 B 区分开（边框外仍是纯页面色 B，由 wrap 提供） */
+    background: linear-gradient(var(--chat-bg-hover), var(--chat-bg-hover)), var(--chat-bg-primary);
     box-sizing: border-box;
-    overflow-y: auto;
-    /* 超过三行显示滚动条 */
-    overflow-x: hidden;
+    line-height: 1.5;
     white-space: pre-wrap;
     /* 保留空白符和换行 */
     word-wrap: break-word;
@@ -165,25 +186,77 @@ code, pre, .code {
 
 
 .user-input-content {
-    flex: 1;
     width: 100%;
     min-width: 0;
-    color: var(--chat-text-terminal-green);
-    font-weight: 500;
+    color: var(--chat-text-primary);
+    font-weight: 400;
     font-size: var(--chat-font-base);
     line-height: 1.5;
     white-space: pre-wrap;
     word-wrap: break-word;
 }
 
-/* 用户输入块编辑模式 */
-.user-input-block.editing {
-    max-height: none;
-    overflow: visible;
+/* 折叠态：限制约 3 行，底部渐隐到透明（mask 适配任意背景） */
+.user-input-content.collapsed {
+    max-height: calc(1.5em * 3);
+    /* ~3 行，与组件内 COLLAPSED_MAX_PX 同步 */
+    overflow: hidden;
+    -webkit-mask-image: linear-gradient(to bottom, #000 55%, transparent 100%);
+    mask-image: linear-gradient(to bottom, #000 55%, transparent 100%);
 }
 
-/* 队列中待处理的用户输入 */
+/* 展开 / 收起 控件：左下角，弱化色 */
+.user-input-toggle {
+    margin-top: 2px;
+    padding: 0;
+    border: none;
+    background: transparent;
+    color: var(--chat-color-muted);
+    font-size: var(--chat-font-sm);
+    line-height: 1.4;
+    cursor: pointer;
+}
+
+.user-input-toggle:hover {
+    color: var(--chat-color-muted-hover);
+    text-decoration: underline;
+}
+
+/* 右下角复制按钮：悬浮输入块时淡入显示 */
+.user-input-copy {
+    position: absolute;
+    right: 6px;
+    bottom: 6px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 3px;
+    border: none;
+    border-radius: var(--chat-radius-sm);
+    background: var(--chat-bg-active);
+    color: var(--chat-color-muted);
+    cursor: pointer;
+    opacity: 0;
+    transition: opacity 0.15s, color 0.15s;
+}
+
+.user-input-block:hover .user-input-copy {
+    opacity: 1;
+}
+
+.user-input-copy:hover {
+    color: var(--chat-text-primary);
+}
+
+/* 统一图标尺寸，避免「复制 -> 已复制」切换时的跳动 */
+.user-input-copy svg {
+    width: 12px;
+    height: 12px;
+}
+
+/* 队列中待处理的用户输入（不在吸顶 wrap 内，需自带顶部留白） */
 .user-input-block.pending {
+    margin-top: 8px;
     border: 1px dashed var(--chat-border-input);
     border-width: 0.6px;
     opacity: 0.6;
@@ -224,25 +297,6 @@ code, pre, .code {
 
 .running-task-label {
     white-space: nowrap;
-}
-
-.user-input-block.clickable {
-    cursor: pointer;
-}
-
-/* 用户输入文本域 */
-.user-input-textarea {
-    height: 200px;
-    transition: height 0.2s ease;
-    resize: none;
-    border: 1px solid var(--chat-border-input);
-    background-color: var(--chat-bg-input);
-    color: var(--chat-text-input);
-    padding: 8px;
-    border-radius: 4px;
-    font-size: var(--chat-font-base);
-    width: 100%;
-    outline: none;
 }
 
 /* 补充信息信息样式 如文件引用、中断、压缩 */

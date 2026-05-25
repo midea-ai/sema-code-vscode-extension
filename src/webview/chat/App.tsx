@@ -630,19 +630,36 @@ const ChatSession: React.FC<ChatSessionProps> = ({ vscode, sessionId, active, on
             }
         }
 
-        return messages.map((message, index) => (
-            <div key={message.id} className="msg-wrap">
-                <MessageItem
-                    message={message}
-                    shouldReportChange={index > lastUserInputIndex}
-                    toolPermissionData={activeDialog}
-                    vscode={vscode}
-                    onFileChange={handleFileChange}
-                    streamingAssistantId={streamingAssistantId}
-                    streamingToolId={streamingToolId}
-                    openAgentTaskId={activeDialog ? null : openAgentTaskId}
-                    onAgentModalClose={() => setOpenAgentTaskId(null)}
-                />
+        // 按「轮次」分组：每条用户输入开启一组，后续消息归入同组。
+        // 用户输入在组内 position:sticky 吸顶，被下一组顶替。
+        const groups: Array<{ key: string; items: Array<{ message: Message; index: number }> }> = [];
+        messages.forEach((message, index) => {
+            if (message.type === 'user' || groups.length === 0) {
+                groups.push({ key: message.id, items: [] });
+            }
+            groups[groups.length - 1].items.push({ message, index });
+        });
+
+        return groups.map(group => (
+            <div key={group.key} className="turn-group">
+                {group.items.map(({ message, index }) => (
+                    <div
+                        key={message.id}
+                        className={`msg-wrap${message.type === 'user' ? ' msg-wrap--sticky-user' : ''}`}
+                    >
+                        <MessageItem
+                            message={message}
+                            shouldReportChange={index > lastUserInputIndex}
+                            toolPermissionData={activeDialog}
+                            vscode={vscode}
+                            onFileChange={handleFileChange}
+                            streamingAssistantId={streamingAssistantId}
+                            streamingToolId={streamingToolId}
+                            openAgentTaskId={activeDialog ? null : openAgentTaskId}
+                            onAgentModalClose={() => setOpenAgentTaskId(null)}
+                        />
+                    </div>
+                ))}
             </div>
         ));
     }, [messages, modelName, availableModels, activeDialog, processingState, streamingAssistantId, streamingToolId, openAgentTaskId, agentMode]);

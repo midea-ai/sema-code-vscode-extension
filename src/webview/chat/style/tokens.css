@@ -50,6 +50,8 @@
 
     /* -------- 背景色 -------- */
     --chat-bg-primary: var(--vscode-sideBar-background);
+    /* chat 页面（body/#root）实际背景色，亮色主题下被覆盖为白色 */
+    --chat-page-bg: var(--vscode-sideBar-background);
     --chat-bg-editor: var(--vscode-editor-background);
     --chat-bg-input: var(--vscode-input-background);
     --chat-bg-panel-header: var(--vscode-panel-sectionHeader-background);
@@ -117,4 +119,6 @@
 .vscode-light {
     --chat-spinner-accent: rgb(36, 95, 184);
     --chat-spinner-shimmer: rgba(36, 95, 184, 0.1);
+    /* 与 .vscode-light body / #root 背景一致 */
+    --chat-page-bg: var(--chat-bg-light);
 }

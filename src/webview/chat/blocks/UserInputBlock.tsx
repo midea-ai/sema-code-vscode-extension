@@ -1,95 +1,81 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { CopyIcon, CheckIcon } from '../components/ui/IconButton';
 
 interface UserInputBlockProps {
     content: string;
 }
 
-const UserInputBlock: React.FC<UserInputBlockProps> = React.memo(({ content }) => {
-    
-    const [isEditing, setIsEditing] = useState<boolean>(false);
-    const [editValue, setEditValue] = useState<string>(content);
-    const blockRef = useRef<HTMLDivElement>(null);
-    const contentRef = useRef<HTMLDivElement>(null);
-    const textareaRef = useRef<HTMLTextAreaElement>(null);
+// 折叠态最大高度（px），需与 styles.css 中 .user-input-content.collapsed 的 max-height 同步
+// 当前为 line-height 1.5 * 字号 12px * 3 行 = 54px
+const COLLAPSED_MAX_PX = 54;
 
-    // 点击编辑区域外部时退出编辑
-    useEffect(() => {
-        if (!isEditing) {
+const UserInputBlock: React.FC<UserInputBlockProps> = React.memo(({ content }) => {
+
+    const [isExpanded, setIsExpanded] = useState<boolean>(false);
+    const [isOverflowing, setIsOverflowing] = useState<boolean>(false);
+    const [copied, setCopied] = useState<boolean>(false);
+    const contentRef = useRef<HTMLDivElement>(null);
+    const copyTimerRef = useRef<number | null>(null);
+
+    // 测量内容是否超过折叠高度（scrollHeight 不受 max-height/overflow 影响，展开/折叠两态一致）
+    useLayoutEffect(() => {
+        const el = contentRef.current;
+        if (!el) {
             return;
         }
-
-        const handlePointerDown = (event: PointerEvent) => {
-            const block = blockRef.current;
-            if (block && !block.contains(event.target as Node)) {
-                setIsEditing(false);
-            }
+        const measure = () => {
+            setIsOverflowing(el.scrollHeight > COLLAPSED_MAX_PX + 1);
         };
+        measure();
+        const observer = new ResizeObserver(measure);
+        observer.observe(el);
+        return () => observer.disconnect();
+    }, [content]);
 
-        document.addEventListener('pointerdown', handlePointerDown, true);
-
-        return () => {
-            document.removeEventListener('pointerdown', handlePointerDown, true);
-        };
-    }, [isEditing]);
-
-    const handleClick = () => {
-        // 记录选中区域位置，以便在编辑模式下恢复光标
-        const selection = window.getSelection();
-        let nextSelection: [number, number] | null = null;
-        if (selection && selection.rangeCount > 0 && contentRef.current) {
-            const range = selection.getRangeAt(0);
-            if (contentRef.current.contains(range.commonAncestorContainer)) {
-                const beforeRange = range.cloneRange();
-                beforeRange.selectNodeContents(contentRef.current);
-                beforeRange.setEnd(range.startContainer, range.startOffset);
-                const start = beforeRange.toString().length;
-                nextSelection = [start, start + range.toString().length];
-            }
+    useEffect(() => () => {
+        if (copyTimerRef.current) {
+            window.clearTimeout(copyTimerRef.current);
         }
+    }, []);
 
-        setIsEditing(true);
-        // 延迟聚焦以确保textarea已渲染
-        setTimeout(() => {
-            const textarea = textareaRef.current;
-            if (!textarea) {
-                return;
-            }
-
-            textarea.focus();
-            textarea.selectionStart = nextSelection ? nextSelection[0] : textarea.value.length;
-            textarea.selectionEnd = nextSelection ? nextSelection[1] : textarea.value.length;
-        }, 0);
+    const handleToggle = () => {
+        setIsExpanded(prev => !prev);
     };
 
-    const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-        setEditValue(e.target.value);
-    };
-
-    const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-        if (e.key === 'Escape') {
-            // ESC键退出编辑
-            setEditValue(content); // 恢复原始内容
-            setIsEditing(false);
+    const handleCopy = () => {
+        if (!content) {
+            return;
         }
+        navigator.clipboard.writeText(content).then(() => {
+            setCopied(true);
+            if (copyTimerRef.current) {
+                window.clearTimeout(copyTimerRef.current);
+            }
+            copyTimerRef.current = window.setTimeout(() => setCopied(false), 1000);
+        }).catch(() => { /* ignore */ });
     };
-
-    if (isEditing) {
-        return (
-            <div ref={blockRef} className="user-input-block editing">
-                <textarea
-                    ref={textareaRef}
-                    className="user-input-textarea"
-                    value={editValue}
-                    onChange={handleChange}
-                    onKeyDown={handleKeyDown}
-                />
-            </div>
-        );
-    }
 
     return (
-        <div ref={blockRef} className="user-input-block clickable" onClick={handleClick}>
-            <div ref={contentRef} className="user-input-content">{content}</div>
+        <div className="user-input-block">
+            <div
+                ref={contentRef}
+                className={`user-input-content${isOverflowing && !isExpanded ? ' collapsed' : ''}`}
+            >
+                {content}
+            </div>
+            {isOverflowing && (
+                <button type="button" className="user-input-toggle" onClick={handleToggle}>
+                    {isExpanded ? '收起' : '展开'}
+                </button>
+            )}
+            <button
+                type="button"
+                className="user-input-copy"
+                title={copied ? '已复制' : '复制'}
+                onClick={handleCopy}
+            >
+                {copied ? <CheckIcon /> : <CopyIcon />}
+            </button>
         </div>
     );
 });
