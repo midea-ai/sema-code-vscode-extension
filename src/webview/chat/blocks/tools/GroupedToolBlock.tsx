@@ -128,10 +128,10 @@ const splitCommand = (command: string): string[] => {
     });
 };
 
-export const getLsListTarget = (command: string): string => {
-    const tokens = splitCommand(command.trim());
+const parseLsTarget = (lsCommand: string): string => {
+    const tokens = splitCommand(lsCommand.trim());
     if (tokens.length === 0 || tokens[0] !== 'ls') {
-        return '.';
+        return '';
     }
 
     let afterOptions = false;
@@ -143,10 +143,52 @@ export const getLsListTarget = (command: string): string => {
         if (!afterOptions && token.startsWith('-') && token !== '-') {
             continue;
         }
-        return token || '.';
+        return token;
     }
 
-    return '.';
+    return '';
+};
+
+const parseCdTarget = (cdCommand: string): string => {
+    const tokens = splitCommand(cdCommand.trim());
+    if (tokens.length === 0 || tokens[0] !== 'cd') {
+        return '';
+    }
+
+    for (const token of tokens.slice(1)) {
+        if (token.startsWith('-') && token !== '-') {
+            continue;
+        }
+        return token;
+    }
+
+    return '';
+};
+
+const joinPaths = (base: string, target: string): string => {
+    if (!target) {
+        return base || '.';
+    }
+    if (!base || target.startsWith('/') || target.startsWith('~')) {
+        return target;
+    }
+    return `${base.replace(/\/+$/, '')}/${target}`;
+};
+
+export const getLsListTarget = (command: string): string => {
+    const segments = command.trim().split(/\s+&&\s+/).map(segment => segment.trim()).filter(Boolean);
+    let cwd = '';
+    let lsTarget = '';
+
+    for (const segment of segments) {
+        if (/^cd(?:\s|$)/.test(segment)) {
+            cwd = parseCdTarget(segment) || cwd;
+        } else if (/^ls(?:\s|$)/.test(segment)) {
+            lsTarget = parseLsTarget(segment);
+        }
+    }
+
+    return joinPaths(cwd, lsTarget);
 };
 
 export const getFindTarget = (command: string): string => {
@@ -331,7 +373,7 @@ const renderExpandedItem = (
 const GroupedToolBlock: React.FC<GroupedToolBlockProps> = ({ messages, vscode }) => {
     const [isExpanded, setIsExpanded] = useState(false);
 
-    const title = useMemo(() => getGroupTitle(messages), [messages]);
+    const count = useMemo(() => formatCount(messages.length, 'tool', 'tools'), [messages]);
 
     const expandedItems = useMemo(() => {
         if (!isExpanded) return [];
@@ -354,7 +396,7 @@ const GroupedToolBlock: React.FC<GroupedToolBlockProps> = ({ messages, vscode })
         <div className="chat-block chat-block--borderless grouped-tool-block">
             <div className="chat-block-header grouped-tool-header" onClick={handleToggle}>
                 <div className="chat-block-title">
-                    <span className="chat-block-title-label">{title}</span>
+                    <span className="chat-block-title-label"><strong>Explored</strong> <span className="grouped-tool-muted-text">{count}</span></span>
                     <div className="grouped-tool-toggle-btn">
                         <ToggleIcon isExpanded={isExpanded} />
                     </div>

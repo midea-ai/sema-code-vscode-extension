@@ -44,6 +44,11 @@
     display: flex;
 }
 
+/* “Explored N tools” 折叠图标始终显示 */
+.grouped-tool-block > .grouped-tool-header .grouped-tool-toggle-btn {
+    display: flex;
+}
+
 /* 内容区：继承 .chat-block-content */
 .bash-command {
     margin-bottom: var(--chat-spacing-md);
@@ -237,6 +242,11 @@
     cursor: pointer;
 }
 
+/* 组内所有 label（Explored / List / Search / Read 等）统一用 hover 色，hover 不再变化 */
+.grouped-tool-block .chat-block-title-label {
+    color: var(--chat-text-primary);
+}
+
 .grouped-tool-header:hover .chat-block-title-label {
     color: var(--chat-text-primary);
 }
@@ -251,10 +261,20 @@
     margin-right: 0;
 }
 
+/* List / Search 等结果行：标题过长换行时，后续行与“值”首字符悬挂对齐 */
+.grouped-tool-content .grouped-tool-header .chat-block-title {
+    align-items: flex-start;
+}
+
+.grouped-tool-content .grouped-tool-header .grouped-tool-muted-text {
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
 .grouped-read-summary {
     display: flex;
-    align-items: baseline;
-    flex-wrap: wrap;
+    align-items: flex-start;
+    flex-wrap: nowrap;
     gap: var(--chat-spacing-xs) var(--chat-spacing-sm);
     padding: var(--chat-block-header-padding);
     line-height: 1.4;

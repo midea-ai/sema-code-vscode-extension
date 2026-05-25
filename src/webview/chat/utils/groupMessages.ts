@@ -34,8 +34,17 @@ export const getToolTitle = (message: Message): string => {
     return message.content?.title || '';
 };
 
+const stripLeadingCdSegments = (command: string): string => {
+    const segments = command.split(/\s+&&\s+/).map(segment => segment.trim()).filter(Boolean);
+    let index = 0;
+    while (index < segments.length - 1 && /^cd(?:\s|$)/.test(segments[index])) {
+        index += 1;
+    }
+    return segments.slice(index).join(' && ');
+};
+
 export const isLsShellCommand = (message: Message): boolean => {
-    const command = getToolTitle(message).trim();
+    const command = stripLeadingCdSegments(getToolTitle(message).trim());
     return /^ls(?:\s|$)/.test(command);
 };
 
