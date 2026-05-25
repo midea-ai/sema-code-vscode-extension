@@ -179,7 +179,7 @@ const SystemConfig: React.FC<SystemConfigProps> = ({ vscode }) => {
                                 <button
                                     type="button"
                                     className={`show-thinking-toggle ${showThinkingText ? 'hide' : 'show'}`}
-                                    title={showThinkingText ? '隐藏聊天区Thinking文本' : '显示聊天区Thinking文本'}
+                                    title={showThinkingText ? '点击隐藏聊天区Thinking文本' : '点击显示聊天区Thinking文本'}
                                     onClick={() => handleChange('showThinkingText', !showThinkingText)}
                                 >
                                     {showThinkingText ? '隐藏' : '显示'}

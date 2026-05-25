@@ -76,7 +76,7 @@ const getReadFileInfo = (message: Message): ReadSummaryFile | null => {
 };
 
 export const getGroupTitle = (messages: Message[]): string => {
-    return `Explored with ${formatCount(messages.length, 'tool', 'tools')}`;
+    return `Explored ${formatCount(messages.length, 'tool', 'tools')}`;
 };
 
 export const getReadSummaryItems = (messages: Message[]): ReadSummaryItem[] => {
@@ -313,7 +313,7 @@ const renderExpandedItem = (
             <span className="grouped-read-files">
                 {item.item.files.map((file, index) => (
                     <React.Fragment key={file.title}>
-                        {index > 0 && <span className="grouped-tool-muted-text"> , </span>}
+                        {index > 0 && <span className="grouped-tool-muted-text">, </span>}
                         <button
                             className="grouped-tool-muted-text grouped-read-file"
                             onClick={() => handleFileOpen(file.filePath, file.line)}

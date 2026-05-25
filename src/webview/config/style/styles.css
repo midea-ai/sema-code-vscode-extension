@@ -705,8 +705,16 @@ button.small {
     color: var(--vscode-descriptionForeground);
 }
 
-.show-thinking-toggle:hover {
-    filter: brightness(1.15);
+/* 悬浮时保持与未悬浮一致的背景，覆盖通用 button:hover 的蓝色背景与阴影/位移 */
+.show-thinking-toggle[type="button"]:hover {
+    background: var(--s-btn-secondary-bg);
+    box-shadow: none;
+    transform: none;
+    opacity: 0.85;
+}
+
+.show-thinking-toggle.show[type="button"]:hover {
+    background: color-mix(in srgb, var(--s-btn-secondary-bg) 55%, var(--vscode-editor-background));
 }
 
 /* 文本域样式 */

@@ -5,7 +5,7 @@
 export const defaultConfig = {
     stream: true,
     thinking: true,
-    showThinkingText: true,
+    showThinkingText: false,
     skipFileEditPermission: false,
     skipShellExecPermission: false,
     skipSkillPermission: false,
@@ -14,7 +14,6 @@ export const defaultConfig = {
     systemPrompt: "You are Sema, AIRC's Agent AI for coding.",
     customRules: "- 中文回答",
     enableLLMCache: false,
-    enableClaudeCodeCompat: true,
     disableBackgroundTasks: false,
     enablePet: false
 };
