@@ -107,7 +107,8 @@ code, pre, .code {
     flex: 1;
     overflow-y: auto;
     overflow-x: hidden;
-    padding: 0 5px 5px 5px;
+    /* 左右留出 > 滚动条宽度(8px) 的间距，避免滚动条出现时压住正文 */
+    padding: 0 12px 5px 12px;
     font-size: var(--chat-font-base);
     line-height: 1.6;
     width: 100%;
@@ -877,34 +878,12 @@ code, pre, .code {
     flex-direction: column;
     align-items: flex-start;
     margin: var(--chat-block-margin);
-    padding: var(--chat-spacing-md) var(--chat-spacing-lg);
+    padding: var(--chat-spacing-sm) var(--chat-spacing-lg);
     width: 100%;
     max-width: var(--chat-block-max-width);
     box-sizing: border-box;
-    border-radius: var(--chat-radius-md);
-    background: var(--chat-bg-hover);
-    border: 1px solid var(--chat-bg-hover);
-    position: relative;
-    overflow: hidden;
-    min-height: 32px;
+    min-height: 24px;
     container-type: inline-size;
-}
-
-.processing-spinner::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: -100%;
-    width: 100%;
-    height: 100%;
-    background: linear-gradient(90deg, transparent, var(--chat-spinner-shimmer), transparent);
-    animation: shimmer 3s infinite;
-}
-
-@keyframes shimmer {
-    to {
-        left: 100%;
-    }
 }
 
 .processing-spinner-main {
@@ -912,43 +891,67 @@ code, pre, .code {
     align-items: center;
     gap: 10px;
     width: 100%;
-    position: relative;
-    z-index: 1;
     min-width: 0;
 }
 
-.spinner-char {
+/* 计时前面的内容（CHARACTERS + Working / 当前 todo）整体做透明度波浪闪烁，
+   文字保持正文颜色，仅由移动的遮罩让一段文字透明度趋近 0 扫过 */
+.spinner-shimmer-text {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
     font-size: var(--chat-font-base);
+    font-weight: 500;
+    color: var(--chat-text-primary);
+    -webkit-mask-image: linear-gradient(
+        90deg,
+        rgba(0, 0, 0, 1) 0%,
+        rgba(0, 0, 0, 1) 35%,
+        rgba(0, 0, 0, 0) 50%,
+        rgba(0, 0, 0, 1) 65%,
+        rgba(0, 0, 0, 1) 100%
+    );
+    mask-image: linear-gradient(
+        90deg,
+        rgba(0, 0, 0, 1) 0%,
+        rgba(0, 0, 0, 1) 35%,
+        rgba(0, 0, 0, 0) 50%,
+        rgba(0, 0, 0, 1) 65%,
+        rgba(0, 0, 0, 1) 100%
+    );
+    -webkit-mask-size: 200% 100%;
+    mask-size: 200% 100%;
+    animation: spinnerShimmerWave 2s linear infinite;
+}
+
+@keyframes spinnerShimmerWave {
+    0% {
+        -webkit-mask-position: 0% 0;
+        mask-position: 0% 0;
+    }
+    100% {
+        -webkit-mask-position: -200% 0;
+        mask-position: -200% 0;
+    }
+}
+
+.spinner-char {
     font-weight: 600;
-    color: var(--chat-spinner-accent);
-    animation: spinnerGlow 2s ease-in-out infinite alternate;
+    color: var(--vscode-textLink-foreground);
     flex-shrink: 0;
     width: 1em;
     text-align: center;
     display: inline-block;
 }
 
-@keyframes spinnerGlow {
-    to {
-        opacity: 1;
-        filter: brightness(1.2);
-    }
-}
-
 .spinner-message {
-    font-size: var(--chat-font-base);
-    color: var(--chat-text-secondary);
     flex: 0 1 auto;
     min-width: 0;
     max-width: max-content;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-}
-
-.spinner-message.custom-message {
-    color: var(--chat-color-spinner);
-    font-weight: 500;
 }
 
 .spinner-time-info {
@@ -1008,30 +1011,16 @@ code, pre, .code {
     z-index: 1;
 }
 
-/* 亮色主题 */
-.vscode-light .processing-spinner {
-    background: linear-gradient(135deg, #f5f7fa, #eef2f9);
-    border-color: rgba(36, 95, 184, 0.12);
-}
-
-.vscode-light .spinner-message {
+/* 高对比度主题：关闭透明度波浪，保证可读性 */
+.vscode-high-contrast .spinner-shimmer-text {
+    -webkit-mask-image: none;
+    mask-image: none;
     color: var(--chat-text-primary);
-}
-
-/* 高对比度主题 */
-.vscode-high-contrast .processing-spinner {
-    border: 2px solid var(--chat-text-primary);
-    background: var(--chat-bg-editor);
-    box-shadow: 0 0 0 1px var(--chat-border-focus);
+    animation: none;
 }
 
 .vscode-high-contrast .spinner-char {
     font-weight: 700;
-    filter: contrast(1.2);
-}
-
-.vscode-high-contrast .processing-spinner::before {
-    display: none;
 }
 
 /* Light主题专用样式 - Chat页面白色背景 */

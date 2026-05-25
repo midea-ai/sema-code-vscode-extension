@@ -41,7 +41,6 @@
     /* -------- 语义色 -------- */
     --chat-color-purple: #9575ff;
     --chat-color-purple-bg: rgba(149, 117, 255, 0.2);
-    --chat-color-spinner: #4fc08d;
 
     /* -------- 灰阶 -------- */
     --chat-color-muted: #808080;
@@ -103,10 +102,6 @@
     --chat-diff-added-bg: rgba(46, 160, 67, 0.15);
     --chat-diff-removed-bg: rgba(248, 81, 73, 0.15);
 
-    /* -------- Spinner -------- */
-    --chat-spinner-accent: #4fc08d;
-    --chat-spinner-shimmer: rgba(79, 192, 141, 0.1);
-
     /* -------- 块级组件公共尺寸 -------- */
     --chat-block-margin: 3px 8px;
     --chat-block-header-padding: 4px 8px;
@@ -117,8 +112,6 @@
 
 /* ===== 亮色主题 Token 覆盖 ===== */
 .vscode-light {
-    --chat-spinner-accent: rgb(36, 95, 184);
-    --chat-spinner-shimmer: rgba(36, 95, 184, 0.1);
     /* 与 .vscode-light body / #root 背景一致 */
     --chat-page-bg: var(--chat-bg-light);
 }

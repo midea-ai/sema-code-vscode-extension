@@ -2,65 +2,6 @@ import React, { useState, useEffect, useRef } from 'react';
 
 const CHARACTERS = ['·', '✢', '✳', '∗', '✻', '✽']
 
-const MESSAGES = [
-    'Accomplishing',
-    'Actioning',
-    'Actualizing',
-    'Baking',
-    'Brewing',
-    'Calculating',
-    'Cerebrating',
-    'Churning',
-    'Coding',
-    'Coalescing',
-    'Cogitating',
-    'Computing',
-    'Conjuring',
-    'Considering',
-    'Cooking',
-    'Crafting',
-    'Creating',
-    'Crunching',
-    'Deliberating',
-    'Determining',
-    'Doing',
-    'Effecting',
-    'Finagling',
-    'Forging',
-    'Forming',
-    'Generating',
-    'Hatching',
-    'Herding',
-    'Honking',
-    'Hustling',
-    'Ideating',
-    'Inferring',
-    'Manifesting',
-    'Marinating',
-    'Moseying',
-    'Mulling',
-    'Mustering',
-    'Musing',
-    'Noodling',
-    'Percolating',
-    'Pondering',
-    'Processing',
-    'Puttering',
-    'Reticulating',
-    'Ruminating',
-    'Schlepping',
-    'Shucking',
-    'Simmering',
-    'Smooshing',
-    'Spinning',
-    'Stewing',
-    'Synthesizing',
-    'Transmuting',
-    'Tinkering',
-    'Vibing',
-    'Working',
-]
-
 interface ProcessingSpinnerProps {
     in_progress?: string;
     next_progress?: string;
@@ -75,7 +16,6 @@ const ProcessingSpinner: React.FC<ProcessingSpinnerProps> = ({
     const frames = [...CHARACTERS, ...[...CHARACTERS].reverse()];
     const [frame, setFrame] = useState(0);
     const [elapsedTime, setElapsedTime] = useState(accumulatedSeconds);
-    const messageRef = useRef(in_progress || MESSAGES[Math.floor(Math.random() * MESSAGES.length)] + '…') ;
     const startTimeRef = useRef(Date.now() - accumulatedSeconds * 1000);
 
     useEffect(() => {
@@ -118,16 +58,14 @@ const ProcessingSpinner: React.FC<ProcessingSpinnerProps> = ({
 
     const displayMessage = in_progress
         ? `${formatMessage(in_progress)}`
-        : `${messageRef.current}`;
+        : 'Working…';
 
     return (
         <div className="processing-spinner">
             <div className="processing-spinner-main">
-                <span className="spinner-char">{frames[frame]}</span>
-                <span
-                    className={`spinner-message ${in_progress ? 'custom-message' : ''}`}
-                >
-                    {displayMessage}
+                <span className="spinner-shimmer-text">
+                    <span className="spinner-char">{frames[frame]}</span>
+                    <span className="spinner-message">{displayMessage}</span>
                 </span>
                 <span className="spinner-time-info">
                     ({formatTime(elapsedTime)}<span className="spinner-interrupt-hint"> · esc to interrupt</span>)
