@@ -658,12 +658,46 @@ button.small {
 .thinking-form-group {
     display: flex;
     align-items: center;
-    flex-wrap: wrap;
-    gap: 10px;
+    gap: 0;
 }
 
-.show-thinking-label {
-    margin-top: 0;
+.thinking-options {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.show-thinking-toggle[type="button"] {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 4px;
+    height: 16px;
+    line-height: 16px;
+    background: var(--s-btn-secondary-bg);
+    border: none;
+    border-radius: 2px;
+    font-size: 9px;
+    font-weight: 400;
+    color: var(--s-btn-secondary-fg);
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+/* 隐藏状态（当前显示 thinking，点击后隐藏）—— 灰色 */
+.show-thinking-toggle.hide {
+    background: var(--s-btn-secondary-bg);
+    color: var(--s-btn-secondary-fg);
+}
+
+/* 显示状态（当前隐藏 thinking，点击后显示）—— 比“隐藏”更浅的中性灰 */
+.show-thinking-toggle.show {
+    background: color-mix(in srgb, var(--s-btn-secondary-bg) 55%, var(--vscode-editor-background));
+    color: var(--vscode-descriptionForeground);
+}
+
+.show-thinking-toggle:hover {
+    filter: brightness(1.15);
 }
 
 /* 文本域样式 */
