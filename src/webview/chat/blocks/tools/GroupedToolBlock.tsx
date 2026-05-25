@@ -1,13 +1,14 @@
 import React, { useState, useMemo, useCallback } from 'react';
 import { ToggleIcon } from '../../components/ui/IconButton';
 import { Message } from '../../types';
+import { CONTINUATION_SYMBOL } from '../../utils/symbols';
 import {
     TOOL_NAME_RUN_SHELL,
     TOOL_NAME_SEARCH_CONTENT,
     TOOL_NAME_SEARCH_FILES,
     TOOL_NAME_VIEW_FILE,
 } from '../../../../utils/tool';
-import { getToolName, getToolTitle, isLsShellCommand } from '../../utils/groupMessages';
+import { getToolName, getToolTitle, isExploratoryShellCommand, isFindShellCommand, isLsShellCommand, isPwdShellCommand } from '../../utils/groupMessages';
 import { formatSearchTitle } from './utils';
 
 interface GroupedToolBlockProps {
@@ -18,6 +19,8 @@ interface GroupedToolBlockProps {
 const formatCount = (count: number, singular: string, plural: string): string => {
     return `${count} ${count === 1 ? singular : plural}`;
 };
+
+const MAX_VISIBLE_LINES = 4;
 
 interface ReadSummaryFile {
     display: string;
@@ -146,6 +149,22 @@ export const getLsListTarget = (command: string): string => {
     return '.';
 };
 
+export const getFindTarget = (command: string): string => {
+    const tokens = splitCommand(command.trim());
+    if (tokens.length === 0 || tokens[0] !== 'find') {
+        return '.';
+    }
+
+    for (const token of tokens.slice(1)) {
+        if (token.startsWith('-') || token === '(' || token === '!' || token === 'not') {
+            return '.';
+        }
+        return token || '.';
+    }
+
+    return '.';
+};
+
 export const getExpandedItems = (messages: Message[]): ExpandedItem[] => {
     const items: ExpandedItem[] = [];
     let readRun: Message[] = [];
@@ -184,11 +203,29 @@ const CollapsibleResultRow: React.FC<{
     title: string;
     tooltip: string;
     content: unknown;
-}> = ({ label, title, tooltip, content }) => {
+    summary?: string;
+    toolId?: string;
+    vscode?: any;
+}> = ({ label, title, tooltip, content, summary, toolId = '', vscode }) => {
     const [isExpanded, setIsExpanded] = useState(false);
-    const displayContent = typeof content === 'object'
-        ? JSON.stringify(content, null, 2) ?? ''
-        : String(content ?? '');
+    const command = title ? `${label} ${title}` : label;
+    const formattedContent = [
+        summary ? `${CONTINUATION_SYMBOL} ${summary}` : '',
+        typeof content === 'object' ? JSON.stringify(content, null, 2) : String(content ?? ''),
+    ].filter(Boolean).join('\n');
+    const contentLines = formattedContent.split('\n').filter(line => line.trim());
+    const omittedCount = Math.max(contentLines.length - MAX_VISIBLE_LINES, 0);
+    const visibleLines = omittedCount > 0 ? contentLines.slice(-MAX_VISIBLE_LINES) : contentLines;
+
+    const handleViewAll = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        vscode?.postMessage({
+            type: 'openBashOutput',
+            content: contentLines.join('\n'),
+            command,
+            toolId,
+        });
+    };
 
     return (
         <div className="chat-block chat-block--borderless">
@@ -202,34 +239,47 @@ const CollapsibleResultRow: React.FC<{
                 </div>
             </div>
             {isExpanded && (
-                <div className="chat-block-content">
-                    <pre className="grouped-result-content">{displayContent}</pre>
+                <div className="chat-block-content grouped-result-content">
+                    {omittedCount > 0 && (
+                        <div className="bash-omitted-lines bash-omitted-lines-clickable" onClick={handleViewAll}>{`...\u7701\u7565\u4e86 ${omittedCount} \u884c`}</div>
+                    )}
+                    {visibleLines.join('\n')}
                 </div>
             )}
         </div>
     );
 };
 
-const SearchItemBlock: React.FC<{ message: Message }> = ({ message }) => (
+const SearchItemBlock: React.FC<{ message: Message; vscode: any }> = ({ message, vscode }) => (
     <CollapsibleResultRow
         label="Search"
         title={formatSearchTitle(getToolTitle(message))}
         tooltip={formatSearchTitle(getToolTitle(message))}
         content={message.content?.content}
+        summary={message.content?.summary}
+        toolId={message.content?.toolId}
+        vscode={vscode}
     />
 );
 
 export const CommandItemBlock: React.FC<{
     message: Message;
-}> = ({ message }) => {
+    vscode?: any;
+}> = ({ message, vscode }) => {
     const command = getToolTitle(message).trim();
+    const isFind = isFindShellCommand(message);
+    const isPwd = isPwdShellCommand(message);
+    const isExplore = isExploratoryShellCommand(message);
 
     return (
         <CollapsibleResultRow
-            label="List"
-            title={getLsListTarget(command)}
+            label={isExplore ? 'Inspect' : isPwd ? 'Path' : isFind ? 'Find' : 'List'}
+            title={isExplore ? command : isPwd ? 'current directory' : isFind ? getFindTarget(command) : getLsListTarget(command)}
             tooltip={command}
             content={message.content?.content}
+            summary={message.content?.summary}
+            toolId={message.content?.toolId}
+            vscode={vscode}
         />
     );
 };
@@ -237,13 +287,22 @@ export const CommandItemBlock: React.FC<{
 const renderExpandedItem = (
     item: ExpandedItem,
     handleFileOpen: (filePath: string, line: number) => void,
+    vscode: any,
 ): React.ReactNode => {
     if (item.kind === 'message') {
         if (isSearchMessage(item.message)) {
-            return <SearchItemBlock key={item.message.id} message={item.message} />;
+            return <SearchItemBlock key={item.message.id} message={item.message} vscode={vscode} />;
         }
-        if (item.message.toolName === TOOL_NAME_RUN_SHELL && isLsShellCommand(item.message)) {
-            return <CommandItemBlock key={item.message.id} message={item.message} />;
+        if (
+            item.message.toolName === TOOL_NAME_RUN_SHELL
+            && (
+                isLsShellCommand(item.message)
+                || isFindShellCommand(item.message)
+                || isPwdShellCommand(item.message)
+                || isExploratoryShellCommand(item.message)
+            )
+        ) {
+            return <CommandItemBlock key={item.message.id} message={item.message} vscode={vscode} />;
         }
         return null;
     }
@@ -303,7 +362,7 @@ const GroupedToolBlock: React.FC<GroupedToolBlockProps> = ({ messages, vscode })
             </div>
             {isExpanded && (
                 <div className="chat-block-content grouped-tool-content">
-                    {expandedItems.map(item => renderExpandedItem(item, handleFileOpen))}
+                    {expandedItems.map(item => renderExpandedItem(item, handleFileOpen, vscode))}
                 </div>
             )}
         </div>

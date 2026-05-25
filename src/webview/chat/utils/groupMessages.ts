@@ -12,6 +12,7 @@ export type RenderItem =
 
 interface GroupMessagesOptions {
     streamingToolId?: string | null;
+    showThinkingText?: boolean;
 }
 
 interface RunItem {
@@ -38,6 +39,43 @@ export const isLsShellCommand = (message: Message): boolean => {
     return /^ls(?:\s|$)/.test(command);
 };
 
+export const isFindShellCommand = (message: Message): boolean => {
+    const command = getToolTitle(message).trim();
+    if (!/^find(?:\s|$)/.test(command)) {
+        return false;
+    }
+
+    return !/(?:^|\s)-(?:delete|exec|execdir|ok|okdir)(?:\s|$)/.test(command);
+};
+
+export const isPwdShellCommand = (message: Message): boolean => {
+    const command = getToolTitle(message).trim();
+    return /^pwd(?:\s+-(?:L|P))*\s*$/.test(command);
+};
+
+export const isExploratoryShellCommand = (message: Message): boolean => {
+    const command = getToolTitle(message).trim();
+    const segments = command.split(/\s+&&\s+/).map(segment => segment.trim()).filter(Boolean);
+
+    if (segments.length < 2) {
+        return false;
+    }
+
+    return segments.every(segment => {
+        const segmentMessage = {
+            ...message,
+            content: {
+                ...message.content,
+                title: segment,
+            },
+        };
+
+        return isLsShellCommand(segmentMessage)
+            || isFindShellCommand(segmentMessage)
+            || isPwdShellCommand(segmentMessage);
+    });
+};
+
 export const getGroupableToolKind = (message: Message): string | null => {
     const toolName = getToolName(message);
     if (toolName === TOOL_NAME_VIEW_FILE) {
@@ -49,6 +87,15 @@ export const getGroupableToolKind = (message: Message): string | null => {
     if (toolName === TOOL_NAME_RUN_SHELL && isLsShellCommand(message)) {
         return 'list';
     }
+    if (toolName === TOOL_NAME_RUN_SHELL && isFindShellCommand(message)) {
+        return 'find';
+    }
+    if (toolName === TOOL_NAME_RUN_SHELL && isPwdShellCommand(message)) {
+        return 'path';
+    }
+    if (toolName === TOOL_NAME_RUN_SHELL && isExploratoryShellCommand(message)) {
+        return 'explore';
+    }
     return null;
 };
 
@@ -58,21 +105,26 @@ const isGroupableToolMessage = (message: Message): boolean => {
     }
 
     const toolName = getToolName(message);
-    return GROUPABLE_TOOL_NAMES.has(toolName) || getGroupableToolKind(message) === 'list';
+    return GROUPABLE_TOOL_NAMES.has(toolName) || getGroupableToolKind(message) !== null;
 };
 
 const isStreamingToolMessage = (message: Message, streamingToolId?: string | null): boolean => {
     return message.content?.completed === false || (!!streamingToolId && message.id === streamingToolId);
 };
 
-const isInvisibleCompletedAssistantMessage = (message: Message): boolean => {
+const isInvisibleCompletedAssistantMessage = (
+    message: Message,
+    showThinkingText = true,
+): boolean => {
     if (message.type !== 'assistant' || message.content?.completed === false) {
         return false;
     }
 
     const content = message.content?.content;
     const reasoning = message.reasoning;
-    return (!content || content.trim().length === 0) && (!reasoning || reasoning.trim().length === 0);
+    const hasContent = !!(content && content.trim().length > 0);
+    const hasVisibleReasoning = showThinkingText && !!(reasoning && reasoning.trim().length > 0);
+    return !hasContent && !hasVisibleReasoning;
 };
 
 const toMessageItems = (run: RunItem[]): RenderItem[] => {
@@ -121,7 +173,7 @@ export const groupMessages = (
             return;
         }
 
-        if (isInvisibleCompletedAssistantMessage(message)) {
+        if (isInvisibleCompletedAssistantMessage(message, options.showThinkingText)) {
             return;
         }
 

@@ -610,7 +610,7 @@ const ChatSession: React.FC<ChatSessionProps> = ({ vscode, sessionId, active, on
 
         if (!messages || messages.length === 0) {
             if (PREVIEW_MODE) {
-                return groupMessages(getPreviewMessages()).map((item) => {
+                return groupMessages(getPreviewMessages(), { showThinkingText: shouldShowThinkingText }).map((item) => {
                     if (item.kind === 'group') {
                         return (
                             <div key={item.id} className="msg-wrap">
@@ -666,7 +666,7 @@ const ChatSession: React.FC<ChatSessionProps> = ({ vscode, sessionId, active, on
 
         return groups.map(group => (
             <div key={group.key} className="turn-group">
-                {groupMessages(group.items.map(item => item.message), { streamingToolId }).map((item) => {
+                {groupMessages(group.items.map(item => item.message), { streamingToolId, showThinkingText: shouldShowThinkingText }).map((item) => {
                     if (item.kind === 'group') {
                         return (
                             <div key={item.id} className="msg-wrap">
