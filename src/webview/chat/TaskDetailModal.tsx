@@ -2,6 +2,8 @@ import React, { useEffect, useCallback, useMemo, useRef, useState } from 'react'
 import ReactDOM from 'react-dom';
 import { Message, VscodeApi } from './types';
 import MessageItem from './MessageItem';
+import GroupedToolBlock from './blocks/tools/GroupedToolBlock';
+import { groupMessages } from './utils/groupMessages';
 
 interface TaskDetailModalProps {
     title: string;
@@ -117,16 +119,28 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
             );
         }
 
-        return taskMessages.map((message) => (
-            <div key={message.id} className="msg-wrap">
-                <MessageItem
-                    message={message}
-                    shouldReportChange={false}
-                    toolPermissionData={null}
-                    vscode={vscode}
-                />
-            </div>
-        ));
+        return groupMessages(taskMessages, { showThinkingText: false }).map((item) => {
+            if (item.kind === 'group') {
+                return (
+                    <div key={item.id} className="msg-wrap">
+                        <GroupedToolBlock messages={item.messages} vscode={vscode} />
+                    </div>
+                );
+            }
+
+            const { message } = item;
+            return (
+                <div key={message.id} className="msg-wrap">
+                    <MessageItem
+                        message={message}
+                        shouldReportChange={false}
+                        toolPermissionData={null}
+                        vscode={vscode}
+                        showThinkingText={false}
+                    />
+                </div>
+            );
+        });
     }, [taskMessages, vscode]);
 
     return ReactDOM.createPortal(
