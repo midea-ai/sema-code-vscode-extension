@@ -4,8 +4,8 @@ const DesignModeHint: React.FC = () => {
     return (
         <div className="welcome-container">
             <div className="welcome-header">
-                <span className="welcome-icon">🎨</span>
-                <span className="welcome-title">已进入设计模式</span>
+                <span className="welcome-title">Sema Code</span>
+                <span className="welcome-mode-tag">Design</span>
             </div>
             <div className="welcome-message">
                 <div className="welcome-line">

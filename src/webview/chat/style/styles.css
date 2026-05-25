@@ -457,78 +457,51 @@ code, pre, .code {
     color: var(--chat-color-muted);
 }
 
-/* 对应的 CSS 样式 */
+/* 欢迎页：空状态下铺满 chat 区域、居中的极简标题 */
 .welcome-container {
-    background: var(--chat-bg-editor);
-    border: 1px solid var(--chat-border);
-    border-radius: 8px;
-    margin: 12px 0;
-    padding: 0;
-    box-shadow: var(--chat-shadow);
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    gap: 8px;
+    user-select: none;
 }
 
 .welcome-header {
     display: flex;
     align-items: center;
     gap: 8px;
-    padding: 12px 16px;
-    background: var(--chat-bg-panel-header);
-    border-bottom: 1px solid var(--chat-border);
-    border-radius: 8px 8px 0 0;
-}
-
-.welcome-icon {
-    font-size: var(--chat-font-xl);
 }
 
 .welcome-title {
+    margin: 0;
+    font-size: 30px;
     font-weight: 600;
+    letter-spacing: 0.5px;
     color: var(--chat-text-primary);
-    font-size: var(--chat-font-lg);
 }
 
-.welcome-message {
-    font-size: var(--chat-font-base);
-    color: var(--chat-text-secondary);
-    padding: 16px;
-    line-height: 1.5;
-    max-height: 300px;
-    overflow-y: auto;
-}
-
-.welcome-line {
-    margin-bottom: 4px;
-}
-
-.command-text {
-    color: var(--chat-text-symbol);
-}
-
-.welcome-footer {
-    padding: 8px 16px;
-    background: var(--chat-bg-panel-header);
-    border-top: 1px solid var(--chat-border);
-    border-radius: 0 0 8px 8px;
-    text-align: center;
-}
-
-.hint-text {
+.welcome-mode-tag {
+    padding: 2px 8px;
+    border-radius: 6px;
     font-size: var(--chat-font-sm);
+    font-weight: 500;
+    background: var(--chat-color-purple-bg);
+    color: var(--chat-color-purple);
+}
+
+.welcome-subtitle {
+    margin: 0;
+    font-size: var(--chat-font-md);
     color: var(--chat-text-secondary);
-    opacity: 0.8;
-    font-style: italic;
 }
 
 .welcome-version-badge {
-    margin-left: auto;
     display: flex;
-    align-items: center;
-    flex-shrink: 0;
-    margin-bottom: 10px;
-}
-
-.welcome-intro-text {
-    color: var(--chat-text-primary);
+    margin-top: -2px;
+    margin-bottom: 12px;
 }
 
 .welcome-version-badge img {

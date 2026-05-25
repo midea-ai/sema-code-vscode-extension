@@ -201,7 +201,7 @@ const ChatSession: React.FC<ChatSessionProps> = ({ vscode, sessionId, active, on
                     break;
                 case 'enableInput':
                     setInputDisabled(false);
-                    setInputPlaceholder('请输入需求...(/ 指令 | Enter 发送 | Shift+Enter 换行 | ↑↓ 历史)');
+                    setInputPlaceholder('请输入需求...(/指令 @文件)');
                     vscode.postMessage({ type: 'requestSystemConfig' });
                     break;
                 case 'disableInput':
