@@ -53,7 +53,7 @@ export class ChatWebviewProvider {
                 insertPermissionRequest: () => this.sessionController.getSessionWrapper(sid!)?.insertPermissionRequestMessage(msg.permissionData),
                 insertAskFormRequest: () => this.sessionController.getSessionWrapper(sid!)?.insertAskFormRequestMessage(msg.askFormData),
                 updateAgentMode: () => this.sessionController.getSessionWrapper(sid!)?.updateAgentMode(msg.mode),
-                updateAutoEdit: () => this.sessionController.getSessionWrapper(sid!)?.updateAutoEdit(msg.enable),
+                updatePermissionLevel: () => this.sessionController.getSessionWrapper(sid!)?.updatePermissionLevel(msg.level),
                 transferAgentToBackground: () => { this.sessionController.getSessionWrapper(sid!)?.transferAgentToBackground(msg.taskId); },
 
                 // ── 进程级 / 工具类 ──

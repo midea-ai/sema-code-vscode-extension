@@ -24,14 +24,15 @@ import {
     TaskEndData,
     TaskTransferData,
     ConversationUsageData,
+    PermissionLevelUpdateData,
     Usage
 } from 'sema-core/event';
 import { MAIN_AGENT_ID } from 'sema-core/types';
-import type { TaskListItem, AgentMode } from 'sema-core/types';
+import type { TaskListItem, AgentMode, PermissionLevel } from 'sema-core/types';
 
 import { TOOL_NAME_SEARCH_FILES, TOOL_NAME_SEARCH_CONTENT, TOOL_NAME_SUB_AGENT } from '../utils/tool';
 
-export type { AgentMode };
+export type { AgentMode, PermissionLevel };
 
 const SKIP_COMPLETE_TOOLS = new Set<string>([TOOL_NAME_SUB_AGENT]);
 
@@ -96,7 +97,7 @@ export class SemaSessionWrapper {
     private taskAgentThrottleTimer: NodeJS.Timeout | null = null;
     private pendingTaskUpdates: Set<string> = new Set();
     private _agentMode: AgentMode;
-    private _autoEdit: boolean = false;
+    private _permissionLevel: PermissionLevel = 'Ask';
     private lastUsage: Usage | null = null;
     private lastTodos: any[] = [];
 
@@ -153,9 +154,9 @@ export class SemaSessionWrapper {
         return this._agentMode;
     }
 
-    public updateAutoEdit(enable: boolean): void {
-        this._autoEdit = enable;
-        this.session.updateAutoEdit(enable);
+    public updatePermissionLevel(level: PermissionLevel): void {
+        this._permissionLevel = level;
+        this.session.updatePermissionLevel(level);
     }
 
     public watchTask(taskId: string, onDelta: (delta: string) => void): () => void {
@@ -206,7 +207,7 @@ export class SemaSessionWrapper {
             ? { type: 'enableInput' }
             : { type: 'disableInput', message: '正在初始化 CLI，请稍候...' });
         this.post({ type: 'agentModeUpdate', mode: this._agentMode });
-        this.post({ type: 'autoEditUpdate', enable: this._autoEdit });
+        this.post({ type: 'permissionLevelUpdate', level: this._permissionLevel });
         this.post({ type: 'stateUpdate', state: this.currentState });
         if (this.lastUsage) {
             this.post({ type: 'updateTokenInfo', tokenInfo: this.lastUsage });
@@ -767,9 +768,9 @@ export class SemaSessionWrapper {
         this.session.on('quickchat:response', (data: any) => {
             this.post({ type: 'quickchatResponse', data });
         });
-        this.session.on('autoEdit:update', (data: any) => {
-            this._autoEdit = !!data.enable;
-            this.post({ type: 'autoEditUpdate', enable: data.enable });
+        this.session.on<PermissionLevelUpdateData>('permissionLevel:update', (data) => {
+            this._permissionLevel = data.level;
+            this.post({ type: 'permissionLevelUpdate', level: data.level });
         });
     }
 

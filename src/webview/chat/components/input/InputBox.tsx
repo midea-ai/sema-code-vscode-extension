@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useMemo, forwardRef, useImperativeHandle } from 'react';
-import { VscodeApi, TokenInfo, InputMention, AgentMode } from '../../types';
+import { VscodeApi, TokenInfo, InputMention, AgentMode, PermissionLevel } from '../../types';
 import Tooltip from '../ui/Tooltip';
 import {
     PlusIcon,
@@ -16,12 +16,14 @@ import { SelectedFile, FileItem } from '../../types';
 import { useModelMenu } from './hooks/useModelMenu';
 import { useShortcutPanel } from './hooks/useShortcutPanel';
 import { useAgentModeMenu } from './hooks/useAgentModeMenu';
+import { usePermissionLevelMenu } from './hooks/usePermissionLevelMenu';
 
 import TokenProgress from './components/TokenProgress';
 import FilePicker from './components/FilePicker';
 import ModelMenu from './components/ModelMenu';
 import ShortcutPanel from './components/ShortcutPanel';
 import AgentModeMenu from './components/AgentModeMenu';
+import PermissionLevelMenu from './components/PermissionLevelMenu';
 
 import { setCustomCommands, setSkills, getFilteredShortcutCommands } from './utils/commandUtils';
 import { isAtBoundary } from './utils/boundary';
@@ -58,9 +60,8 @@ interface InputBoxProps {
     availableModels: string[];
     agentMode: AgentMode;
     onAgentModeChange: (mode: AgentMode) => void;
-    autoEdit: boolean;
-    skipFileEditPermission: boolean;
-    onAutoEditChange: (enable: boolean) => void;
+    permissionLevel: PermissionLevel;
+    onPermissionLevelChange: (level: PermissionLevel) => void;
 }
 
 const InputBox = forwardRef<InputBoxHandle, InputBoxProps>(({
@@ -76,9 +77,8 @@ const InputBox = forwardRef<InputBoxHandle, InputBoxProps>(({
     availableModels,
     agentMode,
     onAgentModeChange,
-    autoEdit,
-    skipFileEditPermission,
-    onAutoEditChange
+    permissionLevel,
+    onPermissionLevelChange
 }, ref) => {
     const [inputValue, setInputValue] = useState<string>('');
     const [mentions, setMentions] = useState<InputMention[]>([]);
@@ -96,6 +96,8 @@ const InputBox = forwardRef<InputBoxHandle, InputBoxProps>(({
     const shortcutPanelRef = useRef<HTMLDivElement>(null);
     const agentModeMenuRef = useRef<HTMLDivElement>(null);
     const agentModeButtonRef = useRef<HTMLButtonElement>(null);
+    const permissionLevelMenuRef = useRef<HTMLDivElement>(null);
+    const permissionLevelButtonRef = useRef<HTMLButtonElement>(null);
     const composingRef = useRef<boolean>(false);
     const atPositionRef = useRef<number>(-1);
 
@@ -104,6 +106,7 @@ const InputBox = forwardRef<InputBoxHandle, InputBoxProps>(({
     const modelMenu = useModelMenu(vscode, disabled, modelName, modelMenuRef, modelButtonRef);
     const shortcutPanel = useShortcutPanel(disabled, shortcutPanelRef, inputBoxRef);
     const agentModeMenu = useAgentModeMenu(disabled, agentMode, onAgentModeChange, agentModeMenuRef, agentModeButtonRef);
+    const permissionLevelMenu = usePermissionLevelMenu(disabled, onPermissionLevelChange, permissionLevelMenuRef, permissionLevelButtonRef);
 
     useImperativeHandle(ref, () => ({
         focus: () => { inputBoxRef.current?.focus(); }
@@ -1001,20 +1004,26 @@ const InputBox = forwardRef<InputBoxHandle, InputBoxProps>(({
                         />
                     </div>
 
-                    {!skipFileEditPermission && (
-                        <>
-                            <span className="bottom-separator separator-autoedit">|</span>
-                            <Tooltip content={disabled ? '' : (autoEdit ? '点击关闭自动编辑' : '点击开启自动编辑')}>
-                                <button
-                                    className={`auto-edit-btn ${autoEdit ? 'active' : ''}`}
-                                    onClick={() => onAutoEditChange(!autoEdit)}
-                                    disabled={disabled}
-                                >
-                                    <span>AutoEdit</span>
-                                </button>
-                            </Tooltip>
-                        </>
-                    )}
+                    <span className="bottom-separator separator-autoedit">|</span>
+                    <div className="permission-level-container">
+                        <Tooltip content={disabled || permissionLevelMenu.showPermissionLevelMenu ? '' : '切换权限档位'}>
+                            <button
+                                ref={permissionLevelButtonRef}
+                                className={`permission-level-btn level-${permissionLevel.toLowerCase()}`}
+                                onClick={permissionLevelMenu.handleTogglePermissionLevelMenu}
+                                disabled={disabled}
+                            >
+                                <span>{permissionLevel}</span>
+                                <ChevronDownIcon />
+                            </button>
+                        </Tooltip>
+                        <PermissionLevelMenu
+                            show={permissionLevelMenu.showPermissionLevelMenu}
+                            currentLevel={permissionLevel}
+                            onLevelSelect={permissionLevelMenu.handlePermissionLevelSelect}
+                            menuRef={permissionLevelMenuRef}
+                        />
+                    </div>
                 </div>
 
                 <div className="input-actions">

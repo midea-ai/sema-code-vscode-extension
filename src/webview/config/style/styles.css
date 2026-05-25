@@ -628,6 +628,15 @@ button.small {
     border-bottom: 1px solid var(--vscode-panel-border);
 }
 
+/* 区块标题旁的「说明」信息图标，悬浮显示 title 提示 */
+.section-hint-icon {
+    margin-left: 6px;
+    font-size: 12px;
+    font-weight: 400;
+    color: var(--vscode-descriptionForeground);
+    cursor: help;
+}
+
 /* 复选框样式 */
 .checkbox-label {
     display: flex;

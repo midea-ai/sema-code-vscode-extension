@@ -496,10 +496,17 @@
     stroke: currentColor;
 }
 
-/* AutoEdit 开关按钮 */
-.auto-edit-btn {
+/* 权限档位选择器容器 */
+.permission-level-container {
+    position: relative;
+    min-width: 0;
+}
+
+/* 权限档位按钮 */
+.permission-level-btn {
     display: flex;
     align-items: center;
+    gap: 4px;
     padding: 2px 6px;
     background: var(--chat-bg-hover);
     border: none;
@@ -510,22 +517,41 @@
     transition: all 0.15s;
 }
 
-.auto-edit-btn.active {
+/* 各档位配色：Ask 中性、AutoEdit 绿色、AutoRun 警示色 */
+.permission-level-btn.level-ask {
+    background: var(--chat-bg-hover);
+    color: var(--chat-text-secondary);
+}
+
+.permission-level-btn.level-autoedit {
     background: var(--chat-color-success-bg, rgba(72, 187, 120, 0.15));
     color: var(--chat-color-success, #48bb78);
 }
 
-.auto-edit-btn:hover {
+.permission-level-btn.level-autorun {
+    background: var(--chat-color-warning-bg);
+    color: var(--chat-color-warning);
+}
+
+.permission-level-btn:hover {
     filter: brightness(1.15);
 }
 
-.auto-edit-btn:disabled {
+.permission-level-btn:disabled {
     opacity: 0.5;
     cursor: not-allowed;
 }
 
-.auto-edit-btn:disabled:hover {
+.permission-level-btn:disabled:hover {
     filter: none;
+}
+
+.permission-level-btn svg {
+    width: 10px;
+    height: 10px;
+    flex-shrink: 0;
+    color: inherit;
+    stroke: currentColor;
 }
 
 /* Agent 模式菜单弹窗 */
@@ -591,6 +617,73 @@
     text-transform: uppercase;
     letter-spacing: 0.3px;
     opacity: 0.75;
+}
+
+/* 权限档位菜单弹窗 */
+.permission-level-menu-popup {
+    position: absolute;
+    bottom: calc(100% + 6px);
+    left: 0;
+    min-width: 200px;
+    max-width: 260px;
+    width: max-content;
+    background: var(--chat-bg-primary);
+    border: 1px solid var(--chat-border);
+    border-radius: 4px;
+    box-shadow: var(--chat-shadow-lg);
+    overflow: hidden;
+    z-index: 1000;
+    animation: fadeIn 0.15s ease-out;
+}
+
+/* 权限档位菜单项 */
+.permission-level-menu-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 6px 10px;
+    color: var(--chat-text-primary);
+    cursor: pointer;
+    transition: background 0.15s;
+}
+
+.permission-level-menu-item:hover {
+    background: var(--chat-bg-hover);
+}
+
+/* 当前档位项 */
+.permission-level-menu-item.permission-level-current {
+    cursor: default;
+}
+
+.permission-level-menu-item.permission-level-current:hover {
+    background: var(--chat-bg-hover);
+}
+
+/* 档位短名 + 说明文案两行布局 */
+.permission-level-menu-texts {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+}
+
+.permission-level-menu-name {
+    font-size: var(--chat-font-base);
+    color: var(--chat-text-primary);
+}
+
+.permission-level-menu-desc {
+    font-size: var(--chat-font-sm);
+    color: var(--chat-text-secondary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.permission-level-menu-item svg {
+    flex-shrink: 0;
 }
 
 /* 模型信息容器 */
@@ -781,7 +874,7 @@
 /* 响应式隐藏：侧边栏变窄时依次隐藏底部左侧元素 */
 /* 第一阶段：AutoEdit 消失 */
 @container (max-width: 280px) {
-    .auto-edit-btn,
+    .permission-level-container,
     .separator-autoedit {
         display: none;
     }

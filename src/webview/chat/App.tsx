@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { FileChange, TokenInfo, AppProps, SelectedFile, TodoItem, Message, AgentMode, SessionMeta } from './types';
+import { FileChange, TokenInfo, AppProps, SelectedFile, TodoItem, Message, AgentMode, PermissionLevel, SessionMeta } from './types';
 import { streamingStore } from './utils/StreamingStore';
 import InputBox, { InputBoxHandle } from './components/input/InputBox';
 import MessageItem from './MessageItem';
@@ -70,7 +70,7 @@ const ChatSession: React.FC<ChatSessionProps> = ({ vscode, sessionId, active, on
     const [modelConfigReminder, setModelConfigReminder] = useState<string>('');
     const [spinnerAccumulatedSeconds, setSpinnerAccumulatedSeconds] = useState<number>(0);
     const [agentMode, setAgentMode] = useState<AgentMode>('Agent');
-    const [autoEdit, setAutoEdit] = useState<boolean>(false);
+    const [permissionLevel, setPermissionLevel] = useState<PermissionLevel>('Ask');
     const [skipFileEditPermission, setSkipFileEditPermission] = useState<boolean>(false);
     const [thinkingEnabled, setThinkingEnabled] = useState<boolean>(true);
     const [showThinkingText, setShowThinkingText] = useState<boolean>(true);
@@ -304,9 +304,9 @@ const ChatSession: React.FC<ChatSessionProps> = ({ vscode, sessionId, active, on
                         setShowThinkingText(message.showThinkingText);
                     }
                     break;
-                case 'autoEditUpdate':
-                    if (typeof message.enable === 'boolean') {
-                        setAutoEdit(message.enable);
+                case 'permissionLevelUpdate':
+                    if (message.level) {
+                        setPermissionLevel(message.level);
                     }
                     break;
                 case 'inputReceived':
@@ -547,11 +547,12 @@ const ChatSession: React.FC<ChatSessionProps> = ({ vscode, sessionId, active, on
         });
     };
 
-    const handleAutoEditChange = (enable: boolean) => {
+    const handlePermissionLevelChange = (level: PermissionLevel) => {
+        setPermissionLevel(level);
         vscode.postMessage({
-            type: 'updateAutoEdit',
+            type: 'updatePermissionLevel',
             sessionId,
-            enable
+            level
         });
     };
 
@@ -802,9 +803,8 @@ const ChatSession: React.FC<ChatSessionProps> = ({ vscode, sessionId, active, on
                     availableModels={availableModels}
                     agentMode={agentMode}
                     onAgentModeChange={handleAgentModeChange}
-                    autoEdit={autoEdit}
-                    skipFileEditPermission={skipFileEditPermission}
-                    onAutoEditChange={handleAutoEditChange}
+                    permissionLevel={permissionLevel}
+                    onPermissionLevelChange={handlePermissionLevelChange}
                 />
             </div>
         </SessionContext.Provider>

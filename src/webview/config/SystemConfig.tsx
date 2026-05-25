@@ -240,7 +240,13 @@ const SystemConfig: React.FC<SystemConfigProps> = ({ vscode }) => {
 
             {/* 开关配置 */}
             <div className="config-section">
-                <h3 className="config-section-title">权限设置</h3>
+                <h3 className="config-section-title">
+                    权限设置
+                    <span
+                        className="section-hint-icon"
+                        title="以下「跳过…权限检查」开关优先级高于输入框的权限等级（Ask / AutoEdit / AutoRun）。勾选后对应操作将始终跳过确认，不受当前权限等级影响。"
+                    >ⓘ</span>
+                </h3>
                 {/* 跳过权限第一行 */}
                 <div className="form-row">
                     <div className="form-group">
