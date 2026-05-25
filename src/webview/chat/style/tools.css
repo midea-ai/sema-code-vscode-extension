@@ -24,7 +24,8 @@
 
 .bash-toggle-btn,
 .pub-toggle-btn,
-.thought-toggle-btn {
+.thought-toggle-btn,
+.grouped-tool-toggle-btn {
     display: none;
     align-items: center;
     justify-content: center;
@@ -38,7 +39,8 @@
 .bash-block-header:hover .bash-toggle-btn,
 .bash-permission-header:hover .bash-toggle-btn,
 .pub-block-header:hover .pub-toggle-btn,
-.thought-block-header:hover .thought-toggle-btn {
+.thought-block-header:hover .thought-toggle-btn,
+.grouped-tool-header:hover .grouped-tool-toggle-btn {
     display: flex;
 }
 
@@ -227,6 +229,73 @@
 
 .vscode-light .pub-block-content {
     color: var(--chat-color-muted-light);
+}
+
+/* ========== Grouped Tool Block ========== */
+
+.grouped-tool-header {
+    cursor: pointer;
+}
+
+.grouped-tool-header:hover .chat-block-title-label {
+    color: var(--chat-text-primary);
+}
+
+.grouped-tool-content {
+    padding: var(--chat-spacing-xs) 0 var(--chat-spacing-xs) var(--chat-spacing-md);
+}
+
+.grouped-tool-content > .chat-block,
+.grouped-tool-item .chat-block {
+    margin-left: 0;
+    margin-right: 0;
+}
+
+.grouped-read-summary {
+    display: flex;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: var(--chat-spacing-xs) var(--chat-spacing-sm);
+    padding: var(--chat-block-header-padding);
+    line-height: 1.4;
+}
+
+.grouped-read-files {
+    display: inline-flex;
+    flex-wrap: wrap;
+    gap: var(--chat-spacing-xs) var(--chat-spacing-sm);
+    min-width: 0;
+}
+
+.grouped-tool-muted-text {
+    color: var(--chat-color-muted);
+    line-height: inherit;
+}
+
+.grouped-read-file {
+    border: 0;
+    padding: 0;
+    background: transparent;
+    cursor: pointer;
+    font: inherit;
+}
+
+.grouped-read-file:hover {
+    color: var(--chat-text-primary);
+    text-decoration: underline;
+}
+
+.grouped-result-content {
+    margin: 0;
+    padding: 0;
+    overflow-y: auto;
+    max-height: 200px;
+    font-size: var(--chat-font-sm);
+    line-height: 1.3;
+    white-space: pre-wrap;
+    color: var(--chat-color-muted);
+    font-family: var(--vscode-editor-font-family);
+    background: transparent;
 }
 
 /* ========== Task Block (Agent) ========== */

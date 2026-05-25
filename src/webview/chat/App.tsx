@@ -3,6 +3,7 @@ import { FileChange, TokenInfo, AppProps, SelectedFile, TodoItem, Message, Agent
 import { streamingStore } from './utils/StreamingStore';
 import InputBox, { InputBoxHandle } from './components/input/InputBox';
 import MessageItem from './MessageItem';
+import GroupedToolBlock from './blocks/tools/GroupedToolBlock';
 import SessionTabs from './components/SessionTabs';
 import { SessionContext } from './SessionContext';
 
@@ -17,6 +18,7 @@ import QuickChatDialog from './components/ui/QuickChatDialog';
 import ProcessingSpinner from './components/ui/ProcessingSpinner';
 import ModelConfigReminder from './components/ui/ModelConfigReminder';
 import { PREVIEW_MODE, getPreviewMessages, mockDialogMap, isPreviewActive } from './utils/mockMessages';
+import { groupMessages } from './utils/groupMessages';
 import { TOOL_NAME_RUN_SHELL } from '../../utils/tool';
 import { TASK_TYPE_SHELL, TASK_TYPE_AGENT } from '../config/BackgroundTaskConfig';
 import PreviewDialogs from './utils/PreviewDialogs';
@@ -597,21 +599,31 @@ const ChatSession: React.FC<ChatSessionProps> = ({ vscode, sessionId, active, on
     const renderedContent = useMemo(() => {
         if (!messages || messages.length === 0) {
             if (PREVIEW_MODE) {
-                return getPreviewMessages().map((message) => (
-                    <div key={message.id} className="msg-wrap">
-                        <MessageItem
-                            message={message}
-                            shouldReportChange={false}
-                            toolPermissionData={null}
-                            vscode={vscode}
-                            onFileChange={handleFileChange}
-                            streamingAssistantId={null}
-                            streamingToolId={null}
-                            openAgentTaskId={null}
-                            onAgentModalClose={() => {}}
-                        />
-                    </div>
-                ));
+                return groupMessages(getPreviewMessages()).map((item) => {
+                    if (item.kind === 'group') {
+                        return (
+                            <div key={item.id} className="msg-wrap">
+                                <GroupedToolBlock messages={item.messages} vscode={vscode} />
+                            </div>
+                        );
+                    }
+
+                    return (
+                        <div key={item.message.id} className="msg-wrap">
+                            <MessageItem
+                                message={item.message}
+                                shouldReportChange={false}
+                                toolPermissionData={null}
+                                vscode={vscode}
+                                onFileChange={handleFileChange}
+                                streamingAssistantId={null}
+                                streamingToolId={null}
+                                openAgentTaskId={null}
+                                onAgentModalClose={() => {}}
+                            />
+                        </div>
+                    );
+                });
             }
             if (modelName && availableModels.length > 0 && processingState !== 'processing') {
                 if (agentMode === 'Design') {
@@ -642,24 +654,35 @@ const ChatSession: React.FC<ChatSessionProps> = ({ vscode, sessionId, active, on
 
         return groups.map(group => (
             <div key={group.key} className="turn-group">
-                {group.items.map(({ message, index }) => (
-                    <div
-                        key={message.id}
-                        className={`msg-wrap${message.type === 'user' ? ' msg-wrap--sticky-user' : ''}`}
-                    >
-                        <MessageItem
-                            message={message}
-                            shouldReportChange={index > lastUserInputIndex}
-                            toolPermissionData={activeDialog}
-                            vscode={vscode}
-                            onFileChange={handleFileChange}
-                            streamingAssistantId={streamingAssistantId}
-                            streamingToolId={streamingToolId}
-                            openAgentTaskId={activeDialog ? null : openAgentTaskId}
-                            onAgentModalClose={() => setOpenAgentTaskId(null)}
-                        />
-                    </div>
-                ))}
+                {groupMessages(group.items.map(item => item.message), { streamingToolId }).map((item) => {
+                    if (item.kind === 'group') {
+                        return (
+                            <div key={item.id} className="msg-wrap">
+                                <GroupedToolBlock messages={item.messages} vscode={vscode} />
+                            </div>
+                        );
+                    }
+
+                    const { message, index } = group.items[item.originalIndex];
+                    return (
+                        <div
+                            key={message.id}
+                            className={`msg-wrap${message.type === 'user' ? ' msg-wrap--sticky-user' : ''}`}
+                        >
+                            <MessageItem
+                                message={message}
+                                shouldReportChange={index > lastUserInputIndex}
+                                toolPermissionData={activeDialog}
+                                vscode={vscode}
+                                onFileChange={handleFileChange}
+                                streamingAssistantId={streamingAssistantId}
+                                streamingToolId={streamingToolId}
+                                openAgentTaskId={activeDialog ? null : openAgentTaskId}
+                                onAgentModalClose={() => setOpenAgentTaskId(null)}
+                            />
+                        </div>
+                    );
+                })}
             </div>
         ));
     }, [messages, modelName, availableModels, activeDialog, processingState, streamingAssistantId, streamingToolId, openAgentTaskId, agentMode]);
