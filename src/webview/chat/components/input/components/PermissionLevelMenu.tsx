@@ -14,8 +14,8 @@ const PERMISSION_LEVELS: PermissionLevel[] = ['Ask', 'AutoEdit', 'AutoRun'];
 /** 各档位在菜单中的说明文案 */
 const PERMISSION_LEVEL_DESC: Record<PermissionLevel, string> = {
     Ask: 'Ask before every action',
-    AutoEdit: 'Auto-approve edits in project',
-    AutoRun: 'Auto-approve safe actions'
+    AutoEdit: 'Auto-approve edits',
+    AutoRun: 'Auto-approve all, ask if risky'
 };
 
 const PermissionLevelMenu: React.FC<PermissionLevelMenuProps> = ({
