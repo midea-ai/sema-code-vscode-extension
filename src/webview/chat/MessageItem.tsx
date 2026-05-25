@@ -28,6 +28,7 @@ interface MessageItemProps {
     streamingToolId?: string | null;
     openAgentTaskId?: string | null;
     onAgentModalClose?: () => void;
+    showThinkingText?: boolean;
 }
 
 const MessageItem: React.FC<MessageItemProps> = React.memo(({
@@ -39,6 +40,7 @@ const MessageItem: React.FC<MessageItemProps> = React.memo(({
     streamingAssistantId,
     openAgentTaskId,
     onAgentModalClose,
+    showThinkingText = true,
 }) => {
     const renderToolContent = () => {
         switch (message.toolName) {
@@ -90,7 +92,7 @@ const MessageItem: React.FC<MessageItemProps> = React.memo(({
             const displayContent = message.content?.content;
             const displayReasoning = message.reasoning;
 
-            const hasReasoning = !!(displayReasoning && displayReasoning.trim().length > 0);
+            const hasReasoning = showThinkingText && !!(displayReasoning && displayReasoning.trim().length > 0);
             const isCompleted = message.content?.completed !== false;
             // 流式中即使 content 暂时为空也需要渲染 AiResponseBlock（等待 store 推送内容）
             const hasContent = isCurrentlyStreaming || !!(displayContent && displayContent.trim().length > 0);
@@ -183,7 +185,8 @@ const MessageItem: React.FC<MessageItemProps> = React.memo(({
     const baseEqual = prev.message === next.message
         && prev.shouldReportChange === next.shouldReportChange
         && prev.toolPermissionData === next.toolPermissionData
-        && prev.openAgentTaskId === next.openAgentTaskId;
+        && prev.openAgentTaskId === next.openAgentTaskId
+        && prev.showThinkingText === next.showThinkingText;
 
     const prevStreamingIsForThis =
         prev.streamingAssistantId === prev.message.id ||

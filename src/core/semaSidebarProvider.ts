@@ -103,10 +103,13 @@ export class SemaSidebarProvider implements vscode.WebviewViewProvider {
         );
         this.configWebviewProvider = new ConfigWebviewProvider(this.processWrapper, this.fileOperationManager);
         this.configWebviewProvider.setOnSystemConfigChanged((key, value) => {
-            if (key === 'skipFileEditPermission') {
+            if (key === 'skipFileEditPermission' || key === 'thinking' || key === 'showThinkingText') {
+                const cfg = this.processWrapper.getSystemConfig() as Record<string, any>;
                 this.chatWebviewProvider.postMessage({
                     type: 'systemConfigUpdate',
-                    skipFileEditPermission: value
+                    skipFileEditPermission: !!cfg.skipFileEditPermission,
+                    thinking: cfg.thinking !== false,
+                    showThinkingText: cfg.showThinkingText !== false
                 });
             }
             if (key === 'enablePet') {

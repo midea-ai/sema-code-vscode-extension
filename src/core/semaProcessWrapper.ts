@@ -32,6 +32,15 @@ export type ProcessEventName = 'cron:update' | 'mcp:server:status';
 
 /** UI 层支持同时打开的会话数量上限 */
 export const MAX_SESSIONS = 5;
+const LOCAL_SYSTEM_CONFIG_KEYS = new Set(['enablePet', 'showThinkingText']);
+
+function toCoreSystemConfig(config: Record<string, any>): UpdatableCoreConfig {
+    const coreConfig = { ...config };
+    for (const key of LOCAL_SYSTEM_CONFIG_KEYS) {
+        delete coreConfig[key];
+    }
+    return coreConfig as UpdatableCoreConfig;
+}
 
 export interface ProcessWrapperCallbacks {
     /** 模型配置变化（addModel / switchModel 等触发） */
@@ -62,7 +71,7 @@ export class SemaProcessWrapper {
         const config: SemaCoreConfig = {
             workingDir,
             logLevel: 'error',
-            ...systemConfig,
+            ...toCoreSystemConfig(systemConfig as Record<string, any>),
             disabledTools: disabledTools,
             maxSessions: MAX_SESSIONS,
         };
@@ -168,7 +177,7 @@ export class SemaProcessWrapper {
 
     public async updateSystemConfig(config: UpdatableCoreConfig): Promise<void> {
         await this.systemConfigManager.saveSystemConfig(config);
-        this.semaCore.updateCoreConfig(config);
+        this.semaCore.updateCoreConfig(toCoreSystemConfig(config as Record<string, any>));
     }
 
     public async updateSystemConfigByKey<K extends keyof UpdatableCoreConfig>(

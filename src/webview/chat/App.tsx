@@ -72,6 +72,8 @@ const ChatSession: React.FC<ChatSessionProps> = ({ vscode, sessionId, active, on
     const [agentMode, setAgentMode] = useState<AgentMode>('Agent');
     const [autoEdit, setAutoEdit] = useState<boolean>(false);
     const [skipFileEditPermission, setSkipFileEditPermission] = useState<boolean>(false);
+    const [thinkingEnabled, setThinkingEnabled] = useState<boolean>(true);
+    const [showThinkingText, setShowThinkingText] = useState<boolean>(true);
     const [pendingInputs, setPendingInputs] = useState<Array<{ inputId: string; content: string }>>([]);
     const [runningTasks, setRunningTasks] = useState<Map<string, { taskId: string; filepath: string; type: string; startTime: number }>>(new Map());
     const [openAgentTaskId, setOpenAgentTaskId] = useState<string | null>(null);
@@ -295,6 +297,12 @@ const ChatSession: React.FC<ChatSessionProps> = ({ vscode, sessionId, active, on
                     if (typeof message.skipFileEditPermission === 'boolean') {
                         setSkipFileEditPermission(message.skipFileEditPermission);
                     }
+                    if (typeof message.thinking === 'boolean') {
+                        setThinkingEnabled(message.thinking);
+                    }
+                    if (typeof message.showThinkingText === 'boolean') {
+                        setShowThinkingText(message.showThinkingText);
+                    }
                     break;
                 case 'autoEditUpdate':
                     if (typeof message.enable === 'boolean') {
@@ -358,6 +366,7 @@ const ChatSession: React.FC<ChatSessionProps> = ({ vscode, sessionId, active, on
         // 消息监听器就位后，通知后端本会话视图已挂载，回放当前状态
         vscode.postMessage({ type: 'webviewSessionReady', sessionId });
         vscode.postMessage({ type: 'requestModelInfo' });
+        vscode.postMessage({ type: 'requestSystemConfig' });
 
         return () => {
             window.removeEventListener('message', handleMessage);
@@ -597,6 +606,8 @@ const ChatSession: React.FC<ChatSessionProps> = ({ vscode, sessionId, active, on
     };
 
     const renderedContent = useMemo(() => {
+        const shouldShowThinkingText = thinkingEnabled && showThinkingText;
+
         if (!messages || messages.length === 0) {
             if (PREVIEW_MODE) {
                 return groupMessages(getPreviewMessages()).map((item) => {
@@ -620,6 +631,7 @@ const ChatSession: React.FC<ChatSessionProps> = ({ vscode, sessionId, active, on
                                 streamingToolId={null}
                                 openAgentTaskId={null}
                                 onAgentModalClose={() => {}}
+                                showThinkingText={shouldShowThinkingText}
                             />
                         </div>
                     );
@@ -679,13 +691,14 @@ const ChatSession: React.FC<ChatSessionProps> = ({ vscode, sessionId, active, on
                                 streamingToolId={streamingToolId}
                                 openAgentTaskId={activeDialog ? null : openAgentTaskId}
                                 onAgentModalClose={() => setOpenAgentTaskId(null)}
+                                showThinkingText={shouldShowThinkingText}
                             />
                         </div>
                     );
                 })}
             </div>
         ));
-    }, [messages, modelName, availableModels, activeDialog, processingState, streamingAssistantId, streamingToolId, openAgentTaskId, agentMode]);
+    }, [messages, modelName, availableModels, activeDialog, processingState, streamingAssistantId, streamingToolId, openAgentTaskId, agentMode, thinkingEnabled, showThinkingText]);
 
     return (
         <SessionContext.Provider value={sessionId}>

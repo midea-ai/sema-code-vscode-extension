@@ -306,8 +306,8 @@ export class ConfigWebviewProvider {
 
     private async saveSystemConfigByKey(key: string, value: any) {
         await this.execute('saveSystemConfigByKeyResult', '保存系统配置', async () => {
-            // enablePet 是扩展端本地副作用字段，不应推给 sema-core
-            if (key === 'enablePet') {
+            // enablePet/showThinkingText 是扩展端本地字段，不应推给 sema-core
+            if (key === 'enablePet' || key === 'showThinkingText') {
                 await this.coreManager.saveLocalSystemConfigByKey(key, value);
             } else {
                 await this.coreManager.updateSystemConfigByKey(key, value);
@@ -322,6 +322,10 @@ export class ConfigWebviewProvider {
         await this.execute('resetSystemConfigResult', '重置系统配置', async () => {
             await this.coreManager.updateSystemConfig(defaultConfig);
             this.postMessage({ command: 'resetSystemConfigResult', success: true, message: '系统配置已重置' });
+            this.onSystemConfigChanged?.('skipFileEditPermission', defaultConfig.skipFileEditPermission);
+            this.onSystemConfigChanged?.('thinking', defaultConfig.thinking);
+            this.onSystemConfigChanged?.('showThinkingText', defaultConfig.showThinkingText);
+            this.onSystemConfigChanged?.('enablePet', defaultConfig.enablePet);
         });
     }
 

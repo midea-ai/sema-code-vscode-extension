@@ -195,7 +195,9 @@ export class ChatWebviewProvider {
             const config = this.processWrapper.getSystemConfig();
             this.postMessage({
                 type: 'systemConfigUpdate',
-                skipFileEditPermission: config.skipFileEditPermission || false
+                skipFileEditPermission: config.skipFileEditPermission || false,
+                thinking: config.thinking !== false,
+                showThinkingText: (config as Record<string, any>).showThinkingText !== false
             });
         } catch (error) {
             console.error('Error sending system config:', error);

@@ -650,6 +650,22 @@ button.small {
     box-shadow: none;
 }
 
+.checkbox-label.disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.thinking-form-group {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.show-thinking-label {
+    margin-top: 0;
+}
+
 /* 文本域样式 */
 textarea {
     width: 100%;

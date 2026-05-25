@@ -5,6 +5,7 @@
 export const defaultConfig = {
     stream: true,
     thinking: true,
+    showThinkingText: true,
     skipFileEditPermission: false,
     skipShellExecPermission: false,
     skipSkillPermission: false,

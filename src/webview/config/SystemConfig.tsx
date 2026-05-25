@@ -10,6 +10,7 @@ interface SystemConfigProps {
 interface SystemConfigData {
     stream?: boolean;
     thinking?: boolean;
+    showThinkingText?: boolean;
     skipFileEditPermission?: boolean;
     skipShellExecPermission?: boolean;
     skipSkillPermission?: boolean;
@@ -28,6 +29,7 @@ const SystemConfig: React.FC<SystemConfigProps> = ({ vscode }) => {
     const [message, setMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
     const [platform, setPlatform] = useState<string>('');
     const petSupported = platform === 'darwin' || platform === 'win32' || platform === 'linux';
+    const thinkingEnabled = config.thinking || false;
 
     // 字符计数状态
     const [systemPromptCount, setSystemPromptCount] = useState(0);
@@ -161,15 +163,28 @@ const SystemConfig: React.FC<SystemConfigProps> = ({ vscode }) => {
                         </label>
                     </div>
 
-                    <div className="form-group">
+                    <div className="form-group thinking-form-group">
                         <label className="checkbox-label" title="开启AI的思考和推理过程">
                             <input
                                 type="checkbox"
-                                checked={config.thinking || false}
+                                checked={thinkingEnabled}
                                 onChange={(e) => handleChange('thinking', e.target.checked)}
                             />
                             <span className="checkmark"></span>
                             开启Thinking
+                        </label>
+                        <label
+                            className={`checkbox-label show-thinking-label${thinkingEnabled ? '' : ' disabled'}`}
+                            title={thinkingEnabled ? '控制聊天区是否显示Thinking文本' : '开启Thinking后可控制是否显示Thinking文本'}
+                        >
+                            <input
+                                type="checkbox"
+                                checked={thinkingEnabled && (config.showThinkingText ?? true)}
+                                disabled={!thinkingEnabled}
+                                onChange={(e) => handleChange('showThinkingText', e.target.checked)}
+                            />
+                            <span className="checkmark"></span>
+                            显示Thinking文本
                         </label>
                     </div>
                 </div>
