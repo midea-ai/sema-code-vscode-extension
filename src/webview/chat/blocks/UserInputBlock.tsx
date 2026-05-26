@@ -1,15 +1,18 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { CopyIcon, CheckIcon } from '../components/ui/IconButton';
+import { CopyIcon, CheckIcon, ForkIcon } from '../components/ui/IconButton';
 
 interface UserInputBlockProps {
     content: string;
+    uuid?: string;                      // 有值才可 fork（旧历史消息无锚点）
+    canFork?: boolean;                  // = 会话处于 idle
+    onFork?: (uuid: string) => void;
 }
 
 // 折叠态最大高度（px），需与 styles.css 中 .user-input-content.collapsed 的 max-height 同步
 // 当前为 line-height 1.5 * 字号 12px * 3 行 = 54px
 const COLLAPSED_MAX_PX = 54;
 
-const UserInputBlock: React.FC<UserInputBlockProps> = React.memo(({ content }) => {
+const UserInputBlock: React.FC<UserInputBlockProps> = React.memo(({ content, uuid, canFork, onFork }) => {
 
     const [isExpanded, setIsExpanded] = useState<boolean>(false);
     const [isOverflowing, setIsOverflowing] = useState<boolean>(false);
@@ -76,6 +79,17 @@ const UserInputBlock: React.FC<UserInputBlockProps> = React.memo(({ content }) =
             >
                 {copied ? <CheckIcon /> : <CopyIcon />}
             </button>
+            {uuid && (
+                <button
+                    type="button"
+                    className="user-input-fork"
+                    title={canFork ? '从此处 Fork / 撤销' : '生成中，暂不可 Fork'}
+                    disabled={!canFork}
+                    onClick={() => canFork && onFork?.(uuid)}
+                >
+                    <ForkIcon />
+                </button>
+            )}
         </div>
     );
 });

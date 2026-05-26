@@ -1,4 +1,5 @@
 import { SemaSession } from 'sema-core';
+import type { ForkOptions, ForkPreview, ForkResult } from 'sema-core';
 import {
     MessageCompleteData,
     StateUpdateData,
@@ -38,6 +39,8 @@ const SKIP_COMPLETE_TOOLS = new Set<string>([TOOL_NAME_SUB_AGENT]);
 
 export interface Message {
     id: string;
+    /** fork 句柄（== input:processing 的 inputId）；仅本会话内由用户输入创建的消息才有，旧历史/恢复的消息无此字段 */
+    uuid?: string;
     type: 'user' | 'assistant' | 'tool' | 'system' | 'permission_request' | 'askForm';
     content: any;
     toolName?: string;
@@ -124,6 +127,20 @@ export class SemaSessionWrapper {
 
     public processUserInput(content: string, orgContent?: string): void {
         this.session.processUserInput(content, orgContent);
+    }
+
+    /** 预览：在该用户消息处恢复文件会改动哪些文件、各自增删行数（只读、同步，无副作用） */
+    public getForkPreview(messageUuid: string): ForkPreview {
+        const preview = this.session.getForkPreview(messageUuid);
+        // console.log('[fork] getForkPreview', messageUuid, '=>', JSON.stringify(preview));
+        return preview;
+    }
+
+    /** 原地回退（Fork / 撤销）到该用户消息之前；restoreFiles=true 时同时回滚文件。会话 id 不变 */
+    public async fork(messageUuid: string, options?: ForkOptions): Promise<ForkResult> {
+        const result = await this.session.fork(messageUuid, options);
+        // console.log('[fork] fork', messageUuid, JSON.stringify(options), '=>', JSON.stringify(result));
+        return result;
     }
 
     public interruptSession(): void {
@@ -421,6 +438,7 @@ export class SemaSessionWrapper {
 
             const userMsg: Message = {
                 id: this.generateId(),
+                uuid: data.inputId,
                 type: 'user',
                 content: content,
             };
@@ -528,7 +546,7 @@ export class SemaSessionWrapper {
 
             let newCompleteMessage: Message | undefined;
             if (!messageUpdated) {
-                console.warn('No streaming message found, creating new complete message');
+                // console.warn('No streaming message found, creating new complete message');
                 newCompleteMessage = {
                     id: this.generateId(),
                     type: 'assistant',

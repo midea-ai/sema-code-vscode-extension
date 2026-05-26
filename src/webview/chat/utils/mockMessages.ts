@@ -792,6 +792,21 @@ export const mockDialogMap: Record<string, any[]> = {
             isBackground: false,
         },
     ],
+    ForkDialog: [
+        {
+            preview: {
+                messageUuid: 'mock-fork-uuid-1',
+                canRestoreFiles: true,
+                files: [
+                    { filePath: '/ws/src/utils/config.ts', displayPath: 'src/utils/config.ts', effect: 'modify', additions: 12, removals: 5 },
+                    { filePath: '/Users/zhoujie195/midea-code/sema-vscode-extension/ws/src/app/index.ts', displayPath: '/Users/zhoujie195/midea-code/sema-vscode-extension/src/app/index.ts', effect: 'modify', additions: 3, removals: 2 },
+                    { filePath: '/ws/src/legacy/oldLoader.ts', displayPath: 'src/legacy/oldLoader.ts', effect: 'recreate', additions: 40, removals: 0 },
+                    { filePath: '/ws/src/utils/configCache.ts', displayPath: 'src/utils/configCache.ts', effect: 'delete', additions: 0, removals: 6 },
+                    { filePath: '/ws/assets/logo.png', displayPath: 'assets/logo.png', effect: 'modify', additions: 0, removals: 0, binary: true },
+                ],
+            },
+        },
+    ],
 };
 
 /** 根据 PREVIEW_COMPONENTS 过滤需要预览的 dialog 组件 key */

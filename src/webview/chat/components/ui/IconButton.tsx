@@ -62,6 +62,28 @@ export const CopyIcon: React.FC = () => {
     );
 };
 
+// 用户输入块 Fork / 撤销图标（git-fork 样式）
+export const ForkIcon: React.FC = () => {
+    return (
+        <svg
+            width="12"
+            height="12"
+            viewBox="0 0 16 16"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.4"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+        >
+            <circle cx="4" cy="3" r="1.5" />
+            <circle cx="4" cy="13" r="1.5" />
+            <circle cx="12" cy="3" r="1.5" />
+            <path d="M4 4.5v7" />
+            <path d="M12 4.5c0 3.5-8 1.5-8 5" />
+        </svg>
+    );
+};
+
 // 文件变更面板 全部放弃按钮
 export const CancelCircleIcon: React.FC = () => {
     return (

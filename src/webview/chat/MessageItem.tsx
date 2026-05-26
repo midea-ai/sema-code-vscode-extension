@@ -29,6 +29,8 @@ interface MessageItemProps {
     openAgentTaskId?: string | null;
     onAgentModalClose?: () => void;
     showThinkingText?: boolean;
+    processingState?: 'idle' | 'processing';
+    onFork?: (uuid: string) => void;
 }
 
 const MessageItem: React.FC<MessageItemProps> = React.memo(({
@@ -41,6 +43,8 @@ const MessageItem: React.FC<MessageItemProps> = React.memo(({
     openAgentTaskId,
     onAgentModalClose,
     showThinkingText = true,
+    processingState,
+    onFork,
 }) => {
     const renderToolContent = () => {
         switch (message.toolName) {
@@ -85,7 +89,14 @@ const MessageItem: React.FC<MessageItemProps> = React.memo(({
 
     switch (message.type) {
         case 'user':
-            return <UserInputBlock content={message.content} />;
+            return (
+                <UserInputBlock
+                    content={message.content}
+                    uuid={message.uuid}
+                    canFork={processingState === 'idle'}
+                    onFork={onFork}
+                />
+            );
 
         case 'assistant': {
             const isCurrentlyStreaming = streamingAssistantId === message.id;
@@ -186,7 +197,9 @@ const MessageItem: React.FC<MessageItemProps> = React.memo(({
         && prev.shouldReportChange === next.shouldReportChange
         && prev.toolPermissionData === next.toolPermissionData
         && prev.openAgentTaskId === next.openAgentTaskId
-        && prev.showThinkingText === next.showThinkingText;
+        && prev.showThinkingText === next.showThinkingText
+        && prev.processingState === next.processingState
+        && prev.onFork === next.onFork;
 
     const prevStreamingIsForThis =
         prev.streamingAssistantId === prev.message.id ||

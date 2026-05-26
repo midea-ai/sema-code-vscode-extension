@@ -93,12 +93,36 @@ export interface FileReferenceInfo {
 
 export interface Message {
     id: string;
+    /** fork 句柄（== 后端 input:processing 的 inputId）；仅本会话内由用户输入创建的消息才有 */
+    uuid?: string;
     type: 'user' | 'assistant' | 'tool' | 'system' | 'permission_request' | 'askForm';
     content: any;
     toolName?: string;
     toolArgs?: any;
     reasoning?: string;  // 用于存储思考过程（thinking）
 }
+
+// ─── Fork / 撤销（与 sema-core types/fork 镜像，前端独立定义） ──────────────────
+export type ForkFileEffect = 'modify' | 'recreate' | 'delete';
+
+export interface ForkFileChange {
+    filePath: string;       // 绝对路径
+    displayPath: string;    // 相对工作目录的展示路径
+    effect: ForkFileEffect;
+    additions: number;
+    removals: number;
+    binary?: boolean;       // 二进制文件：不展示增删行
+}
+
+export interface ForkPreview {
+    messageUuid: string;
+    canRestoreFiles: boolean;   // false → 无快照锚点，仅可撤销对话
+    files: ForkFileChange[];
+}
+
+export type ForkResult =
+    | { ok: true; sessionId: string; restoredFiles: string[] }
+    | { ok: false; error: string };
 
 // Diff Hunk 类型（来自 diff 库）
 export interface DiffHunk {

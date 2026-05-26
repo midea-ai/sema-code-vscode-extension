@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { FileChange, TokenInfo, AppProps, SelectedFile, TodoItem, Message, AgentMode, PermissionLevel, SessionMeta } from './types';
+import { FileChange, TokenInfo, AppProps, SelectedFile, TodoItem, Message, AgentMode, PermissionLevel, SessionMeta, ForkPreview } from './types';
 import { streamingStore } from './utils/StreamingStore';
 import InputBox, { InputBoxHandle } from './components/input/InputBox';
 import MessageItem from './MessageItem';
@@ -15,6 +15,7 @@ import PermissionDialog from './components/permission/PermissionDialog';
 import AskFormDialog, { AskFormValues, AskFormStatus, PickOptionRequestData } from './components/ui/AskFormDialog';
 import PlanExitDialog from './components/ui/PlanExitDialog';
 import QuickChatDialog from './components/ui/QuickChatDialog';
+import ForkDialog from './components/ui/ForkDialog';
 import ProcessingSpinner from './components/ui/ProcessingSpinner';
 import ModelConfigReminder from './components/ui/ModelConfigReminder';
 import { PREVIEW_MODE, getPreviewMessages, mockDialogMap, isPreviewActive } from './utils/mockMessages';
@@ -58,6 +59,7 @@ const ChatSession: React.FC<ChatSessionProps> = ({ vscode, sessionId, active, on
         | { type: 'quickchat';         data: { question: string; content: string }; isBackground: false };
     const [dialogQueue, setDialogQueue] = useState<DialogQueueItem[]>([]);
     const activeDialog = dialogQueue[0] ?? null;
+    const [forkDialog, setForkDialog] = useState<{ uuid: string; preview: ForkPreview } | null>(null);
 
     // 队列中存在权限/表单/计划弹窗时，向 App 上报本会话处于「等待用户响应」状态
     useEffect(() => {
@@ -84,6 +86,7 @@ const ChatSession: React.FC<ChatSessionProps> = ({ vscode, sessionId, active, on
     const spinnerStartTimeRef = useRef<number>(0);
     const runningTasksRef = useRef(runningTasks);
     const prevMessagesLenRef = useRef<number>(0);
+    const forkReqRef = useRef<string | null>(null);
 
     const handleFileChange = useCallback(async (change: FileChange) => {
         try {
@@ -118,6 +121,14 @@ const ChatSession: React.FC<ChatSessionProps> = ({ vscode, sessionId, active, on
             console.error('handleFileChange error:', error);
         }
     }, [sessionId]);
+
+    // 点击用户输入块的 Fork 角标：先取预览，收到 forkPreviewResult 后再开弹窗。
+    // 仅 idle 时按钮可点（UserInputBlock 已用 canFork 拦截），这里只负责发起预览请求。
+    const handleFork = useCallback((uuid: string) => {
+        const reqId = `fork-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+        forkReqRef.current = reqId;
+        vscode.postMessage({ type: 'getForkPreview', sessionId, uuid, reqId });
+    }, [sessionId, vscode]);
 
     useEffect(() => {
         const handleMessage = (event: MessageEvent) => {
@@ -358,6 +369,49 @@ const ChatSession: React.FC<ChatSessionProps> = ({ vscode, sessionId, active, on
                         setOpenAgentTaskId(message.taskId);
                     }
                     break;
+                case 'forkPreviewResult':
+                    // 仅处理最新一次预览请求，旧响应丢弃
+                    if (message.reqId && message.reqId === forkReqRef.current) {
+                        forkReqRef.current = null;
+                        if (message.error || !message.preview) {
+                            console.error('[fork] preview failed:', message.error);
+                        } else {
+                            setForkDialog({ uuid: message.preview.messageUuid, preview: message.preview });
+                        }
+                    }
+                    break;
+                case 'forkResult': {
+                    setForkDialog(null);
+                    const result = message.result;
+                    if (!result || !result.ok) {
+                        console.error('[fork] fork failed:', result?.error);
+                        break;
+                    }
+                    // 1) 截断对话：移除该用户消息及其之后的所有消息
+                    const forkUuid = message.uuid;
+                    const idx = messagesRef.current.findIndex(m => m.uuid === forkUuid);
+                    if (idx >= 0) {
+                        const originalContent = messagesRef.current[idx]?.content;
+                        const truncated = messagesRef.current.slice(0, idx);
+                        messagesRef.current = truncated;
+                        setMessages(truncated);
+                        // 回填原输入，方便用户改了重发
+                        if (typeof originalContent === 'string' && originalContent) {
+                            inputBoxRef.current?.setText(originalContent);
+                        }
+                    }
+                    // 2) 文件回滚：移除已回滚的变更条目（restoreFiles=false 时 restoredFiles 为空，不动面板）。
+                    //    core 回滚的是绝对路径，而面板 fullPath 取决于工具调用入参（可能是相对路径/文件名），
+                    //    故按"绝对路径相等，或绝对路径以 /相对路径 结尾"判断等价（带 / 边界避免误配同名后缀）。
+                    const restoredFiles: string[] = Array.isArray(result.restoredFiles) ? result.restoredFiles : [];
+                    if (restoredFiles.length > 0) {
+                        const isRestored = (fullPath: string) =>
+                            restoredFiles.some(rf => rf === fullPath || rf.endsWith('/' + fullPath));
+                        setFileChanges(prev => prev.filter(c => !isRestored(c.fullPath)));
+                    }
+                    // 3) todos：core 回档后会重发 todos:update，前端 todosUpdate 已整体替换，无需处理
+                    break;
+                }
             }
         };
 
@@ -693,13 +747,15 @@ const ChatSession: React.FC<ChatSessionProps> = ({ vscode, sessionId, active, on
                                 openAgentTaskId={activeDialog ? null : openAgentTaskId}
                                 onAgentModalClose={() => setOpenAgentTaskId(null)}
                                 showThinkingText={shouldShowThinkingText}
+                                processingState={processingState}
+                                onFork={handleFork}
                             />
                         </div>
                     );
                 })}
             </div>
         ));
-    }, [messages, modelName, availableModels, activeDialog, processingState, streamingAssistantId, streamingToolId, openAgentTaskId, agentMode, thinkingEnabled, showThinkingText]);
+    }, [messages, modelName, availableModels, activeDialog, processingState, streamingAssistantId, streamingToolId, openAgentTaskId, agentMode, thinkingEnabled, showThinkingText, handleFork]);
 
     return (
         <SessionContext.Provider value={sessionId}>
@@ -752,6 +808,21 @@ const ChatSession: React.FC<ChatSessionProps> = ({ vscode, sessionId, active, on
                         <QuickChatDialog
                             data={activeDialog.data}
                             onClose={() => setDialogQueue(prev => prev.slice(1))}
+                        />
+                    )}
+                    {forkDialog && (
+                        <ForkDialog
+                            preview={forkDialog.preview}
+                            onConfirm={(restoreFiles) => {
+                                vscode.postMessage({
+                                    type: 'forkSession',
+                                    sessionId,
+                                    uuid: forkDialog.uuid,
+                                    restoreFiles,
+                                    reqId: `forkrun-${Date.now()}`
+                                });
+                            }}
+                            onCancel={() => setForkDialog(null)}
                         />
                     )}
                     {activeDialog?.type === 'permission' && (

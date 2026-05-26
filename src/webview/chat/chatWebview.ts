@@ -65,6 +65,8 @@ export class ChatWebviewProvider {
                 switchModel: () => this.switchModel(msg.modelName),
                 restoreFromSnapshots: () => this.restoreFromSnapshots(sid, msg.filePaths),
                 restoreFromSnapshot: () => this.restoreFromSnapshot(sid, msg.filePath),
+                getForkPreview: () => this.handleGetForkPreview(sid, msg.uuid, msg.reqId),
+                forkSession: () => this.handleForkSession(sid, msg.uuid, msg.restoreFiles, msg.reqId),
                 showFileDiff: () => this.fileStateDiffManager.showFileDiff(msg.filePath, msg.minLine),
                 showPermissionDiff: () => this.fileStateDiffManager.showPermissionDiff(msg.filePath, msg.diffContent),
                 getFileChangeStats: () => this.getFileChangeStats(sid, msg.filePath),
@@ -234,6 +236,40 @@ export class ChatWebviewProvider {
         if (!filePath) return;
         await this.fileStateDiffManager.revertAllChanges([filePath]);
         this.postMessage({ type: 'removeFileChange', sessionId, filePath });
+    }
+
+    private handleGetForkPreview(sessionId: string | undefined, uuid: string, reqId: string): void {
+        const wrapper = sessionId ? this.sessionController.getSessionWrapper(sessionId) : undefined;
+        if (!wrapper || !uuid) {
+            this.postMessage({ type: 'forkPreviewResult', sessionId, reqId, error: '无法获取 fork 预览' });
+            return;
+        }
+        try {
+            const preview = wrapper.getForkPreview(uuid);
+            this.postMessage({ type: 'forkPreviewResult', sessionId, reqId, preview });
+        } catch (error) {
+            this.postMessage({
+                type: 'forkPreviewResult', sessionId, reqId,
+                error: error instanceof Error ? error.message : String(error)
+            });
+        }
+    }
+
+    private async handleForkSession(sessionId: string | undefined, uuid: string, restoreFiles: boolean, reqId: string): Promise<void> {
+        const wrapper = sessionId ? this.sessionController.getSessionWrapper(sessionId) : undefined;
+        if (!wrapper || !uuid) {
+            this.postMessage({ type: 'forkResult', sessionId, reqId, uuid, result: { ok: false, error: '会话不可用' } });
+            return;
+        }
+        try {
+            const result = await wrapper.fork(uuid, { restoreFiles: !!restoreFiles });
+            this.postMessage({ type: 'forkResult', sessionId, reqId, uuid, result });
+        } catch (error) {
+            this.postMessage({
+                type: 'forkResult', sessionId, reqId, uuid,
+                result: { ok: false, error: error instanceof Error ? error.message : String(error) }
+            });
+        }
     }
 
     private async getFileChangeStats(sessionId: string | undefined, filePath: string): Promise<void> {

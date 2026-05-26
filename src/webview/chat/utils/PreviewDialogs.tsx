@@ -6,6 +6,7 @@ import PermissionDialog from '../components/permission/PermissionDialog';
 import AskFormDialog from '../components/ui/AskFormDialog';
 import PlanExitDialog from '../components/ui/PlanExitDialog';
 import QuickChatDialog from '../components/ui/QuickChatDialog';
+import ForkDialog from '../components/ui/ForkDialog';
 
 const log = (name: string, action: string, ...args: any[]) =>
     console.log(`[Preview] ${name}.${action}`, ...args);
@@ -73,6 +74,14 @@ const PreviewDialogs: React.FC<{ vscode: any }> = ({ vscode }) => {
                     onSubmit={(selected) => dismiss('PlanExitDialog', 'onSubmit', selected)}
                     onCancel={() => dismiss('PlanExitDialog', 'onCancel')}
                     vscode={vscode}
+                />
+            ))}
+            {show('ForkDialog') && mockDialogMap.ForkDialog.map((item, i) => (
+                <ForkDialog
+                    key={`ForkDialog-${i}`}
+                    preview={item.preview}
+                    onConfirm={(restoreFiles) => dismiss('ForkDialog', 'onConfirm', restoreFiles)}
+                    onCancel={() => dismiss('ForkDialog', 'onCancel')}
                 />
             ))}
         </>

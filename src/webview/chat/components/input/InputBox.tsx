@@ -45,6 +45,7 @@ import { ShortcutCommand } from '../../../../utils/command';
 
 export interface InputBoxHandle {
     focus: () => void;
+    setText: (text: string) => void;
 }
 
 interface InputBoxProps {
@@ -109,7 +110,18 @@ const InputBox = forwardRef<InputBoxHandle, InputBoxProps>(({
     const permissionLevelMenu = usePermissionLevelMenu(disabled, onPermissionLevelChange, permissionLevelMenuRef, permissionLevelButtonRef);
 
     useImperativeHandle(ref, () => ({
-        focus: () => { inputBoxRef.current?.focus(); }
+        focus: () => { inputBoxRef.current?.focus(); },
+        // 以纯文本回填输入框（如 Fork 后回填原输入），复用 completeShortcut/restoreFromHistory 的写入模式
+        setText: (text: string) => {
+            const el = inputBoxRef.current;
+            if (!el) return;
+            renderEditorContent(el, text, []);
+            setInputValue(text);
+            setMentions([]);
+            fileSelection.setSelectedFiles([]);
+            setCaretOffset(el, text.length);
+            el.focus();
+        }
     }));
 
     // 启动时主动向扩展请求项目级输入历史

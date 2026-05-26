@@ -226,7 +226,7 @@ code, pre, .code {
 /* 右下角复制按钮：悬浮输入块时淡入显示 */
 .user-input-copy {
     position: absolute;
-    right: 6px;
+    right: 30px;
     bottom: 6px;
     display: inline-flex;
     align-items: center;
@@ -249,8 +249,54 @@ code, pre, .code {
     color: var(--chat-text-primary);
 }
 
+/* 无 fork 按钮时（旧历史消息无锚点），复制按钮独占最右位置，不留空 */
+.user-input-copy:last-child {
+    right: 6px;
+}
+
 /* 统一图标尺寸，避免「复制 -> 已复制」切换时的跳动 */
 .user-input-copy svg {
+    width: 12px;
+    height: 12px;
+}
+
+/* Fork / 撤销角标按钮，复用复制按钮的定位与 hover 淡入，排在复制右侧（最右） */
+.user-input-fork {
+    position: absolute;
+    right: 6px;
+    bottom: 6px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 3px;
+    border: none;
+    border-radius: var(--chat-radius-sm);
+    background: var(--chat-bg-active);
+    color: var(--chat-color-muted);
+    cursor: pointer;
+    opacity: 0;
+    transition: opacity 0.15s, color 0.15s;
+}
+
+.user-input-block:hover .user-input-fork {
+    opacity: 1;
+}
+
+.user-input-fork:hover {
+    color: var(--chat-text-primary);
+}
+
+/* 生成中不可 fork：非悬浮仍隐藏，悬浮时显示为半透明且不响应 */
+.user-input-fork:disabled {
+    cursor: default;
+}
+
+.user-input-block:hover .user-input-fork:disabled {
+    opacity: 0.4;
+    color: var(--chat-color-muted);
+}
+
+.user-input-fork svg {
     width: 12px;
     height: 12px;
 }
