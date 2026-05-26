@@ -63,8 +63,8 @@ const ProcessingSpinner: React.FC<ProcessingSpinnerProps> = ({
     return (
         <div className="processing-spinner">
             <div className="processing-spinner-main">
+                <span className="spinner-char">{frames[frame]}</span>
                 <span className="spinner-shimmer-text">
-                    <span className="spinner-char">{frames[frame]}</span>
                     <span className="spinner-message">{displayMessage}</span>
                 </span>
                 <span className="spinner-time-info">

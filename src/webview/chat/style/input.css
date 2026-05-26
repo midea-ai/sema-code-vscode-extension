@@ -620,10 +620,11 @@
 }
 
 /* 权限档位菜单弹窗 */
+/* 权限选择器位于底部左侧组的最右端，故向左展开，避免侧边栏变窄时溢出右边界 */
 .permission-level-menu-popup {
     position: absolute;
     bottom: calc(100% + 6px);
-    left: 0;
+    right: 0;
     min-width: 200px;
     max-width: 260px;
     width: max-content;

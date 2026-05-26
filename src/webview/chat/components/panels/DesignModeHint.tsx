@@ -7,11 +7,7 @@ const DesignModeHint: React.FC = () => {
                 <span className="welcome-title">Sema Code</span>
                 <span className="welcome-mode-tag">Design</span>
             </div>
-            <div className="welcome-message">
-                <div className="welcome-line">
-                    <span className="welcome-intro-text">请描述你想要的页面 / 原型 / 演示 ～</span>
-                </div>
-            </div>
+            <p className="welcome-subtitle">请描述你想要的页面 / 原型 / 演示 ～</p>
         </div>
     );
 };

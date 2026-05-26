@@ -409,6 +409,10 @@ code, pre, .code {
     flex-shrink: 0;
     line-height: 1.4;
     /* 确保与内容文本行高一致 */
+    /* 与 .spinner-char 同构：1em 居中盒，使圆点与 spinner 旋转字符占据同一记号列 */
+    width: 1em;
+    text-align: center;
+    display: inline-block;
 }
 
 .ai-response-content .plain-text-content {
@@ -465,48 +469,62 @@ code, pre, .code {
     align-items: center;
     justify-content: center;
     text-align: center;
-    gap: 8px;
+    gap: 0;
     user-select: none;
+    transform: translateY(-8%);
 }
 
 .welcome-header {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 7px;
 }
 
 .welcome-title {
     margin: 0;
-    font-size: 30px;
-    font-weight: 600;
-    letter-spacing: 0.5px;
+    font-size: 32px;
+    font-weight: 650;
+    letter-spacing: 0;
     color: var(--chat-text-primary);
+    line-height: 1.2;
 }
 
 .welcome-mode-tag {
-    padding: 2px 8px;
-    border-radius: 6px;
+    padding: 1px 6px;
+    border-radius: 4px;
     font-size: var(--chat-font-sm);
     font-weight: 500;
     background: var(--chat-color-purple-bg);
     color: var(--chat-color-purple);
+    line-height: 1.4;
 }
 
 .welcome-subtitle {
-    margin: 0;
+    margin: 22px 0 0;
     font-size: var(--chat-font-md);
     color: var(--chat-text-secondary);
 }
 
 .welcome-version-badge {
-    display: flex;
-    margin-top: -2px;
-    margin-bottom: 12px;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 10px;
+    color: var(--chat-text-secondary);
+    font-size: var(--chat-font-sm);
+    line-height: 1.3;
+    text-decoration: none;
+    opacity: 0.78;
+    transition: opacity 0.15s, color 0.15s;
 }
 
-.welcome-version-badge img {
-    height: 18px;
-    display: block;
+.welcome-version-badge:hover {
+    color: var(--chat-text-primary);
+    opacity: 0.95;
+}
+
+.welcome-version-badge span+span {
+    color: var(--chat-text-link);
 }
 
 
@@ -852,6 +870,8 @@ code, pre, .code {
     align-items: flex-start;
     margin: var(--chat-block-margin);
     padding: var(--chat-spacing-sm) var(--chat-spacing-lg);
+    /* 左侧不留 padding，由 .processing-spinner-main 的 padding-left 统一对齐到响应块 */
+    padding-left: 0;
     width: 100%;
     max-width: var(--chat-block-max-width);
     box-sizing: border-box;
@@ -859,12 +879,17 @@ code, pre, .code {
     container-type: inline-size;
 }
 
+/* 与 .ai-response-content 同构：padding-left:8px 让文字列对齐响应正文(16px)，
+   旋转字符绝对定位到 left:-6px 对齐响应圆点(2px) */
 .processing-spinner-main {
     display: flex;
     align-items: center;
     gap: 10px;
     width: 100%;
     min-width: 0;
+    position: relative;
+    padding-left: 8px;
+    box-sizing: border-box;
 }
 
 /* 计时前面的内容（CHARACTERS + Working / 当前 todo）整体做透明度波浪闪烁，
@@ -910,6 +935,8 @@ code, pre, .code {
 }
 
 .spinner-char {
+    position: absolute;
+    left: -6px;
     font-weight: 600;
     color: var(--vscode-textLink-foreground);
     flex-shrink: 0;
@@ -971,7 +998,8 @@ code, pre, .code {
 
 .spinner-next-progress {
     margin-top: 4px;
-    margin-left: 26px;
+    /* 对齐到 spinner 文字列（与 .processing-spinner-main 的 padding-left 一致）*/
+    margin-left: 8px;
     font-size: var(--chat-font-xs);
     color: var(--chat-text-secondary);
     font-variant-numeric: tabular-nums;
@@ -979,7 +1007,7 @@ code, pre, .code {
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    max-width: calc(100% - 26px);
+    max-width: calc(100% - 8px);
     position: relative;
     z-index: 1;
 }

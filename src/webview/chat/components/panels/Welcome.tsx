@@ -9,10 +9,8 @@ const Welcome: React.FC = () => (
             className="welcome-version-badge"
             title="sema-code-core"
         >
-            <img
-                src="https://img.shields.io/npm/v/sema-core?label=sema-core&style=flat-square"
-                alt="sema-core version"
-            />
+            <span>sema-core</span>
+            <span>v2.0.2</span>
         </a>
         <p className="welcome-subtitle">AI 驱动的智能编程助手</p>
     </div>

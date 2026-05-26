@@ -119,12 +119,20 @@ const FileChangesPanel: React.FC<FileChangesPanelProps> = ({ changes, vscode, on
                                 <span className="file-change-name">
                                     {change.fileName}
                                 </span>
-                                <span
-                                    className="file-change-fullpath"
-                                    title={change.fullPath}
-                                >
-                                    {change.fullPath}
-                                </span>
+                                {(() => {
+                                    // 路径只保留目录部分（去掉结尾重复的文件名）；目录为空则不显示
+                                    const dir = change.fullPath.endsWith(change.fileName)
+                                        ? change.fullPath.slice(0, -change.fileName.length)
+                                        : change.fullPath;
+                                    return dir ? (
+                                        <span
+                                            className="file-change-fullpath"
+                                            title={change.fullPath}
+                                        >
+                                            {dir}
+                                        </span>
+                                    ) : null;
+                                })()}
                             </div>
                             <div className="file-change-right">
                                 {!change.isNotebook && (
