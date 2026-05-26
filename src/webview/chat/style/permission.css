@@ -318,6 +318,29 @@ body.vscode-light .ask-form-dialog {
     gap: 12px;
     padding: 10px 12px 8px 12px;
     border-bottom: 1px solid var(--chat-border);
+    cursor: pointer;
+    user-select: none;
+}
+
+.ask-form-header:hover {
+    background-color: var(--chat-bg-hover);
+}
+
+.ask-form-toggle-icon {
+    flex-shrink: 0;
+    align-self: center;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--chat-text-secondary);
+}
+
+.ask-form-toggle-icon svg.toggle-icon {
+    transition: transform 0.2s ease;
+}
+
+.ask-form-toggle-icon svg.toggle-icon.expanded {
+    transform: rotate(90deg);
 }
 
 .ask-form-header-titles {

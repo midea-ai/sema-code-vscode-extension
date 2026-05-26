@@ -129,7 +129,8 @@ const FileChangesPanel: React.FC<FileChangesPanelProps> = ({ changes, vscode, on
                                             className="file-change-fullpath"
                                             title={change.fullPath}
                                         >
-                                            {dir}
+                                            {/* 首尾包裹 LRM 锚定为 LTR，避免 direction:rtl 下路径首/尾的 "/" 被 bidi 移位 */}
+                                            {'‎' + dir + '‎'}
                                         </span>
                                     ) : null;
                                 })()}

@@ -775,7 +775,7 @@ export const mockDialogMap: Record<string, any[]> = {
     FileChangesPanel: [
         {
             changes: [
-                { fileName: 'config.ts', fullPath: 'src/utils/config.ts', additions: 12, removals: 5, type: 'edit', minLine: 10 },
+                { fileName: 'config.ts', fullPath: '/Users/zhoujie195/midea-code/sema-vscode-extension/src/utils/config.ts', additions: 12, removals: 5, type: 'edit', minLine: 10 },
                 { fileName: 'configCache.ts', fullPath: 'src/utils/configCache.ts', additions: 6, removals: 0, type: 'write', minLine: 1 },
                 { fileName: 'index.ts', fullPath: 'src/app/index.ts', additions: 3, removals: 2, type: 'edit', minLine: 5 },
                 { fileName: 'analysis.ipynb', fullPath: 'notebooks/analysis.ipynb', additions: 0, removals: 0, type: 'edit', minLine: 1, isNotebook: true },

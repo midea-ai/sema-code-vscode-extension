@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { ToggleIcon } from './IconButton';
 
 export type PickOptionQuestion =
     | { type: 'radio'; id: string; label: string; required?: boolean; options: string[] }
@@ -134,6 +135,7 @@ const AskFormDialog: React.FC<AskFormDialogProps> = ({
     const [otherActive, setOtherActive] = useState<Record<string, boolean>>(initActive);
     const [otherText, setOtherText] = useState<Record<string, string>>(initText);
     const [errors, setErrors] = useState<Record<string, string>>({});
+    const [isExpanded, setIsExpanded] = useState<boolean>(true);
     const containerRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
@@ -421,7 +423,14 @@ const AskFormDialog: React.FC<AskFormDialogProps> = ({
             ref={containerRef}
             tabIndex={readonly ? -1 : 0}
         >
-            <div className="ask-form-header">
+            <div
+                className="ask-form-header"
+                onClick={() => setIsExpanded(prev => !prev)}
+                title={isExpanded ? '收起' : '展开'}
+            >
+                <span className="ask-form-toggle-icon">
+                    <ToggleIcon isExpanded={isExpanded} />
+                </span>
                 <div className="ask-form-header-titles">
                     <div className="ask-form-header-title">{mainTitle}</div>
                     {data.intro ? <div className="ask-form-header-intro">{data.intro}</div> : null}
@@ -430,27 +439,29 @@ const AskFormDialog: React.FC<AskFormDialogProps> = ({
                     {answered ? 'Answered' : 'Pending'}
                 </div>
             </div>
-            <div className="ask-form-content">
-                {data.questions.map(renderQuestion)}
-                {!readonly ? (
-                    <div className="ask-form-buttons">
-                        <button
-                            type="button"
-                            className="ask-form-submit-btn"
-                            onClick={handleSubmit}
-                        >
-                            Submit Answers
-                        </button>
-                        <button
-                            type="button"
-                            className="ask-form-skip-btn"
-                            onClick={handleSkip}
-                        >
-                            Continue
-                        </button>
-                    </div>
-                ) : null}
-            </div>
+            {isExpanded ? (
+                <div className="ask-form-content">
+                    {data.questions.map(renderQuestion)}
+                    {!readonly ? (
+                        <div className="ask-form-buttons">
+                            <button
+                                type="button"
+                                className="ask-form-submit-btn"
+                                onClick={handleSubmit}
+                            >
+                                Submit Answers
+                            </button>
+                            <button
+                                type="button"
+                                className="ask-form-skip-btn"
+                                onClick={handleSkip}
+                            >
+                                Continue
+                            </button>
+                        </div>
+                    ) : null}
+                </div>
+            ) : null}
         </div>
     );
 };

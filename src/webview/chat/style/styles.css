@@ -718,6 +718,9 @@ code, pre, .code {
     /* 确保完整路径能够自适应 */
     min-width: 0;
     /* 重要：允许在flex布局中收缩 */
+    /* 路径过长时省略前面部分，保留靠近文件名的尾部目录 */
+    direction: rtl;
+    text-align: left;
 }
 
 .file-change-right {
