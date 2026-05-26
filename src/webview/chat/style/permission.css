@@ -643,7 +643,7 @@ body.vscode-light .ask-form-dialog {
 }
 
 .fork-dialog-title {
-    font-size: var(--chat-font-base);
+    font-size: var(--chat-font-md);
     font-weight: 600;
     color: var(--chat-text-primary);
     line-height: 1.3;
@@ -651,7 +651,7 @@ body.vscode-light .ask-form-dialog {
 
 .fork-dialog-subtitle {
     margin-top: 2px;
-    font-size: var(--chat-font-xs);
+    font-size: var(--chat-font-sm);
     color: var(--chat-text-secondary);
     line-height: 1.4;
 }
@@ -672,14 +672,14 @@ body.vscode-light .ask-form-dialog {
 }
 
 .fork-file-group-title {
-    font-size: var(--chat-font-xs);
+    font-size: var(--chat-font-sm);
     font-weight: 600;
     color: var(--chat-text-secondary);
 }
 
 .fork-dialog-note {
     padding: 10px 12px;
-    font-size: var(--chat-font-xs);
+    font-size: var(--chat-font-sm);
     color: var(--chat-text-secondary);
     line-height: 1.5;
 }
@@ -688,7 +688,7 @@ body.vscode-light .ask-form-dialog {
     display: flex;
     align-items: center;
     gap: 8px;
-    font-size: var(--chat-font-base);
+    font-size: var(--chat-font-md);
 }
 
 .fork-file-path {
