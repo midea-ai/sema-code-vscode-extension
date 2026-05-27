@@ -162,7 +162,11 @@ const BashBlock: React.FC<BashBlockProps> = ({ content: toolContent, messageId, 
                             {omittedCount > 0 && (
                                 <div className="bash-omitted-lines bash-omitted-lines-clickable" onClick={handleViewAll}>...省略了 {omittedCount} 行</div>
                             )}
-                            <pre className="bash-output">{visibleLines.join('\n')}</pre>
+                            <div className="bash-output">
+                                {visibleLines.map((line, i) => (
+                                    <div key={i} className="bash-output-line">{line}</div>
+                                ))}
+                            </div>
                         </>
                     )}
                 </div>

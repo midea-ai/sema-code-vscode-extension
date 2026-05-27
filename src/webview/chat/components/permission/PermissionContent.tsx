@@ -1,6 +1,7 @@
 import React from 'react';
 import BaseBashContent from '../ui/BaseBashContent';
-import UpdateCodeDiff from '../ui/UpdateCodeDiff';
+import CollapsibleDiff from '../ui/CollapsibleDiff';
+import CollapsibleContent from '../ui/CollapsibleContent';
 import FileIcon from '../ui/FileIcon';
 import { langMap } from '../../utils/fileLangTypeMap';
 import { DiffContent } from '../../types';
@@ -119,7 +120,7 @@ const PermissionContent: React.FC<PermissionContentProps> = ({
                     </div>
                     <div className="file-permission-title-divider-bottom" />
                 </div>
-                <UpdateCodeDiff
+                <CollapsibleDiff
                     diffContent={diffContent}
                     language={language}
                 />
@@ -146,7 +147,9 @@ const PermissionContent: React.FC<PermissionContentProps> = ({
                     <div className="file-permission-title-divider-bottom" />
                 </div>
                 <div className="mcp-tool-content">
-                    {typeof content === 'string' ? content : JSON.stringify(content, null, 2)}
+                    <CollapsibleContent>
+                        {typeof content === 'string' ? content : JSON.stringify(content, null, 2)}
+                    </CollapsibleContent>
                 </div>
                 <div className="file-permission-code-divider" />
             </div>
@@ -173,7 +176,9 @@ const PermissionContent: React.FC<PermissionContentProps> = ({
                     Code Agent may use instructions, code, or files from this Skill.
                 </div>
                 <div className="skill-permission-content">
-                    {typeof content === 'string' ? content : JSON.stringify(content, null, 2)}
+                    <CollapsibleContent>
+                        {typeof content === 'string' ? content : JSON.stringify(content, null, 2)}
+                    </CollapsibleContent>
                 </div>
                 <div className="file-permission-code-divider" />
             </div>
@@ -227,7 +232,7 @@ const PermissionContent: React.FC<PermissionContentProps> = ({
                     </div>
                     <div className="file-permission-title-divider-bottom" />
                 </div>
-                <UpdateCodeDiff
+                <CollapsibleDiff
                     diffContent={diffContent}
                     language={language}
                 />

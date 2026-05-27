@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { renderMarkdownToHtml, hasMarkdownFormatting } from '../../utils/markdown';
 import { ToggleIcon } from './IconButton';
+import CollapsibleContent from './CollapsibleContent';
 import '../../style/markdown.css';
 
 interface PlanImplementPanelProps {
@@ -57,14 +58,16 @@ const PlanImplementPanel: React.FC<PlanImplementPanelProps> = ({
                 {/* 计划内容 - 可展开/收起 */}
                 {isExpanded && (
                     <div className="plan-implement-plan-content">
-                        {hasMarkdownFormatting(planContent) ? (
-                            <div
-                                className="markdown-content"
-                                dangerouslySetInnerHTML={{ __html: renderMarkdownToHtml(planContent, vscode) }}
-                            />
-                        ) : (
-                            <pre>{planContent}</pre>
-                        )}
+                        <CollapsibleContent>
+                            {hasMarkdownFormatting(planContent) ? (
+                                <div
+                                    className="markdown-content"
+                                    dangerouslySetInnerHTML={{ __html: renderMarkdownToHtml(planContent, vscode) }}
+                                />
+                            ) : (
+                                <pre>{planContent}</pre>
+                            )}
+                        </CollapsibleContent>
                     </div>
                 )}
             </div>

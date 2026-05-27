@@ -120,6 +120,53 @@
     background-color: var(--chat-bg-active);
 }
 
+/* 内容区整体可点击：点击代码 / 「+ xx lines」均打开文件 diff，与点击文件名一致。
+   用双 class 提高特异性，确保覆盖 blocks.css 的 .chat-block-content（二者加载顺序不定）。 */
+.chat-block-content.edit-block-content {
+    cursor: pointer;
+    /* 去掉左右 padding，让代码块横向贴到块边框（上下保留分隔） */
+    padding-left: 0;
+    padding-right: 0;
+}
+
+/* CollapsibleDiff：diff 不再内部滚动，改为内容整体折叠 + 底部渐隐 + 左下角「展开/收起」。
+   仅作用于被 CollapsibleDiff 包裹的 diff（EditBlock / 权限弹窗），不影响其他 UpdateCodeDiff（如 NotebookEditBlock）。 */
+.collapsible-diff .update-code-diff {
+    max-height: none;
+}
+
+.collapsible-diff .update-code-diff-scroll {
+    overflow: visible;
+}
+
+/* 折叠态：限制高度，底部渐隐到透明（mask 适配任意背景） */
+.collapsible-diff.collapsed {
+    max-height: 140px;
+    overflow: hidden;
+    -webkit-mask-image: linear-gradient(to bottom, #000 78%, transparent 100%);
+    mask-image: linear-gradient(to bottom, #000 78%, transparent 100%);
+}
+
+/* 展开 / 收起 控件：左下角，弱化色，背景透明以贴合所在容器 */
+.collapsible-diff-toggle {
+    display: block;
+    width: 100%;
+    box-sizing: border-box;
+    padding: 4px 8px;
+    border: none;
+    text-align: left;
+    background: transparent;
+    color: var(--chat-color-muted);
+    font-size: var(--chat-font-sm);
+    line-height: 1.4;
+    cursor: pointer;
+}
+
+.collapsible-diff-toggle:hover {
+    color: var(--chat-color-muted-hover);
+    text-decoration: underline;
+}
+
 .cell-info {
     color: var(--chat-color-warning);
     font-weight: 500;
@@ -229,16 +276,34 @@
 }
 
 .diff-row-meta {
-    background-color: var(--chat-bg-editor);
-    color: var(--chat-text-secondary);
+    /* 与标题/块背景一致（--chat-page-bg 暗色=sideBar 背景，亮色自动转白），
+       让「+ xx lines」像块的页脚而非代码块的一部分 */
+    background-color: var(--chat-page-bg);
+    /* 文字色与「展开/收起」(.collapsible-diff-toggle) 一致 */
+    color: var(--chat-color-muted);
 }
 
 .diff-row-meta td {
-    padding: 4px 16px;
-    font-style: italic;
+    position: relative;
+    padding: 7px 16px 2px;
     font-size: var(--chat-font-xs);
-    opacity: 0.7;
-    border-top: 1px solid var(--chat-border);
+    /* 不要在此设 opacity：会连同下方的 ::before 渐变一起变半透明，
+       使渐变底端到不了纯 --chat-page-bg，与 meta 行背景出现分界线。
+       文字弱化已由 --chat-text-secondary + xs 字号承担。 */
+}
+
+/* 存在 meta（如新建文件的「+ xx lines」）时，在其上方叠一层透明 → 编辑器背景色的渐变，
+   让代码块底部平滑过渡到 meta 行，消除硬色差。与高度 / 折叠态无关：折叠时 meta 被截掉看不到，
+   由折叠态 mask 接管，两者不冲突。pointer-events:none 让点击穿透到可点击的内容区。 */
+.diff-row-meta td::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 100%;
+    height: 24px;
+    background: linear-gradient(to bottom, transparent, var(--chat-page-bg));
+    pointer-events: none;
 }
 
 .diff-row-added {

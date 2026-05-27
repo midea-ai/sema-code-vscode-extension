@@ -58,6 +58,24 @@ const PreviewDialogs: React.FC<{ vscode: any }> = ({ vscode }) => {
                     vscode={vscode}
                 />
             ))}
+            {show('McpToolPermissionDialog') && mockDialogMap.McpToolPermissionDialog.map((item, i) => (
+                <PermissionDialog
+                    key={`McpToolPermissionDialog-${i}`}
+                    permissionData={item.data}
+                    onPermissionSelect={(action) => dismiss('McpToolPermissionDialog', 'onPermissionSelect', action)}
+                    onCancel={() => dismiss('McpToolPermissionDialog', 'onCancel')}
+                    vscode={vscode}
+                />
+            ))}
+            {show('SkillPermissionDialog') && mockDialogMap.SkillPermissionDialog.map((item, i) => (
+                <PermissionDialog
+                    key={`SkillPermissionDialog-${i}`}
+                    permissionData={item.data}
+                    onPermissionSelect={(action) => dismiss('SkillPermissionDialog', 'onPermissionSelect', action)}
+                    onCancel={() => dismiss('SkillPermissionDialog', 'onCancel')}
+                    vscode={vscode}
+                />
+            ))}
             {show('AskFormDialog') && mockDialogMap.AskFormDialog.map((item, i) => (
                 <AskFormDialog
                     key={`AskFormDialog-${i}`}

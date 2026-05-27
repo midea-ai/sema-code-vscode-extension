@@ -64,7 +64,8 @@
     --chat-bg-light: #ffffff;
     --chat-bg-hover: rgba(128, 128, 128, 0.1);
     --chat-bg-active: rgba(128, 128, 128, 0.2);
-    --chat-overlay: rgba(0, 0, 0, 0.4);
+    /* 模态遮罩：暗色主题加深以保证可见，亮色主题在 .vscode-light 中调浅 */
+    --chat-overlay: rgba(0, 0, 0, 0.6);
 
     /* -------- 按钮 / 列表前景 -------- */
     --chat-text-button: var(--vscode-button-foreground);
@@ -114,4 +115,6 @@
 .vscode-light {
     /* 与 .vscode-light body / #root 背景一致 */
     --chat-page-bg: var(--chat-bg-light);
+    /* 亮色背景下黑色遮罩观感更重，调浅避免过黑 */
+    --chat-overlay: rgba(0, 0, 0, 0.4);
 }

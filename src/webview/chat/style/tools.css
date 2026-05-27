@@ -124,13 +124,18 @@
 .bash-output {
     margin: 0;
     padding: 0;
-    overflow-y: auto;
-    white-space: pre;
     font-size: var(--chat-font-base);
     line-height: 1.3;
     color: var(--chat-color-muted);
     font-family: var(--vscode-editor-font-family);
     background: transparent;
+}
+
+/* 单行输出：不换行、超长省略，避免长行撑出横向滚动（BashBlock / PubBlock 共用） */
+.bash-output-line {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 
@@ -147,13 +152,10 @@
 }
 
 
-/* 内容区：继承 .chat-block-content */
+/* 内容区：继承 .chat-block-content。单行省略交给 .bash-output-line，不再内部滚动 */
 .pub-block-content {
-    overflow-y: auto;
-    max-height: 300px;
     font-size: var(--chat-font-base);
     line-height: 1.3;
-    white-space: pre;
     color: var(--chat-color-muted);
     font-family: var(--vscode-editor-font-family);
 }
@@ -318,8 +320,6 @@
 .grouped-result-content {
     margin: 0;
     padding: var(--chat-block-header-padding);
-    overflow-y: auto;
-    max-height: 200px;
     font-size: var(--chat-font-sm);
     line-height: 1.3;
     white-space: pre-wrap;

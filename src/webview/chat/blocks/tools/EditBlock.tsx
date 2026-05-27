@@ -3,7 +3,7 @@ import { VscodeApi, FileChange } from '../../types';
 import { ToggleIcon } from '../../components/ui/IconButton';
 import FileIcon from '../../components/ui/FileIcon';
 import { ToolContent } from '../../types';
-import UpdateCodeDiff from '../../components/ui/UpdateCodeDiff';
+import CollapsibleDiff from '../../components/ui/CollapsibleDiff';
 import { langMap } from '../../utils/fileLangTypeMap';
 import { countDiffChanges } from '../../utils/diffParser';
 import { TOOL_NAME_WRITE_FILE } from '../../../../utils/tool';
@@ -152,8 +152,8 @@ const EditBlock: React.FC<EditBlockProps> = React.memo(({
                 </div>
             </div>
             {isExpanded && (
-                <div className="chat-block-content edit-block-content">
-                    <UpdateCodeDiff
+                <div className="chat-block-content edit-block-content" onClick={handleShowDiff}>
+                    <CollapsibleDiff
                         diffContent={diffContent}
                         language={language}
                     />

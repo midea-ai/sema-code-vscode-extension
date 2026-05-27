@@ -31,29 +31,26 @@
   vertical-align: baseline;
 }
 
-/* 内联代码样式 - `代码` 变色 */
+/* 内联代码样式 - `代码` 变色 + 淡背景 */
 .markdown-content .inline-code {
   color: var(--chat-text-symbol);
-  background: none;
+  background: var(--chat-bg-hover);
+  padding: 0.1em 0.35em;
+  border-radius: var(--chat-radius-sm);
 }
 
-/* 文件路径内联代码样式 - 可点击的文件路径 */
+/* 文件路径内联代码样式 - 可点击的文件路径，颜色与内联代码一致，仅用下划线区分，不加背景 */
 .markdown-content .file-path-code {
-  color: var(--chat-text-link);
+  color: var(--chat-text-symbol);
   background: none;
   cursor: pointer;
-  text-decoration: underline;
-  transition: color 0.2s ease;
-}
-
-.markdown-content .file-path-code:hover {
-  color: var(--chat-text-link-active);
   text-decoration: underline;
 }
 
 /* 代码块样式 - ``` 代码块高亮 */
 .markdown-content .code-block {
   color: var(--chat-text-editor);
+  background: var(--chat-bg-hover);
   border-radius: var(--chat-radius-md);
   padding: var(--chat-spacing-lg);
   margin: 0;
@@ -89,6 +86,7 @@
 .markdown-content .markdown-table {
   border-collapse: collapse;
   margin: 3px 0;
+  width: 100%;
 }
 
 .markdown-content .markdown-table th,
@@ -102,17 +100,7 @@
   font-weight: 600;
 }
 
-/* 表格内的内联代码 */
-.markdown-content .markdown-table .inline-code {
-  color: var(--chat-text-symbol);
-  background: none;
-}
-
-.markdown-content .markdown-table .file-path-code {
-  color: var(--chat-text-link);
-  cursor: pointer;
-  text-decoration: underline;
-}
+/* 表格内的内联代码 / 文件路径沿用统一的 .inline-code / .file-path-code 样式 */
 
 /* 图片样式 - ![alt](path) 渲染结果 */
 .markdown-content .md-image {
@@ -123,15 +111,11 @@
   cursor: pointer;
 }
 
-/* 本地 loopback URL 链接样式 - 仅匹配 localhost / 127.0.0.1 / 0.0.0.0 / [::1] */
+/* 本地 loopback URL 链接样式 - 仅匹配 localhost / 127.0.0.1 / 0.0.0.0 / [::1]
+   颜色与内联代码一致，仅用下划线区分，避免正文出现多种高亮色 */
 .markdown-content .md-url-link {
-  color: var(--chat-text-link);
+  color: var(--chat-text-symbol);
   cursor: pointer;
   text-decoration: underline;
-  transition: color 0.2s ease;
-}
-
-.markdown-content .md-url-link:hover {
-  color: var(--chat-text-link-active);
 }
 

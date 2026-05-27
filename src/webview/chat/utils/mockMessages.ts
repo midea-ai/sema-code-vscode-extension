@@ -12,7 +12,7 @@ import {
     TOOL_NAME_SEARCH_FILES, TOOL_NAME_SEARCH_CONTENT, TOOL_NAME_VIEW_FILE,
     TOOL_NAME_PATCH_FILE, TOOL_NAME_WRITE_FILE, TOOL_NAME_EDIT_NOTEBOOK,
     TOOL_NAME_RUN_SHELL, TOOL_NAME_FETCH_URL, TOOL_NAME_STOP_BG_JOB, TOOL_NAME_PEEK_BG_JOB,
-    TOOL_NAME_PICK_OPTION
+    TOOL_NAME_PICK_OPTION, TOOL_NAME_SKILL
 } from '../../../utils/tool';
 
 /** 手动切换预览范围：null = 全部，['xx'] = 指定组件，[] = 关闭 */
@@ -286,7 +286,7 @@ print('=== Sheet Names ===')
 print(wb.sheetnames)
 print()
 " 2>&1`,
-                content: 'PASS  src/utils/config.test.ts\n  ✓ should load config (12ms)\n  ✓ should validate schema (8ms)\n  ✓ should merge defaults (5ms)\n\nTest Suites: 1 passed, 1 total\nTests:       3 passed, 3 total\nTime:        1.234s',
+                content: 'PASS  src/utils/config.test.ts\n  ✓ should load config (12ms)\n  ✓ should validate schema (8ms)\n  ✓ should merge defaults (5ms)\n\nTest Suites: 1 passed, 1 total\nTests:       3 passed, 3 tbvjhsbvhktal\nTime:        1.234s',
             },
         },
         {
@@ -555,8 +555,8 @@ print()
             toolName: 'Agent',
             content: {
                 taskId: 'agent-mock-1',
-                subagent_type: 'SearchCodebase',
-                description: 'Search config usage',
+                agent_type: 'SearchCodebase',
+                title: 'Search config usage',
                 prompt: 'Find all usages of getConfig in the codebase',
                 status: 'completed',
                 summary: 'Found 12 usages of getConfig across 5 files.\n- src/app/index.ts (3 calls)\n- src/utils/loader.ts (4 calls)\n- src/test/config.test.ts (5 calls)',
@@ -604,14 +604,7 @@ print()
             content: {
                 type: 'plan_implement',
                 planFilePath: '/workspace/plan.md',
-                planContent: `# Config Optimization Plan
-
-## Steps
-1. ~~Add caching layer~~ ✅
-2. ~~Create ConfigCache module~~ ✅
-3. Update all callers to use new API
-4. Add cache invalidation logic
-5. Write integration tests`,
+                planContent: '# Optimization Plan\n\n## Steps\n1. ~~Analyze codebase~~ ✅\n2. ~~Add caching~~ ✅\n3. Update `callers`\n4. Write testsebase~~ ✅\n2. ~~Add caching~~ ✅\n3. Update `callers`\n4. Write testsebase~~ ✅\n2. ~~Add caching~~ ✅\n3. Update `callers`\n4. Write tests',
             },
         },
     ],
@@ -716,6 +709,59 @@ export const mockDialogMap: Record<string, any[]> = {
             isBackground: false,
         },
     ],
+    McpToolPermissionDialog: [
+        {
+            type: 'permission',
+            data: {
+                agentId: 'main',
+                toolId: 'mcp-perm-1',
+                toolName: 'mcp__github__search_repositories',
+                title: 'query: sema-code language:typescript',
+                content: {
+                    query: 'sema-code language:typescript',
+                    perPage: 10,
+                    sort: 'stars',
+                    query1: 'sema-code language:typescript',
+                    perPage1: 10,
+                    sort1: 'stars',
+                    query2: 'sema-code language:typescript',
+                    perPage2: 10,
+                    sort2: 'stars',
+                },
+                options: {
+                    agree: '确认',
+                    allow: '确认，本项目不再询问 `github` MCP 工具',
+                    refuse: '拒绝'
+                }
+            },
+            isBackground: false,
+        },
+    ],
+    SkillPermissionDialog: [
+        {
+            type: 'permission',
+            data: {
+                agentId: 'main',
+                toolId: 'skill-perm-1',
+                toolName: TOOL_NAME_SKILL,
+                title: 'xlsx-pricing',
+                content: `python3 SKILL_DIR/scripts/xlsx_reader.py input.xlsx                 # structure discovery
+python3 SKILL_DIR/scripts/formula_check.py file.xlsx --json         # formula validation
+python3 SKILL_DIR/scripts/formula_check.py file.xlsx --report      # standardized report
+python3 SKILL_DIR/scripts/xlsx_unpack.py in.xlsx /tmp/work/         # unpack for XML editing
+python3 SKILL_DIR/scripts/xlsx_pack.py /tmp/work/ out.xlsx          # repack after editing
+python3 SKILL_DIR/scripts/xlsx_shift_rows.py /tmp/work/ insert 5 1  # shift rows for insertion
+python3 SKILL_DIR/scripts/xlsx_add_column.py /tmp/work/ --col G ... # add column with formulas
+python3 SKILL_DIR/scripts/xlsx_insert_row.py /tmp/work/ --at 6 ...  # insert row with data`,
+                options: {
+                    agree: '确认',
+                    allow: '确认，本次会话不再询问 `xlsx-pricing` Skill',
+                    refuse: '拒绝'
+                }
+            },
+            isBackground: false,
+        },
+    ],
     AskFormDialog: [
         {
             type: 'askForm',
@@ -768,7 +814,7 @@ export const mockDialogMap: Record<string, any[]> = {
             data: {
                 agentId: 'mock-agent-3',
                 planFilePath: '/workspace/plan.md',
-                planContent: '# Optimization Plan\n\n## Steps\n1. ~~Analyze codebase~~ ✅\n2. ~~Add caching~~ ✅\n3. Update `callers`\n4. Write tests',
+                planContent: '# Optimization Plan\n\n## Steps\n1. ~~Analyze codebase~~ ✅\n2. ~~Add caching~~ ✅\n3. Update `callers`\n4. Write testsebase~~ ✅\n2. ~~Add caching~~ ✅\n3. Update `callers`\n4. Write testsebase~~ ✅\n2. ~~Add caching~~ ✅\n3. Update `callers`\n4. Write tests',
                 options: {
                     startEditing: '开始代码编辑',
                     clearContextAndStart: '清理上下文，并开始代码编辑',

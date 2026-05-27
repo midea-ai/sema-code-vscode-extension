@@ -4,7 +4,7 @@ import { SessionContext } from '../../SessionContext';
 import { ToolContent } from '../../types';
 import { streamingStore } from '../../utils/StreamingStore';
 
-const MAX_VISIBLE_LINES = 4;
+const MAX_VISIBLE_LINES = 2;
 
 interface BackgroundJobBlockProps {
     content: ToolContent;
@@ -130,7 +130,11 @@ const BackgroundJobBlock: React.FC<BackgroundJobBlockProps> = ({ content: toolCo
                             {omittedCount > 0 && (
                                 <div className="bash-omitted-lines bash-omitted-lines-clickable" onClick={handleViewAll}>...省略了 {omittedCount} 行</div>
                             )}
-                            <pre className="bash-output pub-block-content">{visibleLines.join('\n')}</pre>
+                            <div className="bash-output pub-block-content">
+                                {visibleLines.map((line, i) => (
+                                    <div key={i} className="bash-output-line">{line}</div>
+                                ))}
+                            </div>
                         </>
                     )}
                 </div>

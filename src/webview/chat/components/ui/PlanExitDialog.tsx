@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { renderMarkdownToHtml } from '../../utils/markdown';
 import { getSelectionPointer } from '../../utils/symbols';
+import CollapsibleContent from './CollapsibleContent';
 
 import '../../style/markdown.css';
 
@@ -144,10 +145,12 @@ const PlanExitDialog: React.FC<PlanExitDialogProps> = ({
 
                     {/* MD 内容 */}
                     <div className="plan-exit-md-content">
-                        <div
-                            className="markdown-content"
-                            dangerouslySetInnerHTML={{ __html: renderMarkdownToHtml(data.planContent, vscode) }}
-                        />
+                        <CollapsibleContent>
+                            <div
+                                className="markdown-content"
+                                dangerouslySetInnerHTML={{ __html: renderMarkdownToHtml(data.planContent, vscode) }}
+                            />
+                        </CollapsibleContent>
                     </div>
 
                     {/* 底部虚线 */}
