@@ -5,7 +5,7 @@ export interface ShortcutCommand {
     send?: boolean;
     argumentHint?: string;
     isCustom?: boolean;  // 标识是否为自定义命令
-    category?: 'command' | 'skill';  // 分类：命令或技能
+    category?: 'command' | 'skill' | 'agent';  // 分类：命令 / 技能 / 子代理
 }
 
 // 内置快捷命令配置

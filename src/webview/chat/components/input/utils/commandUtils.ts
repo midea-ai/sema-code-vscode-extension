@@ -1,12 +1,16 @@
 import { BUILTIN_SHORTCUT_COMMANDS, ShortcutCommand } from '../../../../../utils/command';
 import { CommandConfig } from '../../../../config/types/command';
 import { SkillConfig } from '../../../../config/types/skill';
+import { AgentConfig } from '../../../../config/types/agent';
 
 // 存储自定义命令（由后端推送更新）
 let customCommands: ShortcutCommand[] = [];
 
 // 存储技能（由后端推送更新）
 let skills: ShortcutCommand[] = [];
+
+// 存储子代理（由后端推送更新）
+let agents: ShortcutCommand[] = [];
 
 /**
  * 由后端推送自定义命令时调用，更新自定义命令列表
@@ -32,13 +36,27 @@ export const setSkills = (skillList: SkillConfig[]) => {
 };
 
 /**
- * 获取所有命令（内置 + 自定义 + 技能）
+ * 由后端推送子代理时调用，更新子代理列表（过滤内置 agent）
+ */
+export const setAgents = (agentList: AgentConfig[]) => {
+    agents = agentList
+        .filter(agent => agent.locate !== 'builtin')
+        .map(agent => ({
+            text: agent.name,
+            desc: agent.description,
+            category: 'agent'
+        }));
+};
+
+/**
+ * 获取所有命令（内置 + 自定义 + 技能 + 子代理）
  */
 const getAllCommands = (): ShortcutCommand[] => {
     return [
         ...BUILTIN_SHORTCUT_COMMANDS.map(cmd => ({ send: false, category: 'command' as const, ...cmd })),
         ...customCommands,
-        ...skills
+        ...skills,
+        ...agents
     ];
 };
 

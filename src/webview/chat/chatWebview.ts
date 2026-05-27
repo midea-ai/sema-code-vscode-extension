@@ -78,6 +78,7 @@ export class ChatWebviewProvider {
                 requestSystemConfig: () => this.sendSystemConfig(),
                 requestCommands: () => this.sendCommands(),
                 requestSkills: () => this.sendSkills(),
+                requestAgents: () => this.sendAgents(),
                 openBashOutput: () => this.fileOperationManager.openBashOutputAsDocument(msg.content, msg.command, msg.toolId),
                 requestInputHistory: () => this.sendInputHistory(),
                 saveInputHistory: () => this.appendInputHistory(msg.item),
@@ -367,6 +368,15 @@ export class ChatWebviewProvider {
             this.postMessage({ type: 'skillsLoaded', skills });
         } catch (error) {
             console.error('Error loading skills:', error);
+        }
+    }
+
+    private async sendAgents(): Promise<void> {
+        try {
+            const agents = await this.processWrapper.getAgentsInfo();
+            this.postMessage({ type: 'agentsLoaded', agents });
+        } catch (error) {
+            console.error('Error loading agents:', error);
         }
     }
 

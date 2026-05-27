@@ -81,10 +81,13 @@ const ShortcutPanel: React.FC<ShortcutPanelProps> = ({
     type Indexed = { item: ShortcutCommand; flatIndex: number };
     const commandItems: Indexed[] = [];
     const skillItems: Indexed[] = [];
+    const agentItems: Indexed[] = [];
     filteredCommands.forEach((item, idx) => {
         const entry = { item, flatIndex: idx };
         if (item.category === 'skill') {
             skillItems.push(entry);
+        } else if (item.category === 'agent') {
+            agentItems.push(entry);
         } else {
             commandItems.push(entry);
         }
@@ -103,23 +106,22 @@ const ShortcutPanel: React.FC<ShortcutPanelProps> = ({
         </div>
     );
 
-    const showDivider = commandItems.length > 0 && skillItems.length > 0;
+    // 渲染顺序与 getAllCommands 一致：命令 → 技能 → 子代理；分组间按非空插入分隔线
+    const sections = [
+        { title: 'Command', items: commandItems },
+        { title: 'Skill', items: skillItems },
+        { title: 'Agent', items: agentItems },
+    ].filter(s => s.items.length > 0);
 
     return (
         <div className="shortcut-panel-popup" ref={shortcutPanelRef}>
-            {commandItems.length > 0 && (
-                <>
-                    <div className="shortcut-panel-section-title">Command</div>
-                    {commandItems.map(renderItem)}
-                </>
-            )}
-            {showDivider && <div className="shortcut-panel-divider" />}
-            {skillItems.length > 0 && (
-                <>
-                    <div className="shortcut-panel-section-title">Skill</div>
-                    {skillItems.map(renderItem)}
-                </>
-            )}
+            {sections.map((section, i) => (
+                <React.Fragment key={section.title}>
+                    {i > 0 && <div className="shortcut-panel-divider" />}
+                    <div className="shortcut-panel-section-title">{section.title}</div>
+                    {section.items.map(renderItem)}
+                </React.Fragment>
+            ))}
         </div>
     );
 };

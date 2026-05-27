@@ -25,7 +25,7 @@ import ShortcutPanel from './components/ShortcutPanel';
 import AgentModeMenu from './components/AgentModeMenu';
 import PermissionLevelMenu from './components/PermissionLevelMenu';
 
-import { setCustomCommands, setSkills, getFilteredShortcutCommands } from './utils/commandUtils';
+import { setCustomCommands, setSkills, setAgents, getFilteredShortcutCommands } from './utils/commandUtils';
 import { isAtBoundary } from './utils/boundary';
 import {
     MENTION_CLASS,
@@ -140,6 +140,7 @@ const InputBox = forwardRef<InputBoxHandle, InputBoxProps>(({
         if (shortcutPanel.showShortcutPanel) {
             vscode.postMessage({ type: 'requestCommands' });
             vscode.postMessage({ type: 'requestSkills' });
+            vscode.postMessage({ type: 'requestAgents' });
         }
     }, [shortcutPanel.showShortcutPanel]);
 
@@ -150,6 +151,9 @@ const InputBox = forwardRef<InputBoxHandle, InputBoxProps>(({
                 setShortcutCommands(getFilteredShortcutCommands(''));
             } else if (event.data.type === 'skillsLoaded' && Array.isArray(event.data.skills)) {
                 setSkills(event.data.skills);
+                setShortcutCommands(getFilteredShortcutCommands(''));
+            } else if (event.data.type === 'agentsLoaded' && Array.isArray(event.data.agents)) {
+                setAgents(event.data.agents);
                 setShortcutCommands(getFilteredShortcutCommands(''));
             }
         };
@@ -726,7 +730,12 @@ const InputBox = forwardRef<InputBoxHandle, InputBoxProps>(({
                     if (filteredCommands.length > 0) {
                         const safeIndex = Math.min(selectedCommandIndex, filteredCommands.length - 1);
                         const sel = filteredCommands[safeIndex];
-                        if (sel) sendShortcut(sel.text);
+                        // 仅 send 标记的内置命令（clear/compact）回车直发；
+                        // 自定义命令/技能/子代理回车与 Tab 一致：填入输入框，便于继续输入参数。
+                        if (sel) {
+                            if (sel.send) sendShortcut(sel.text);
+                            else completeShortcut(sel.text);
+                        }
                     }
                     return;
                 } else if (e.key === 'Escape') {

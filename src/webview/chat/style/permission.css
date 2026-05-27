@@ -616,7 +616,8 @@ body.vscode-light .ask-form-dialog {
     left: 0;
     right: 0;
     bottom: 0;
-    background-color: var(--chat-overlay);
+    /* 遮罩比共享 token 更深，弱化弹窗背后的原始内容 */
+    background-color: rgba(0, 0, 0, 0.7);
     display: flex;
     align-items: center;
     justify-content: center;
