@@ -61,6 +61,20 @@ const getAllCommands = (): ShortcutCommand[] => {
 };
 
 /**
+ * 取输入开头的快捷指令 token（如 "/review-pr"）。
+ * 仅当 "/" 后到首个空白为止的词「恰好」命中某个已知命令时返回，
+ * 否则返回 null（"/clearx" 不会命中 "/clear"）。
+ */
+export const getLeadingCommand = (text: string): { text: string; length: number } | null => {
+    if (!text.startsWith('/')) return null;
+    const match = text.match(/^\/(\S+)/);
+    if (!match) return null;
+    const name = match[1];
+    const known = getAllCommands().some(cmd => cmd.text === name);
+    return known ? { text: '/' + name, length: name.length + 1 } : null;
+};
+
+/**
  * 获取所有需要高亮的命令列表
  */
 export const getHighlightCommands = () => {

@@ -1,6 +1,18 @@
 import { InputMention } from '../../../types';
+import { getLeadingCommand } from './commandUtils';
 
 export const MENTION_CLASS = 'file-mention';
+export const COMMAND_CLASS = 'command-mention';
+
+// 开头快捷指令高亮块（如 "/review-pr"）。仅作视觉装饰，不参与 mentions 状态；
+// data-cmd 存原始命令文本，供 scanAndUnwrapStaleMentions 在被编辑破坏后解包。
+export function createCommandSpan(cmdText: string): HTMLSpanElement {
+    const span = document.createElement('span');
+    span.className = COMMAND_CLASS;
+    span.dataset.cmd = cmdText;
+    span.textContent = cmdText;
+    return span;
+}
 
 export function getMentionExpectedText(span: HTMLElement): string {
     const path = span.dataset.path || '';
@@ -75,6 +87,18 @@ export function scanAndUnwrapStaleMentions(root: HTMLElement): boolean {
             mutated = true;
         }
     }
+    // 快捷指令高亮：被编辑破坏（文本与原命令不一致）即解包，行为同 mention
+    const cmdSpans = Array.from(root.querySelectorAll<HTMLElement>('span.' + COMMAND_CLASS));
+    for (const span of cmdSpans) {
+        if (span.textContent !== (span.dataset.cmd || '')) {
+            if (span.textContent) {
+                span.replaceWith(document.createTextNode(span.textContent));
+            } else {
+                span.remove();
+            }
+            mutated = true;
+        }
+    }
     return mutated;
 }
 
@@ -92,6 +116,12 @@ export function renderEditorContent(root: HTMLElement, text: string, mentions: I
             if (i < parts.length - 1) root.appendChild(document.createElement('br'));
         }
     };
+    // 开头若命中快捷指令，先渲染成高亮块（与 @文件 同款视觉）
+    const cmd = getLeadingCommand(text);
+    if (cmd && (sorted.length === 0 || sorted[0].start >= cmd.length)) {
+        root.appendChild(createCommandSpan(cmd.text));
+        pos = cmd.length;
+    }
     for (const m of sorted) {
         if (m.start > pos) appendText(text.substring(pos, m.start));
         const span = createMentionSpan(m);

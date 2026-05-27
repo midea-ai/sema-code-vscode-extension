@@ -275,19 +275,21 @@
     overflow: hidden;
 }
 
-/* @文件 高亮 */
-.file-mention {
+/* @文件 高亮 / 快捷指令高亮（同款视觉） */
+.file-mention,
+.command-mention {
     background-color: var(--chat-bg-button);
     color: var(--chat-text-button);
     border-radius: 3px;
     padding: 0 3px;
     margin: 0 1px;
     font-weight: 500;
-    /* 让 mention 内部的字符可被光标命中，但视觉上是一整块 */
+    /* 让内部字符可被光标命中，但视觉上是一整块 */
     white-space: nowrap;
 }
 
-.file-mention:focus {
+.file-mention:focus,
+.command-mention:focus {
     outline: none;
 }
 
