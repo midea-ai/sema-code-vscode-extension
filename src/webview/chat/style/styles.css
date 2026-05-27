@@ -1171,8 +1171,8 @@ code, pre, .code {
     align-items: center;
     flex-shrink: 0;
     height: 30px;
-    border-bottom: 1px solid var(--chat-border, var(--vscode-editorGroup-border));
-    background-color: var(--chat-bg-primary);
+    /* 栏底比页面略深,作为非活跃区,衬托出活跃标签 */
+    background: linear-gradient(var(--chat-bg-hover), var(--chat-bg-hover)), var(--chat-bg-primary);
 }
 
 .session-tabs-list {
@@ -1189,6 +1189,8 @@ code, pre, .code {
 }
 
 .session-tab {
+    position: relative;
+    z-index: 0; /* 建立层叠上下文,让 ::after 圆角高亮位于文字下方、栏背景之上 */
     display: flex;
     align-items: center;
     gap: 5px;
@@ -1200,25 +1202,61 @@ code, pre, .code {
     cursor: pointer;
     font-size: var(--chat-font-base);
     color: var(--chat-text-secondary, var(--vscode-descriptionForeground));
-    border-right: 1px solid var(--chat-border, var(--vscode-editorGroup-border));
     white-space: nowrap;
 }
 
-.session-tab:hover {
+/* 悬浮/活跃的圆角高亮背景:四周内缩,与分隔线和上下边缘都留出距离 */
+.session-tab::after {
+    content: '';
+    position: absolute;
+    inset: 4px 6px;
+    border-radius: 8px;
+    z-index: -1;
+    pointer-events: none;
+}
+
+/* 标签间的短竖线分隔符:上下留白,只显示中间一段 */
+.session-tab:not(:first-child)::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 2px;
+    height: 16px;
+    background-color: rgba(128, 128, 128, 0.4);
+    pointer-events: none;
+}
+
+/* 活跃标签与相邻标签之间不显示分隔线 */
+.session-tab.active::before,
+.session-tab.active + .session-tab::before {
+    display: none;
+}
+
+.session-tab:hover::after {
     background-color: var(--chat-bg-hover, var(--vscode-toolbar-hoverBackground));
 }
 
 .session-tab.active {
     color: var(--chat-text-primary);
-    background-color: var(--chat-bg-hover, var(--vscode-tab-activeBackground));
+}
+
+/* 活跃标签:仅上方两角圆,底部贴边且左右拉满,与下方 chat 内容同色相连、无间隔 */
+/* 置于 :hover::after 之后,使悬浮活跃标签时仍保持活跃配色 */
+.session-tab.active::after {
+    inset: 4px 0 0; /* 上 4px、左右 0、底部 0 */
+    border-radius: 8px 8px 0 0;
+    background-color: var(--chat-page-bg);
 }
 
 .session-tab-title {
     flex: 1 1 0;
     min-width: 0;
     overflow: hidden;
-    text-overflow: ellipsis;
     white-space: nowrap;
+    -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 16px), transparent);
+    mask-image: linear-gradient(to right, #000 calc(100% - 16px), transparent);
 }
 
 .session-tab-dot {

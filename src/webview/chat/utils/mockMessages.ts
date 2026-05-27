@@ -691,7 +691,7 @@ export const mockDialogMap: Record<string, any[]> = {
             isBackground: false,
         },
     ],
-    FetchUrlPermissionDialog: [
+    WebFetchPermissionDialog: [
         {
             type: 'permission',
             data: {

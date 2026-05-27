@@ -31,11 +31,13 @@ const SessionTabs: React.FC<SessionTabsProps> = ({ sessions, activeId, onSwitch,
                             <span className={`session-tab-dot${s.waiting ? ' waiting' : ''}`} />
                         )}
                         <span className="session-tab-title">{s.title || '新会话'}</span>
-                        <span
-                            className="session-tab-close"
-                            title="关闭会话"
-                            onClick={(e) => { e.stopPropagation(); onClose(s.id); }}
-                        >×</span>
+                        {s.id === activeId && (
+                            <span
+                                className="session-tab-close"
+                                title="关闭会话"
+                                onClick={(e) => { e.stopPropagation(); onClose(s.id); }}
+                            >×</span>
+                        )}
                     </div>
                 ))}
             </div>
