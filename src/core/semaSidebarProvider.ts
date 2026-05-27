@@ -99,7 +99,8 @@ export class SemaSidebarProvider implements vscode.WebviewViewProvider {
         this.sessionHistoryManager = new SessionHistoryManager(
             context,
             this.workingDir,
-            () => this.activeSessionId
+            () => this.activeSessionId,
+            () => Array.from(this.sessions.keys())
         );
         this.configWebviewProvider = new ConfigWebviewProvider(this.processWrapper, this.fileOperationManager);
         this.configWebviewProvider.setOnSystemConfigChanged((key, value) => {
@@ -223,6 +224,8 @@ export class SemaSidebarProvider implements vscode.WebviewViewProvider {
         this.activeSessionId = sessionId;
         this.processWrapper.setActiveSession(sessionId);
         // 桌宠监听所有会话，切换活跃会话无需重新绑定。
+        // 活跃会话变化时刷新历史面板，使「活跃/打开」徽标与排序同步。
+        this.sessionHistoryWebviewProvider?.refreshSessionList();
     }
 
     public async closeSession(sessionId: string): Promise<void> {

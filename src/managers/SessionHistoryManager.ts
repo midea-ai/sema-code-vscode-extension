@@ -27,15 +27,18 @@ export class SessionHistoryManager {
     private context: vscode.ExtensionContext;
     private projectPath: string;
     private getActiveSessionId: () => string | null;
+    private getOpenIds: () => string[];
 
     constructor(
         context: vscode.ExtensionContext,
         workingDir: string,
-        getActiveSessionId: () => string | null
+        getActiveSessionId: () => string | null,
+        getOpenIds: () => string[]
     ) {
         this.context = context;
         this.projectPath = workingDir;
         this.getActiveSessionId = getActiveSessionId;
+        this.getOpenIds = getOpenIds;
     }
 
     /**
@@ -166,14 +169,29 @@ export class SessionHistoryManager {
     }
 
     /**
+     * 获取所有已在 chat 中打开的会话ID（含活跃会话）
+     */
+    public getOpenSessionIds(): string[] {
+        return this.getOpenIds();
+    }
+
+    /**
      * 获取当前项目的所有会话
      */
     public async getAllSessions(): Promise<Session[]> {
         const sessions = await this.getSessions();
         const currentSessionId = this.getActiveSessionId();
+        const openIds = new Set(this.getOpenIds());
+        // 优先级：活跃(0) > 已打开(1) > 其余(2)，同级按更新时间倒序
+        const rank = (s: Session): number => {
+            if (s.id === currentSessionId) { return 0; }
+            if (openIds.has(s.id)) { return 1; }
+            return 2;
+        };
         return [...sessions].sort((a, b) => {
-            if (a.id === currentSessionId) { return -1; }
-            if (b.id === currentSessionId) { return 1; }
+            const ra = rank(a);
+            const rb = rank(b);
+            if (ra !== rb) { return ra - rb; }
             return b.updatedAt - a.updatedAt;
         });
     }
@@ -181,10 +199,11 @@ export class SessionHistoryManager {
     /**
      * 获取会话列表及当前激活ID（减少重复调用）
      */
-    public async getSessionsWithActiveId(): Promise<{ sessions: Session[]; currentSessionId: string | null }> {
+    public async getSessionsWithActiveId(): Promise<{ sessions: Session[]; currentSessionId: string | null; openSessionIds: string[] }> {
         return {
             sessions: await this.getAllSessions(),
-            currentSessionId: this.getActiveSessionId()
+            currentSessionId: this.getActiveSessionId(),
+            openSessionIds: this.getOpenIds()
         };
     }
 

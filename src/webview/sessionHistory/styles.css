@@ -93,23 +93,29 @@ body {
 }
 
 .session-current,
+.session-open,
 .session-mode-design {
     display: inline-flex;
     align-items: center;
-    font-size: 11px;
-    line-height: 1;
-    color: var(--vscode-editor-background);
-    padding: 2px 8px;
-    border-radius: 3px;
+    font-size: 12px;
+    padding: 4px 12px;
+    border-radius: 4px;
     font-weight: 600;
 }
 
 .session-current {
-    background-color: var(--vscode-terminal-ansiGreen);
+    color: var(--chat-color-success, #48bb78);
+    background-color: var(--chat-color-success-bg, rgba(72, 187, 120, 0.15));
+}
+
+.session-open {
+    color: var(--chat-color-warning, #ffba49);
+    background-color: var(--chat-color-warning-bg, rgba(255, 186, 73, 0.2));
 }
 
 .session-mode-design {
-    background-color: var(--vscode-terminal-ansiBrightBlue);
+    color: var(--chat-color-purple, #9575ff);
+    background-color: var(--chat-color-purple-bg, rgba(149, 117, 255, 0.2));
 }
 
 .session-delete {

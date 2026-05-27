@@ -23,6 +23,7 @@ interface AppProps {
 const App: React.FC<AppProps> = ({ vscode }) => {
     const [sessions, setSessions] = useState<Session[]>([]);
     const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
+    const [openSessionIds, setOpenSessionIds] = useState<string[]>([]);
 
     useEffect(() => {
         // 接收来自扩展的消息
@@ -34,6 +35,7 @@ const App: React.FC<AppProps> = ({ vscode }) => {
                     if (message.currentSessionId !== undefined) {
                         setCurrentSessionId(message.currentSessionId);
                     }
+                    setOpenSessionIds(message.openSessionIds || []);
                     break;
             }
         };
@@ -135,9 +137,12 @@ const App: React.FC<AppProps> = ({ vscode }) => {
                     </div>
                 ) : (
                     sessions.map(session => {
-                        // 判断当前会话的两种情况：临时标记为'current'或者与currentSessionId匹配
-                        const isCurrent = session.id === 'current' || session.id === currentSessionId;
-                        const clickable = !isCurrent;
+                        // 活跃会话：临时标记为'current'或与currentSessionId匹配
+                        const isActive = session.id === 'current' || session.id === currentSessionId;
+                        // 已在 chat 中打开的会话（含活跃会话）
+                        const isOpen = isActive || openSessionIds.includes(session.id);
+                        // 活跃会话不可点；「打开」态仍可点（点击切到对应 tab）
+                        const clickable = !isActive;
                         const itemClass = clickable
                             ? 'session-item'
                             : 'session-item session-current-active';
@@ -156,10 +161,13 @@ const App: React.FC<AppProps> = ({ vscode }) => {
                                         {session.agentMode === 'Design' && (
                                             <span className="session-mode-design">Design</span>
                                         )}
-                                        {isCurrent && (
-                                            <span className="session-current">当前</span>
+                                        {isActive && (
+                                            <span className="session-current">活跃</span>
                                         )}
-                                        {!isCurrent && (
+                                        {!isActive && isOpen && (
+                                            <span className="session-open">打开</span>
+                                        )}
+                                        {!isOpen && (
                                             <button
                                                 className="session-delete"
                                                 onClick={(e) => deleteSession(e, session.id)}

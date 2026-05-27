@@ -54,12 +54,13 @@ export class SessionHistoryWebviewProvider {
             switch (message.type) {
                 case 'webviewReady': {
                     // React 应用已准备好，发送会话数据
-                    const { sessions: currentSessions, currentSessionId: activeSessionId } =
+                    const { sessions: currentSessions, currentSessionId: activeSessionId, openSessionIds } =
                         await this.sessionHistoryManager.getSessionsWithActiveId();
                     this.panel?.webview.postMessage({
                         type: 'updateSessions',
                         sessions: currentSessions,
-                        currentSessionId: activeSessionId
+                        currentSessionId: activeSessionId,
+                        openSessionIds
                     });
                     break;
                 }
@@ -75,10 +76,9 @@ export class SessionHistoryWebviewProvider {
                     await this.refreshSessionList();
                     break;
                 case 'deleteSession':
-                    // 获取当前会话ID，禁止删除当前会话
-                    const currentActiveSessionId = this.sessionHistoryManager.getCurrentSessionId();
-                    if (message.sessionId === currentActiveSessionId) {
-                        vscode.window.showWarningMessage('无法删除当前会话');
+                    // 禁止删除已在 chat 中打开的会话（含活跃会话）
+                    if (this.sessionHistoryManager.getOpenSessionIds().includes(message.sessionId)) {
+                        vscode.window.showWarningMessage('无法删除已打开的会话');
                         return;
                     }
 
@@ -99,11 +99,12 @@ export class SessionHistoryWebviewProvider {
      */
     public async refreshSessionList(): Promise<void> {
         if (!this.panel) { return; }
-        const { sessions, currentSessionId } = await this.sessionHistoryManager.getSessionsWithActiveId();
+        const { sessions, currentSessionId, openSessionIds } = await this.sessionHistoryManager.getSessionsWithActiveId();
         this.panel.webview.postMessage({
             type: 'updateSessions',
             sessions,
-            currentSessionId
+            currentSessionId,
+            openSessionIds
         });
     }
 
