@@ -54,8 +54,8 @@
     margin-bottom: var(--chat-spacing-md);
     background-color: transparent;
     width: 100%;
-    max-height: 300px;
-    overflow-y: auto;
+    max-height: 50px;
+    overflow: hidden;
 }
 
 .bash-command pre {
@@ -91,6 +91,16 @@
 
 .bash-command .hljs {
     background: transparent !important;
+}
+
+/* 命令过长时不滚动：裁剪 + 底部渐隐到透明（参考 user-input 折叠态），可点击打开完整命令 */
+.bash-command.overflowing {
+    -webkit-mask-image: linear-gradient(to bottom, #000 60%, transparent 100%);
+    mask-image: linear-gradient(to bottom, #000 60%, transparent 100%);
+}
+
+.bash-command.overflowing.clickable {
+    cursor: pointer;
 }
 
 .bash-omitted-lines {
@@ -399,13 +409,13 @@
     padding: 4px 8px 6px 8px;
 }
 
-.task-block-summary pre {
-    margin: 0;
+.task-block-summary > div {
     font-size: var(--chat-font-sm);
     color: var(--chat-color-muted);
-    white-space: pre-wrap;
-    word-wrap: break-word;
     line-height: 1.4;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 /* ========== Task Detail Modal ========== */

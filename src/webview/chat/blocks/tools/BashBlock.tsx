@@ -5,7 +5,7 @@ import BaseBashContent from '../../components/ui/BaseBashContent';
 import { ToolContent } from '../../types';
 import { streamingStore } from '../../utils/StreamingStore';
 
-const MAX_VISIBLE_LINES = 4;
+const MAX_VISIBLE_LINES = 2;
 
 interface BashBlockProps {
     content: ToolContent;
@@ -113,14 +113,27 @@ const BashBlock: React.FC<BashBlockProps> = ({ content: toolContent, messageId, 
         }
     };
 
+    // 「省略了 N 行」→ 仅打开纯执行结果（无命令、无开头 #）
     const handleViewAll = (e: React.MouseEvent) => {
         e.stopPropagation();
         if (vscode) {
             vscode.postMessage({
                 type: 'openBashOutput',
                 content: outputText,
-                command: command || '',
+                command: '',
                 toolId: toolContent.toolId || ''
+            });
+        }
+    };
+
+    // 命令过长 → 仅打开完整命令（无执行结果、无开头 #），单独 tab 避免与结果互相覆盖
+    const handleOpenCommand = () => {
+        if (vscode && command) {
+            vscode.postMessage({
+                type: 'openBashOutput',
+                content: command,
+                command: '',
+                toolId: toolContent.toolId ? `${toolContent.toolId}-cmd` : ''
             });
         }
     };
@@ -142,7 +155,7 @@ const BashBlock: React.FC<BashBlockProps> = ({ content: toolContent, messageId, 
             {isExpanded && (
                 <div className="chat-block-content bash-block-content">
                     {command && (
-                        <BaseBashContent command={command} />
+                        <BaseBashContent command={command} onOpenFull={handleOpenCommand} />
                     )}
                     {visibleLines.length > 0 && (
                         <>

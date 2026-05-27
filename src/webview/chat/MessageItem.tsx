@@ -137,6 +137,7 @@ const MessageItem: React.FC<MessageItemProps> = React.memo(({
             return (
                 <PermissionRequestBlock
                     permissionData={message.content}
+                    vscode={vscode}
                 />
             );
 

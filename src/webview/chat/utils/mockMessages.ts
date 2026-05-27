@@ -277,7 +277,15 @@ export const mockMessageMap: Record<string, Message[]> = {
             content: {
                 toolId: 'bash-1',
                 toolName: TOOL_NAME_RUN_SHELL,
-                title: 'npm test -- --coverage',
+                title: `python3 -c "
+import pandas as pd
+import openpyxl
+# Step 1: Read all sheet names and data
+wb = openpyxl.load_workbook('/Users/zhoujie195/ReactProject/sema-design-test/src/估价样例.xlsx', data_only=False)
+print('=== Sheet Names ===')
+print(wb.sheetnames)
+print()
+" 2>&1`,
                 content: 'PASS  src/utils/config.test.ts\n  ✓ should load config (12ms)\n  ✓ should validate schema (8ms)\n  ✓ should merge defaults (5ms)\n\nTest Suites: 1 passed, 1 total\nTests:       3 passed, 3 total\nTime:        1.234s',
             },
         },
@@ -369,7 +377,15 @@ $$P_{\\text{Bash}}(c) = \\text{allow} \\iff \\begin{cases} \\text{head}(c) \\in 
             type: 'permission_request',
             content: {
                 toolName: TOOL_NAME_RUN_SHELL,
-                title: 'rm -rf node_modules && npm install',
+                title: `python3 -c "
+import pandas as pd
+import openpyxl
+# Step 1: Read all sheet names and data
+wb = openpyxl.load_workbook('/Users/zhoujie195/ReactProject/sema-design-test/src/估价样例.xlsx', data_only=False)
+print('=== Sheet Names ===')
+print(wb.sheetnames)
+print()
+" 2>&1`,
                 content: '',
                 action: 'refuse',
                 refuseMessage: '请不要删除 node_modules，只运行 npm install',

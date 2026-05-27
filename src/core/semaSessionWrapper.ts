@@ -904,7 +904,8 @@ export class SemaSessionWrapper {
 
         const formatToolDisplay = (m: Message): string => {
             const toolName = m.toolName || 'Unknown Tool';
-            const title = m.content?.title || '';
+            // 标题可能是多行终端命令等，折叠为单行，保证每个工具只占一行
+            const title = (m.content?.title || '').replace(/\\?\s*\n\s*/g, ' ').trim();
 
             if (toolName === TOOL_NAME_SEARCH_FILES || toolName === TOOL_NAME_SEARCH_CONTENT) {
                 return `Search(${title})`;

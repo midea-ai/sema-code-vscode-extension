@@ -13,9 +13,10 @@ interface PermissionRequestData {
 
 interface PermissionRequestBlockProps {
     permissionData: PermissionRequestData;
+    vscode?: any;
 }
 
-const PermissionRequestBlock: React.FC<PermissionRequestBlockProps> = ({ permissionData }) => {
+const PermissionRequestBlock: React.FC<PermissionRequestBlockProps> = ({ permissionData, vscode }) => {
     const [isExpanded, setIsExpanded] = useState(true);
 
     // 获取状态文本和样式类
@@ -51,6 +52,7 @@ const PermissionRequestBlock: React.FC<PermissionRequestBlockProps> = ({ permiss
                         toolName={permissionData.toolName}
                         title={permissionData.title}
                         content={permissionData.content}
+                        vscode={vscode}
                     />
                     {permissionData.refuseMessage && (
                         <div className="bash-permission-refuse-message">

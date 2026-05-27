@@ -262,7 +262,7 @@ const PermissionContent: React.FC<PermissionContentProps> = ({
                 </div>
                 <div className="bash-permission-bash-body">
                     <div className="bash-permission-bash-command">
-                        <BaseBashContent command={title} />
+                        <BaseBashContent command={title} onOpenFull={vscode ? handleBashTitleClick : undefined} />
                     </div>
                     <div className="bash-permission-bash-description">
                         {typeof content === 'string' ? content : JSON.stringify(content, null, 2)}
@@ -276,6 +276,17 @@ const PermissionContent: React.FC<PermissionContentProps> = ({
     const renderWebFetchContent = () => {
         const url = typeof content === 'string' ? content : '';
 
+        const handleOpenUrl = () => {
+            if (vscode) {
+                vscode.postMessage({
+                    type: 'openBashOutput',
+                    content: url,
+                    command: '',
+                    toolId: ''
+                });
+            }
+        };
+
         return (
             <div className="file-permission-container">
                 <div className="file-permission-title-wrapper">
@@ -286,7 +297,7 @@ const PermissionContent: React.FC<PermissionContentProps> = ({
                 </div>
                 <div className="bash-permission-bash-body">
                     <div className="bash-permission-bash-command">
-                        <BaseBashContent command={url} />
+                        <BaseBashContent command={url} onOpenFull={vscode ? handleOpenUrl : undefined} />
                     </div>
                 </div>
             </div>

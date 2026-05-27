@@ -143,13 +143,6 @@ const AgentBlock: React.FC<AgentBlockProps> = React.memo(({ content, vscode, for
     // 构建标题
     const title = `${agent_type}(${agentTitle})`;
 
-    // 截断每行超过100字符的内容
-    const truncateSummary = (text: string) => {
-        return text.split('\n').map(line =>
-            line.length > 100 ? line.slice(0, 100) + '…' : line
-        ).join('\n');
-    };
-
     // 获取状态图标
     const getStatusIcon = () => {
         switch (status) {
@@ -202,7 +195,9 @@ const AgentBlock: React.FC<AgentBlockProps> = React.memo(({ content, vscode, for
                 </div>
                 {summary && (
                     <div className="task-block-summary">
-                        <pre>{truncateSummary(summary)}</pre>
+                        {summary.split('\n').map((line, i) => (
+                            <div key={i}>{line}</div>
+                        ))}
                     </div>
                 )}
             </div>
