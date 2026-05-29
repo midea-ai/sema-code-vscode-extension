@@ -6,6 +6,22 @@ import { SemaProcessWrapper } from '../../core/semaProcessWrapper';
 import type { SessionController } from '../../core/semaSidebarProvider';
 import { transformCommandToPrompt } from '../../utils/prompt';
 
+const FILE_REFERENCE_QUOTE_REGEX = /[\s。，、；：！？""''「」『』（）《》〈〉【】,;!?]/;
+
+function escapeQuotedFileReferencePath(filePath: string): string {
+    return filePath.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+}
+
+function formatFileReference(file: any, quoted = true): string {
+    const pathText = String(file.path ?? '');
+    const needsQuotes = quoted && FILE_REFERENCE_QUOTE_REGEX.test(pathText);
+    const pathRef = needsQuotes ? `"${escapeQuotedFileReferencePath(pathText)}"` : pathText;
+    const hasLineRange = file.startLine !== undefined && file.endLine !== undefined;
+    return hasLineRange
+        ? `@${pathRef}:${file.startLine}-${file.endLine}`
+        : `@${pathRef}`;
+}
+
 /**
  * ChatWebviewProvider - 管理聊天界面 Webview（单 webview，多会话按 sessionId 路由）
  */
@@ -114,15 +130,20 @@ export class ChatWebviewProvider {
         try {
             let content = text;
             if (files && files.length > 0) {
-                const fileContext = files
-                    .map((file: any) =>
-                        file.startLine && file.endLine
-                            ? `@${file.path}:${file.startLine}-${file.endLine}`
-                            : `@${file.path}`
-                    )
-                    .filter((ref: string) => !text.includes(ref))
+                const refs = files.map((file: any) => ({
+                    encoded: formatFileReference(file),
+                    display: formatFileReference(file, false)
+                }));
+                for (const { encoded, display } of refs) {
+                    if (encoded !== display) {
+                        content = content.split(display).join(encoded);
+                    }
+                }
+                const fileContext = refs
+                    .filter(({ encoded }: { encoded: string; display: string }) => !content.includes(encoded))
+                    .map(({ encoded }: { encoded: string }) => encoded)
                     .join(' ');
-                content = fileContext ? `${text} ${fileContext} ` : text;
+                content = fileContext ? `${content} ${fileContext} ` : content;
             }
 
             const transformedContent = transformCommandToPrompt(content);
