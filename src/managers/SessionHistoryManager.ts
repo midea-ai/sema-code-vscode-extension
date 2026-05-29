@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import type { AgentMode } from 'sema-core/types';
 import type { SemaSessionWrapper } from '../core/semaSessionWrapper';
+import { CLAW_SESSION_ID } from '../claw/paths';
 
 /**
  * 会话数据结构
@@ -188,7 +189,9 @@ export class SessionHistoryManager {
             if (openIds.has(s.id)) { return 1; }
             return 2;
         };
-        return [...sessions].sort((a, b) => {
+        // claw 远程会话不进历史列表：它由远程连接驱动、不能像普通会话那样从历史
+        // 「点开恢复」。开启时本就是一个活 tab，历史回填走 getSession()，不受此过滤影响。
+        return [...sessions].filter(s => s.id !== CLAW_SESSION_ID).sort((a, b) => {
             const ra = rank(a);
             const rb = rank(b);
             if (ra !== rb) { return ra - rb; }
