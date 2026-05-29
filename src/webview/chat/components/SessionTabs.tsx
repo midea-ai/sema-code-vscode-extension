@@ -23,7 +23,7 @@ const SessionTabs: React.FC<SessionTabsProps> = ({ sessions, activeId, onSwitch,
                 {sessions.map(s => (
                     <div
                         key={s.id}
-                        className={`session-tab${s.id === activeId ? ' active' : ''}`}
+                        className={`session-tab${s.id === activeId ? ' active' : ''}${s.isClaw ? ' claw' : ''}`}
                         onClick={() => onSwitch(s.id)}
                         title={s.title || '新会话'}
                     >

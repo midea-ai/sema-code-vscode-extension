@@ -1250,6 +1250,12 @@ code, pre, .code {
     background-color: var(--chat-page-bg);
 }
 
+/* claw 远程会话标签：始终用紫色标识，区别于普通会话（active/hover 都保持紫色） */
+.session-tab.claw,
+.session-tab.active.claw {
+    color: var(--vscode-charts-purple, #b180d7);
+}
+
 .session-tab-title {
     flex: 1 1 0;
     min-width: 0;

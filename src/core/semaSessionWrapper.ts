@@ -76,7 +76,8 @@ export interface SessionWrapperCallbacks {
     onTaskEnd?: (sessionId: string, data: TaskEndData) => void;
     onSessionCleared?: (sessionId: string) => void;
     onOpenAgentDetail?: (sessionId: string, taskId: string) => void;
-    onUserResponded?: (sessionId: string) => void;
+    /** 用户在前端响应了某个交互；权限响应时第二参为所选 option key（同意/拒绝）。 */
+    onUserResponded?: (sessionId: string, permissionSelected?: string) => void;
     /** 标题变化（用于 tab 栏 / 历史保存） */
     onTitleUpdate?: (sessionId: string, title: string) => void;
 }
@@ -148,7 +149,7 @@ export class SemaSessionWrapper {
     }
 
     public respondToToolPermission(response: ToolPermissionResponse): void {
-        this.callbacks.onUserResponded?.(this.sessionId);
+        this.callbacks.onUserResponded?.(this.sessionId, response.selected);
         this.session.respondToToolPermission(response);
     }
 

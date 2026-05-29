@@ -51,6 +51,8 @@ export interface SessionMeta {
     processing: boolean;
     /** 是否有待处理的权限/表单弹窗（等待用户响应） */
     waiting: boolean;
+    /** 是否为 claw 远程会话（tab 用紫色标识） */
+    isClaw?: boolean;
 }
 
 export interface SelectedFile {

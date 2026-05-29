@@ -279,7 +279,7 @@ const PermissionContent: React.FC<PermissionContentProps> = ({
 
     // 渲染WebFetch内容
     const renderWebFetchContent = () => {
-        const url = typeof content === 'string' ? content : '';
+        const url = typeof title === 'string' ? title : '';
 
         const handleOpenUrl = () => {
             if (vscode) {

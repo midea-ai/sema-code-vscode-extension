@@ -11,3 +11,5 @@ docs
 test
 
 .DS_Store
+
+scripts/

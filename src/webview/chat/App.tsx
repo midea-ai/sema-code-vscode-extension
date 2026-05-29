@@ -909,7 +909,7 @@ const App: React.FC<AppProps> = ({ vscode }) => {
                                 ? { ...s, title: message.title || s.title }
                                 : s);
                         }
-                        return [...prev, { id: message.sessionId, title: message.title || '新会话', processing: false, waiting: false }];
+                        return [...prev, { id: message.sessionId, title: message.title || '新会话', processing: false, waiting: false, isClaw: !!message.isClaw }];
                     });
                     setActiveId(message.sessionId);
                     break;

@@ -9,11 +9,13 @@ import { defaultConfig } from './default/defaultConfig';
 import { skillHubConfig } from './default/defaultSkillHub';
 import { AgentConfig } from './types/agent';
 import { CommandConfig } from './types/command';
+import type { ClawCoordinator } from '../../claw/coordinator';
 
 export class ConfigWebviewProvider {
     private panel?: vscode.WebviewPanel;
     private coreManager: any;
     private fileOperationManager: any;
+    private clawCoordinator?: ClawCoordinator;
     private mcpStatusHandler?: (data: any) => void;
     private cronUpdateHandler?: () => void;
     private taskWatcherMap: Map<string, () => void> = new Map();
@@ -21,9 +23,10 @@ export class ConfigWebviewProvider {
     private pendingTaskId?: string;
     private onSystemConfigChanged?: (key: string, value: any) => void;
 
-    constructor(coreManager: any, fileOperationManager?: any) {
+    constructor(coreManager: any, fileOperationManager?: any, clawCoordinator?: ClawCoordinator) {
         this.coreManager = coreManager;
         this.fileOperationManager = fileOperationManager;
+        this.clawCoordinator = clawCoordinator;
     }
 
     public setOnSystemConfigChanged(callback: (key: string, value: any) => void): void {
@@ -127,6 +130,14 @@ export class ConfigWebviewProvider {
                 refreshDesignSkills:        () => this.refreshDesignSkills(),
                 loadDesignSystems:          () => this.loadDesignSystems(),
                 refreshDesignSystems:       () => this.refreshDesignSystems(),
+                clawLoadStatus:             () => this.clawLoadStatus(),
+                clawEnable:                 () => this.clawEnable(),
+                clawDisable:                () => this.clawDisable(),
+                clawStartBind:              () => this.clawStartBind(),
+                clawBindFeishu:             () => this.clawBindFeishu(m.appId, m.appSecret),
+                clawSubmitVerifyCode:       () => Promise.resolve(this.clawCoordinator?.submitVerifyCode(m.code)),
+                clawUnbind:                 () => this.clawUnbind(),
+                clawSaveVerbosity:          () => this.clawSaveVerbosity(m.value),
             };
             await handlers[m.command]?.();
         });
@@ -158,6 +169,95 @@ export class ConfigWebviewProvider {
 
     private postMessage(message: any) {
         this.panel?.webview.postMessage(message);
+    }
+
+    // ─── Claw（远程入口）────────────────────────────────────────────────────
+    // 轻量：仅 fs 读 + 内存布尔，不触发懒载 chunk。占用信息只在 enable 失败时回传。
+
+    private clawLoadStatus(): Promise<void> {
+        if (this.clawCoordinator) {
+            this.postMessage({ command: 'clawStatus', data: this.clawCoordinator.getStatus() });
+        }
+        return Promise.resolve();
+    }
+
+    private async clawEnable(): Promise<void> {
+        if (!this.clawCoordinator) return;
+        const res = await this.clawCoordinator.enable();
+        const status = this.clawCoordinator.getStatus();
+        if (res.ok) {
+            this.postMessage({ command: 'clawStatus', data: status });
+        } else if (res.occupiedBy) {
+            this.postMessage({ command: 'clawStatus', data: { ...status, occupancy: res.occupiedBy } });
+        } else {
+            this.postMessage({ command: 'clawStatus', data: { ...status, error: res.error } });
+        }
+    }
+
+    private async clawDisable(): Promise<void> {
+        if (!this.clawCoordinator) return;
+        await this.clawCoordinator.disable();
+        this.postMessage({ command: 'clawStatus', data: this.clawCoordinator.getStatus() });
+    }
+
+    private async clawStartBind(): Promise<void> {
+        if (!this.clawCoordinator) return;
+        try {
+            const { qrcodeDataUrl, message, sessionKey } = await this.clawCoordinator.startBind();
+            this.postMessage({ command: 'clawQrCode', data: { qrcodeDataUrl, message } });
+            // Drive the long-poll bind in the background; report back as it progresses.
+            void this.clawCoordinator.waitBind(sessionKey, {
+                onVerifyCodeNeeded: () => this.postMessage({ command: 'clawVerifyCodeNeeded' }),
+                onQrRefresh: (url: string) =>
+                    this.postMessage({ command: 'clawQrCode', data: { qrcodeDataUrl: url, message: '二维码已刷新，请重新扫描' } }),
+                onResult: (r) => {
+                    this.postMessage({ command: 'clawBindResult', data: r });
+                    if (this.clawCoordinator) {
+                        this.postMessage({ command: 'clawStatus', data: this.clawCoordinator.getStatus() });
+                    }
+                },
+            });
+        } catch (e) {
+            this.postMessage({ command: 'clawBindResult', data: { connected: false, message: String(e) } });
+        }
+    }
+
+    /** 绑定飞书并立即开启长连接（点「连接飞书」一步到位）。已绑定其它平台时前端会禁用入口，这里不再二次校验。 */
+    private async clawBindFeishu(appId: string, appSecret: string): Promise<void> {
+        if (!this.clawCoordinator) return;
+        if (!appId?.trim() || !appSecret?.trim()) {
+            this.postMessage({ command: 'clawBindResult', data: { connected: false, message: 'App ID 和 App Secret 不能为空' } });
+            return;
+        }
+        this.clawCoordinator.bindFeishu(appId.trim(), appSecret.trim());
+        const res = await this.clawCoordinator.enable();
+        const status = this.clawCoordinator.getStatus();
+        if (res.ok) {
+            this.postMessage({ command: 'clawBindResult', data: { connected: true, message: '已连接飞书' } });
+            this.postMessage({ command: 'clawStatus', data: status });
+        } else if (res.occupiedBy) {
+            this.postMessage({ command: 'clawBindResult', data: { connected: false, message: `claw 正在『${res.occupiedBy.projectPath}』使用中` } });
+            this.postMessage({ command: 'clawStatus', data: { ...status, occupancy: res.occupiedBy } });
+        } else {
+            this.postMessage({ command: 'clawBindResult', data: { connected: false, message: res.error || '连接失败' } });
+            this.postMessage({ command: 'clawStatus', data: { ...status, error: res.error } });
+        }
+    }
+
+    private clawUnbind(): Promise<void> {
+        if (this.clawCoordinator) {
+            this.clawCoordinator.unbind();
+            this.postMessage({ command: 'clawStatus', data: this.clawCoordinator.getStatus() });
+        }
+        return Promise.resolve();
+    }
+
+    private clawSaveVerbosity(level: any): Promise<void> {
+        if (this.clawCoordinator) {
+            this.clawCoordinator.setVerbosity(level);
+            this.postMessage({ command: 'clawStatus', data: this.clawCoordinator.getStatus() });
+        }
+        return Promise.resolve();
     }
 
     /**

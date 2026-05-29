@@ -659,9 +659,76 @@ button.small {
     box-shadow: none;
 }
 
+.checkbox-label input[type="radio"] {
+    width: auto;
+    margin: 0;
+    padding: 0;
+}
+
+.checkbox-label input[type="radio"]:focus {
+    box-shadow: none;
+}
+
 .checkbox-label.disabled {
     opacity: 0.5;
     cursor: not-allowed;
+}
+
+.claw-display-section {
+    margin-bottom: 0;
+}
+
+.claw-verbosity-group {
+    margin-bottom: 0;
+}
+
+.claw-verbosity-option {
+    align-items: flex-start;
+    width: 100%;
+    min-height: 58px;
+    padding: 10px 12px;
+    border: 1px solid var(--s-card-border);
+    border-radius: 6px;
+    background: var(--s-card-bg);
+    box-sizing: border-box;
+    transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.claw-verbosity-option:hover {
+    border-color: var(--vscode-focusBorder);
+    background: var(--vscode-list-hoverBackground);
+}
+
+.claw-verbosity-option.active {
+    border-color: var(--vscode-focusBorder);
+    background: color-mix(in srgb, var(--vscode-focusBorder) 10%, var(--s-card-bg));
+}
+
+.claw-verbosity-option input[type="radio"] {
+    margin-top: 2px;
+    flex-shrink: 0;
+}
+
+.claw-verbosity-copy {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+}
+
+.claw-verbosity-name {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--vscode-foreground);
+}
+
+.claw-verbosity-desc {
+    font-size: 12px;
+    line-height: 1.4;
+    color: var(--vscode-descriptionForeground);
 }
 
 .thinking-form-group {
@@ -817,4 +884,3 @@ textarea:focus {
     background: var(--s-badge-quick-bg);
     color: var(--s-badge-quick-color);
 }
-

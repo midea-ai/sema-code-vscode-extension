@@ -1,0 +1,7 @@
+{
+  // 编辑器专用：让 VS Code 对 webview 文件就近命中此配置（根 tsconfig.json 已 exclude src/webview）。
+  // 复用根 tsconfig.webview.json 的编译选项（node 解析等），仅把 include 收敛到本目录。
+  // 构建不依赖此文件：webview 由 webpack 的 babel-loader 处理。
+  "extends": "../../tsconfig.webview.json",
+  "include": ["**/*"]
+}

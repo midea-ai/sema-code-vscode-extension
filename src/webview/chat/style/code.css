@@ -16,7 +16,8 @@
     font-size: var(--chat-font-base);
     color: var(--chat-text-editor);
     cursor: pointer;
-    flex-shrink: 0;
+    flex-shrink: 1;
+    min-width: 0;
     overflow: hidden;
     position: relative;
 }
@@ -30,7 +31,7 @@
     flex-shrink: 0;
 }
 
-/* 文件名样式 */
+/* 文件名样式：展示相对路径，过长时省略前面、保留靠近文件名的尾部（复用 .file-change-fullpath 的 rtl 截断手法） */
 .edit-title-left .file-name {
     font-size: var(--chat-font-base);
     overflow: hidden;
@@ -38,25 +39,28 @@
     white-space: nowrap;
     flex-shrink: 1;
     min-width: 0;
+    direction: rtl;
+    text-align: left;
 }
 
-/* 统计信息样式 */
+/* 统计信息样式：+N -M 整体加粗，增/删用颜色区分 */
 .edit-stats {
     display: flex;
     align-items: center;
     gap: 4px;
     font-size: var(--chat-font-base);
-    font-weight: 500;
+    font-weight: 700;
     flex-shrink: 0;
 }
 
 .edit-stats .additions {
     color: var(--chat-color-success);
+    font-weight: 700;
 }
 
 .edit-stats .removals {
     color: var(--chat-color-error);
-    font-weight: 500;
+    font-weight: 700;
     font-size: var(--chat-font-base);
 }
 

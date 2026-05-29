@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import * as os from 'os';
+import type { SemaSession } from 'sema-core';
 import type { AgentMode } from 'sema-core/types';
 
 import { SessionHistoryManager } from '../managers/SessionHistoryManager';
@@ -12,6 +13,8 @@ import { ConfigWebviewProvider } from '../webview/config/configWebview';
 import { SessionHistoryWebviewProvider } from '../webview/sessionHistory/sessionHistoryWebview';
 import { SemaProcessWrapper, MAX_SESSIONS } from './semaProcessWrapper';
 import { SemaSessionWrapper, SessionWrapperCallbacks, Message } from './semaSessionWrapper';
+import { ClawCoordinator } from '../claw/coordinator';
+import { CLAW_SESSION_ID } from '../claw/paths';
 import { TOOL_NAME_VIEW_FILE } from '../utils/tool';
 import { pet } from '../pet/pet-client';
 import { ensurePetRunning, killPet } from '../pet/pet-launcher';
@@ -34,6 +37,8 @@ export class SemaSidebarProvider implements vscode.WebviewViewProvider {
     private sessionHistoryWebviewProvider!: SessionHistoryWebviewProvider;
 
     private processWrapper: SemaProcessWrapper;
+    /** 远程入口（claw）。极薄壳，运行时按需懒载，不开则零开销。 */
+    private clawCoordinator: ClawCoordinator;
     private sessions: Map<string, SemaSessionWrapper> = new Map();
     private activeSessionId: string | null = null;
 
@@ -102,7 +107,19 @@ export class SemaSidebarProvider implements vscode.WebviewViewProvider {
             () => this.activeSessionId,
             () => Array.from(this.sessions.keys())
         );
-        this.configWebviewProvider = new ConfigWebviewProvider(this.processWrapper, this.fileOperationManager);
+        this.clawCoordinator = new ClawCoordinator(
+            this.processWrapper,
+            this.workingDir,
+            (m) => console.log('[claw]', m),
+            {
+                onSessionAttach: (session) => { void this.attachClawSession(session); },
+                onSessionDetach: (sessionId) => this.detachClawSession(sessionId),
+                onPermissionResolved: (sessionId) => {
+                    this.chatWebviewProvider.postMessage({ type: 'closePermissionPanel', sessionId });
+                },
+            },
+        );
+        this.configWebviewProvider = new ConfigWebviewProvider(this.processWrapper, this.fileOperationManager, this.clawCoordinator);
         this.configWebviewProvider.setOnSystemConfigChanged((key, value) => {
             if (key === 'skipFileEditPermission' || key === 'thinking' || key === 'showThinkingText') {
                 const cfg = this.processWrapper.getSystemConfig() as Record<string, any>;
@@ -148,7 +165,12 @@ export class SemaSidebarProvider implements vscode.WebviewViewProvider {
             onOpenAgentDetail: (sessionId, taskId) => {
                 this.chatWebviewProvider.postMessage({ type: 'openAgentDetail', sessionId, taskId });
             },
-            onUserResponded: (sessionId) => {
+            onUserResponded: (sessionId, permissionSelected) => {
+                // 电脑端应答了 claw 会话的权限 → 清掉 bridge 的待确认状态（否则手机端
+                // 会被一直挡在"请先回复 y/n"），并把同意/拒绝的结果回传手机。
+                if (sessionId === CLAW_SESSION_ID) {
+                    this.clawCoordinator.notifyDesktopPermissionAnswered(permissionSelected);
+                }
                 if (this.isPetEnabled()) setPetSessionState(sessionId, 'working');
             },
             onTitleUpdate: this.handleTitleUpdate,
@@ -260,6 +282,65 @@ export class SemaSidebarProvider implements vscode.WebviewViewProvider {
             nextActiveId: this.activeSessionId,
         });
 
+        this.unwirePetForSession(sessionId);
+        this.sessionHistoryWebviewProvider?.refreshSessionList();
+    }
+
+    // ─── 远程会话（claw）UI 接入 ───────────────────────────────────────────────
+
+    /**
+     * 把 claw 远程会话以普通 tab 形式接入聊天界面。
+     * 该 session 已由 ClawSession 创建，这里只补一个 SemaSessionWrapper（与 ClawBridge
+     * 并存，各自独立订阅同一 session），并发 sessionOpened。activate:false 让 tab 静默
+     * 出现而不抢占当前焦点。core 已有的历史会在前端 webviewSessionReady 时补显示。
+     */
+    private async attachClawSession(session: SemaSession): Promise<void> {
+        if (this.sessions.has(session.sessionId)) return;
+        const wrapper = new SemaSessionWrapper(session, this.sessionCallbacks, 'Agent');
+        this.sessions.set(wrapper.sessionId, wrapper);
+
+        // 复用插件侧历史，让 chat 页打开 claw 会话时能看到之前的对话（与普通会话一致）。
+        try {
+            const history = await this.sessionHistoryManager.getSession(session.sessionId);
+            if (history?.content?.length) {
+                if (history.title) wrapper.updateTitle(history.title);
+                wrapper.updateMessageHistory(history.content);
+            }
+        } catch (error) {
+            console.error('Error loading claw session history:', error);
+        }
+
+        // 开启 claw 时切到该会话，让用户直接看到远程对话；isClaw 让 tab 用紫色标识。
+        this.activeSessionId = wrapper.sessionId;
+        this.processWrapper.setActiveSession(wrapper.sessionId);
+        this.chatWebviewProvider.postMessage({
+            type: 'sessionOpened',
+            sessionId: wrapper.sessionId,
+            title: wrapper.title || '微信远程',
+            isClaw: true,
+        });
+        this.wirePetForSession(wrapper.sessionId);
+        this.sessionHistoryWebviewProvider?.refreshSessionList();
+    }
+
+    /** claw 关闭/释放时移除其 tab。 */
+    private detachClawSession(sessionId: string): void {
+        const wrapper = this.sessions.get(sessionId);
+        if (!wrapper) return;
+        wrapper.dispose();
+        this.sessions.delete(sessionId);
+
+        if (this.activeSessionId === sessionId) {
+            const next = this.sessions.keys().next().value ?? null;
+            this.activeSessionId = next ?? null;
+            if (next) this.processWrapper.setActiveSession(next);
+        }
+
+        this.chatWebviewProvider.postMessage({
+            type: 'sessionClosed',
+            sessionId,
+            nextActiveId: this.activeSessionId,
+        });
         this.unwirePetForSession(sessionId);
         this.sessionHistoryWebviewProvider?.refreshSessionList();
     }
@@ -499,6 +580,8 @@ export class SemaSidebarProvider implements vscode.WebviewViewProvider {
             wrapper.dispose();
         }
         this.sessions.clear();
+        // 释放 claw（仅当曾开启才有副作用：释放锁 + 停轮询 + dispose claw 会话）。
+        void this.clawCoordinator.dispose();
         void this.processWrapper.dispose();
     }
 }

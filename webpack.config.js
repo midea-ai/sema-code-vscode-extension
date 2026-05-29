@@ -21,7 +21,12 @@ const extensionConfig = {
     '@vscode/ripgrep': 'commonjs @vscode/ripgrep'
   },
   resolve: {
-    extensions: ['.ts', '.js']
+    extensions: ['.ts', '.js'],
+    // Node16 TS requires `.js` on dynamic import() specifiers (claw lazy chunk);
+    // map them back to the .ts sources on disk.
+    extensionAlias: {
+      '.js': ['.ts', '.js']
+    }
   },
   node: {
     // 保持 Node.js 环境的全局变量

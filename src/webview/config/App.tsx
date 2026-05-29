@@ -13,9 +13,10 @@ import RuleMemoryConfig from './RuleMemoryConfig';
 import BackgroundTaskConfig from './BackgroundTaskConfig';
 import CronTaskConfig from './CronTaskConfig';
 import DesignConfig from './DesignConfig';
+import ClawConfig from './ClawConfig';
 import { RefreshIcon } from './utils/svgIcons';
 
-type PageType = 'models' | 'system' | 'memory' | 'mcp' | 'skill' | 'agent' | 'command' | 'plugin' | 'task' | 'design';
+type PageType = 'models' | 'system' | 'memory' | 'mcp' | 'skill' | 'agent' | 'command' | 'plugin' | 'task' | 'design' | 'claw';
 type ModelTabType = 'list' | 'add';
 type TaskTabType = 'background' | 'cron';
 
@@ -157,6 +158,13 @@ const App: React.FC<AppProps> = ({ vscode }) => {
                 >
                     Design
                 </div>
+
+                <div
+                    className={`nav-item nav-main ${currentPage === 'claw' ? 'active' : ''}`}
+                    onClick={() => setCurrentPage('claw')}
+                >
+                    Claw 远程
+                </div>
             </div>
 
             {/* 主内容区域 */}
@@ -246,6 +254,13 @@ const App: React.FC<AppProps> = ({ vscode }) => {
                 {currentPage === 'design' && (
                     <div className="page active">
                         <DesignConfig vscode={vscode} />
+                    </div>
+                )}
+
+                {/* Claw 远程页面 */}
+                {currentPage === 'claw' && (
+                    <div className="page active">
+                        <ClawConfig vscode={vscode} />
                     </div>
                 )}
 

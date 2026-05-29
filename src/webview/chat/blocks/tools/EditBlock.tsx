@@ -137,7 +137,7 @@ const EditBlock: React.FC<EditBlockProps> = React.memo(({
                         isDirectory={false}
                         size={18}
                     />
-                    <span className="file-name">{displayFileName}</span>
+                    <span className="file-name" title={fileName}>{fileName}</span>
                     <span className="edit-stats">
                         {additions > 0 && <span className="additions">+{additions}</span>}
                         {removals > 0 && <span className="removals">-{removals}</span>}
