@@ -226,7 +226,8 @@ const PermissionContent: React.FC<PermissionContentProps> = ({
                         <strong className="file-permission-action">{actionLabel}</strong>
                         <div className="file-permission-file-left">
                             <FileIcon fileName={displayFileName} isDirectory={false} size={18} />
-                            <span className="file-permission-filename">{fileName}</span>
+                            {/* 开头加 LRM(U+200E) 强制路径按 LTR 排版，避免 direction:rtl 把开头的 "." 排到末尾 */}
+                            <span className="file-permission-filename">{String.fromCharCode(0x200e) + fileName}</span>
                             {renderDiffStats()}
                         </div>
                     </div>

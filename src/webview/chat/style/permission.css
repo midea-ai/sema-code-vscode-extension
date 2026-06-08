@@ -228,6 +228,9 @@ body.vscode-light .bash-permission-content {
     white-space: nowrap;
     flex-shrink: 1;
     min-width: 0;
+    /* 路径过长时省略前面部分，保留靠近文件名的尾部 */
+    direction: rtl;
+    text-align: left;
 }
 
 .file-permission-cell-label {

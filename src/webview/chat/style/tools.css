@@ -278,6 +278,12 @@
     align-items: flex-start;
 }
 
+/* 标题用 flex-start 顶部对齐后，折叠图标盒子高度跟首行行高对齐，
+   使图标与首行文字居中对齐，而非贴着行顶（否则视觉偏高） */
+.grouped-tool-content .grouped-tool-header .grouped-tool-toggle-btn {
+    height: 1lh;
+}
+
 .grouped-tool-content .grouped-tool-header .grouped-tool-muted-text {
     min-width: 0;
     overflow-wrap: anywhere;
@@ -295,7 +301,8 @@
 .grouped-read-files {
     display: inline-flex;
     flex-wrap: wrap;
-    gap: var(--chat-spacing-xs) var(--chat-spacing-sm);
+    /* 列间距设 0：水平分隔由逗号 span 的 ", " 文本控制，避免出现 " , " */
+    gap: var(--chat-spacing-xs) 0;
     min-width: 0;
 }
 

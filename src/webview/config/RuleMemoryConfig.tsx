@@ -188,7 +188,7 @@ const RuleMemoryConfig: React.FC<RuleMemoryConfigProps> = ({ vscode }) => {
                     </pre>
                 )}
                 {item.refFilePath && item.refFilePath.length > 0 && (
-                    <div style={{ marginTop: '14px' }}>
+                    <div style={{ marginTop: '14px', padding: '0 14px 14px' }}>
                         <div style={{ fontSize: '12px', color: 'var(--vscode-foreground)', marginBottom: '4px' }}>
                             关联文件（{item.refFilePath.length}）
                         </div>

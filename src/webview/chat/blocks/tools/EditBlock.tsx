@@ -137,7 +137,8 @@ const EditBlock: React.FC<EditBlockProps> = React.memo(({
                         isDirectory={false}
                         size={18}
                     />
-                    <span className="file-name" title={fileName}>{fileName}</span>
+                    {/* 开头加 LRM(U+200E) 强制文件名整体按 LTR 排版，避免 direction:rtl 把开头的 "." 排到末尾；title 仍用真实路径 */}
+                    <span className="file-name" title={fileName}>{String.fromCharCode(0x200e) + fileName}</span>
                     <span className="edit-stats">
                         {additions > 0 && <span className="additions">+{additions}</span>}
                         {removals > 0 && <span className="removals">-{removals}</span>}

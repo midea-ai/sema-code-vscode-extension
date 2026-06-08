@@ -39,6 +39,8 @@
     white-space: nowrap;
     flex-shrink: 1;
     min-width: 0;
+    /* 覆盖全局 .file-name 的 max-width: 150px，宽度足够时完整展示路径，不被截断 */
+    max-width: none;
     direction: rtl;
     text-align: left;
 }
@@ -83,10 +85,10 @@
     opacity: 1;
 }
 
-/* 中间空白区域 - 占据剩余空间 */
+/* 中间空白区域 - 撑开使复制按钮顶到最右；窄屏时可收缩到最小间距，把空间让给文件名 */
 .edit-spacer {
     flex: 1;
-    min-width: 20px;
+    min-width: 5px;
 }
 
 /* 复制按钮 - 悬浮时显示，使用 opacity 避免布局变化 */

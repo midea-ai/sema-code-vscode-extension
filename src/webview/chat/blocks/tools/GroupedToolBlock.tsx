@@ -20,7 +20,7 @@ const formatCount = (count: number, singular: string, plural: string): string =>
     return `${count} ${count === 1 ? singular : plural}`;
 };
 
-const MAX_VISIBLE_LINES = 4;
+const MAX_VISIBLE_LINES = 2;
 
 interface ReadSummaryFile {
     display: string;
@@ -355,7 +355,7 @@ const renderExpandedItem = (
             <span className="grouped-read-files">
                 {item.item.files.map((file, index) => (
                     <React.Fragment key={file.title}>
-                        {index > 0 && <span className="grouped-tool-muted-text">, </span>}
+                        {index > 0 && <span className="grouped-tool-muted-text">,&#160;</span>}
                         <button
                             className="grouped-tool-muted-text grouped-read-file"
                             onClick={() => handleFileOpen(file.filePath, file.line)}
