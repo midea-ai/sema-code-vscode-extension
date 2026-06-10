@@ -149,4 +149,5 @@ export interface ToolContent {
     summary?: string;
     content: string | DiffContent;  // 支持字符串（旧格式）或 DiffContent 对象（新格式）
     completed?: boolean;  // false 表示流式中间态，undefined/true 表示完成
+    autoAllowedContent?: string;  // AutoRun 档位下模型自动放行时的提示文字
 }

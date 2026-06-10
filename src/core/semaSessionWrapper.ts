@@ -8,6 +8,7 @@ import {
     SessionReadyData,
     SessionErrorData,
     SessionInterruptedData,
+    ToolPermissionAutoData,
     ToolPermissionResponse,
     ToolExecutionCompleteData,
     ToolExecutionErrorData,
@@ -100,6 +101,7 @@ export class SemaSessionWrapper {
     private streamingToolMap: Map<string, Message> = new Map();
     private taskAgentThrottleTimer: NodeJS.Timeout | null = null;
     private pendingTaskUpdates: Set<string> = new Set();
+    private pendingAutoPermissions: Map<string, string> = new Map(); // toolId → content
     private _agentMode: AgentMode;
     private _permissionLevel: PermissionLevel = 'Ask';
     private lastUsage: Usage | null = null;
@@ -253,6 +255,7 @@ export class SemaSessionWrapper {
         this.streamingToolMap.clear();
         this.streamingAssistantMap.clear();
         this.pendingTaskUpdates.clear();
+        this.pendingAutoPermissions.clear();
         if (this.taskAgentThrottleTimer) {
             clearTimeout(this.taskAgentThrottleTimer);
             this.taskAgentThrottleTimer = null;
@@ -374,6 +377,7 @@ export class SemaSessionWrapper {
             this.streamingAssistantMap.clear();
             this.streamingToolMap.clear();
             this.pendingTaskUpdates.clear();
+            this.pendingAutoPermissions.clear();
 
             if (this.messageHistory.length === 0) {
                 return;
@@ -386,6 +390,10 @@ export class SemaSessionWrapper {
             };
             this.messageHistory.push(interruptedMsg);
             this.sendAppendMessages([interruptedMsg]);
+        });
+
+        this.session.on<ToolPermissionAutoData>('tool:permission:auto', (data) => {
+            this.pendingAutoPermissions.set(data.toolId, data.content);
         });
 
         this.session.on<SessionErrorData>('session:error', (data) => {
@@ -610,11 +618,16 @@ export class SemaSessionWrapper {
         this.session.on<ToolExecutionCompleteData & { agentId?: string }>('tool:execution:complete', (data) => {
             this.callbacks.onToolExecutionComplete?.(this.sessionId, data);
 
+            const autoAllowedContent = data.toolId ? this.pendingAutoPermissions.get(data.toolId) : undefined;
+            if (data.toolId) {
+                this.pendingAutoPermissions.delete(data.toolId);
+            }
+
             if (this.isSubAgent(data.agentId)) {
                 this.addMessageToTaskAgent(data.agentId!, {
                     id: this.generateId(),
                     type: 'tool',
-                    content: { ...data, completed: true },
+                    content: { ...data, completed: true, ...(autoAllowedContent ? { autoAllowedContent } : {}) },
                     toolName: data.toolName,
                 });
                 return;
@@ -627,7 +640,7 @@ export class SemaSessionWrapper {
             const toolId = data.toolId;
             if (toolId && this.streamingToolMap.has(toolId)) {
                 const existingMessage = this.streamingToolMap.get(toolId)!;
-                const updatedContent = { ...data, completed: true };
+                const updatedContent = { ...data, completed: true, ...(autoAllowedContent ? { autoAllowedContent } : {}) };
                 const updatedMessage = { ...existingMessage, content: updatedContent };
                 const idx = this.messageHistory.indexOf(existingMessage);
                 if (idx >= 0) this.messageHistory[idx] = updatedMessage;
@@ -637,7 +650,7 @@ export class SemaSessionWrapper {
                 const newToolMsg: Message = {
                     id: this.generateId(),
                     type: 'tool',
-                    content: { ...data, completed: true },
+                    content: { ...data, completed: true, ...(autoAllowedContent ? { autoAllowedContent } : {}) },
                     toolName: data.toolName,
                 };
                 this.messageHistory.push(newToolMsg);
@@ -884,6 +897,7 @@ export class SemaSessionWrapper {
                 this.taskAgentThrottleTimer = null;
                 const taskIds = [...this.pendingTaskUpdates];
                 this.pendingTaskUpdates.clear();
+                this.pendingAutoPermissions.clear();
                 for (const tid of taskIds) {
                     const e = this.taskAgentMap.get(tid);
                     if (e) {
@@ -944,6 +958,7 @@ export class SemaSessionWrapper {
             this.streamingToolMap.clear();
             this.taskAgentMap.clear();
             this.pendingTaskUpdates.clear();
+            this.pendingAutoPermissions.clear();
             this.callbacks = {};
         } catch (error) {
             console.error('Error disposing SemaSessionWrapper:', error);

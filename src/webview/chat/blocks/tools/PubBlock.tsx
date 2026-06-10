@@ -116,14 +116,21 @@ const PubBlock: React.FC<PubBlockProps> = React.memo(({ content, messageId, vsco
                     </div>
                 </div>
             </div>
-            {isExpanded && visibleLines.length > 0 && (
+            {isExpanded && (
                 <div className="chat-block-content pub-block-content">
-                    {omittedCount > 0 && (
-                        <div className="bash-omitted-lines bash-omitted-lines-clickable" onClick={handleViewAll}>...省略了 {omittedCount} 行</div>
+                    {visibleLines.length > 0 && (
+                        <>
+                            {omittedCount > 0 && (
+                                <div className="bash-omitted-lines bash-omitted-lines-clickable" onClick={handleViewAll}>...省略了 {omittedCount} 行</div>
+                            )}
+                            {visibleLines.map((line, i) => (
+                                <div key={i} className="bash-output-line">{line}</div>
+                            ))}
+                        </>
                     )}
-                    {visibleLines.map((line, i) => (
-                        <div key={i} className="bash-output-line">{line}</div>
-                    ))}
+                    {content.autoAllowedContent && (
+                        <div className="auto-allowed-info">{CONTINUATION_SYMBOL} {content.autoAllowedContent}</div>
+                    )}
                 </div>
             )}
         </div>

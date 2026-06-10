@@ -3,6 +3,7 @@ import { ToggleIcon } from '../../components/ui/IconButton';
 import { SessionContext } from '../../SessionContext';
 import BaseBashContent from '../../components/ui/BaseBashContent';
 import { ToolContent } from '../../types';
+import { CONTINUATION_SYMBOL } from '../../utils/symbols';
 import { streamingStore } from '../../utils/StreamingStore';
 
 const MAX_VISIBLE_LINES = 2;
@@ -168,6 +169,9 @@ const BashBlock: React.FC<BashBlockProps> = ({ content: toolContent, messageId, 
                                 ))}
                             </div>
                         </>
+                    )}
+                    {toolContent.autoAllowedContent && (
+                        <div className="auto-allowed-info">{CONTINUATION_SYMBOL} {toolContent.autoAllowedContent}</div>
                     )}
                 </div>
             )}
