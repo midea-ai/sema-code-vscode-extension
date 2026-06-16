@@ -277,6 +277,7 @@ export const mockMessageMap: Record<string, Message[]> = {
             content: {
                 toolId: 'bash-1',
                 toolName: TOOL_NAME_RUN_SHELL,
+                summary: '读取 Excel 所有工作表名称并打印',
                 title: `python3 -c "
 import pandas as pd
 import openpyxl
@@ -296,6 +297,7 @@ print()
             content: {
                 toolId: 'bash-2',
                 toolName: TOOL_NAME_RUN_SHELL,
+                summary: '对 config.ts 运行 eslint 检查，这是一段足够长的摘要用于验证页面太窄时的省略号效果',
                 title: 'npx eslint src/utils/config.ts',
                 content: '',
             },

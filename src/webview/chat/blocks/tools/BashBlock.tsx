@@ -144,6 +144,9 @@ const BashBlock: React.FC<BashBlockProps> = ({ content: toolContent, messageId, 
             <div className="chat-block-header bash-block-header" onClick={handleToggle}>
                 <div className="chat-block-title bash-block-title">
                     <span className="chat-block-title-label">Shell</span>
+                    {toolContent.summary && (
+                        <span className="chat-block-title-detail">({toolContent.summary})</span>
+                    )}
                     {isStreaming && <span className="bash-streaming-dot" />}
                     <div className="bash-toggle-btn">
                         <ToggleIcon isExpanded={isExpanded} />
