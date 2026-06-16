@@ -731,6 +731,16 @@ const ChatSession: React.FC<ChatSessionProps> = ({ vscode, sessionId, active, on
                     }
 
                     const { message, index } = group.items[item.originalIndex];
+
+                    // 思考阶段（无正文、未进入流式、且思考文本不展示）的 assistant 消息会渲染为空，
+                    // 不输出空的 .msg-wrap，避免其 content-visibility 占位高度把下方 Spinner 顶下去再回弹。
+                    if (message.type === 'assistant') {
+                        const hasReasoning = shouldShowThinkingText && !!(message.reasoning && message.reasoning.trim());
+                        const isStreaming = streamingAssistantId === message.id;
+                        const hasContent = isStreaming || !!(message.content?.content && message.content.content.trim());
+                        if (!hasReasoning && !hasContent) return null;
+                    }
+
                     return (
                         <div
                             key={message.id}
