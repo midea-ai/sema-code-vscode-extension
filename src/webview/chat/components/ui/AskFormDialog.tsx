@@ -5,8 +5,8 @@ export type PickOptionQuestion =
     | { type: 'radio'; id: string; label: string; required?: boolean; options: string[] }
     | { type: 'checkbox'; id: string; label: string; required?: boolean; options: string[]; maxSelections?: number }
     | { type: 'select'; id: string; label: string; required?: boolean; options: string[] }
-    | { type: 'text'; id: string; label: string; required?: boolean; placeholder?: string; maxLength?: number }
-    | { type: 'textarea'; id: string; label: string; required?: boolean; placeholder?: string; maxLength?: number };
+    | { type: 'text'; id: string; label: string; required?: boolean; placeholder?: string; maxLength?: number; defaultValue?: string }
+    | { type: 'textarea'; id: string; label: string; required?: boolean; placeholder?: string; maxLength?: number; defaultValue?: string };
 
 const DEFAULT_TEXT_MAX_LENGTH = 100;
 const DEFAULT_TEXTAREA_MAX_LENGTH = 500;
@@ -93,7 +93,8 @@ function buildInitialState(questions: PickOptionQuestion[], initialValues?: AskF
                 values[q.id] = s;
             }
         } else {
-            values[q.id] = typeof raw === 'string' ? raw : '';
+            // text / textarea：有回显值优先回显，否则退回 defaultValue 预填（兜底空串）
+            values[q.id] = typeof raw === 'string' ? raw : (q.defaultValue ?? '');
         }
     }
 

@@ -8,7 +8,7 @@ interface BaseBashContentProps {
     maxHeightPx?: number;      // 溢出阈值，默认 80（需与 tools.css 中 .bash-command max-height 同步）
 }
 
-const DEFAULT_MAX_PX = 50;
+const DEFAULT_MAX_PX = 45;
 
 const BaseBashContent: React.FC<BaseBashContentProps> = ({
     command,
