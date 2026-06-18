@@ -2,7 +2,14 @@
 'use strict';
 
 const path = require('path');
+const fs = require('fs');
 const webpack = require('webpack');
+
+// 从已安装的 sema-core 读取真实版本，避免在界面中硬编码
+// 直接读文件而非 require：sema-core 的 exports 未导出 ./package.json
+const semaCoreVersion = JSON.parse(
+  fs.readFileSync(path.resolve(__dirname, 'node_modules/sema-core/package.json'), 'utf8')
+).version;
 
 /** @typedef {import('webpack').Configuration} WebpackConfig **/
 
@@ -96,7 +103,8 @@ const chatWebviewConfig = {
   plugins: [
     new webpack.DefinePlugin({
       'process.env.NODE_ENV': JSON.stringify('production'),
-      'process.env': JSON.stringify({})
+      'process.env': JSON.stringify({}),
+      '__SEMA_CORE_VERSION__': JSON.stringify(semaCoreVersion)
     })
   ],
   devtool: 'nosources-source-map',
