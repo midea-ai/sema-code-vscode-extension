@@ -32,28 +32,28 @@ export const DEFAULT_CONTEXT_LENGTH_OPTIONS = [64000, 128000, 256000, 512000];
 export const DEFAULT_MAX_TOKENS = 32000;
 
 /** Main 任务推荐模型，为空则不显示推荐提示 */
-export const RECOMMENDED_MAIN_MODEL = 'Claude Sonnet 4.6';
+export const RECOMMENDED_MAIN_MODEL = '';
 
 /** Quick 任务推荐模型，为空则不显示推荐提示 */
-export const RECOMMENDED_QUICK_MODEL = 'Claude Haiku 4.5';
+export const RECOMMENDED_QUICK_MODEL = '';
 
 /** 全局默认上下文窗口大小 */
 export const DEFAULT_CONTEXT_LENGTH = 256000;
 
 /** 默认提供商 key */
-export const DEFAULT_PROVIDER = 'anthropic';
+export const DEFAULT_PROVIDER = 'deepseek';
 
 /** 提供商显示顺序 */
 export const PROVIDER_ORDER = [
+    'deepseek',
+    'minimax',
+    'glm',
+    'mimo',
+    'qwen',
+    'kimi',
+    'openrouter',
     'anthropic',
     'openai',
-    'kimi',
-    'minimax',
-    'deepseek',
-    'glm',
-    'openrouter',
-    'qwen',
-    'mimo',
     'custom'
 ];
 
