@@ -13,7 +13,7 @@ import {
     stringToDiffContent
 } from '../../utils/permissionUtils';
 import { countDiffChanges } from '../../utils/diffParser';
-import { TOOL_NAME_PATCH_FILE, TOOL_NAME_WRITE_FILE, TOOL_NAME_RUN_SHELL, TOOL_NAME_FETCH_URL } from '../../../../utils/tool';
+import { TOOL_NAME_PATCH_FILE, TOOL_NAME_WRITE_FILE, TOOL_NAME_RUN_SHELL, TOOL_NAME_FETCH_URL, TOOL_NAME_VIEW_FILE } from '../../../../utils/tool';
 
 interface PermissionContentProps {
     toolName: string;
@@ -242,6 +242,48 @@ const PermissionContent: React.FC<PermissionContentProps> = ({
         );
     };
 
+    // 渲染读取文件内容（view_file，常用于读取项目外文件的授权）
+    const renderViewFileContent = () => {
+        const fileName = title;
+        const displayFileName = fileName.split('/').pop() || fileName;
+
+        const handleFileClick = () => {
+            if (vscode && fileName) {
+                vscode.postMessage({
+                    type: 'openFile',
+                    filePath: fileName,
+                    line: 1
+                });
+            }
+        };
+
+        return (
+            <div className="file-permission-container">
+                <div className="file-permission-title-wrapper">
+                    <div className="file-permission-title-divider-top" />
+                    <div
+                        className={`file-permission-title${vscode ? ' file-permission-title-clickable' : ''}`}
+                        onClick={vscode ? handleFileClick : undefined}
+                    >
+                        <strong className="file-permission-action">Read File</strong>
+                        <div className="file-permission-file-left">
+                            <FileIcon fileName={displayFileName} isDirectory={false} size={18} />
+                            <span className="file-permission-filename">{displayFileName}</span>
+                        </div>
+                    </div>
+                    <div className="file-permission-title-divider-bottom" />
+                </div>
+                <div className="mcp-tool-content">
+                    <CollapsibleContent>
+                        {/* 开头加 LRM(U+200E) 强制路径按 LTR 排版，避免 direction:rtl 把开头的 "." 排到末尾 */}
+                        {`Read(${String.fromCharCode(0x200e)}${fileName})`}
+                    </CollapsibleContent>
+                </div>
+                <div className="file-permission-code-divider" />
+            </div>
+        );
+    };
+
     // 渲染Bash命令内容
     const renderBashContent = () => {
         const handleBashTitleClick = () => {
@@ -313,6 +355,8 @@ const PermissionContent: React.FC<PermissionContentProps> = ({
     // 根据工具类型渲染对应内容
     if (toolName === TOOL_NAME_RUN_SHELL) {
         return renderBashContent();
+    } else if (toolName === TOOL_NAME_VIEW_FILE) {
+        return renderViewFileContent();
     } else if (toolName === TOOL_NAME_FETCH_URL) {
         return renderWebFetchContent();
     } else if (isSkillType(toolName)) {

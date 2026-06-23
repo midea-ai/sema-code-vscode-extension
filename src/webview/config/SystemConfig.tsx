@@ -16,6 +16,7 @@ interface SystemConfigData {
     skipSkillPermission?: boolean;
     skipMCPToolPermission?: boolean;
     skipFetchUrlPermission?: boolean;
+    skipExternalFileReadPermission?: boolean;
     systemPrompt?: string;
     customRules?: string;
     enableLLMCache?: boolean;
@@ -250,6 +251,18 @@ const SystemConfig: React.FC<SystemConfigProps> = ({ vscode }) => {
                 {/* 跳过权限第一行 */}
                 <div className="form-row">
                     <div className="form-group">
+                        <label className="checkbox-label" title="启用后读取项目外文件不需要确认">
+                            <input
+                                type="checkbox"
+                                checked={config.skipExternalFileReadPermission || false}
+                                onChange={(e) => handleChange('skipExternalFileReadPermission', e.target.checked)}
+                            />
+                            <span className="checkmark"></span>
+                            跳过文件读取权限检查
+                        </label>
+                    </div>
+
+                    <div className="form-group">
                         <label className="checkbox-label" title="启用后将直接编辑文件而不需要确认">
                             <input
                                 type="checkbox"
@@ -260,7 +273,10 @@ const SystemConfig: React.FC<SystemConfigProps> = ({ vscode }) => {
                             跳过文件编辑权限检查
                         </label>
                     </div>
+                </div>
 
+                {/* 跳过权限第二行 */}
+                <div className="form-row">
                     <div className="form-group">
                         <label className="checkbox-label" title="启用后将直接执行Shell命令而不需要确认，慎重勾选">
                             <input
@@ -272,10 +288,7 @@ const SystemConfig: React.FC<SystemConfigProps> = ({ vscode }) => {
                             跳过Shell执行权限检查
                         </label>
                     </div>
-                </div>
 
-                {/* 跳过权限第二行 */}
-                <div className="form-row">
                     <div className="form-group">
                         <label className="checkbox-label" title="启用后将直接执行Skill而不需要确认">
                             <input
@@ -287,7 +300,10 @@ const SystemConfig: React.FC<SystemConfigProps> = ({ vscode }) => {
                             跳过Skill权限检查
                         </label>
                     </div>
+                </div>
 
+                {/* 跳过权限第三行 */}
+                <div className="form-row">
                     <div className="form-group">
                         <label className="checkbox-label" title="启用后将直接执行MCP工具而不需要确认">
                             <input
@@ -299,10 +315,7 @@ const SystemConfig: React.FC<SystemConfigProps> = ({ vscode }) => {
                             跳过MCP工具权限检查
                         </label>
                     </div>
-                </div>
 
-                {/* 跳过权限第三行 */}
-                <div className="form-row">
                     <div className="form-group">
                         <label className="checkbox-label" title="启用后将直接执行FetchUrl而不需要确认">
                             <input

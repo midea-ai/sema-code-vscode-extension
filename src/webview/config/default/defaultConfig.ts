@@ -11,6 +11,7 @@ export const defaultConfig = {
     skipSkillPermission: false,
     skipMCPToolPermission: false,
     skipFetchUrlPermission: false,
+    skipExternalFileReadPermission: true,
     systemPrompt: "You are Sema, AIRC's Agent AI for coding.",
     customRules: "- 中文回答",
     enableLLMCache: false,

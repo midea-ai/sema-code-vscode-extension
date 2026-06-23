@@ -644,6 +644,22 @@ export const mockDialogMap: Record<string, any[]> = {
         {
             type: 'permission',
             data: {
+                agentId: 'main',
+                toolId: 'view-file-1',
+                toolName: TOOL_NAME_VIEW_FILE,
+                title: '/Users/sema/design-spec.md',
+                content: '',
+                options: {
+                    agree: '确认',
+                    allow: '确认，本次会话不再询问 /Users/sema 目录下的读取',
+                    refuse: '拒绝'
+                }
+            },
+            isBackground: false,
+        },
+        {
+            type: 'permission',
+            data: {
                 agentId: 'mock-agent-1',
                 toolId: 'mock-tool-perm-1',
                 toolName: TOOL_NAME_RUN_SHELL,
@@ -700,8 +716,8 @@ export const mockDialogMap: Record<string, any[]> = {
                 agentId: 'main',
                 toolId: 'webfetch-1',
                 toolName: TOOL_NAME_FETCH_URL,
-                title: TOOL_NAME_FETCH_URL,
-                content: 'https://github.com/midea-ai/sema-code-core',
+                title: 'https://github.com/midea-ai/sema-code-core',
+                content: '',
                 options: {
                     agree: '确认',
                     allow: '确认，本项目不再询问 github.com 域名',
