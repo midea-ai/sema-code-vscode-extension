@@ -12,6 +12,15 @@ import {
 } from './default/defaultModelProvider';
 
 
+/** 将 token 数格式化为易读形式：1000000 -> 1M，128000 -> 128k */
+const formatTokenCount = (val: number): string => {
+    if (val >= 1000000) {
+        const m = val / 1000000;
+        return `${Number.isInteger(m) ? m : m.toFixed(1)}M`;
+    }
+    return `${Math.round(val / 1000)}k`;
+};
+
 interface AddModelFormProps {
     onSuccess: () => void;
     vscode: VscodeApi;
@@ -453,7 +462,7 @@ const AddModelForm: React.FC<AddModelFormProps> = ({ onSuccess, vscode }) => {
                                     value={val}
                                     disabled={selectedModelMaxTokens !== null && val > selectedModelMaxTokens}
                                 >
-                                    {Math.round(val / 1000)}k
+                                    {formatTokenCount(val)}
                                 </option>
                             ))}
                         </select>
@@ -463,7 +472,7 @@ const AddModelForm: React.FC<AddModelFormProps> = ({ onSuccess, vscode }) => {
                         <label htmlFor="contextLength">上下文窗口大小</label>
                         <select id="contextLength" value={contextLength} onChange={(e) => setContextLength(e.target.value)}>
                             {(defaults.contextLengthOptions ?? DEFAULT_CONTEXT_LENGTH_OPTIONS).map(val => (
-                                <option key={val} value={val}>{Math.round(val / 1000)}k</option>
+                                <option key={val} value={val}>{formatTokenCount(val)}</option>
                             ))}
                         </select>
                     </div>
