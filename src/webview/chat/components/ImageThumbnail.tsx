@@ -34,7 +34,9 @@ const ImageThumbnail: React.FC<ImageThumbnailProps> = ({
                 src={src}
                 alt={displayName}
             />
-            <span className="image-chip-name" title={displayName}>{displayName}</span>
+            <span className="image-chip-name" title={displayName}>
+                <span className="image-chip-name-text">{displayName}</span>
+            </span>
             {sizeText && <span className="image-chip-size">{sizeText}</span>}
             {deletable && (
                 <button

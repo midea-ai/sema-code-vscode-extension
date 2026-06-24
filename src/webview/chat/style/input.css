@@ -948,6 +948,8 @@
     border: 1px solid var(--chat-border-input);
     transition: border-color 0.15s;
     cursor: zoom-in;
+    /* 统一行盒高度：标题/大小字号不同，不固定 line-height 时在 Linux 字体度量下行盒不等高会错位 */
+    line-height: 18px;
 }
 
 /* hover：边框变明显（输入框 + 气泡均生效）。中性灰加深，主题自适应、不抢眼 */
@@ -964,13 +966,27 @@
     cursor: zoom-in;
 }
 
+/* 文字段撑满 chip 高度，再用 flex 几何居中（不依赖字体行盒度量，跨平台一致） */
+.image-chip-name,
+.image-chip-size {
+    display: flex;
+    align-items: center;
+    align-self: stretch;
+    line-height: 1;  /* 压紧行盒，避免大小段的 × 触发字体回退把行盒撑高导致错位 */
+}
 .image-chip-name {
-    max-width: 110px;
+    min-width: 0;
+    font-size: 10px;
+    color: var(--chat-text-primary);
+}
+/* 省略号要放在 flex 子节点的内层（flex 容器自身 text-overflow 不生效） */
+/* 标题无特殊字符，单独放大行盒给 g/p 下伸字留空间；由父级 flex 居中，不影响对齐 */
+.image-chip-name-text {
+    max-width: 80px;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    font-size: 10px;
-    color: var(--chat-text-primary);
+    line-height: 1.5;
 }
 
 .image-chip-size {

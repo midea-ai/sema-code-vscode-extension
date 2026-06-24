@@ -447,41 +447,9 @@ end try`;
                     { timeout: 1500, windowsHide: true }
                 );
                 absolutePaths = stdout.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
-            } else if (process.platform === 'linux') {
-                // Linux：剪贴板里的文件以 text/uri-list（或 GNOME 的 x-special/gnome-copied-files）形式存在。
-                // 用 wl-paste(Wayland) / xclip(X11) 读取；两者可能未安装或无该类型，逐个尝试，
-                // 失败（ENOENT 等）即跳过，全失败则返回 []（退化为既有行为，与未实现时一致）。
-                const isWayland = !!process.env.WAYLAND_DISPLAY;
-                const readers: Array<{ cmd: string; args: string[] }> = isWayland
-                    ? [
-                        { cmd: 'wl-paste', args: ['--no-newline', '--type', 'text/uri-list'] },
-                        { cmd: 'wl-paste', args: ['--no-newline', '--type', 'x-special/gnome-copied-files'] },
-                        { cmd: 'xclip', args: ['-selection', 'clipboard', '-t', 'text/uri-list', '-o'] },
-                    ]
-                    : [
-                        { cmd: 'xclip', args: ['-selection', 'clipboard', '-t', 'text/uri-list', '-o'] },
-                        { cmd: 'xclip', args: ['-selection', 'clipboard', '-t', 'x-special/gnome-copied-files', '-o'] },
-                        { cmd: 'wl-paste', args: ['--no-newline', '--type', 'text/uri-list'] },
-                    ];
-                let raw = '';
-                for (const r of readers) {
-                    try {
-                        const { stdout } = await execFileAsync(r.cmd, r.args, { timeout: 1000 });
-                        if (stdout && stdout.includes('file://')) { raw = stdout; break; }
-                    } catch {
-                        // 工具缺失 / 无该剪贴板类型 → 试下一个
-                    }
-                }
-                absolutePaths = raw
-                    .split(/\r?\n/)
-                    .map(s => s.trim())
-                    .filter(l => l.startsWith('file://'))
-                    .map(l => {
-                        const p = l.replace(/^file:\/\//, '');
-                        try { return decodeURIComponent(p); } catch { return p; }
-                    })
-                    .filter(Boolean);
             }
+            // Linux 不做剪贴板文件路径检测：系统无自带剪贴板 CLI，依赖外部工具不可靠；
+            // 复制的图片仍会经 webview 的图片字节兜底正常粘成图片块，非图片文件请用 @ 选择器。
 
             return absolutePaths.map(abs => vscode.workspace.asRelativePath(vscode.Uri.file(abs), false));
         } catch (error) {
