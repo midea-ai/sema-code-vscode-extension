@@ -283,8 +283,11 @@ const InputBox = forwardRef<InputBoxHandle, InputBoxProps>(({
         const pastedText = getClipboardPlainText(e.clipboardData);
         // 剪贴板里是"复制的文件"（Finder / Explorer / VSCode 文件树）—— webview 沙箱拿不到路径，
         // 交给扩展端读系统剪贴板：拿到路径就插 @mention（含图片文件，core 自带解析）；
-        // 拿不到路径 = 无文件路径的图片数据（如未保存的截图），退化为图片附件
-        if (!pastedText && e.clipboardData.files && e.clipboardData.files.length > 0) {
+        // 拿不到路径 = 无文件路径的图片数据（如未保存的截图），退化为图片附件。
+        // Linux 下复制文件可能不在 clipboardData.files 而仅有 text/uri-list，故一并触发；
+        // 有 text/plain 的普通文本/URL 粘贴已被 !pastedText 排除，不受影响。
+        const hasUriList = Array.from(e.clipboardData.types || []).includes('text/uri-list');
+        if (!pastedText && ((e.clipboardData.files && e.clipboardData.files.length > 0) || hasUriList)) {
             e.preventDefault();
             vscode.postMessage({ type: 'requestClipboardFiles' });
             const paths = await new Promise<string[]>((resolve) => {
@@ -295,10 +298,13 @@ const InputBox = forwardRef<InputBoxHandle, InputBoxProps>(({
                     }
                 };
                 window.addEventListener('message', onResult);
+                // 必须 > 扩展端 readClipboardFiles 的 exec 超时（1500ms），否则
+                // Windows PowerShell 冷启动慢时 webview 会先超时拿到 []，
+                // 把"复制的图片文件"误判成截图塞进 base64 附件
                 setTimeout(() => {
                     window.removeEventListener('message', onResult);
                     resolve([]);
-                }, 1500);
+                }, 2500);
             });
             if (paths.length > 0) {
                 insertMentionsBatchAtCaret(paths.map(p => ({ path: p })));
