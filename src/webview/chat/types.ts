@@ -63,6 +63,13 @@ export interface SelectedFile {
     endLine?: number;
 }
 
+// 发送给 sema-core 的图片附件（= core 的 InputImageAttachment）
+export interface ImageAttachment {
+    type: 'image';
+    data: string;        // 纯 base64（无 data:...;base64, 前缀）
+    media_type: 'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp';
+}
+
 // 输入框中 @文件 的高亮区间。start/length 基于纯文本字符偏移。
 export interface InputMention {
     start: number;
@@ -102,6 +109,7 @@ export interface Message {
     toolName?: string;
     toolArgs?: any;
     reasoning?: string;  // 用于存储思考过程（thinking）
+    attachments?: ImageAttachment[];  // 用户消息携带的图片（来自 core input:processing 回吐）
 }
 
 // ─── Fork / 撤销（与 sema-core types/fork 镜像，前端独立定义） ──────────────────

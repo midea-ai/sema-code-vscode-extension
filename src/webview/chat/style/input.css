@@ -897,3 +897,141 @@
         display: none;
     }
 }
+
+/* ─── 图片附件缩略图（输入框条 + 气泡行 共用） ───────────────────────── */
+
+/* 输入框：缩略图条占 +按钮 与 TokenProgress 之间的弹性区，始终单行、水平滚动 */
+.image-thumb-strip {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-wrap: nowrap;
+    align-items: center;
+    gap: 6px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding: 2px 0;
+}
+
+/* 气泡：顶部单独一行，样式与输入框一致 */
+.user-input-images {
+    display: flex;
+    flex-wrap: nowrap;
+    align-items: center;
+    gap: 6px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    margin-bottom: 6px;
+}
+
+.image-thumb-strip::-webkit-scrollbar,
+.user-input-images::-webkit-scrollbar {
+    height: 4px;
+}
+.image-thumb-strip::-webkit-scrollbar-thumb,
+.user-input-images::-webkit-scrollbar-thumb {
+    background: var(--chat-border-input);
+    border-radius: 2px;
+}
+
+/* 横向卡片：[小缩略图] 文件名 243×281 */
+.image-chip {
+    position: relative;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    height: 20px;
+    padding: 0 8px 0 3px;
+    border-radius: 5px;
+    background-color: var(--chat-bg-list-hover);
+    border: 1px solid var(--chat-border-input);
+    transition: border-color 0.15s;
+    cursor: zoom-in;
+}
+
+/* hover（仅可删除态，即输入框）：边框变明显 */
+.image-chip.deletable:hover {
+    border-color: var(--chat-text-secondary);
+}
+
+.image-chip-thumb {
+    flex-shrink: 0;
+    width: 14px;
+    height: 14px;
+    border-radius: 2px;
+    object-fit: cover;
+    cursor: zoom-in;
+}
+
+.image-chip-name {
+    max-width: 110px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 10px;
+    color: var(--chat-text-primary);
+}
+
+.image-chip-size {
+    font-size: 9px;
+    color: var(--chat-text-secondary);
+    white-space: nowrap;
+}
+
+/* hover：只把尺寸文字最右端一小段（≈叉号宽度）渐隐，左侧文字仍完整显示，
+   透明终点正好落在叉号左边缘，让叉号无背景地"接上"文字 */
+.image-chip.deletable:hover .image-chip-size {
+    /* 左侧文字清晰 → 一小段渐隐 → 叉号区域之前已完全透明（避免半透明文字被叉号压住发糊） */
+    -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 26px), transparent calc(100% - 14px));
+    mask-image: linear-gradient(to right, #000 calc(100% - 26px), transparent calc(100% - 14px));
+}
+
+/* 叉号：无背景，裸 X，垂直居中贴右 */
+.image-chip-remove {
+    position: absolute;
+    top: 50%;
+    right: 3px;
+    transform: translateY(-50%);
+    width: 16px;
+    height: 16px;
+    padding: 0;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    background: transparent;
+    color: var(--chat-text-secondary);
+    cursor: pointer;
+}
+.image-chip-remove svg {
+    width: 15px;
+    height: 15px;
+}
+.image-chip.deletable:hover .image-chip-remove {
+    display: flex;
+}
+.image-chip-remove:hover {
+    color: var(--chat-text-primary);
+}
+
+/* 点击缩略图后的放大遮罩 */
+.image-preview-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    background-color: var(--chat-overlay);
+    cursor: zoom-out;
+}
+
+.image-preview-img {
+    max-width: 92vw;
+    max-height: 92vh;
+    object-fit: contain;
+    border-radius: 4px;
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.4);
+}

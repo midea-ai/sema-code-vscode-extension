@@ -1,22 +1,47 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { CopyIcon, CheckIcon, ForkIcon } from '../components/ui/IconButton';
+import { ImageAttachment } from '../types';
+import ImageThumbnail from '../components/ImageThumbnail';
+import ImagePreviewModal from '../components/ImagePreviewModal';
 
 interface UserInputBlockProps {
     content: string;
+    attachments?: ImageAttachment[];    // 用户发送时携带的图片（core 回吐）
     uuid?: string;                      // 有值才可 fork（旧历史消息无锚点）
     canFork?: boolean;                  // = 会话处于 idle
     onFork?: (uuid: string) => void;
 }
 
+// 气泡里的单张图片：core 回吐只有 {data,media_type}，尺寸用 new Image() 现算、文件名缺省
+const BubbleImage: React.FC<{ attachment: ImageAttachment; onOpen: (src: string) => void }> = ({ attachment, onOpen }) => {
+    const src = `data:${attachment.media_type};base64,${attachment.data}`;
+    const [dim, setDim] = useState<{ width: number; height: number }>({ width: 0, height: 0 });
+    useEffect(() => {
+        const img = new Image();
+        img.onload = () => setDim({ width: img.naturalWidth, height: img.naturalHeight });
+        img.src = src;
+    }, [src]);
+    return (
+        <ImageThumbnail
+            src={src}
+            mediaType={attachment.media_type}
+            width={dim.width}
+            height={dim.height}
+            onOpen={onOpen}
+        />
+    );
+};
+
 // 折叠态最大高度（px），需与 styles.css 中 .user-input-content.collapsed 的 max-height 同步
 // 当前为 line-height 1.5 * 字号 12px * 3 行 = 54px
 const COLLAPSED_MAX_PX = 54;
 
-const UserInputBlock: React.FC<UserInputBlockProps> = React.memo(({ content, uuid, canFork, onFork }) => {
+const UserInputBlock: React.FC<UserInputBlockProps> = React.memo(({ content, attachments, uuid, canFork, onFork }) => {
 
     const [isExpanded, setIsExpanded] = useState<boolean>(false);
     const [isOverflowing, setIsOverflowing] = useState<boolean>(false);
     const [copied, setCopied] = useState<boolean>(false);
+    const [previewSrc, setPreviewSrc] = useState<string | null>(null);
     const contentRef = useRef<HTMLDivElement>(null);
     const copyTimerRef = useRef<number | null>(null);
 
@@ -60,6 +85,13 @@ const UserInputBlock: React.FC<UserInputBlockProps> = React.memo(({ content, uui
 
     return (
         <div className="user-input-block">
+            {attachments && attachments.length > 0 && (
+                <div className="user-input-images">
+                    {attachments.map((att, i) => (
+                        <BubbleImage key={i} attachment={att} onOpen={setPreviewSrc} />
+                    ))}
+                </div>
+            )}
             <div
                 ref={contentRef}
                 className={`user-input-content${isOverflowing && !isExpanded ? ' collapsed' : ''}`}
@@ -89,6 +121,9 @@ const UserInputBlock: React.FC<UserInputBlockProps> = React.memo(({ content, uui
                 >
                     <ForkIcon />
                 </button>
+            )}
+            {previewSrc && (
+                <ImagePreviewModal src={previewSrc} onClose={() => setPreviewSrc(null)} />
             )}
         </div>
     );

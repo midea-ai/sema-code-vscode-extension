@@ -1,6 +1,9 @@
 import React, { useState, useRef, useEffect, useMemo, forwardRef, useImperativeHandle } from 'react';
-import { VscodeApi, TokenInfo, InputMention, AgentMode, PermissionLevel } from '../../types';
+import { VscodeApi, TokenInfo, InputMention, AgentMode, PermissionLevel, ImageAttachment } from '../../types';
 import Tooltip from '../ui/Tooltip';
+import ImageThumbnail from '../ImageThumbnail';
+import ImagePreviewModal from '../ImagePreviewModal';
+import { usePendingImages } from './hooks/usePendingImages';
 import {
     PlusIcon,
     ExpandIcon,
@@ -45,7 +48,7 @@ import { ShortcutCommand } from '../../../../utils/command';
 
 export interface InputBoxHandle {
     focus: () => void;
-    setText: (text: string) => void;
+    setText: (text: string, attachments?: ImageAttachment[]) => void;
 }
 
 interface InputBoxProps {
@@ -54,7 +57,7 @@ interface InputBoxProps {
     placeholder: string;
     isGenerating: boolean;
     showBashPermission: boolean;
-    onSend: (text: string, files: SelectedFile[]) => void;
+    onSend: (text: string, files: SelectedFile[], attachments: ImageAttachment[]) => void;
     onStop: () => void;
     tokenInfo: TokenInfo;
     modelName: string;
@@ -88,6 +91,9 @@ const InputBox = forwardRef<InputBoxHandle, InputBoxProps>(({
     const [selectedFileIndex, setSelectedFileIndex] = useState<number>(0);
     const [shortcutCommands, setShortcutCommands] = useState<ShortcutCommand[]>(() => getFilteredShortcutCommands(''));
     const [filePickerQuery, setFilePickerQuery] = useState<string>('');
+    const [previewSrc, setPreviewSrc] = useState<string | null>(null);
+
+    const pendingImages = usePendingImages();
 
     const inputBoxRef = useRef<HTMLDivElement>(null);
     const filePickerRef = useRef<HTMLDivElement>(null);
@@ -112,13 +118,15 @@ const InputBox = forwardRef<InputBoxHandle, InputBoxProps>(({
     useImperativeHandle(ref, () => ({
         focus: () => { inputBoxRef.current?.focus(); },
         // 以纯文本回填输入框（如 Fork 后回填原输入），复用 completeShortcut/restoreFromHistory 的写入模式
-        setText: (text: string) => {
+        setText: (text: string, attachments?: ImageAttachment[]) => {
             const el = inputBoxRef.current;
             if (!el) return;
             renderEditorContent(el, text, []);
             setInputValue(text);
             setMentions([]);
             fileSelection.setSelectedFiles([]);
+            // Fork 回填时一并恢复图片附件
+            pendingImages.setFromAttachments(attachments || []);
             setCaretOffset(el, text.length);
             el.focus();
         }
@@ -263,9 +271,19 @@ const InputBox = forwardRef<InputBoxHandle, InputBoxProps>(({
     };
 
     const handlePaste: React.ClipboardEventHandler<HTMLDivElement> = async (e) => {
+        // 剪贴板里的图片 blob（截图、或复制的图片文件都会有）
+        const imageFiles: File[] = [];
+        for (const item of Array.from(e.clipboardData.items)) {
+            if (item.kind === 'file' && item.type.startsWith('image/')) {
+                const f = item.getAsFile();
+                if (f) imageFiles.push(f);
+            }
+        }
+
         const pastedText = getClipboardPlainText(e.clipboardData);
         // 剪贴板里是"复制的文件"（Finder / Explorer / VSCode 文件树）—— webview 沙箱拿不到路径，
-        // 必须交给扩展端读系统剪贴板，回传后插入 @mention
+        // 交给扩展端读系统剪贴板：拿到路径就插 @mention（含图片文件，core 自带解析）；
+        // 拿不到路径 = 无文件路径的图片数据（如未保存的截图），退化为图片附件
         if (!pastedText && e.clipboardData.files && e.clipboardData.files.length > 0) {
             e.preventDefault();
             vscode.postMessage({ type: 'requestClipboardFiles' });
@@ -284,6 +302,9 @@ const InputBox = forwardRef<InputBoxHandle, InputBoxProps>(({
             });
             if (paths.length > 0) {
                 insertMentionsBatchAtCaret(paths.map(p => ({ path: p })));
+            } else if (imageFiles.length > 0) {
+                // 无文件路径的图片数据（如未保存的截图）→ 作为图片附件
+                pendingImages.addFiles(imageFiles);
             }
             return;
         }
@@ -328,6 +349,31 @@ const InputBox = forwardRef<InputBoxHandle, InputBoxProps>(({
             });
         } else {
             insertPlainTextAtCaretAt(currentText, currentCaret, pastedText);
+        }
+    };
+
+    // 拖拽图片到输入框：与粘贴同原则——有真实文件路径（Electron 的 File.path）→ 插 @mention
+    // 让 core 自带解析；没有路径（极少数）才退化为图片附件
+    const handleDrop: React.DragEventHandler<HTMLDivElement> = (e) => {
+        const files = e.dataTransfer?.files;
+        if (!files || files.length === 0) return;
+        const images = Array.from(files).filter(f => f.type.startsWith('image/'));
+        if (images.length === 0) return;
+        e.preventDefault();
+        const withPath = images.filter(f => !!(f as any).path);
+        const withoutPath = images.filter(f => !(f as any).path);
+        if (withPath.length > 0) {
+            insertMentionsBatchAtCaret(withPath.map(f => ({ path: (f as any).path as string })));
+        }
+        if (withoutPath.length > 0) {
+            pendingImages.addFiles(withoutPath);
+        }
+    };
+
+    const handleDragOver: React.DragEventHandler<HTMLDivElement> = (e) => {
+        // 必须 preventDefault 才会触发 drop；仅在拖的是文件时拦截
+        if (e.dataTransfer && Array.from(e.dataTransfer.types).includes('Files')) {
+            e.preventDefault();
         }
     };
 
@@ -521,7 +567,7 @@ const InputBox = forwardRef<InputBoxHandle, InputBoxProps>(({
         const item = inputHistory.addToHistory(fullText, [], []);
         inputHistory.resetNavigation();
         if (item) vscode.postMessage({ type: 'saveInputHistory', item: { ...item, ts: Date.now() } });
-        onSend(fullText, []);
+        onSend(fullText, [], []);
         clearEditor();
         fileSelection.setSelectedFiles([]);
         shortcutPanel.setShowShortcutPanel(false);
@@ -552,16 +598,20 @@ const InputBox = forwardRef<InputBoxHandle, InputBoxProps>(({
     const handleSend = () => {
         const text = inputValue;
         const trimmed = text.trim();
-        if (!trimmed || disabled) return;
+        const attachments = pendingImages.toAttachments();
+        // 纯图片无文字也允许发送（core 接受 text 为空）
+        if ((!trimmed && attachments.length === 0) || disabled) return;
 
         const files = filesFromMentions(mentions);
+        // 图片不进输入历史（base64 太大）
         const item = inputHistory.addToHistory(text, files, mentions);
         inputHistory.resetNavigation();
         if (item) vscode.postMessage({ type: 'saveInputHistory', item: { ...item, ts: Date.now() } });
 
-        onSend(trimmed, files);
+        onSend(trimmed, files, attachments);
         clearEditor();
         fileSelection.setSelectedFiles([]);
+        pendingImages.clear();
     };
 
     const handleStop = () => onStop();
@@ -891,7 +941,7 @@ const InputBox = forwardRef<InputBoxHandle, InputBoxProps>(({
         }
     };
 
-    const canSend = inputValue.trim().length > 0 && !disabled;
+    const canSend = (inputValue.trim().length > 0 || pendingImages.images.length > 0) && !disabled;
 
     const filteredAvailableFiles = useMemo(() => {
         const q = filePickerQuery.trim();
@@ -936,6 +986,23 @@ const InputBox = forwardRef<InputBoxHandle, InputBoxProps>(({
                             <PlusIcon />
                         </button>
                     </Tooltip>
+                    {pendingImages.images.length > 0 && (
+                        <div className="image-thumb-strip">
+                            {pendingImages.images.map(img => (
+                                <ImageThumbnail
+                                    key={img.id}
+                                    src={img.previewUrl}
+                                    mediaType={img.media_type}
+                                    name={img.name}
+                                    width={img.width}
+                                    height={img.height}
+                                    deletable
+                                    onOpen={setPreviewSrc}
+                                    onDelete={() => pendingImages.remove(img.id)}
+                                />
+                            ))}
+                        </div>
+                    )}
                     <TokenProgress tokenInfo={tokenInfo} />
                 </div>
 
@@ -971,6 +1038,8 @@ const InputBox = forwardRef<InputBoxHandle, InputBoxProps>(({
                         onInput={handleEditorInput}
                         onKeyDown={handleKeyDown}
                         onPaste={handlePaste}
+                        onDrop={handleDrop}
+                        onDragOver={handleDragOver}
                         onCompositionStart={handleCompositionStart}
                         onCompositionEnd={handleCompositionEnd}
                         spellCheck={false}
@@ -1070,6 +1139,10 @@ const InputBox = forwardRef<InputBoxHandle, InputBoxProps>(({
                     </Tooltip>
                 </div>
             </div>
+
+            {previewSrc && (
+                <ImagePreviewModal src={previewSrc} onClose={() => setPreviewSrc(null)} />
+            )}
         </div>
     );
 });

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { FileChange, TokenInfo, AppProps, SelectedFile, TodoItem, Message, AgentMode, PermissionLevel, SessionMeta, ForkPreview } from './types';
+import { FileChange, TokenInfo, AppProps, SelectedFile, TodoItem, Message, AgentMode, PermissionLevel, SessionMeta, ForkPreview, ImageAttachment } from './types';
 import { streamingStore } from './utils/StreamingStore';
 import InputBox, { InputBoxHandle } from './components/input/InputBox';
 import MessageItem from './MessageItem';
@@ -392,12 +392,14 @@ const ChatSession: React.FC<ChatSessionProps> = ({ vscode, sessionId, active, on
                     const idx = messagesRef.current.findIndex(m => m.uuid === forkUuid);
                     if (idx >= 0) {
                         const originalContent = messagesRef.current[idx]?.content;
+                        const originalAttachments = messagesRef.current[idx]?.attachments;
                         const truncated = messagesRef.current.slice(0, idx);
                         messagesRef.current = truncated;
                         setMessages(truncated);
-                        // 回填原输入，方便用户改了重发
-                        if (typeof originalContent === 'string' && originalContent) {
-                            inputBoxRef.current?.setText(originalContent);
+                        // 回填原输入（文本 + 图片附件），方便用户改了重发；纯图片无文字也要回填
+                        const originalText = typeof originalContent === 'string' ? originalContent : '';
+                        if (originalText || (originalAttachments && originalAttachments.length > 0)) {
+                            inputBoxRef.current?.setText(originalText, originalAttachments);
                         }
                     }
                     // 2) 文件回滚：移除已回滚的变更条目（restoreFiles=false 时 restoredFiles 为空，不动面板）。
@@ -508,7 +510,7 @@ const ChatSession: React.FC<ChatSessionProps> = ({ vscode, sessionId, active, on
         return () => container.removeEventListener('scroll', handleScroll);
     }, []);
 
-    const handleSend = (text: string, files: SelectedFile[]) => {
+    const handleSend = (text: string, files: SelectedFile[], attachments: ImageAttachment[] = []) => {
         userScrolledUpRef.current = false;
         if (processingState !== 'processing') {
             setSpinnerAccumulatedSeconds(0);
@@ -518,7 +520,8 @@ const ChatSession: React.FC<ChatSessionProps> = ({ vscode, sessionId, active, on
             type: 'sendInput',
             sessionId,
             text: text,
-            files: files
+            files: files,
+            attachments: attachments
         });
     };
 

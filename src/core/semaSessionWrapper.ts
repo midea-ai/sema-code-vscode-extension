@@ -31,6 +31,7 @@ import {
 } from 'sema-core/event';
 import { MAIN_AGENT_ID } from 'sema-core/types';
 import type { TaskListItem, AgentMode, PermissionLevel } from 'sema-core/types';
+import type { InputImageAttachment } from 'sema-core';
 
 import { TOOL_NAME_SEARCH_FILES, TOOL_NAME_SEARCH_CONTENT, TOOL_NAME_SUB_AGENT } from '../utils/tool';
 
@@ -44,6 +45,7 @@ export interface Message {
     uuid?: string;
     type: 'user' | 'assistant' | 'tool' | 'system' | 'permission_request' | 'askForm';
     content: any;
+    attachments?: InputImageAttachment[];  // 用户消息携带的图片（core input:processing 回吐）
     toolName?: string;
     toolArgs?: any;
     reasoning?: string;
@@ -128,8 +130,8 @@ export class SemaSessionWrapper {
 
     // ─── 会话交互 ─────────────────────────────────────────────────────────────
 
-    public processUserInput(content: string, orgContent?: string): void {
-        this.session.processUserInput(content, orgContent);
+    public processUserInput(content: string, orgContent?: string, attachments?: InputImageAttachment[]): void {
+        this.session.processUserInput(content, orgContent, attachments);
     }
 
     /** 预览：在该用户消息处恢复文件会改动哪些文件、各自增删行数（只读、同步，无副作用） */
@@ -450,6 +452,7 @@ export class SemaSessionWrapper {
                 uuid: data.inputId,
                 type: 'user',
                 content: content,
+                attachments: data.attachments,  // core 回吐的规范化图片，按 inputId 天然对应
             };
             this.messageHistory.push(userMsg);
             this.sendAppendMessages([userMsg]);

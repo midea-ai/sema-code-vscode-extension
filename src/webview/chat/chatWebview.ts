@@ -5,6 +5,7 @@ import { FileOperationManager } from '../../managers/FileOperationManager';
 import { SemaProcessWrapper } from '../../core/semaProcessWrapper';
 import type { SessionController } from '../../core/semaSidebarProvider';
 import { transformCommandToPrompt } from '../../utils/prompt';
+import type { InputImageAttachment } from 'sema-core';
 
 const FILE_REFERENCE_QUOTE_REGEX = /[\s。，、；：！？""''「」『』（）《》〈〉【】,;!?]/;
 
@@ -61,7 +62,7 @@ export class ChatWebviewProvider {
                 webviewSessionReady: () => this.sessionController.getSessionWrapper(msg.sessionId)?.sendInitialState(),
 
                 // ── 会话级交互 ──
-                sendInput: () => this.handleUserInput(sid, msg.text, msg.files),
+                sendInput: () => this.handleUserInput(sid, msg.text, msg.files, msg.attachments),
                 interrupt: () => this.interrupt(sid),
                 toolPermissionResponse: () => this.sessionController.getSessionWrapper(sid!)?.respondToToolPermission(msg.response),
                 askFormResponse: () => this.sessionController.getSessionWrapper(sid!)?.respondToPickOption(msg.response),
@@ -124,7 +125,7 @@ export class ChatWebviewProvider {
         await this.checkConfiguration();
     }
 
-    private async handleUserInput(sessionId: string | undefined, text: string, files?: Array<any>): Promise<void> {
+    private async handleUserInput(sessionId: string | undefined, text: string, files?: Array<any>, attachments?: InputImageAttachment[]): Promise<void> {
         const wrapper = sessionId ? this.sessionController.getSessionWrapper(sessionId) : undefined;
         if (!wrapper) return;
         try {
@@ -148,9 +149,9 @@ export class ChatWebviewProvider {
 
             const transformedContent = transformCommandToPrompt(content);
             if (transformedContent && transformedContent !== content) {
-                wrapper.processUserInput(transformedContent, content);
+                wrapper.processUserInput(transformedContent, content, attachments);
             } else {
-                wrapper.processUserInput(content);
+                wrapper.processUserInput(content, undefined, attachments);
             }
         } catch (error) {
             this.postMessage({
@@ -430,7 +431,7 @@ export class ChatWebviewProvider {
         style-src ${webview.cspSource} 'unsafe-inline' https://cdnjs.cloudflare.com;
         script-src 'nonce-${nonce}' https://cdnjs.cloudflare.com;
         font-src ${webview.cspSource} data:;
-        img-src ${webview.cspSource} https: data:;">
+        img-src ${webview.cspSource} https: data: blob:;">
     <title>Code Assistant</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css">
 </head>
