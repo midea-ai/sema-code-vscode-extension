@@ -942,7 +942,7 @@
     align-items: center;
     gap: 5px;
     height: 20px;
-    padding: 0 8px 0 3px;
+    padding: 0 4px;
     border-radius: 5px;
     background-color: var(--chat-bg-list-hover);
     border: 1px solid var(--chat-border-input);
@@ -950,15 +950,15 @@
     cursor: zoom-in;
 }
 
-/* hover（仅可删除态，即输入框）：边框变明显 */
-.image-chip.deletable:hover {
-    border-color: var(--chat-text-secondary);
+/* hover：边框变明显（输入框 + 气泡均生效）。中性灰加深，主题自适应、不抢眼 */
+.image-chip:hover {
+    border-color: rgba(128, 128, 128, 0.6);
 }
 
 .image-chip-thumb {
     flex-shrink: 0;
-    width: 14px;
-    height: 14px;
+    width: 12px;
+    height: 12px;
     border-radius: 2px;
     object-fit: cover;
     cursor: zoom-in;
@@ -976,6 +976,7 @@
 .image-chip-size {
     font-size: 9px;
     color: var(--chat-text-secondary);
+    opacity: 0.7;
     white-space: nowrap;
 }
 
@@ -991,7 +992,7 @@
 .image-chip-remove {
     position: absolute;
     top: 50%;
-    right: 3px;
+    right: 1px;
     transform: translateY(-50%);
     width: 16px;
     height: 16px;
