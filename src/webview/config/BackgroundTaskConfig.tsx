@@ -402,22 +402,22 @@ const BackgroundTaskConfig: React.FC<BackgroundTaskConfigProps> = ({ vscode, ref
 
             {/* Task sections */}
             <div className="section-groups">
-                {/* Bashes */}
+                {/* Shells */}
                 <div className="section-group">
                     <div className="section-group-title">
-                        Bashes
+                        Shells
                         <span className="section-group-count">({bashTasks.length})</span>
                     </div>
                     {bashTasks.length > 0
                         ? <div>{bashTasks.map(renderTaskRow)}</div>
-                        : <div className="section-empty">暂无 Bash 任务</div>
+                        : <div className="section-empty">暂无 Shell 任务</div>
                     }
                 </div>
 
-                {/* Local agents */}
+                {/* SubAgents */}
                 <div className="section-group">
                     <div className="section-group-title">
-                        Local agents
+                        SubAgents
                         <span className="section-group-count">({agentTasks.length})</span>
                     </div>
                     {agentTasks.length > 0
