@@ -198,6 +198,12 @@ export function renderMarkdownToHtml(content: string, vscode?: any): string {
   // 步骤10: 清理多余的<br>标签
   processedContent = processedContent.replace(/(<br>){3,}/g, '<br><br>');
   processedContent = processedContent.replace(/<\/code><\/pre><br><br>/g, '</code></pre><br>');
+  // 表格是块级元素：</table> 后的 <br> 会完整生效，<br><br> 会渲染成 2 个空行，
+  // 而 <table> 前的 <br> 会被块级开头吸收一次（<br><br> 只显示 1 个空行，属正常）。
+  // 因此只收敛表格"后面"的连续 <br>，前面保持不动，避免标题/文字与表格之间的空行被吃掉。
+  processedContent = processedContent.replace(/<\/table>(<br>)+/g, '</table><br>');
+  // 图片（.md-image 为 display:block）同理为块级元素，收敛其后面的连续 <br>。
+  processedContent = processedContent.replace(/(<img\b[^>]*>)(<br>)+/gi, '$1<br>');
 
   // console.log(JSON.stringify(processedContent));
 
@@ -217,6 +223,11 @@ export function renderMarkdownToHtml(content: string, vscode?: any): string {
   mathPlaceholders.forEach((html, i) => {
     processedContent = processedContent.split(mathToken(i)).join(html);
   });
+
+  // 块级公式 <div class="md-math-block"> 在 sanitize 之后才注入，赶不上步骤10 的 <br> 收敛，
+  // 这里补一刀：收敛块级公式后面的多余 <br>（同表格/代码块，避免渲染出 2 个空行）。
+  // 行内公式是 <span class="md-math-inline">，不受影响；</div> 只会是块级公式外壳。
+  processedContent = processedContent.replace(/<\/div>(<br>)+/g, '</div><br>');
 
   return processedContent;
 }
