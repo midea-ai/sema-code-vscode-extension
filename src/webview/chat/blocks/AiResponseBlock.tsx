@@ -196,13 +196,6 @@ const AiResponseBlock: React.FC<AiResponseBlockProps> = React.memo(({
 
     const canShowActions = !isStreaming && !!trimmedContent && showActions;
 
-    // actions 出现时若超出视口（例如响应已触底），把它带回可见区域
-    useEffect(() => {
-        if (canShowActions && actionsRef.current) {
-            actionsRef.current.scrollIntoView({ block: 'nearest' });
-        }
-    }, [canShowActions]);
-
     return (
         <div className="ai-resp-block">
             <div className="output-line ai-response-content" ref={contentRef}>
