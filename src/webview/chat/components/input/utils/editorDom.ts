@@ -56,6 +56,50 @@ export function getCaretOffset(root: HTMLElement): number | null {
     return found ? offset : null;
 }
 
+// 读取当前选区的绝对字符区间 [start, end)。与 getCaretOffset 同一套偏移口径，
+// 但同时解析选区终点——粘贴/插入时用来「先删选区再插入」，避免选中内容没被替换。
+export function getSelectionOffsets(root: HTMLElement): { start: number; end: number } | null {
+    const sel = window.getSelection();
+    if (!sel || !sel.rangeCount) return null;
+    const range = sel.getRangeAt(0);
+    if (!root.contains(range.startContainer) || !root.contains(range.endContainer)) return null;
+    const toOffset = (target: Node, targetOffset: number): number | null => {
+        let offset = 0;
+        let found = false;
+        const walk = (node: Node): void => {
+            if (found) return;
+            if (node === target) {
+                if (target.nodeType === Node.TEXT_NODE) {
+                    offset += targetOffset;
+                } else {
+                    for (let i = 0; i < targetOffset; i++) {
+                        offset += getNodeTextLength(node.childNodes[i]);
+                    }
+                }
+                found = true;
+                return;
+            }
+            if (node.nodeType === Node.TEXT_NODE) {
+                offset += (node.nodeValue || '').length;
+            } else if (node.nodeName === 'BR') {
+                offset += 1;
+            } else {
+                for (const c of Array.from(node.childNodes)) {
+                    if (found) break;
+                    walk(c);
+                }
+            }
+        };
+        walk(root);
+        return found ? offset : null;
+    };
+    const start = toOffset(range.startContainer, range.startOffset);
+    const end = toOffset(range.endContainer, range.endOffset);
+    if (start === null || end === null) return null;
+    // 选区方向可能是「从后往前」拖出来的，规范化为 start ≤ end
+    return start <= end ? { start, end } : { start: end, end: start };
+}
+
 export function setCaretOffset(root: HTMLElement, offset: number): void {
     const range = document.createRange();
     let remaining = Math.max(0, offset);

@@ -39,6 +39,7 @@ import {
 import {
     getEditorText,
     getCaretOffset,
+    getSelectionOffsets,
     setCaretOffset,
     insertNodeAtOffset
 } from './utils/editorDom';
@@ -271,6 +272,15 @@ const InputBox = forwardRef<InputBoxHandle, InputBoxProps>(({
     };
 
     const handlePaste: React.ClipboardEventHandler<HTMLDivElement> = async (e) => {
+        // 先记下选区区间：粘贴要用「新内容替换选中内容」，而 preventDefault 接管后浏览器
+        // 不会自己删选区；且后续分支里有 await（读系统剪贴板 / 后端搜索），await 之后 DOM
+        // 选区已丢失，所以必须在任何异步操作前把区间存下来。
+        const selRange = (() => {
+            const el = inputBoxRef.current;
+            const r = el ? getSelectionOffsets(el) : null;
+            return r ?? { start: inputValue.length, end: inputValue.length };
+        })();
+
         // 剪贴板里的图片 blob（截图、或复制的图片文件都会有）
         const imageFiles: File[] = [];
         for (const item of Array.from(e.clipboardData.items)) {
@@ -305,7 +315,7 @@ const InputBox = forwardRef<InputBoxHandle, InputBoxProps>(({
                 }, 2500);
             });
             if (paths.length > 0) {
-                insertMentionsBatchAtCaret(paths.map(p => ({ path: p })));
+                insertMentionsBatchAtCaret(paths.map(p => ({ path: p })), selRange);
             } else if (imageFiles.length > 0) {
                 // 无文件路径的图片数据（如未保存的截图）→ 作为图片附件
                 pendingImages.addFiles(imageFiles);
@@ -319,15 +329,14 @@ const InputBox = forwardRef<InputBoxHandle, InputBoxProps>(({
         const el = inputBoxRef.current;
         if (!el) return;
 
-        // 短文本或 ≤3 行：纯文本插入
+        // 短文本或 ≤3 行：纯文本插入（替换选区）
         if (pastedText.trim().length < 10 || pastedText.split('\n').length <= 3) {
-            insertPlainTextAtCaret(pastedText);
+            insertPlainTextAtCaretAt(inputValue, selRange.start, selRange.end, pastedText);
             return;
         }
 
         // 触发后端搜索
         const currentText = inputValue;
-        const currentCaret = getCaretOffset(el) ?? currentText.length;
 
         vscode.postMessage({ type: 'searchContentInFiles', content: pastedText.trim() });
 
@@ -346,13 +355,13 @@ const InputBox = forwardRef<InputBoxHandle, InputBoxProps>(({
         });
 
         if (foundFile) {
-            insertMentionAtCaret(currentText, currentCaret, {
+            insertMentionAtCaret(currentText, selRange.start, selRange.end, {
                 path: foundFile.path,
                 startLine: foundFile.startLine,
                 endLine: foundFile.endLine
             });
         } else {
-            insertPlainTextAtCaretAt(currentText, currentCaret, pastedText);
+            insertPlainTextAtCaretAt(currentText, selRange.start, selRange.end, pastedText);
         }
     };
 
@@ -381,24 +390,19 @@ const InputBox = forwardRef<InputBoxHandle, InputBoxProps>(({
         }
     };
 
-    // 在当前光标处插纯文本
-    const insertPlainTextAtCaret = (textToInsert: string) => {
+    // 用纯文本替换 [start, end) 区间（选区）后插入；无选区时 start === end 退化为单点插入
+    const insertPlainTextAtCaretAt = (currentText: string, start: number, end: number, textToInsert: string) => {
         const el = inputBoxRef.current; if (!el) return;
-        const caret = getCaretOffset(el) ?? inputValue.length;
-        insertPlainTextAtCaretAt(inputValue, caret, textToInsert);
-    };
-
-    const insertPlainTextAtCaretAt = (currentText: string, caret: number, textToInsert: string) => {
-        const el = inputBoxRef.current; if (!el) return;
-        const newText = currentText.substring(0, caret) + textToInsert + currentText.substring(caret);
-        const delta = textToInsert.length;
+        const newText = currentText.substring(0, start) + textToInsert + currentText.substring(end);
+        const delta = textToInsert.length - (end - start);
         const newMentions: InputMention[] = mentions
-            .filter(m => !(m.start < caret && m.start + m.length > caret))
-            .map(m => m.start >= caret ? { ...m, start: m.start + delta } : m);
+            // 删除与选区相交的 mention（被替换掉的部分），其余在 end 之后的按 delta 平移
+            .filter(m => !(m.start + m.length > start && m.start < end))
+            .map(m => m.start >= end ? { ...m, start: m.start + delta } : m);
         renderEditorContent(el, newText, newMentions);
         setInputValue(newText);
         setMentions(newMentions);
-        const newCaret = caret + textToInsert.length;
+        const newCaret = start + textToInsert.length;
         setCaretOffset(el, newCaret);
         el.focus();
         // 粘贴是「合成事件」，不会触发 onInput → 必须手动跑一遍 syncFromDom，
@@ -406,15 +410,17 @@ const InputBox = forwardRef<InputBoxHandle, InputBoxProps>(({
         syncFromDom(newCaret);
     };
 
-    // 纯函数：基于 (text, caret, mentions) 计算插入一个 mention 后的新状态，便于循环累计
+    // 纯函数：基于 (text, [start,end), mentions) 计算「替换选区后插入一个 mention」的新状态，便于循环累计。
+    // 无选区时 start === end，退化为单点插入。
     const computeMentionInsertion = (
         currentText: string,
-        caret: number,
+        start: number,
+        end: number,
         curMentions: InputMention[],
         m: { path: string; isDirectory?: boolean; startLine?: number; endLine?: number }
     ): { text: string; mentions: InputMention[]; caret: number } => {
-        const before = currentText.substring(0, caret);
-        const after = currentText.substring(caret);
+        const before = currentText.substring(0, start);
+        const after = currentText.substring(end);
         const needSpaceBefore = before.length > 0 && !before.endsWith(' ') && !before.endsWith('\n');
         // \n 不再视为"已经有分隔"——否则删空后残留 <br> 时会渲染成 <span/><br>，光标视觉上挤到高亮末尾
         const needSpaceAfter = !after.startsWith(' ');
@@ -423,12 +429,13 @@ const InputBox = forwardRef<InputBoxHandle, InputBoxProps>(({
         const suffix = needSpaceAfter ? ' ' : '';
         const insertion = prefix + mentionText + suffix;
         const newText = before + insertion + after;
-        const mentionStart = caret + prefix.length;
+        const mentionStart = start + prefix.length;
 
-        const delta = insertion.length;
+        const delta = insertion.length - (end - start);
         const shifted: InputMention[] = curMentions
-            .filter(om => !(om.start < caret && om.start + om.length > caret))
-            .map(om => om.start >= caret ? { ...om, start: om.start + delta } : om);
+            // 删除与选区相交的 mention，其余在 end 之后的按 delta 平移
+            .filter(om => !(om.start + om.length > start && om.start < end))
+            .map(om => om.start >= end ? { ...om, start: om.start + delta } : om);
         const newMentions: InputMention[] = [
             ...shifted,
             {
@@ -449,14 +456,15 @@ const InputBox = forwardRef<InputBoxHandle, InputBoxProps>(({
         };
     };
 
-    // 在当前光标处插入一个 mention（粘贴匹配 / 文件选择共用）
+    // 用一个 mention 替换 [start,end) 区间（粘贴匹配 / 文件选择共用）
     const insertMentionAtCaret = (
         currentText: string,
-        caret: number,
+        start: number,
+        end: number,
         m: { path: string; isDirectory?: boolean; startLine?: number; endLine?: number }
     ) => {
         const el = inputBoxRef.current; if (!el) return;
-        const r = computeMentionInsertion(currentText, caret, mentions, m);
+        const r = computeMentionInsertion(currentText, start, end, mentions, m);
         renderEditorContent(el, r.text, r.mentions);
         setInputValue(r.text);
         setMentions(r.mentions);
@@ -464,18 +472,24 @@ const InputBox = forwardRef<InputBoxHandle, InputBoxProps>(({
         el.focus();
     };
 
-    // 在当前光标处依次插入多个 mention（多文件粘贴）
+    // 依次插入多个 mention（多文件粘贴/拖拽）；首个替换选区，其余顺着光标续插。
+    // selRange 由调用方在 await 前捕获；未传时回退到读取当前 DOM 选区。
     const insertMentionsBatchAtCaret = (
-        items: Array<{ path: string; isDirectory?: boolean; startLine?: number; endLine?: number }>
+        items: Array<{ path: string; isDirectory?: boolean; startLine?: number; endLine?: number }>,
+        selRange?: { start: number; end: number }
     ) => {
         const el = inputBoxRef.current; if (!el || items.length === 0) return;
         let text = inputValue;
-        let caret = getCaretOffset(el) ?? text.length;
+        const range = selRange ?? getSelectionOffsets(el) ?? { start: text.length, end: text.length };
         let curMentions = mentions;
-        for (const m of items) {
-            const r = computeMentionInsertion(text, caret, curMentions, m);
+        let caret = range.end;
+        items.forEach((m, i) => {
+            // 首个 mention 替换整段选区，之后每个都在上一个落点续插（此时无选区）
+            const start = i === 0 ? range.start : caret;
+            const end = i === 0 ? range.end : caret;
+            const r = computeMentionInsertion(text, start, end, curMentions, m);
             text = r.text; caret = r.caret; curMentions = r.mentions;
-        }
+        });
         renderEditorContent(el, text, curMentions);
         setInputValue(text);
         setMentions(curMentions);
