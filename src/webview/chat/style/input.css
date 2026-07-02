@@ -535,6 +535,11 @@
     color: var(--chat-color-warning);
 }
 
+.permission-level-btn.level-bypass {
+    background: var(--chat-color-error-bg);
+    color: var(--chat-color-error);
+}
+
 .permission-level-btn:hover {
     filter: brightness(1.15);
 }

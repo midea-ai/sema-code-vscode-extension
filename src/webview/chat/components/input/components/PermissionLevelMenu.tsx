@@ -9,13 +9,14 @@ interface PermissionLevelMenuProps {
     menuRef: React.RefObject<HTMLDivElement>;
 }
 
-const PERMISSION_LEVELS: PermissionLevel[] = ['Ask', 'AutoEdit', 'AutoRun'];
+const PERMISSION_LEVELS: PermissionLevel[] = ['Ask', 'AutoEdit', 'AutoRun', 'Bypass'];
 
 /** 各档位在菜单中的说明文案 */
 const PERMISSION_LEVEL_DESC: Record<PermissionLevel, string> = {
     Ask: 'Ask before every action',
     AutoEdit: 'Auto-approve edits',
-    AutoRun: 'Auto-approve all, ask if risky'
+    AutoRun: 'Auto-approve all, ask if risky',
+    Bypass: 'Skip all, never ask (dangerous)'
 };
 
 const PermissionLevelMenu: React.FC<PermissionLevelMenuProps> = ({

@@ -1,8 +1,9 @@
 export type AgentMode = 'Agent' | 'Plan' | 'Design';
 
 /** 会话权限自由度档位（与 sema-core 的 PermissionLevel 对齐）：
- *  Ask=每次都询问；AutoEdit=项目内编辑自动放行；AutoRun=安全动作自动放行 */
-export type PermissionLevel = 'Ask' | 'AutoEdit' | 'AutoRun';
+ *  Ask=每次都询问；AutoEdit=项目内编辑自动放行；AutoRun=安全动作自动放行；
+ *  Bypass=放行所有工具调用、跳过全部安全检查（危险） */
+export type PermissionLevel = 'Ask' | 'AutoEdit' | 'AutoRun' | 'Bypass';
 
 export interface VscodeApi {
     postMessage(message: any): void;
