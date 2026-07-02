@@ -14,6 +14,7 @@ import {
 } from '../ui/IconButton';
 
 import { useInputHistory } from './hooks/useInputHistory';
+import { useEditorHistory, EditorSnapshot } from './hooks/useEditorHistory';
 import { useFileSelection } from './hooks/useFileSelection';
 import { SelectedFile, FileItem } from '../../types';
 import { useModelMenu } from './hooks/useModelMenu';
@@ -110,6 +111,7 @@ const InputBox = forwardRef<InputBoxHandle, InputBoxProps>(({
     const atPositionRef = useRef<number>(-1);
 
     const inputHistory = useInputHistory();
+    const editorHistory = useEditorHistory();
     const fileSelection = useFileSelection(vscode, filePickerRef, addFileButtonRef, inputBoxRef);
     const modelMenu = useModelMenu(vscode, disabled, modelName, modelMenuRef, modelButtonRef);
     const shortcutPanel = useShortcutPanel(disabled, shortcutPanelRef, inputBoxRef);
@@ -130,11 +132,14 @@ const InputBox = forwardRef<InputBoxHandle, InputBoxProps>(({
             pendingImages.setFromAttachments(attachments || []);
             setCaretOffset(el, text.length);
             el.focus();
+            editorHistory.reset({ text, mentions: [], caret: text.length });
         }
     }));
 
     // 启动时主动向扩展请求项目级输入历史
     useEffect(() => {
+        // 撤销栈基线：空编辑器
+        editorHistory.reset({ text: '', mentions: [], caret: 0 });
         vscode.postMessage({ type: 'requestInputHistory' });
         const handler = (event: MessageEvent) => {
             if (event.data?.type === 'inputHistoryLoaded' && Array.isArray(event.data.items)) {
@@ -183,10 +188,11 @@ const InputBox = forwardRef<InputBoxHandle, InputBoxProps>(({
         return () => clearTimeout(timer);
     }, [filePickerQuery, fileSelection.showFilePicker]);
 
-    // 从 DOM 重新读取文本/mentions，并触发 @ 触发区与 / 命令检测
-    const syncFromDom = (caretOverride?: number | null) => {
+    // 从 DOM 重新读取文本/mentions，并触发 @ 触发区与 / 命令检测。
+    // 返回算出的快照，供调用方决定是否落入撤销栈（本函数自身不 commit）。
+    const syncFromDom = (caretOverride?: number | null): EditorSnapshot | null => {
         const el = inputBoxRef.current;
-        if (!el) return;
+        if (!el) return null;
         let caret = caretOverride !== undefined ? caretOverride : getCaretOffset(el);
         const mutated = scanAndUnwrapStaleMentions(el);
         if (mutated && caret !== null) setCaretOffset(el, caret);
@@ -241,17 +247,36 @@ const InputBox = forwardRef<InputBoxHandle, InputBoxProps>(({
         }
 
         if (inputHistory.historyIndex !== -1) inputHistory.exitNavigation();
+
+        return { text, mentions: ms, caret: cursorPos };
+    };
+
+    // 把一帧快照落入撤销栈；仅在真正由用户输入/操作驱动的路径调用
+    const commitHistory = (snap: EditorSnapshot | null, kind: 'type' | 'op') => {
+        if (snap) editorHistory.commit(snap, kind);
+    };
+
+    // 撤销/重做：整帧重建 DOM + 回填 React 状态，保证两者一致
+    const applySnapshot = (snap: EditorSnapshot) => {
+        const el = inputBoxRef.current; if (!el) return;
+        renderEditorContent(el, snap.text, snap.mentions);
+        setInputValue(snap.text);
+        setMentions(snap.mentions);
+        setCaretOffset(el, snap.caret);
+        el.focus();
+        // 刷新 @/命令面板等派生状态；此路径不再 commit，不污染撤销栈
+        syncFromDom(snap.caret);
     };
 
     const handleEditorInput: React.FormEventHandler<HTMLDivElement> = () => {
         if (composingRef.current) return;
-        syncFromDom();
+        commitHistory(syncFromDom(), 'type');
     };
 
     const handleCompositionEnd = () => {
         composingRef.current = false;
         // 输入法合成结束后再扫描 mention，避免拼音中间态误清
-        syncFromDom();
+        commitHistory(syncFromDom(), 'type');
     };
 
     const handleCompositionStart = () => {
@@ -365,31 +390,6 @@ const InputBox = forwardRef<InputBoxHandle, InputBoxProps>(({
         }
     };
 
-    // 拖拽图片到输入框：与粘贴同原则——有真实文件路径（Electron 的 File.path）→ 插 @mention
-    // 让 core 自带解析；没有路径（极少数）才退化为图片附件
-    const handleDrop: React.DragEventHandler<HTMLDivElement> = (e) => {
-        const files = e.dataTransfer?.files;
-        if (!files || files.length === 0) return;
-        const images = Array.from(files).filter(f => f.type.startsWith('image/'));
-        if (images.length === 0) return;
-        e.preventDefault();
-        const withPath = images.filter(f => !!(f as any).path);
-        const withoutPath = images.filter(f => !(f as any).path);
-        if (withPath.length > 0) {
-            insertMentionsBatchAtCaret(withPath.map(f => ({ path: (f as any).path as string })));
-        }
-        if (withoutPath.length > 0) {
-            pendingImages.addFiles(withoutPath);
-        }
-    };
-
-    const handleDragOver: React.DragEventHandler<HTMLDivElement> = (e) => {
-        // 必须 preventDefault 才会触发 drop；仅在拖的是文件时拦截
-        if (e.dataTransfer && Array.from(e.dataTransfer.types).includes('Files')) {
-            e.preventDefault();
-        }
-    };
-
     // 用纯文本替换 [start, end) 区间（选区）后插入；无选区时 start === end 退化为单点插入
     const insertPlainTextAtCaretAt = (currentText: string, start: number, end: number, textToInsert: string) => {
         const el = inputBoxRef.current; if (!el) return;
@@ -407,7 +407,7 @@ const InputBox = forwardRef<InputBoxHandle, InputBoxProps>(({
         el.focus();
         // 粘贴是「合成事件」，不会触发 onInput → 必须手动跑一遍 syncFromDom，
         // 否则 @ 后粘贴的查询词无法被检测到、FilePicker 仍停留在空 query 状态
-        syncFromDom(newCaret);
+        commitHistory(syncFromDom(newCaret), 'op');
     };
 
     // 纯函数：基于 (text, [start,end), mentions) 计算「替换选区后插入一个 mention」的新状态，便于循环累计。
@@ -470,6 +470,7 @@ const InputBox = forwardRef<InputBoxHandle, InputBoxProps>(({
         setMentions(r.mentions);
         setCaretOffset(el, r.caret);
         el.focus();
+        commitHistory({ text: r.text, mentions: r.mentions, caret: r.caret }, 'op');
     };
 
     // 依次插入多个 mention（多文件粘贴/拖拽）；首个替换选区，其余顺着光标续插。
@@ -495,6 +496,7 @@ const InputBox = forwardRef<InputBoxHandle, InputBoxProps>(({
         setMentions(curMentions);
         setCaretOffset(el, caret);
         el.focus();
+        commitHistory({ text, mentions: curMentions, caret }, 'op');
     };
 
     const handleFileSelect = (fileItem: FileItem) => {
@@ -535,6 +537,7 @@ const InputBox = forwardRef<InputBoxHandle, InputBoxProps>(({
         // 避免 setCaretOffset 把光标递归放进 mention span 末尾
         setCaretOffset(el, atPos + mentionText.length + 1);
         el.focus();
+        commitHistory({ text: newText, mentions: newMentions, caret: atPos + mentionText.length + 1 }, 'op');
 
         fileSelection.setShowFilePicker(false);
         setSelectedFileIndex(0);
@@ -559,6 +562,7 @@ const InputBox = forwardRef<InputBoxHandle, InputBoxProps>(({
         if (newText !== inputValue) {
             renderEditorContent(el, newText, mentions);
             setInputValue(newText);
+            commitHistory({ text: newText, mentions, caret: newText.length }, 'op');
         }
         setCaretOffset(el, newText.length);
         el.focus();
@@ -577,6 +581,7 @@ const InputBox = forwardRef<InputBoxHandle, InputBoxProps>(({
         shortcutPanel.setShowShortcutPanel(false);
         setCaretOffset(el, newValue.length);
         el.focus();
+        commitHistory({ text: newValue, mentions: [], caret: newValue.length }, 'op');
     };
 
     const sendShortcut = (text: string) => {
@@ -596,6 +601,8 @@ const InputBox = forwardRef<InputBoxHandle, InputBoxProps>(({
         if (el) el.innerHTML = '';
         setInputValue('');
         setMentions([]);
+        // 发送/清空后重设基线：撤销不会把已发送内容拉回来
+        editorHistory.reset({ text: '', mentions: [], caret: 0 });
     };
 
     const handleToggleExpand = () => {
@@ -717,9 +724,33 @@ const InputBox = forwardRef<InputBoxHandle, InputBoxProps>(({
         fileSelection.setSelectedFiles(item.files);
         setCaretOffset(el, item.text.length);
         el.focus();
+        commitHistory({ text: item.text, mentions: item.mentions, caret: item.text.length }, 'op');
     };
 
     const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+        // 撤销 / 重做：走自建栈，整帧重建，避免原生 contentEditable undo 破坏 mention 状态。
+        // 三端键位：Undo = Cmd/Ctrl+Z；Redo = Cmd+Shift+Z(mac) 或 Ctrl+Y(win/linux)。
+        // stopPropagation 同 Ctrl+W：阻止事件外泄触发 VSCode 宿主自带的撤销。
+        if ((e.metaKey || e.ctrlKey) && !e.altKey && !e.shiftKey && (e.key === 'z' || e.key === 'Z')) {
+            if (composingRef.current) return;
+            e.preventDefault();
+            e.stopPropagation();
+            const snap = editorHistory.undo();
+            if (snap) applySnapshot(snap);
+            return;
+        }
+        if (
+            ((e.metaKey || e.ctrlKey) && e.shiftKey && (e.key === 'z' || e.key === 'Z')) ||
+            (e.ctrlKey && !e.metaKey && (e.key === 'y' || e.key === 'Y'))
+        ) {
+            if (composingRef.current) return;
+            e.preventDefault();
+            e.stopPropagation();
+            const snap = editorHistory.redo();
+            if (snap) applySnapshot(snap);
+            return;
+        }
+
         // Ctrl+A 全选 + Backspace/Delete：手动清空，绕开浏览器留空 mention span 外壳的 bug
         // (Chromium 删除全选 selection 时不会移除外层 span，光标残留在空 span 内，
         //  下一个字符被吸进 span → 文字显示带 mention 高亮且无法靠 input 事件兜底)
@@ -732,7 +763,7 @@ const InputBox = forwardRef<InputBoxHandle, InputBoxProps>(({
                     e.preventDefault();
                     root.innerHTML = '';
                     root.focus();
-                    syncFromDom(0);
+                    commitHistory(syncFromDom(0), 'op');
                     return;
                 }
             }
@@ -880,6 +911,7 @@ const InputBox = forwardRef<InputBoxHandle, InputBoxProps>(({
             setMentions(newMentions);
             el.focus();
             setCaretOffset(el, start);
+            commitHistory({ text: newText, mentions: newMentions, caret: start }, 'op');
             // webview 偶发抢焦点：下一帧再夺回一次
             requestAnimationFrame(() => {
                 if (document.activeElement !== el) {
@@ -909,6 +941,7 @@ const InputBox = forwardRef<InputBoxHandle, InputBoxProps>(({
             setMentions(newMentions);
             setCaretOffset(el, deleteFrom);
             el.focus();
+            commitHistory({ text: newText, mentions: newMentions, caret: deleteFrom }, 'op');
             return;
         }
 
@@ -925,7 +958,7 @@ const InputBox = forwardRef<InputBoxHandle, InputBoxProps>(({
                     insertNodeAtOffset(el, caret + 1, document.createElement('br'));
                 }
                 setCaretOffset(el, caret + 1);
-                syncFromDom(caret + 1);
+                commitHistory(syncFromDom(caret + 1), 'op');
                 return;
             }
             if (canSend && isGenerating) handleSend();
@@ -1056,8 +1089,6 @@ const InputBox = forwardRef<InputBoxHandle, InputBoxProps>(({
                         onInput={handleEditorInput}
                         onKeyDown={handleKeyDown}
                         onPaste={handlePaste}
-                        onDrop={handleDrop}
-                        onDragOver={handleDragOver}
                         onCompositionStart={handleCompositionStart}
                         onCompositionEnd={handleCompositionEnd}
                         spellCheck={false}
