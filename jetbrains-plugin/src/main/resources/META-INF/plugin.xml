@@ -1,0 +1,30 @@
+<idea-plugin>
+    <id>com.sema</id>
+    <name>Sema Code</name>
+    <vendor>SemaCode</vendor>
+
+    <description><![CDATA[
+        Sema Code —— JetBrains 全家桶通用的 Code Agent。
+        与 VSCode 扩展共享同一 Agent 大脑（sema-core）与同一套 React UI。
+    ]]></description>
+
+    <!-- 只依赖平台核心 → 可装进 IDEA / PyCharm / GoLand / WebStorm 等全家桶 -->
+    <depends>com.intellij.modules.platform</depends>
+
+    <extensions defaultExtensionNs="com.intellij">
+        <toolWindow
+            id="Sema Code"
+            anchor="right"
+            factoryClass="com.sema.toolwindow.SemaToolWindowFactory"
+            icon="AllIcons.Toolwindows.ToolWindowMessages" />
+
+        <projectService serviceImplementation="com.sema.sidecar.SidecarService" />
+        <projectService serviceImplementation="com.sema.bridge.SemaPanelBus" />
+        <projectService serviceImplementation="com.sema.config.SessionHistoryManager" />
+        <applicationService serviceImplementation="com.sema.config.SystemConfigManager" />
+
+        <!-- 配置页 / 历史会话页：编辑器主区域的独立 tab（对齐 VSCode 的 createWebviewPanel(ViewColumn.One)） -->
+        <fileEditorProvider implementation="com.sema.config.SemaConfigFileEditorProvider" />
+        <fileEditorProvider implementation="com.sema.config.SemaHistoryFileEditorProvider" />
+    </extensions>
+</idea-plugin>

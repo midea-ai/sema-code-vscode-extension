@@ -6,6 +6,13 @@ src/**
 # 桌宠原生工程源码（独立编译并通过 GitHub Releases 分发，运行时由扩展按需下载）
 pet/**
 
+# JetBrains 插件工程（独立发布，与 VSCode 扩展完全无关，勿打进 vsix）
+jetbrains-plugin/**
+
+# JetBrains 专用 webview 产物（仅供 JB 插件加载，VSCode 运行时不引用）
+dist/webview/jb-*.js
+dist/webview/jb-*.js.map
+
 # 配置文件
 tsconfig*.json
 webpack.config.js

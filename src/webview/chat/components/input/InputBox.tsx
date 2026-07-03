@@ -268,9 +268,36 @@ const InputBox = forwardRef<InputBoxHandle, InputBoxProps>(({
         syncFromDom(snap.caret);
     };
 
-    const handleEditorInput: React.FormEventHandler<HTMLDivElement> = () => {
-        if (composingRef.current) return;
-        commitHistory(syncFromDom(), 'type');
+    // 是否运行在 JetBrains JCEF 中（由 jb-index.tsx 在入口置位；VSCode 下恒为 undefined）。
+    // 下面所有 IME/输入相关的 JB 兜底逻辑都用它隔离，确保 VSCode 走与改动前逐字节等价的老路径。
+    const IS_JB = !!(window as any).__SEMA_JB__;
+
+    // JCEF 下 compositionend 可能不触发，会让 composingRef 卡死（回车变换行、发送读到空内容）。
+    // 统一以原生事件的实时合成态为准：InputEvent/KeyboardEvent 的 isComposing，或 IME 处理中的 keyCode 229。
+    const eventIsComposing = (e: any): boolean =>
+        !!e?.nativeEvent && (e.nativeEvent.isComposing === true || e.nativeEvent.keyCode === 229);
+
+    const handleEditorInput: React.FormEventHandler<HTMLDivElement> = (e) => {
+        if (!IS_JB) {
+            // VSCode：保持改动前的原始逻辑，零变化。
+            if (composingRef.current) return;
+            commitHistory(syncFromDom(), 'type');
+            return;
+        }
+        // 以下仅 JB（JCEF）走：
+        if (eventIsComposing(e)) { composingRef.current = true; return; }
+        const wasComposing = composingRef.current;
+        composingRef.current = false; // 兜底复位：即使 compositionend 缺失也能恢复
+        const snap = syncFromDom();
+        // JCEF：一次输入法合成刚结束时，CEF 可能残留合成态下划线，用模型重渲染 DOM 清掉。
+        if (wasComposing && snap) {
+            const el = inputBoxRef.current;
+            if (el) {
+                renderEditorContent(el, snap.text, snap.mentions);
+                setCaretOffset(el, snap.caret);
+            }
+        }
+        commitHistory(snap, 'type');
     };
 
     const handleCompositionEnd = () => {
@@ -824,7 +851,7 @@ const InputBox = forwardRef<InputBoxHandle, InputBoxProps>(({
                     }
                     return;
                 } else if (e.key === 'Enter' && !e.shiftKey) {
-                    if (composingRef.current) return;
+                    if (IS_JB ? eventIsComposing(e) : composingRef.current) return;
                     e.preventDefault();
                     if (filteredCommands.length > 0) {
                         const safeIndex = Math.min(selectedCommandIndex, filteredCommands.length - 1);
@@ -946,7 +973,7 @@ const InputBox = forwardRef<InputBoxHandle, InputBoxProps>(({
         }
 
         if (e.key === 'Enter') {
-            if (composingRef.current) return;
+            if (IS_JB ? eventIsComposing(e) : composingRef.current) return;
             e.preventDefault();
             if (e.shiftKey) {
                 // 软换行：在光标处插入一个 \n 文本节点

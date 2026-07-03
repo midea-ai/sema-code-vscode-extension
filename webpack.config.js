@@ -199,4 +199,45 @@ const sessionHistoryWebviewConfig = {
   }
 };
 
-module.exports = [extensionConfig, chatWebviewConfig, configWebviewConfig, sessionHistoryWebviewConfig];
+// JB 插件用的聊天 bundle：与 chat 相同配置，仅换入口/产物名。
+// 入口 jb-index.tsx 额外打包了 semaSessionWrapper + RemoteSession 代理（走 gRPC）。
+const chatWebviewJbConfig = {
+  ...chatWebviewConfig,
+  entry: './src/webview/chat/jb-index.tsx',
+  output: {
+    path: path.resolve(__dirname, 'dist/webview'),
+    filename: 'jb-chat.js'
+  },
+  resolve: {
+    ...chatWebviewConfig.resolve,
+    alias: {
+      ...(chatWebviewConfig.resolve.alias || {}),
+      // 只把 semaSessionWrapper 需要的常量留下，避免 sema-core 的 node 依赖进入 web 包
+      'sema-core/types$': path.resolve(__dirname, 'src/webview/chat/jb/sema-core-types-stub.ts')
+    }
+  }
+};
+
+// JB 插件用的配置页 bundle：与 config 相同配置，仅换入口/产物名。
+// 入口 jb-index.tsx 用 config-bridge 提供 vscode shim（走 gRPC + Kotlin systemConfig channel）。
+const configWebviewJbConfig = {
+  ...configWebviewConfig,
+  entry: './src/webview/config/jb-index.tsx',
+  output: {
+    path: path.resolve(__dirname, 'dist/webview'),
+    filename: 'jb-config.js'
+  }
+};
+
+// JB 插件用的历史会话 bundle：与 sessionHistory 相同配置，仅换入口/产物名。
+// 入口 jb-index.tsx 用 history-bridge 提供 vscode shim（走 Kotlin 本地会话历史存储）。
+const sessionHistoryWebviewJbConfig = {
+  ...sessionHistoryWebviewConfig,
+  entry: './src/webview/sessionHistory/jb-index.tsx',
+  output: {
+    path: path.resolve(__dirname, 'dist/webview'),
+    filename: 'jb-sessionHistory.js'
+  }
+};
+
+module.exports = [extensionConfig, chatWebviewConfig, configWebviewConfig, sessionHistoryWebviewConfig, chatWebviewJbConfig, configWebviewJbConfig, sessionHistoryWebviewJbConfig];

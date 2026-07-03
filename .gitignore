@@ -13,3 +13,5 @@ test
 .DS_Store
 
 scripts/
+
+# jetbrains-plugin/
