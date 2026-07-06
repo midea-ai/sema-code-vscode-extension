@@ -36,6 +36,9 @@ const LOCATE_PATHS: Record<SkillScope, string> = {
 type SkillTabType = 'installed' | 'hub';
 
 const SkillConfig: React.FC<SkillConfigProps> = ({ vscode }) => {
+    // JB 插件不支持 SkillHub 在线搜索/安装，隐藏其标签页（VSCode 下 __SEMA_JB__ 为 undefined，行为不变）。
+    // 必须在组件内读取：模块顶层求值早于 jb-index 设置该标记，会恒为 false。
+    const IS_JB = !!(window as any).__SEMA_JB__;
     const [activeTab, setActiveTab] = useState<SkillTabType>('installed');
     const [skills, setSkills] = useState<SkillConfigItem[]>([]);
     const [loading, setLoading] = useState(true);
@@ -277,12 +280,14 @@ const SkillConfig: React.FC<SkillConfigProps> = ({ vscode }) => {
                         <span className="section-tab-count">{skills.length}</span>
                     )}
                 </div>
-                <div
-                    className={`tab-item ${activeTab === 'hub' ? 'active' : ''}`}
-                    onClick={() => setActiveTab('hub')}
-                >
-                    SkillHub
-                </div>
+                {!IS_JB && (
+                    <div
+                        className={`tab-item ${activeTab === 'hub' ? 'active' : ''}`}
+                        onClick={() => setActiveTab('hub')}
+                    >
+                        SkillHub
+                    </div>
+                )}
                 <div className="section-tab-actions">
                     {activeTab === 'installed' && (
                         <button
@@ -335,7 +340,7 @@ const SkillConfig: React.FC<SkillConfigProps> = ({ vscode }) => {
                                 {skillHubConfig.sourceLabel}{' '}
                                 <a
                                     href="#"
-                                    className="mcp-npx-hint-link"
+                                    className="skillhub-source-link"
                                     onClick={(e) => { e.preventDefault(); vscode.postMessage({ command: 'openExternal', url: skillHubConfig.homepageUrl }); }}
                                 >
                                     {skillHubConfig.sourceName}
@@ -412,7 +417,7 @@ const SkillConfig: React.FC<SkillConfigProps> = ({ vscode }) => {
                             {skillHubConfig.sourceLabel}{' '}
                             <a
                                 href="#"
-                                className="mcp-npx-hint-link"
+                                className="skillhub-source-link"
                                 onClick={(e) => { e.preventDefault(); vscode.postMessage({ command: 'openExternal', url: skillHubConfig.homepageUrl }); }}
                             >
                                 {skillHubConfig.sourceName}

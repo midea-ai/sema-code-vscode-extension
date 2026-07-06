@@ -22,11 +22,20 @@ export class ConfigController {
 
     constructor(private t: Transport, private postToApp: (msg: any) => void) {
         this.core = new RemoteCore(t);
-        // 进程级事件（session_id 空）：cron:update / mcp:server:status → 翻成配置页出站 command
+        // 进程级事件（session_id 空）：cron:update / mcp:server:status / task:watch:delta → 翻成配置页出站 command
         t.setEventHandler((event, data, sessionId) => {
             if (sessionId) return; // 会话级事件与配置页无关
             if (event === 'mcp:server:status') this.postToApp({ command: 'mcpServerStatusUpdate', data });
             else if (event === 'cron:update') this.postToApp({ command: 'cronUpdate' });
+            // 模型变更跨面板同步：聊天页改模型后桥广播 model:update，配置页据此刷新模型列表
+            // （对齐 VSCode handleModelUpdate → configWebviewProvider.refreshConfigPage）。
+            else if (event === 'model:update') void this.loadConfig();
+            // 后台任务生命周期跨面板同步：会话开启/结束任务时桥广播 task:start/transfer/end，
+            // 配置页任务面板据此实时增删（对齐 VSCode handleTaskStart/End → pushTaskStart/pushTaskEnd）。
+            else if (event === 'task:start' || event === 'task:transfer') this.postToApp({ command: 'taskStart', data });
+            else if (event === 'task:end') this.postToApp({ command: 'taskEnd', data });
+            // watchTask 实时增量（D4b）：桥合成帧，delta 携带 taskId（对齐 VSCode watchTask onDelta）。
+            else if (event === 'task:watch:delta') this.postToApp({ command: 'taskWatchUpdate', taskId: data?.taskId, data: data?.delta });
         });
         t.setAppMessageHandler((m) => this.postToApp(m));
     }
@@ -41,6 +50,12 @@ export class ConfigController {
         const c = { ...config };
         for (const k of LOCAL_SYSTEM_CONFIG_KEYS) delete c[k];
         return c;
+    }
+
+    /** 破坏性操作二次确认：走 Kotlin 模态弹窗（对齐 VSCode configWebview 的 showWarningMessage modal）。取消/失败均视为不确认。 */
+    private async confirm(message: string, confirmLabel = '确定'): Promise<boolean> {
+        try { const r = await this.t.callEditor('confirm', { message, confirmLabel }); return !!r?.confirmed; }
+        catch { return false; }
     }
 
     /** 统一：ensureInit → 调 core → 成功/失败都按给定 command 回灌（data 缺省值可配）。 */
@@ -77,6 +92,7 @@ export class ConfigController {
                 await this.loadConfig();
                 break;
             case 'deleteModel':
+                if (!await this.confirm(`确定要删除模型 "${m.modelName}" 吗？\n\n注意：如果该模型正在被任务配置使用，将无法删除。`, '删除')) break;
                 await this.respond('deleteResult', () => this.core.delModel(m.modelName), () => ({ message: '模型已删除' }), undefined);
                 await this.loadConfig();
                 break;
@@ -125,6 +141,7 @@ export class ConfigController {
                 }
                 break;
             case 'resetSystemConfig':
+                if (!await this.confirm('确定要重置为默认配置吗？此操作将恢复所有系统配置', '重置')) break;
                 try {
                     await this.ensureInit();
                     await this.t.callEditor('systemConfig', { op: 'save', config: defaultConfig });
@@ -161,6 +178,7 @@ export class ConfigController {
                 await this.respond('installPluginResult', () => this.core.installPlugin(m.pluginName, m.marketplaceName, m.scope), (data) => ({ key: m.key, data }), undefined);
                 break;
             case 'uninstallPlugin':
+                if (!await this.confirm(`确定要卸载插件 "${m.pluginName}" 吗？`, '卸载')) break;
                 await this.respond('uninstallPluginResult', () => this.core.uninstallPlugin(m.pluginName, m.marketplaceName, m.scope), (data) => ({ key: m.key, data }), undefined);
                 break;
             case 'enablePlugin':
@@ -173,6 +191,7 @@ export class ConfigController {
                 await this.respond('updateMarketplaceResult', () => this.core.updateMarketplace(m.marketplaceName), (data) => ({ name: m.marketplaceName, data }), undefined);
                 break;
             case 'removeMarketplace':
+                if (!await this.confirm(`确定要移除插件市场 "${m.marketplaceName}" 吗？`, '移除')) break;
                 await this.respond('removeMarketplaceResult', () => this.core.removeMarketplace(m.marketplaceName), (data) => ({ name: m.marketplaceName, data }), undefined);
                 break;
             case 'addMarketplaceFromGit':
@@ -193,6 +212,7 @@ export class ConfigController {
                 await this.respond('addAgentResult', () => this.core.addAgentConf(m.data), (data) => ({ message: 'Agent 创建成功', data }));
                 break;
             case 'removeAgent':
+                if (!await this.confirm(`确定要删除 Agent "${m.name}" 吗？`, '删除')) break;
                 await this.respond('removeAgentResult', () => this.core.removeAgentConf(m.name), (data) => ({ message: 'Agent 已删除', data }));
                 break;
 
@@ -204,6 +224,7 @@ export class ConfigController {
                 await this.respond('refreshSkillsInfoResult', () => this.core.getSkillsInfo(true), (data) => ({ data }));
                 break;
             case 'removeSkill':
+                if (!await this.confirm(`确定要删除 Skill "${m.name}" 吗？`, '删除')) break;
                 await this.respond('removeSkillResult', () => this.core.removeSkillConf(m.name), (data) => ({ message: 'Skill 已删除', data }));
                 break;
             case 'searchSkillHub':
@@ -224,6 +245,7 @@ export class ConfigController {
                 await this.respond('addCommandResult', () => this.core.addCommandConf(m.data), (data) => ({ message: 'Command 创建成功', data }));
                 break;
             case 'removeCommand':
+                if (!await this.confirm(`确定要删除 Command "${m.name}" 吗？`, '删除')) break;
                 await this.respond('removeCommandResult', () => this.core.removeCommandConf(m.name), (data) => ({ message: 'Command 已删除', data }));
                 break;
 
@@ -238,6 +260,7 @@ export class ConfigController {
                 await this.respond('addMCPServerResult', () => this.core.addMCPServer(m.data), (data) => ({ message: 'MCP Server 添加成功', data }));
                 break;
             case 'removeMCPServer':
+                if (!await this.confirm(`确定要删除 MCP Server "${m.name}" 吗？`, '删除')) break;
                 await this.respond('removeMCPServerResult', () => this.core.removeMCPServer(m.name), (data) => ({ message: 'MCP Server 已删除', data }));
                 break;
             case 'reconnectMCPServer':
@@ -299,11 +322,16 @@ export class ConfigController {
             case 'openFile': this.t.editor('openFile', { filePath: m.filePath, line: m.line, endLine: m.endLine }); break;
             case 'openExternal': this.t.editor('openExternal', { url: m.url }); break;
             case 'openBashOutput': this.t.editor('openBashOutput', { content: m.content, title: m.title, toolId: m.toolId }); break;
-            case 'openAgentDetail': this.t.editor('openAgentDetail', { taskId: m.taskId }); break;
+            // 带上归属会话（D8）：getTaskList 聚合项已含 sessionId，UI 回传时一并带上，供 Kotlin 定位子 agent 详情。
+            case 'openAgentDetail': this.t.editor('openAgentDetail', { taskId: m.taskId, sessionId: m.sessionId }); break;
 
-            // ─── 后台任务面板（后置：先回空避免 UI 卡住）─────────────────
-            case 'loadTaskList': this.postToApp({ command: 'loadTaskListResult', success: true, data: [] }); break;
-            case 'watchTask': case 'unwatchTask': case 'stopTask': break;
+            // ─── 后台任务面板（D4：跨会话聚合，走 gRPC）─────────────────
+            case 'loadTaskList':
+                await this.respond('loadTaskListResult', () => this.core.getTaskList(), (data) => ({ data }));
+                break;
+            case 'watchTask': try { await this.ensureInit(); await this.core.watchTask(m.taskId); } catch { /* ignore */ } break;
+            case 'unwatchTask': try { await this.ensureInit(); await this.core.unwatchTask(m.taskId); } catch { /* ignore */ } break;
+            case 'stopTask': try { await this.ensureInit(); await this.core.stopTask(m.taskId); } catch { /* ignore */ } break;
 
             // ─── Claw（后置：入口应隐藏，命令到达则忽略）──────────────────
             case 'clawLoadStatus': case 'clawEnable': case 'clawDisable': case 'clawStartBind':

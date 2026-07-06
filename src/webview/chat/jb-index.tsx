@@ -14,6 +14,8 @@ import { createJbBridge } from './jb/bridge';
 // React UI（App）与 index.tsx 完全一致，一行不改。
 // 标记 JB 运行环境，供共享组件对 JCEF 的差异做兜底（如 IME 合成下划线清理）。
 (window as any).__SEMA_JB__ = true;
+// 挂 jb class：供样式对 JCEF 做作用域隔离的差异化（如常驻滚动条槽），VSCode 无此 class 不受影响。
+document.documentElement.classList.add('jb');
 const vscode = createJbBridge();
 (window as any).acquireVsCodeApi = () => vscode;
 

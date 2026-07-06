@@ -25,6 +25,9 @@ interface AppProps {
 }
 
 const App: React.FC<AppProps> = ({ vscode }) => {
+    // JB 插件不支持 Claw 远程，隐藏其入口（VSCode 下 __SEMA_JB__ 为 undefined，行为不变）。
+    // 必须在组件内读取：模块顶层求值早于 jb-index 设置该标记，会恒为 false。
+    const IS_JB = !!(window as any).__SEMA_JB__;
     const [currentPage, setCurrentPage] = useState<PageType>('models');
     const [modelTab, setModelTab] = useState<ModelTabType>('list');
     const [taskTab, setTaskTab] = useState<TaskTabType>('background');
@@ -159,12 +162,14 @@ const App: React.FC<AppProps> = ({ vscode }) => {
                     Design
                 </div>
 
-                <div
-                    className={`nav-item nav-main ${currentPage === 'claw' ? 'active' : ''}`}
-                    onClick={() => setCurrentPage('claw')}
-                >
-                    Claw 远程
-                </div>
+                {!IS_JB && (
+                    <div
+                        className={`nav-item nav-main ${currentPage === 'claw' ? 'active' : ''}`}
+                        onClick={() => setCurrentPage('claw')}
+                    >
+                        Claw 远程
+                    </div>
+                )}
             </div>
 
             {/* 主内容区域 */}
@@ -258,7 +263,7 @@ const App: React.FC<AppProps> = ({ vscode }) => {
                 )}
 
                 {/* Claw 远程页面 */}
-                {currentPage === 'claw' && (
+                {!IS_JB && currentPage === 'claw' && (
                     <div className="page active">
                         <ClawConfig vscode={vscode} />
                     </div>

@@ -62,6 +62,10 @@ class ChatPanel(project: Project) : Disposable {
         }, browser.cefBrowser)
 
         loadUi()
+        // 订阅 IDE 换肤，随主题实时刷新页面主题变量（无需重开面板）。
+        Theme.installLiveUpdate(browser, this)
+        // JCEF 不渲染原生 title 提示，接管 onTooltip 转 Swing tooltip。
+        Tooltips.install(browser)
     }
 
     private fun loadUi() {
@@ -76,7 +80,7 @@ class ChatPanel(project: Project) : Disposable {
         val js = File(dir, "jb-chat.js")
         stream.use { input -> js.outputStream().use { input.copyTo(it) } }
         val html = File(dir, "index.html")
-        html.writeText(HtmlShell.page(buildInjection(), Theme.cssVariables()))
+        html.writeText(HtmlShell.page(buildInjection(), Theme.cssVariables(), extraCss = Theme.chatPageBgOverrideCss()))
         log.warn("[sema] bundle=${js.length()} bytes 载入 ${html.toURI()}")
         browser.loadURL(html.toURI().toString())
     }

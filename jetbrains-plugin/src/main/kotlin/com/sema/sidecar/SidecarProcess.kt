@@ -11,11 +11,12 @@ import java.util.concurrent.TimeUnit
 /**
  * 拉起 sema-grpc sidecar（Node 进程），读取其 stdout 打印的实际端口。
  *
- * 运行时：系统 node 跑打包后的单文件 `server.js`（esbuild 产物，无需 node_modules）。
- * - rg（ripgrep）由 [RipgrepProvisioner] 首启下载后前置进子进程 PATH（sema-core 只认 PATH）。
+ * 运行时：node 跑打包后的单文件 `server.js`（esbuild 产物，无需 node_modules）。
+ * - node / rg 均按统一范式解析：本地优先 → 缓存 → 按需下载（[NodeProvisioner] / [RipgrepProvisioner]），
+ *   解析出的目录前置进子进程 PATH（sema-core 只认 PATH）。
  * - SEMA_BRIDGE_PORT=0 让系统分配空闲端口，避免多个 IDE 窗口撞端口。
  *
- * boot（含 rg 首启下载）在独立守护线程执行，绝不阻塞 EDT。
+ * boot（含 node/rg 首启下载）在独立守护线程执行，绝不阻塞 EDT。
  */
 class SidecarProcess(
     private val sidecarDir: File,   // 含 server.js 的目录（打包：resources/sidecar；dev：sema-grpc）
@@ -24,7 +25,6 @@ class SidecarProcess(
     private val log = logger<SidecarProcess>()
     @Volatile private var process: Process? = null
     private val portFuture = CompletableFuture<Int>()
-    private val isWindows = System.getProperty("os.name").lowercase().contains("win")
 
     fun start(): CompletableFuture<Int> {
         Thread({ boot() }, "sema-sidecar-boot").apply { isDaemon = true }.start()
@@ -48,29 +48,39 @@ class SidecarProcess(
             env["SEMA_BRIDGE_PORT"] = "0"
             env["SEMA_WORKING_DIR"] = workingDir
 
-            // 组装子进程 PATH：rg 目录 > 登录 shell 的 PATH > IDE 继承的 PATH。
-            // 关键：IDE 从 Finder/图标启动时只继承 launchd 的精简 PATH，读不到 nvm/homebrew 的 node/git。
-            // 主动问登录 shell 要真实 PATH（`$SHELL -ilc`），node/git/pdftotext 一并解决。
+            // 搜索用 PATH：登录 shell 真实 PATH（含 nvm/homebrew/volta）> IDE 继承的精简 PATH。
+            // 关键：IDE 从 Finder/图标启动时只继承 launchd 精简 PATH，读不到 nvm/homebrew 的 node/git；
+            // 本地优先探测 rg/node 都基于它。
             val pathKey = env.keys.firstOrNull { it.equals("PATH", ignoreCase = true) } ?: "PATH"
+            val searchPath = (BinaryProvisioner.loginShellPath() ?: env[pathKey])?.takeIf { it.isNotBlank() }
+
+            // 组装子进程 PATH：rg 目录 + node 目录（供 sema-core 再 spawn 的 npx/node/git 命中）> searchPath。
             val parts = ArrayList<String>()
-            val rgDir = runCatching { RipgrepProvisioner.ensureRgDir() }.getOrNull()
+            val rgDir = runCatching { RipgrepProvisioner.ensureRgDir(searchPath) }.getOrNull()
             if (rgDir != null) parts.add(rgDir.absolutePath)
             else log.warn("[sema] 未能准备 ripgrep，将依赖 PATH 里的 rg（搜索/插件加载可能受影响）")
-            (loginShellPath() ?: env[pathKey])?.takeIf { it.isNotBlank() }?.let { parts.add(it) }
+
+            val node = runCatching { NodeProvisioner.ensureNode(searchPath) }.getOrNull()
+            if (node == null) {
+                portFuture.completeExceptionally(
+                    IllegalStateException(
+                        "无法启动 sidecar：未找到可用的 node（需 ≥18），且按需下载失败。" +
+                            "请安装 Node.js 18+，或设 `SEMA_NODE_PATH` 指向 node 可执行文件；" +
+                            "内网可设 `SEMA_NODE_BASE_URL` 指向 node 镜像。"
+                    )
+                )
+                return
+            }
+            File(node).parentFile?.let { parts.add(it.absolutePath) }
+            searchPath?.let { parts.add(it) }
             env[pathKey] = parts.joinToString(File.pathSeparator)
 
-            val node = resolveNode(env[pathKey])
             val proc = try {
                 pb.command()[0] = node
                 pb.start()
             } catch (e: IOException) {
                 portFuture.completeExceptionally(
-                    IllegalStateException(
-                        "无法启动 sidecar：未找到可执行的 node。请安装 Node.js 18+；" +
-                            "若已装，通常是 IDE 从 Finder/图标启动读不到终端 PATH——从终端启动 IDE，" +
-                            "或设 `SEMA_NODE_PATH` 指向 node 可执行文件。",
-                        e
-                    )
+                    IllegalStateException("无法启动 sidecar：node 启动失败（$node）", e)
                 )
                 return
             }
@@ -101,41 +111,6 @@ class SidecarProcess(
         File(sidecarDir, "dist/server.js"),
         File(sidecarDir, "dist/src/server.js"),
     ).firstOrNull { it.exists() }
-
-    /**
-     * 解析 node 的**绝对路径**。注意：Java 的 ProcessBuilder 用**父进程** PATH 解析命令名，
-     * 改子进程 env 的 PATH 不影响命令名解析——所以必须自己在拼好的 PATH 里定位 node 绝对路径。
-     */
-    private fun resolveNode(path: String?): String {
-        (System.getenv("SEMA_NODE_PATH") ?: System.getProperty("sema.node.path"))?.let {
-            if (File(it).canExecute()) return it
-        }
-        val exe = if (isWindows) "node.exe" else "node"
-        path?.split(File.pathSeparator)?.forEach { dir ->
-            if (dir.isNotBlank()) File(dir, exe).takeIf { it.canExecute() }?.let { return it.absolutePath }
-        }
-        listOf("/opt/homebrew/bin/node", "/usr/local/bin/node", "/usr/bin/node")
-            .firstOrNull { File(it).canExecute() }?.let { return it }
-        return "node"
-    }
-
-    /** 问登录 shell 要真实 PATH（含 nvm/homebrew/volta），绕开 launchd 精简 PATH。 */
-    private fun loginShellPath(): String? {
-        if (isWindows) return null
-        return try {
-            val shell = System.getenv("SHELL") ?: "/bin/zsh"
-            val p = ProcessBuilder(shell, "-ilc", "printf '__SEMA_PATH__:%s\\n' \"\$PATH\"")
-                .redirectErrorStream(false).start()
-            val out = p.inputStream.bufferedReader().readText()
-            if (!p.waitFor(5, TimeUnit.SECONDS)) p.destroyForcibly()
-            out.lineSequence()
-                .firstOrNull { it.startsWith("__SEMA_PATH__:") }
-                ?.removePrefix("__SEMA_PATH__:")?.trim()
-                ?.takeIf { it.isNotEmpty() }
-        } catch (_: Exception) {
-            null
-        }
-    }
 
     fun stop() {
         process?.let {

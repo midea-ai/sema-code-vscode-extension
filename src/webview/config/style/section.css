@@ -547,6 +547,18 @@
     font-weight: 500;
 }
 
+/* ===== SkillHub 来源链接 ===== */
+.skillhub-source-link {
+    color: var(--vscode-textLink-foreground);
+    text-decoration: underline;
+    cursor: pointer;
+}
+
+.skillhub-source-link:hover {
+    color: var(--vscode-textLink-activeForeground, var(--vscode-textLink-foreground));
+    text-decoration: underline;
+}
+
 /* ===== 响应式 - 弹窗 ===== */
 @media (max-width: 600px) {
     .section-modal {

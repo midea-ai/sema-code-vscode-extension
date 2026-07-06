@@ -61,6 +61,7 @@ class MessageBridge(
                 when (obj.str("type")) {
                     "systemConfig" -> handleSystemConfig(obj)
                     "history" -> handleHistory(obj)
+                    "confirm" -> handleConfirm(obj)
                     else -> editorOps.handle(obj)
                 }
             }
@@ -89,7 +90,43 @@ class MessageBridge(
             replyEditorError(reqId, e.message ?: "systemConfig 操作失败")
             return
         }
+        // 配置页改系统配置后，主动把聊天页关心的三个开关推给聊天 webview
+        // （对齐 VSCode setOnSystemConfigChanged → chat.postMessage systemConfigUpdate；
+        //  跨 JCEF 面板只能经总线，配置页那条 gRPC 连接推不到聊天页）。
+        if (op == "save" || op == "saveByKey") pushSystemConfigToChat()
         replyEditor(reqId, data)
+    }
+
+    /** 把聊天页关心的三个系统配置开关推给聊天 webview（systemConfigUpdate，走 editor message 帧）。
+     *  取值口径与聊天 controller.sendSystemConfig 一致，避免两端漂移。 */
+    private fun pushSystemConfigToChat() {
+        val c = sysConfig.getConfig()
+        val uiMsg = linkedMapOf<String, Any?>(
+            "type" to "systemConfigUpdate",
+            "skipFileEditPermission" to (c["skipFileEditPermission"] == true),
+            "thinking" to (c["thinking"] != false),
+            "showThinkingText" to (c["showThinkingText"] != false),
+        )
+        val frame = JsonObject().apply {
+            addProperty("channel", "editor")
+            addProperty("message", gson.toJson(uiMsg))
+        }
+        bus.pushToChat(gson.toJson(frame))
+    }
+
+    /** 破坏性操作确认弹窗（channel=editor, type=confirm；带 reqId 回帧供 callEditor resolve）。对齐 VSCode configWebview.confirm 的 modal 警告。 */
+    private fun handleConfirm(obj: JsonObject) {
+        val reqId = obj.str("reqId")
+        val payload = runCatching { gson.fromJson(obj.str("payload"), JsonObject::class.java) }.getOrNull() ?: JsonObject()
+        val message = payload.str("message")
+        val confirmLabel = payload.str("confirmLabel").ifEmpty { "确定" }
+        ApplicationManager.getApplication().invokeLater {
+            val ok = com.intellij.openapi.ui.Messages.showYesNoDialog(
+                project, message, "Sema Code", confirmLabel, "取消",
+                com.intellij.openapi.ui.Messages.getWarningIcon(),
+            ) == com.intellij.openapi.ui.Messages.YES
+            replyEditor(reqId, mapOf("confirmed" to ok))
+        }
     }
 
     /**
@@ -119,7 +156,13 @@ class MessageBridge(
                 "save" -> { history.save(payload.getAsJsonObject("session")); emptyMap<String, Any?>() }
                 "delete" -> {
                     val id = payload.str("sessionId")
-                    if (bus.openIds.contains(id)) throw IllegalStateException("无法删除已打开的会话")
+                    if (bus.openIds.contains(id)) {
+                        // 对齐 VSCode：拒删已打开会话并提示（VSCode 为 showWarningMessage 提示条，JB 用模态提示替代）
+                        ApplicationManager.getApplication().invokeLater {
+                            com.intellij.openapi.ui.Messages.showWarningDialog(project, "无法删除已打开的会话", "Sema Code")
+                        }
+                        throw IllegalStateException("无法删除已打开的会话")
+                    }
                     history.delete(id); emptyMap<String, Any?>()
                 }
                 "load" -> { handleHistoryLoad(payload.str("sessionId")); emptyMap<String, Any?>() }

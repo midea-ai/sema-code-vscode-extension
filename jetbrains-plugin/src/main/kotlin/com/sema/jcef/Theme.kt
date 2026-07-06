@@ -1,15 +1,16 @@
 package com.sema.jcef
 
+import com.intellij.ide.ui.LafManagerListener
+import com.intellij.openapi.Disposable
+import com.intellij.openapi.application.ApplicationManager
+import com.intellij.openapi.editor.colors.EditorColorsListener
 import com.intellij.openapi.editor.colors.EditorColorsManager
 import com.intellij.ui.JBColor
+import com.intellij.ui.jcef.JBCefBrowser
 import com.intellij.util.ui.UIUtil
 import java.awt.Color
 
-/**
- * 把当前 IDE 主题色映射成 React UI 所需的 --vscode-* CSS 变量。
- * React UI 原为 VSCode 设计，靠这些变量取色；JCEF 里没有这些变量，需注入，
- * 否则前景/背景同色导致看不清。自动适配 IDE 明/暗主题。
- */
+/** 把当前 IDE 主题色映射成 React UI（原为 VSCode 设计）所需的 --vscode-* CSS 变量，自动适配明/暗主题。 */
 object Theme {
     fun cssVariables(): String {
         val scheme = EditorColorsManager.getInstance().globalScheme
@@ -36,6 +37,8 @@ object Theme {
         v("editor-foreground", hex(editorFg))
         v("editor-background", hex(editorBg))
         v("sideBar-background", hex(bg))
+        // chat 页 body 底色专用：取树背景与 Project 工具窗一致（Light 下 panel 灰≠tree 白）。
+        v("sema-chatPageBg", hex(UIUtil.getTreeBackground()))
         v("panel-sectionHeader-background", hex(bg))
         v("input-background", hex(inputBg))
         v("input-foreground", hex(inputFg))
@@ -47,8 +50,9 @@ object Theme {
         v("button-secondaryBackground", hex(hoverBg))
         v("button-secondaryForeground", hex(fg))
         v("button-secondaryHoverBackground", hex(hoverBg))
-        v("badge-background", hex(selBg))
-        v("badge-foreground", hex(selFg))
+        // badge 是低调标签（工具标签 / NPX / mcp 描述等），不用明亮 selBg，改用前景色低透明叠加 + 正常前景文字。
+        v("badge-background", rgba(fg, 0.12))
+        v("badge-foreground", hex(fg))
         v("list-hoverBackground", hex(hoverBg))
         v("list-activeSelectionBackground", hex(selBg))
         v("list-activeSelectionForeground", hex(selFg))
@@ -90,6 +94,32 @@ object Theme {
         sb.append("}")
         return sb.toString()
     }
+
+    /** chat 页覆盖 CSS：把背景 token 重指到 Project 树背景，使整个 chat 底色与 Project 一致（html:root 压过 bundle）。 */
+    fun chatPageBgOverrideCss(): String =
+        "html:root{--chat-bg-primary:var(--vscode-sema-chatPageBg);--chat-page-bg:var(--vscode-sema-chatPageBg);}"
+
+    /**
+     * config 页覆盖 CSS：选中标签（.tab-item.active）文字原用 button-background，JB 下它与
+     * 背景 list-activeSelectionBackground 同色而看不见；改用配套的 list-activeSelectionForeground。
+     */
+    fun configPageOverrideCss(): String =
+        "html:root .tab-item.active{color:var(--vscode-list-activeSelectionForeground);}"
+
+    /** 订阅 IDE 换肤/配色变化，重算变量写回 <style id="sema-theme">，面板无需重载即随主题刷新（绑 parent，随面板注销）。 */
+    fun installLiveUpdate(browser: JBCefBrowser, parent: Disposable) {
+        val conn = ApplicationManager.getApplication().messageBus.connect(parent)
+        val refresh = Runnable {
+            val js = "var s=document.getElementById('sema-theme'); if(s) s.textContent=${jsLiteral(cssVariables())};"
+            browser.cefBrowser.executeJavaScript(js, browser.cefBrowser.url, 0)
+        }
+        conn.subscribe(LafManagerListener.TOPIC, LafManagerListener { refresh.run() })
+        conn.subscribe(EditorColorsManager.TOPIC, EditorColorsListener { refresh.run() })
+    }
+
+    /** 把 CSS 文本转成安全的 JS 字符串字面量（供 executeJavaScript 内联）。 */
+    private fun jsLiteral(s: String): String =
+        "\"" + s.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n").replace("\r", "") + "\""
 
     private fun hex(c: Color) = String.format("#%02x%02x%02x", c.red, c.green, c.blue)
     private fun rgba(c: Color, a: Double) = "rgba(${c.red},${c.green},${c.blue},$a)"

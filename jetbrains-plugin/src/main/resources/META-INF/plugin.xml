@@ -4,8 +4,26 @@
     <vendor>SemaCode</vendor>
 
     <description><![CDATA[
-        Sema Code —— JetBrains 全家桶通用的 Code Agent。
-        与 VSCode 扩展共享同一 Agent 大脑（sema-core）与同一套 React UI。
+        <b>基于 Sema Code Core 的 JetBrains 智能编程插件</b>
+        <p>为开发者提供开箱即用的 AI 编程体验，支持 IntelliJ IDEA / PyCharm / GoLand / WebStorm / CLion 等 JetBrains 全家桶。</p>
+        <p><b>Sema Code</b> 是基于 <a href="https://github.com/midea-ai/sema-code-core">Sema Code Core</a> 引擎的智能编程插件。</p>
+        <b>核心特性</b>
+        <ul>
+            <li><b>自然语言指令</b> —— 通过自然语言直接驱动编程任务</li>
+            <li><b>权限控制</b> —— 细粒度的权限管理，确保操作安全可控</li>
+            <li><b>Subagent 管理</b> —— 支持多智能体协同工作，可根据任务类型动态调度合适的子代理</li>
+            <li><b>Skill 扩展机制</b> —— 提供插件化架构，可灵活扩展 AI 编程能力</li>
+            <li><b>Plan 模式任务规划</b> —— 支持复杂任务的分解与执行规划</li>
+            <li><b>MCP 协议支持</b> —— 内置 Model Context Protocol 服务，支持工具扩展</li>
+            <li><b>多模型支持</b> —— 兼容 Anthropic、OpenAI SDK，支持国内外主流厂商 LLM API</li>
+        </ul>
+        <b>安装与使用</b>
+        <ol>
+            <li>打开 JetBrains IDE（IntelliJ IDEA / PyCharm / GoLand / WebStorm / CLion 等）</li>
+            <li>进入 <b>Settings/Preferences → Plugins</b></li>
+            <li>搜索 <code>Sema Code</code> 并点击安装</li>
+            <li>或从 <a href="https://github.com/midea-ai/sema-code-vscode-extension/releases">GitHub Releases</a> 下载插件包手动安装</li>
+        </ol>
     ]]></description>
 
     <!-- 只依赖平台核心 → 可装进 IDEA / PyCharm / GoLand / WebStorm 等全家桶 -->
@@ -16,7 +34,7 @@
             id="Sema Code"
             anchor="right"
             factoryClass="com.sema.toolwindow.SemaToolWindowFactory"
-            icon="AllIcons.Toolwindows.ToolWindowMessages" />
+            icon="/icons/sema.svg" />
 
         <projectService serviceImplementation="com.sema.sidecar.SidecarService" />
         <projectService serviceImplementation="com.sema.bridge.SemaPanelBus" />

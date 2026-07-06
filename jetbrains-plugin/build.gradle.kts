@@ -32,7 +32,11 @@ dependencies {
     // gRPC 客户端（连接 sema-grpc sidecar）。okhttp 传输比 netty-shaded 小 ~8M，
     // 本机 127.0.0.1 明文连接足够用。
     implementation("io.grpc:grpc-okhttp:$grpcVersion")
-    implementation("io.grpc:grpc-protobuf:$grpcVersion")
+    // proto-google-common-protos(~2.6M) 是 well-known types(Any/Timestamp…)的预生成类。
+    // 我们的 sema.proto 未引用任何 google/protobuf/*.proto，运行时用不到 → 排除省包体。
+    implementation("io.grpc:grpc-protobuf:$grpcVersion") {
+        exclude(group = "com.google.api.grpc", module = "proto-google-common-protos")
+    }
     implementation("io.grpc:grpc-stub:$grpcVersion")
     implementation("com.google.protobuf:protobuf-java:$protobufVersion")
     // gRPC 生成代码需要 javax.annotation.Generated
@@ -120,7 +124,9 @@ val syncSidecarProto by tasks.registering(Copy::class) {
 val syncWeb by tasks.registering(Copy::class) {
     from("../dist/webview")
     into(layout.buildDirectory.dir("resources/main/web"))
-    include("*.js")
+    // 只打 JB 用的 bundle：插件仅加载 jb-chat/jb-config/jb-sessionHistory。
+    // VSCode 版（chat.js/config.js/sessionHistory.js）在 JB 从不加载，别带进来（省 ~3.8MB）。
+    include("jb-*.js")
 }
 
 tasks.named("processResources") {
@@ -135,4 +141,28 @@ tasks.named("compileKotlin") {
 // 打包产物直接落在 jetbrains-plugin/ 根下，省得进 build/distributions 深目录
 tasks.named<AbstractArchiveTask>("buildPlugin") {
     destinationDirectory.set(layout.projectDirectory)
+}
+
+// 沙箱里禁用 IDE 自带的 Android 插件：它加载自身 pluginIcon_dark.svg 时会刷
+// "Cannot load plugin icon ... Not a directory" 警告（IC-2023.2 已知噪音，与本插件无关）。
+// 我们不做 Android 开发，禁掉即可静默该日志并略微加快沙箱启动。
+val disableBundledPluginsInSandbox by tasks.registering {
+    val disabledFile = layout.buildDirectory.file(
+        "idea-sandbox/${providers.gradleProperty("platformType").get()}-${providers.gradleProperty("platformVersion").get()}/config/disabled_plugins.txt"
+    )
+    outputs.file(disabledFile)
+    // 沙箱由 prepareSandbox 搭建，禁用清单要在其之后写入，避免被覆盖
+    mustRunAfter("prepareSandbox")
+    doLast {
+        val f = disabledFile.get().asFile
+        f.parentFile.mkdirs()
+        val ids = if (f.exists()) f.readLines().map { it.trim() }.filter { it.isNotEmpty() }.toMutableSet()
+                  else mutableSetOf()
+        if (ids.add("org.jetbrains.android")) {
+            f.writeText(ids.joinToString(System.lineSeparator()))
+        }
+    }
+}
+tasks.named("runIde") {
+    dependsOn(disableBundledPluginsInSandbox)
 }

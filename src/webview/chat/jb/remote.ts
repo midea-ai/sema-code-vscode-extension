@@ -39,14 +39,14 @@ export class RemoteSession {
     updateAgentMode(mode: any): void { void this.t.call('updateAgentMode', { mode }, this.sessionId); }
     updatePermissionLevel(level: any): void { void this.t.call('updatePermissionLevel', { level }, this.sessionId); }
 
-    // ── MVP 未接入的会话能力：给 wrapper 提供安全的空实现（阶段2/3 再接）──
-    watchTask(): () => void { return () => {}; }
-    transferAgentToBackground(): boolean { return false; }
-    stopTask(): void {}
-    stopAllTasks(): number { return 0; }
-    getTaskList(): any[] { return []; }
-    getForkPreview(): any { return { changes: [] }; }
-    async fork(): Promise<any> { return { ok: false, error: 'fork 暂未接入' }; }
+    // ── 会话级任务/fork 能力（走 gRPC；异步返回，调用方需 await）──
+    // fork/撤销回退（D1）：同步语义在过界后变异步往返（A1），调用方 await。
+    getForkPreview(messageUuid: string): Promise<any> { return this.t.call('getForkPreview', { messageUuid }, this.sessionId); }
+    fork(messageUuid: string, options?: any): Promise<any> { return this.t.call('fork', { messageUuid, options }, this.sessionId); }
+    // Stop 时停后台子 agent（D3）；fire-and-forget（对齐 VSCode 丢弃返回值）。
+    stopAllTasks(): Promise<number> { return this.t.call('stopAllTasks', undefined, this.sessionId); }
+    // 子 agent 转后台（D4，会话级）。
+    transferAgentToBackground(taskId: string): Promise<{ ok: boolean }> { return this.t.call('transferAgentToBackground', { taskId }, this.sessionId); }
 }
 
 /** 远程 SemaCore 代理。 */
@@ -58,9 +58,13 @@ export class RemoteCore {
     switchModel(modelName: string): Promise<any> { return this.t.call('switchModel', { modelName }, ''); }
     closeSession(sessionId: string): void { void this.t.call('closeSession', undefined, sessionId); }
 
-    async createSession(opts: { sessionId?: string } = {}): Promise<{ ok: boolean; sessionId?: string; error?: string }> {
+    async createSession(opts: { sessionId?: string; permissionLevel?: any; mode?: any } = {}): Promise<{ ok: boolean; sessionId?: string; error?: string }> {
         try {
-            const data = await this.t.call('createSession', { sessionId: opts.sessionId }, '');
+            // 建会话即透传 per-session 档位/模式（D7）；仅在有值时带上。
+            const payload: Record<string, any> = { sessionId: opts.sessionId };
+            if (opts.permissionLevel) payload.permissionLevel = opts.permissionLevel;
+            if (opts.mode) payload.mode = opts.mode;
+            const data = await this.t.call('createSession', payload, '');
             return { ok: true, sessionId: data?.sessionId };
         } catch (e: any) {
             return { ok: false, error: e?.message || '创建会话失败' };
@@ -126,6 +130,13 @@ export class RemoteCore {
     deleteCronTask(id: string): Promise<any> { return this.t.call('deleteCronTask', { id }, ''); }
     enableCronTask(id: string): Promise<any> { return this.t.call('enableCronTask', { id }, ''); }
     disableCronTask(id: string): Promise<any> { return this.t.call('disableCronTask', { id }, ''); }
+
+    // 后台任务面板（进程级，跨会话聚合；D4）。watchTask 流式：不再传回调，
+    // 起停由 watch/unwatch 控制，实际 delta 走进程级事件 task:watch:delta 上行。
+    getTaskList(): Promise<any[]> { return this.t.call('getTaskList', undefined, ''); }
+    stopTask(taskId: string): Promise<any> { return this.t.call('stopTask', { taskId }, ''); }
+    watchTask(taskId: string): Promise<any> { return this.t.call('watchTask', { taskId }, ''); }
+    unwatchTask(taskId: string): Promise<any> { return this.t.call('unwatchTask', { taskId }, ''); }
 
     // Memory / Rule / Design
     getMemoryInfo(refresh?: boolean): Promise<any> { return this.t.call('getMemoryInfo', { refresh }, ''); }

@@ -25,6 +25,9 @@ interface SystemConfigData {
 }
 
 const SystemConfig: React.FC<SystemConfigProps> = ({ vscode }) => {
+    // JB 插件不支持桌宠，隐藏「启用桌宠」开关（VSCode 下 __SEMA_JB__ 为 undefined，行为不变）。
+    // 必须在组件内读取：模块顶层求值早于 jb-index 设置该标记，会恒为 false。
+    const IS_JB = !!(window as any).__SEMA_JB__;
     const [config, setConfig] = useState<SystemConfigData>(defaultConfig);
     const [savedConfig, setSavedConfig] = useState<SystemConfigData>(defaultConfig); // 已保存的配置
     const [message, setMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
@@ -217,26 +220,28 @@ const SystemConfig: React.FC<SystemConfigProps> = ({ vscode }) => {
                     </div>
                 </div>
 
-                <div className="form-row">
-                    <div className="form-group">
-                        <label
-                            className="checkbox-label"
-                            title={petSupported
-                                ? '启用后将下载并启动桌面 Pet（Sema Pet）。本地已有二进制时直接使用，否则从 GitHub releases 自动下载'
-                                : '桌宠暂仅支持 macOS / Windows / Linux'}
-                            style={petSupported ? undefined : { opacity: 0.5, cursor: 'not-allowed' }}
-                        >
-                            <input
-                                type="checkbox"
-                                checked={petSupported && (config.enablePet || false)}
-                                disabled={!petSupported}
-                                onChange={(e) => handleChange('enablePet', e.target.checked)}
-                            />
-                            <span className="checkmark"></span>
-                            启用桌宠{petSupported ? '' : '（暂仅支持 macOS / Windows / Linux）'}
-                        </label>
+                {!IS_JB && (
+                    <div className="form-row">
+                        <div className="form-group">
+                            <label
+                                className="checkbox-label"
+                                title={petSupported
+                                    ? '启用后将下载并启动桌面 Pet（Sema Pet）。本地已有二进制时直接使用，否则从 GitHub releases 自动下载'
+                                    : '桌宠暂仅支持 macOS / Windows / Linux'}
+                                style={petSupported ? undefined : { opacity: 0.5, cursor: 'not-allowed' }}
+                            >
+                                <input
+                                    type="checkbox"
+                                    checked={petSupported && (config.enablePet || false)}
+                                    disabled={!petSupported}
+                                    onChange={(e) => handleChange('enablePet', e.target.checked)}
+                                />
+                                <span className="checkmark"></span>
+                                启用桌宠{petSupported ? '' : '（暂仅支持 macOS / Windows / Linux）'}
+                            </label>
+                        </div>
                     </div>
-                </div>
+                )}
             </div>
 
             {/* 开关配置 */}

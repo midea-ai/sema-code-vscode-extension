@@ -57,6 +57,10 @@ class HistoryPanel(project: Project) : Disposable {
         }, browser.cefBrowser)
 
         loadUi()
+        // 订阅 IDE 换肤，随主题实时刷新页面主题变量（无需重开面板）。
+        Theme.installLiveUpdate(browser, this)
+        // JCEF 不渲染原生 title 提示，接管 onTooltip 转 Swing tooltip。
+        Tooltips.install(browser)
     }
 
     private fun loadUi() {

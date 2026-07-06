@@ -1,9 +1,23 @@
 import { SemaSessionWrapper, SessionWrapperCallbacks } from '../../../core/semaSessionWrapper';
+import { transformCommandToPrompt } from '../../../utils/prompt';
 import { Transport } from './transport';
 import { RemoteCore, RemoteSession } from './remote';
 
 /** 同时打开的会话上限（对齐 semaProcessWrapper.MAX_SESSIONS = 5，本地常量避免拽入 node 依赖）。 */
 const MAX_SESSIONS = 5;
+
+// @file 引用格式化（1:1 复刻 chatWebview 的本地实现，helper 未导出故此处重写）。
+const FILE_REFERENCE_QUOTE_REGEX = /[\s。，、；：！？""''「」『』（）《》〈〉【】,;!?]/;
+function escapeQuotedFileReferencePath(filePath: string): string {
+    return filePath.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+}
+function formatFileReference(file: any, quoted = true): string {
+    const pathText = String(file.path ?? '');
+    const needsQuotes = quoted && FILE_REFERENCE_QUOTE_REGEX.test(pathText);
+    const pathRef = needsQuotes ? `"${escapeQuotedFileReferencePath(pathText)}"` : pathText;
+    const hasLineRange = file.startLine !== undefined && file.endLine !== undefined;
+    return hasLineRange ? `@${pathRef}:${file.startLine}-${file.endLine}` : `@${pathRef}`;
+}
 
 /**
  * 复刻 VSCode 端 semaSidebarProvider + chatWebview 的「会话编排 + 消息路由」，
@@ -30,12 +44,23 @@ export class Controller {
     }
 
     private onGrpcEvent(event: string, data: any, sessionId: string): void {
-        const entry = sessionId ? this.sessions.get(sessionId) : undefined;
+        // 进程级事件（空 sessionId）：不属于任何会话，走进程级分发（D2/A2）。
+        if (!sessionId) { this.onProcessEvent(event, data); return; }
+        const entry = this.sessions.get(sessionId);
         if (entry) { entry.remote.emit(event, data); return; }
-        if (sessionId) {
-            const buf = this.eventBuffer.get(sessionId) ?? [];
-            buf.push({ event, data });
-            this.eventBuffer.set(sessionId, buf);
+        const buf = this.eventBuffer.get(sessionId) ?? [];
+        buf.push({ event, data });
+        this.eventBuffer.set(sessionId, buf);
+    }
+
+    /**
+     * 进程级事件（跨连接广播来的合成帧）。model:update 由配置页改模型后桥广播而来，
+     * 转成聊天页可消费的 modelUpdate（对齐 VSCode semaSidebarProvider 推给聊天页的 {type:'modelUpdate'}）。
+     */
+    private onProcessEvent(event: string, data: any): void {
+        switch (event) {
+            case 'model:update': this.postToApp({ type: 'modelUpdate', data }); break;
+            default: break;
         }
     }
 
@@ -66,38 +91,51 @@ export class Controller {
         switch (msg.type) {
             case 'frontendReady':
                 await this.ensureInit();
-                await this.createSession({ mode: msg.mode });
+                await this.createSession({ mode: msg.mode, permissionLevel: msg.permissionLevel });
                 await this.checkConfiguration();
                 break;
-            case 'createSession': await this.createSession({ mode: msg.mode }); break;
+            case 'createSession': await this.createSession({ mode: msg.mode, permissionLevel: msg.permissionLevel }); break;
             // 从历史面板加载会话（跨 JCEF：Kotlin bus → host 通路下发）
             case 'loadHistorySession': await this.loadHistorySession(msg.session); break;
             case 'switchSession': if (sid) { this.activeSessionId = sid; this.reportState(); } break;
             case 'closeSession': this.closeSession(sid); break;
             case 'webviewSessionReady': this.sessions.get(sid ?? '')?.wrapper.sendInitialState(); break;
 
-            case 'sendInput': this.handleUserInput(sid, msg.text, msg.attachments); break;
+            case 'sendInput': this.handleUserInput(sid, msg.text, msg.files, msg.attachments); break;
             case 'interrupt': this.interrupt(sid); break;
+            // 撤销/回退（D1）：async 往返，按 reqId 回发预览/结果，避免弹窗挂起。
+            case 'getForkPreview': await this.handleGetForkPreview(sid, msg.uuid, msg.reqId); break;
+            case 'forkSession': await this.handleForkSession(sid, msg.uuid, msg.restoreFiles, msg.reqId); break;
+            // 子 agent 转后台（D4，会话级）。
+            case 'transferAgentToBackground': void this.sessions.get(sid ?? '')?.remote.transferAgentToBackground(msg.taskId); break;
             case 'toolPermissionResponse': this.sessions.get(sid ?? '')?.wrapper.respondToToolPermission(msg.response); break;
             case 'askFormResponse': this.sessions.get(sid ?? '')?.wrapper.respondToPickOption(msg.response); break;
             case 'planExitResponse': this.handlePlanExit(sid, msg.response); break;
+            // Stop 时把挂起的权限/表单请求标记为中断态回插历史（对齐 VSCode insert*RequestMessage）
+            case 'insertPermissionRequest': this.sessions.get(sid ?? '')?.wrapper.insertPermissionRequestMessage(msg.permissionData); break;
+            case 'insertAskFormRequest': this.sessions.get(sid ?? '')?.wrapper.insertAskFormRequestMessage(msg.askFormData); break;
             case 'updateAgentMode': this.sessions.get(sid ?? '')?.wrapper.updateAgentMode(msg.mode); break;
             case 'updatePermissionLevel': this.sessions.get(sid ?? '')?.wrapper.updatePermissionLevel(msg.level); break;
 
             case 'requestModelInfo': await this.sendModelInfo(); break;
-            case 'requestSystemConfig': this.sendSystemConfig(); break;
+            case 'requestSystemConfig': void this.sendSystemConfig(); break;
             case 'switchModel': await this.core.switchModel(msg.modelName).catch(() => {}); break;
-            case 'requestCommands': this.postToApp({ type: 'customCommandsLoaded', commands: [] }); break;
-            case 'requestSkills': this.postToApp({ type: 'skillsLoaded', skills: [] }); break;
-            case 'requestAgents': this.postToApp({ type: 'agentsLoaded', agents: [] }); break;
-            case 'requestInputHistory': this.postToApp({ type: 'inputHistoryLoaded', items: [] }); break;
+            case 'requestCommands': void this.sendCommands(); break;
+            case 'requestSkills': void this.sendSkills(); break;
+            case 'requestAgents': void this.sendAgents(); break;
+            case 'requestInputHistory': this.t.editor('requestInputHistory'); break;
 
             // 打开配置页（编辑器区独立 tab，由 Kotlin FileEditorManager 承载）
             case 'openConfig': this.t.editor('openConfig', { page: msg.page, taskId: msg.taskId }); break;
+            // 打开 bash 输出/命令（只读 tab，由 Kotlin EditorOps.openBashOutput 承载；字段对齐 VSCode openBashOutputAsDocument）
+            case 'openBashOutput': this.t.editor('openBashOutput', { content: msg.content, command: msg.command, toolId: msg.toolId }); break;
 
             // 编辑器操作 → 转发 Kotlin
             case 'openFile': this.t.editor('openFile', { filePath: msg.filePath, line: msg.line, endLine: msg.endLine }); break;
             case 'openExternal': this.t.editor('openExternal', { url: msg.url }); break;
+            // 文件校验 / 图片解析：Kotlin 原生处理后经 editor 通路回推 filePathVerified / imagePathResolved（对齐 VSCode，fire-and-forget）
+            case 'verifyFilePath': this.t.editor('verifyFilePath', { filePath: msg.filePath, tempId: msg.tempId, originalCode: msg.originalCode, lineInfo: msg.lineInfo }); break;
+            case 'resolveImagePath': this.t.editor('resolveImagePath', { filePath: msg.filePath, tempId: msg.tempId }); break;
             case 'showFileDiff': this.t.editor('showFileDiff', { filePath: msg.filePath, minLine: msg.minLine }); break;
             case 'showPermissionDiff': this.t.editor('showPermissionDiff', { filePath: msg.filePath, diffContent: msg.diffContent }); break;
             case 'getFileChangeStats': this.t.editor('getFileChangeStats', { filePath: msg.filePath, sessionId: sid }); break;
@@ -112,11 +150,15 @@ export class Controller {
                 this.postToApp({ type: 'removeFileChange', sessionId: sid, filePath: msg.filePath });
                 break;
 
-            // MVP 未接入的请求：立即回空，避免 UI 等待卡住
-            case 'requestWorkspaceFiles': this.postToApp({ type: 'workspaceFiles', reqId: msg.reqId, files: [] }); break;
-            case 'searchWorkspaceFiles': this.postToApp({ type: 'workspaceFiles', reqId: msg.reqId, files: [] }); break;
+            // 工作区文件 / 内容搜索 / 剪贴板：Kotlin 原生处理后经 editor 通路回推（对齐 VSCode，fire-and-forget；reqId 原样回带）
+            case 'requestWorkspaceFiles': this.t.editor('requestWorkspaceFiles', { reqId: msg.reqId }); break;
+            case 'searchWorkspaceFiles': this.t.editor('searchWorkspaceFiles', { query: msg.query || '', reqId: msg.reqId }); break;
+            case 'searchContentInFiles': this.t.editor('searchContentInFiles', { content: msg.content }); break;
+            case 'requestClipboardFiles': this.t.editor('requestClipboardFiles'); break;
+            // 输入历史：读/写走 Kotlin 项目级持久化
+            case 'saveInputHistory': this.t.editor('saveInputHistory', { item: msg.item }); break;
 
-            default: break; // saveInputHistory 等：忽略
+            default: break;
         }
     }
 
@@ -130,13 +172,14 @@ export class Controller {
      * 建会话。复刻 VSCode createNewSession 的历史重放：传 sessionId → sema-core 按 id 重新
      * 水合 LLM 上下文（可续聊）；传 historyContent → 纯客户端把历史 UI 消息灌回 React。
      */
-    private async createSession(opts: { mode?: any; sessionId?: string; historyContent?: any[]; title?: string } = {}): Promise<void> {
+    private async createSession(opts: { mode?: any; permissionLevel?: any; sessionId?: string; historyContent?: any[]; title?: string } = {}): Promise<void> {
         // 会话数上限（对齐 VSCode createNewSession）。已打开的历史会话走切 tab 不到这里。
         if (this.sessions.size >= MAX_SESSIONS) {
             this.postToApp({ type: 'sessionCreateFailed', error: `最多同时打开 ${MAX_SESSIONS} 个会话，请先关闭已有会话` });
             return;
         }
-        const res = await this.core.createSession({ sessionId: opts.sessionId });
+        // 建会话即透传 per-session 档位/模式（D7）；无值时回落 core 默认档位。
+        const res = await this.core.createSession({ sessionId: opts.sessionId, permissionLevel: opts.permissionLevel, mode: opts.mode });
         if (!res.ok || !res.sessionId) {
             this.postToApp({ type: 'sessionCreateFailed', error: res.error });
             return;
@@ -182,17 +225,73 @@ export class Controller {
         });
     }
 
-    private handleUserInput(sid: string | undefined, text: string, attachments?: any): void {
+    private handleUserInput(sid: string | undefined, text: string, files?: Array<any>, attachments?: any): void {
         const entry = sid ? this.sessions.get(sid) : undefined;
         if (!entry) return;
-        entry.wrapper.processUserInput(text, undefined, attachments);
+        // @file 引用编码（对齐 chatWebview.handleUserInput）：把内联的 display 引用替换成 encoded（含引号转义），
+        // 再把 content 里尚缺的引用补到末尾。
+        let content = text;
+        if (files && files.length > 0) {
+            const refs = files.map((file: any) => ({
+                encoded: formatFileReference(file),
+                display: formatFileReference(file, false),
+            }));
+            for (const { encoded, display } of refs) {
+                if (encoded !== display) content = content.split(display).join(encoded);
+            }
+            const fileContext = refs
+                .filter(({ encoded }) => !content.includes(encoded))
+                .map(({ encoded }) => encoded)
+                .join(' ');
+            content = fileContext ? `${content} ${fileContext} ` : content;
+        }
+        // 斜杠命令展开（D6，对齐 chatWebview:150-155）：命中改写时传展开后文本 + 原文为 orgContent，
+        // 让 UI 保留「原文 vs 展开」区分；未命中则 orgContent 为 undefined。
+        const transformed = transformCommandToPrompt(content);
+        if (transformed && transformed !== content) {
+            entry.wrapper.processUserInput(transformed, content, attachments);
+        } else {
+            entry.wrapper.processUserInput(content, undefined, attachments);
+        }
     }
 
     private interrupt(sid: string | undefined): void {
         const entry = sid ? this.sessions.get(sid) : undefined;
         if (!entry) return;
         this.clearPanels(sid!);
+        // 中断主回合 + 停后台子 agent（D3，对齐 chatWebview:174-175）。
         entry.wrapper.interruptSession();
+        void entry.remote.stopAllTasks();
+    }
+
+    /** 撤销/回退预览（D1，对齐 chatWebview.handleGetForkPreview）：async 往返，按 reqId 回发。 */
+    private async handleGetForkPreview(sid: string | undefined, uuid: string, reqId: any): Promise<void> {
+        const entry = sid ? this.sessions.get(sid) : undefined;
+        if (!entry || !uuid) {
+            this.postToApp({ type: 'forkPreviewResult', sessionId: sid, reqId, error: '会话不可用' });
+            return;
+        }
+        try {
+            const preview = await entry.remote.getForkPreview(uuid);
+            this.postToApp({ type: 'forkPreviewResult', sessionId: sid, reqId, preview });
+        } catch (e: any) {
+            this.postToApp({ type: 'forkPreviewResult', sessionId: sid, reqId, error: e?.message || '预览失败' });
+        }
+    }
+
+    /** 执行 fork/回退（D1，对齐 chatWebview.handleForkSession）：async 往返，按 reqId 回发结果。 */
+    private async handleForkSession(sid: string | undefined, uuid: string, restoreFiles: any, reqId: any): Promise<void> {
+        const entry = sid ? this.sessions.get(sid) : undefined;
+        if (!entry || !uuid) {
+            this.postToApp({ type: 'forkResult', sessionId: sid, reqId, uuid, result: { ok: false, error: '会话不可用' } });
+            return;
+        }
+        try {
+            const result = await entry.remote.fork(uuid, { restoreFiles: !!restoreFiles });
+            this.postToApp({ type: 'forkResult', sessionId: sid, reqId, uuid, result });
+        } catch (e: any) {
+            this.postToApp({ type: 'forkResult', sessionId: sid, reqId, uuid, result: { ok: false, error: e?.message || 'fork 失败' } });
+        }
     }
 
     private handlePlanExit(sid: string | undefined, response: any): void {
@@ -227,9 +326,37 @@ export class Controller {
         }
     }
 
-    private sendSystemConfig(): void {
-        // MVP：JB 端暂无系统配置持久化，给默认值让 UI 正常渲染
-        this.postToApp({ type: 'systemConfigUpdate', skipFileEditPermission: false, thinking: true, showThinkingText: true });
+    /**
+     * 系统配置：改读 Kotlin 本地持久化（systemConfig channel，与配置页同源），
+     * 抽取聊天页需要的三个开关（抽取逻辑对齐 VSCode chatWebview.sendSystemConfig）。
+     */
+    private async sendSystemConfig(): Promise<void> {
+        try {
+            const res = await this.t.callEditor('systemConfig', { op: 'get' });
+            const config = res?.config ?? {};
+            this.postToApp({
+                type: 'systemConfigUpdate',
+                skipFileEditPermission: config.skipFileEditPermission || false,
+                thinking: config.thinking !== false,
+                showThinkingText: config.showThinkingText !== false,
+            });
+        } catch {
+            this.postToApp({ type: 'systemConfigUpdate', skipFileEditPermission: false, thinking: true, showThinkingText: false });
+        }
+    }
+
+    /** 斜杠命令 / 技能 / Agent 列表：转发 core（sema-core 透明镜像，对齐 VSCode getCommandsInfo/getSkillsInfo/getAgentsInfo）。 */
+    private async sendCommands(): Promise<void> {
+        try { this.postToApp({ type: 'customCommandsLoaded', commands: await this.core.getCommandsInfo() }); }
+        catch { this.postToApp({ type: 'customCommandsLoaded', commands: [] }); }
+    }
+    private async sendSkills(): Promise<void> {
+        try { this.postToApp({ type: 'skillsLoaded', skills: await this.core.getSkillsInfo() }); }
+        catch { this.postToApp({ type: 'skillsLoaded', skills: [] }); }
+    }
+    private async sendAgents(): Promise<void> {
+        try { this.postToApp({ type: 'agentsLoaded', agents: await this.core.getAgentsInfo() }); }
+        catch { this.postToApp({ type: 'agentsLoaded', agents: [] }); }
     }
 
     private async checkConfiguration(): Promise<void> {

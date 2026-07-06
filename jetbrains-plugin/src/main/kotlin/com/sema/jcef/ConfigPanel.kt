@@ -53,6 +53,10 @@ class ConfigPanel(project: Project) : Disposable {
         }, browser.cefBrowser)
 
         loadUi()
+        // 订阅 IDE 换肤，随主题实时刷新页面主题变量（无需重开面板）。
+        Theme.installLiveUpdate(browser, this)
+        // JCEF 不渲染原生 title 提示，接管 onTooltip 转 Swing tooltip。
+        Tooltips.install(browser)
     }
 
     private fun loadUi() {
@@ -67,7 +71,7 @@ class ConfigPanel(project: Project) : Disposable {
         val js = File(dir, "jb-config.js")
         stream.use { input -> js.outputStream().use { input.copyTo(it) } }
         val html = File(dir, "index.html")
-        html.writeText(HtmlShell.page(buildInjection(), Theme.cssVariables(), "jb-config.js"))
+        html.writeText(HtmlShell.page(buildInjection(), Theme.cssVariables(), "jb-config.js", extraCss = Theme.configPageOverrideCss()))
         log.warn("[sema] config bundle=${js.length()} bytes 载入 ${html.toURI()}")
         browser.loadURL(html.toURI().toString())
     }

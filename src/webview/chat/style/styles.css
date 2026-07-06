@@ -115,12 +115,20 @@ code, pre, .code {
     overflow-anchor: none;
 }
 
+/* JCEF 专属：常驻滚动条槽，避免内容高度在视口边界横跳时竖直滚动条闪现/消失改变正文宽度、
+   触发整段重排导致的高频抖动。仅作用于 JB（html.jb），VSCode 不加此 class、外观零变化。 */
+html.jb #output-container {
+    scrollbar-gutter: stable;
+}
+
 
 /* 消息包装层：让浏览器跳过视口外元素的 layout 和 paint，
    contain-intrinsic-size 作为未渲染时的占位高度估算 */
 .msg-wrap {
     content-visibility: auto;
-    contain-intrinsic-size: 0 80px;
+    /* auto 关键字：浏览器记住每条消息上次渲染的真实高度，再次跳过时用真值而非死值 80px 当占位，
+       避免真实高度≠估算值时在视口边缘反复横跳造成的高频抖动（尤其 JCEF）。 */
+    contain-intrinsic-size: auto 80px;
 }
 
 .output-line {

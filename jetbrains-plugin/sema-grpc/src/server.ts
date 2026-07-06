@@ -37,11 +37,24 @@ const manager = new SemaCoreManager({ workingDir: WORKING_DIR, logLevel: 'none' 
 /** 进程级事件（挂在 SemaCore 上，非会话级）；转发时 session_id 留空 */
 const PROCESS_EVENTS = ['cron:update', 'mcp:server:status'];
 
+/**
+ * 所有活跃连接的 pushEvent 句柄。用于把「非 core 原生事件、但需跨面板同步」的合成帧
+ * （如模型变更 model:update）广播到每条独立 gRPC 连接 —— 各面板连接互相独立，
+ * 单连接 push 到不了兄弟面板，跨面板同步只能靠广播真事件（对齐 VSCode 宿主广播返回值）。
+ */
+const connections = new Set<(event: string, data: any, sessionId: string) => void>();
+const broadcast = (event: string, data: any) => {
+  for (const push of connections) push(event, data, '');
+};
+
 function connect(call: grpc.ServerDuplexStream<any, any>): void {
   console.log('[sema-grpc] Client connected');
 
   // 本连接创建的会话绑定器，key = sessionId
   const binders = new Map<string, SessionBinder>();
+
+  // 本连接注册的 watchTask 取消函数，key = taskId（连接关闭时全部取消，防泄漏）
+  const watchers = new Map<string, () => void>();
 
   const write = (frame: { event: string; data?: any; cmdId?: string; sessionId?: string }) => {
     if (call.writable) {
@@ -57,6 +70,9 @@ function connect(call: grpc.ServerDuplexStream<any, any>): void {
   const ack = (cmdId: string, data?: any) => write({ event: 'ack', data, cmdId });
   const fail = (cmdId: string, message: string, action?: string) =>
     write({ event: 'error', data: { message, action }, cmdId });
+
+  // 本连接加入广播集合，接收跨连接合成事件（如 model:update）
+  connections.add(pushEvent);
 
   // 进程级事件转发到本连接（session_id 留空）
   const processHandlers = PROCESS_EVENTS.map((event) => ({
@@ -103,16 +119,23 @@ function connect(call: grpc.ServerDuplexStream<any, any>): void {
           return;
         }
         case 'updateCoreConfig': manager.instance.updateCoreConfig(payload); break;
-        case 'addModel':         await manager.instance.addModel(payload.config, payload.skipValidation); break;
-        case 'delModel':         await manager.instance.delModel(payload.modelName); break;
-        case 'switchModel':      await manager.instance.switchModel(payload.modelName); break;
-        case 'applyTaskModel':   await manager.instance.applyTaskModel(payload); break;
+        // 模型变更四连：ack 回 core 的 ModelUpdateData（对齐「ack 回原始返回值」契约，D5），
+        // 并跨连接广播 model:update，让兄弟面板（聊天页模型指示器）同步刷新（D2；对齐 VSCode onModelUpdate 双面板广播）。
+        case 'addModel':         { const r = await manager.instance.addModel(payload.config, payload.skipValidation); broadcast('model:update', r); ack(id, r); return; }
+        case 'delModel':         { const r = await manager.instance.delModel(payload.modelName); broadcast('model:update', r); ack(id, r); return; }
+        case 'switchModel':      { const r = await manager.instance.switchModel(payload.modelName); broadcast('model:update', r); ack(id, r); return; }
+        case 'applyTaskModel':   { const r = await manager.instance.applyTaskModel(payload); broadcast('model:update', r); ack(id, r); return; }
         case 'getModelData':     { const data = await manager.instance.getModelData(); ack(id, data); return; }
         case 'listSessions':     ack(id, { sessions: manager.listSessions() }); return;
 
         case 'createSession': {
+          // 建会话即透传 per-session 档位/模式（D7，对齐 VSCode/claw：建会话即带 permissionLevel）。
+          const createOpts: Record<string, any> = {};
+          if (payload?.sessionId) createOpts.sessionId = payload.sessionId;
+          if (payload?.permissionLevel) createOpts.permissionLevel = payload.permissionLevel;
+          if (payload?.mode) createOpts.mode = payload.mode;
           const result = await manager.instance.createSession(
-            payload?.sessionId ? { sessionId: payload.sessionId } : undefined,
+            Object.keys(createOpts).length ? createOpts : undefined,
           );
           if (!result.ok) {
             // tsconfig strict=false 下不会按 ok 收窄联合类型，这里显式取 error
@@ -120,7 +143,7 @@ function connect(call: grpc.ServerDuplexStream<any, any>): void {
             return;
           }
           const session = result.session;
-          const binder = new SessionBinder(session.sessionId, session, pushEvent);
+          const binder = new SessionBinder(session.sessionId, session, pushEvent, broadcast);
           binder.bind();
           binders.set(session.sessionId, binder);
           // 会话级后续指令用此 sessionId 路由；session:ready 事件也会带同一 id
@@ -143,6 +166,14 @@ function connect(call: grpc.ServerDuplexStream<any, any>): void {
         case 'updateAgentMode':         requireSession(sessionId, action).updateAgentMode(payload.mode); break;
         case 'updatePermissionLevel':   requireSession(sessionId, action).updatePermissionLevel(payload.level); break;
 
+        // fork / 撤销回退（D1）：ack 回 core 原始返回值，UI 弹窗按 reqId 匹配。
+        case 'getForkPreview':          ack(id, (requireSession(sessionId, action) as any).getForkPreview(payload.messageUuid)); return;
+        case 'fork':                    ack(id, await (requireSession(sessionId, action) as any).fork(payload.messageUuid, payload.options)); return;
+        // Stop 时一并停后台子 agent（D3）；ack 回停掉的任务数。
+        case 'stopAllTasks':            ack(id, { count: (requireSession(sessionId, action) as any).stopAllTasks() }); return;
+        // 子 agent 转后台（D4，会话级）；ack 回 boolean。
+        case 'transferAgentToBackground': ack(id, { ok: (requireSession(sessionId, action) as any).transferAgentToBackground(payload.taskId) }); return;
+
         // ── 配置页 SemaCore 方法（进程级，无需 session_id）──────────
         // 均为 sema-core 原始方法名，桥透明转发；ack 回原始返回值，UI 侧的翻译在 config-controller。
         // 参数映射对齐 semaProcessWrapper 的公开签名。
@@ -156,6 +187,46 @@ function connect(call: grpc.ServerDuplexStream<any, any>): void {
         case 'getToolInfos':         ack(id, manager.instance.getToolInfos()); return;
         case 'updateDisabledTools':  manager.instance.updateDisabledTools(payload.disabledTools); break;
         case 'updateCoreConfByKey':  manager.instance.updateCoreConfByKey(payload.key, payload.value); break;
+
+        // ── 后台任务面板（进程级，跨会话聚合；对齐 semaProcessWrapper:359-389）──────────
+        case 'getTaskList': {
+          // 遍历所有会话聚合任务，并给每项打上归属 sessionId（供 openAgentDetail 带上下文，D8）。
+          const tasks: any[] = [];
+          for (const sid of manager.listSessions()) {
+            const s = manager.getSession(sid) as any;
+            if (!s) continue;
+            for (const t of s.getTaskList() ?? []) tasks.push({ ...t, sessionId: sid });
+          }
+          ack(id, tasks);
+          return;
+        }
+        case 'stopTask': {
+          // 按 taskId 全局生效：借道任一会话转发（对齐 wrapper anySession）。
+          const first = manager.listSessions()[0];
+          if (first) (manager.getSession(first) as any)?.stopTask(payload.taskId);
+          ack(id, { action });
+          return;
+        }
+        // watchTask 流式（D4b / A1）：回调只活在本 sidecar 进程内、不跨 gRPC；
+        // 每次 delta 合成为进程级事件 task:watch:delta 上行（session_id 留空）。
+        case 'watchTask': {
+          const first = manager.listSessions()[0];
+          const anySession = first ? (manager.getSession(first) as any) : undefined;
+          if (anySession) {
+            watchers.get(payload.taskId)?.(); // 幂等：重复 watch 先取消旧的
+            const cancel = anySession.watchTask(payload.taskId, (delta: any) =>
+              pushEvent('task:watch:delta', { taskId: payload.taskId, delta }, ''));
+            watchers.set(payload.taskId, typeof cancel === 'function' ? cancel : () => {});
+          }
+          ack(id, { action });
+          return;
+        }
+        case 'unwatchTask': {
+          watchers.get(payload.taskId)?.();
+          watchers.delete(payload.taskId);
+          ack(id, { action });
+          return;
+        }
 
         // 插件市场 / Plugins
         case 'getMarketplacePluginsInfo':     ack(id, await manager.instance.getMarketplacePluginsInfo()); return;
@@ -217,6 +288,9 @@ function connect(call: grpc.ServerDuplexStream<any, any>): void {
   });
 
   const cleanup = () => {
+    connections.delete(pushEvent);
+    for (const cancel of watchers.values()) cancel();
+    watchers.clear();
     detachProcessEvents();
     for (const [sid, binder] of binders) {
       binder.unbind();

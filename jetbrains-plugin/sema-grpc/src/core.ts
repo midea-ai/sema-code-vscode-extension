@@ -17,15 +17,16 @@ export class SemaCoreManager {
   }
 
   /**
-   * 首次调用创建 SemaCore；已存在时做**非破坏式**配置合并（updateCoreConfig），
-   * 不再 dispose 重建 —— 避免把已存在的其它会话一起干掉。
+   * 首次调用创建 SemaCore（seed 配置仅在此刻生效，引导 core 用持久化配置启动）。
+   * core 已存在时 init 即 no-op —— 只确认就绪，**不再用 seed 去 updateCoreConfig**：
+   * 多面板（chat / config / history）共享同一进程单 core，后打开的面板也会发 init，
+   * 若在这里更新配置，就等于"打开面板 = 悄悄改一次 core 配置"，既非本意、又会撞白名单校验。
+   * 真正的配置更新只走显式路径（saveSystemConfig → updateCoreConfig）。
    */
   init(overrides?: Record<string, any>): SemaCore {
     if (!this.core) {
       this.baseConfig = { ...this.baseConfig, ...(overrides ?? {}) };
       this.core = new SemaCore(this.baseConfig);
-    } else if (overrides && Object.keys(overrides).length > 0) {
-      this.core.updateCoreConfig(overrides);
     }
     return this.core;
   }
