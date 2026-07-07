@@ -1,6 +1,6 @@
 <div align="center">
 
-<h3>基于 Sema Code Core 的 VSCode 智能编程插件</h3>
+<h3>基于 Sema Code Core 的智能编程插件（VSCode / JetBrains）</h3>
 
 <p>为开发者提供开箱即用的 AI 编程体验</p>
 
@@ -30,7 +30,16 @@
 
 ## 安装与使用
 
+### VSCode
+
 1. 打开 Visual Studio Code  
 2. 进入扩展视图 (`Ctrl+Shift+X`)  
 3. 搜索 `Sema Code` 并点击安装  
 4. 或从 [GitHub Releases](https://github.com/midea-ai/sema-code-vscode-extension/releases) 下载 VSIX 手动安装
+
+### JetBrains（IntelliJ IDEA / PyCharm / GoLand / WebStorm / CLion 等）
+
+1. 打开 JetBrains IDE  
+2. 进入 **Settings/Preferences → Plugins**  
+3. 搜索 `Sema Code` 并点击安装  
+4. 或从 [GitHub Releases](https://github.com/midea-ai/sema-code-vscode-extension/releases) 下载插件包手动安装
