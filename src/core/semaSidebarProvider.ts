@@ -15,7 +15,7 @@ import { SemaProcessWrapper, MAX_SESSIONS } from './semaProcessWrapper';
 import { SemaSessionWrapper, SessionWrapperCallbacks, Message } from './semaSessionWrapper';
 import { ClawCoordinator } from '../claw/coordinator';
 import { CLAW_SESSION_ID } from '../claw/paths';
-import { TOOL_NAME_VIEW_FILE } from '../utils/tool';
+import { TOOL_NAME_VIEW_FILE, TOOL_NAME_WRITE_FILE, TOOL_NAME_PATCH_FILE } from '../utils/tool';
 import { pet } from '../pet/pet-client';
 import { ensurePetRunning, killPet } from '../pet/pet-launcher';
 import { wirePetEvents, setPetSessionState } from '../pet/pet-events';
@@ -195,10 +195,6 @@ export class SemaSidebarProvider implements vscode.WebviewViewProvider {
         }
 
         try {
-            if (this.sessions.size === 0) {
-                await this.fileStateDiffManager.createSnapshot();
-            }
-
             const result = await this.processWrapper.createSession({
                 sessionId: opts.sessionId,
                 agentMode: opts.agentMode,
@@ -215,6 +211,8 @@ export class SemaSidebarProvider implements vscode.WebviewViewProvider {
                 opts.agentMode ?? 'Agent'
             );
             this.sessions.set(wrapper.sessionId, wrapper);
+            // 为该会话建立独立的快照作用域（清掉可能残留的同 id 旧状态）
+            await this.fileStateDiffManager.createSnapshot(wrapper.sessionId);
 
             if (opts.historyContent && opts.historyContent.length > 0) {
                 if (opts.title) wrapper.updateTitle(opts.title);
@@ -263,6 +261,8 @@ export class SemaSidebarProvider implements vscode.WebviewViewProvider {
         wrapper.dispose();
         this.processWrapper.closeSession(sessionId);
         this.sessions.delete(sessionId);
+        // 释放该会话的快照与临时文件，避免泄漏
+        this.fileStateDiffManager.createSnapshot(sessionId);
 
         const timer = this.saveSessionTimers.get(sessionId);
         if (timer) {
@@ -298,6 +298,7 @@ export class SemaSidebarProvider implements vscode.WebviewViewProvider {
         if (this.sessions.has(session.sessionId)) return;
         const wrapper = new SemaSessionWrapper(session, this.sessionCallbacks, 'Agent');
         this.sessions.set(wrapper.sessionId, wrapper);
+        await this.fileStateDiffManager.createSnapshot(wrapper.sessionId);
 
         // 复用插件侧历史，让 chat 页打开 claw 会话时能看到之前的对话（与普通会话一致）。
         try {
@@ -329,6 +330,7 @@ export class SemaSidebarProvider implements vscode.WebviewViewProvider {
         if (!wrapper) return;
         wrapper.dispose();
         this.sessions.delete(sessionId);
+        this.fileStateDiffManager.createSnapshot(sessionId);
 
         if (this.activeSessionId === sessionId) {
             const next = this.sessions.keys().next().value ?? null;
@@ -450,11 +452,11 @@ export class SemaSidebarProvider implements vscode.WebviewViewProvider {
 
     // ─── 会话事件 handlers ────────────────────────────────────────────────────
 
-    private handleSessionReady = async (_sessionId: string, data: any): Promise<void> => {
+    private handleSessionReady = async (sessionId: string, data: any): Promise<void> => {
         try {
             if (data.readFileTimestamps && typeof data.readFileTimestamps === 'object') {
                 for (const filePath of Object.keys(data.readFileTimestamps)) {
-                    await this.fileStateDiffManager.addFileToSnapshotIfNew(filePath);
+                    await this.fileStateDiffManager.addFileToSnapshotIfNew(sessionId, filePath);
                 }
             }
         } catch (error) {
@@ -481,17 +483,23 @@ export class SemaSidebarProvider implements vscode.WebviewViewProvider {
         this.debouncedSaveSession(sessionId);
     };
 
-    private handleToolExecutionComplete = (_sessionId: string, data: any): void => {
+    private handleToolExecutionComplete = (sessionId: string, data: any): void => {
         if (data.toolName === TOOL_NAME_VIEW_FILE) {
-            this.fileStateDiffManager.addFileToSnapshotIfNew(data.title);
+            this.fileStateDiffManager.addFileToSnapshotIfNew(sessionId, data.title);
+        } else if (
+            (data.toolName === TOOL_NAME_WRITE_FILE || data.toolName === TOOL_NAME_PATCH_FILE) &&
+            data.content && typeof data.content === 'object' && (data.content as any).type === 'new'
+        ) {
+            // 新建文件：钉空基线，避免 fork 后重读把已修改内容误当基线
+            this.fileStateDiffManager.pinEmptySnapshotIfNew(sessionId, data.title);
         }
     };
 
-    private handleFileReference = (_sessionId: string, data: any): void => {
+    private handleFileReference = (sessionId: string, data: any): void => {
         if (data.references && Array.isArray(data.references)) {
             for (const ref of data.references) {
                 if (ref.type === 'file' && ref.name) {
-                    this.fileStateDiffManager.addFileToSnapshotIfNew(ref.name);
+                    this.fileStateDiffManager.addFileToSnapshotIfNew(sessionId, ref.name);
                 }
             }
         }
@@ -508,7 +516,7 @@ export class SemaSidebarProvider implements vscode.WebviewViewProvider {
     };
 
     private handleSessionCleared = (sessionId: string): void => {
-        this.fileStateDiffManager.createSnapshot();
+        this.fileStateDiffManager.createSnapshot(sessionId);
         this.chatWebviewProvider.clearSessionPanels(sessionId);
     };
 

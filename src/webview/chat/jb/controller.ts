@@ -1,5 +1,6 @@
 import { SemaSessionWrapper, SessionWrapperCallbacks } from '../../../core/semaSessionWrapper';
 import { transformCommandToPrompt } from '../../../utils/prompt';
+import { TOOL_NAME_VIEW_FILE, TOOL_NAME_WRITE_FILE, TOOL_NAME_PATCH_FILE } from '../../../utils/tool';
 import { Transport } from './transport';
 import { RemoteCore, RemoteSession } from './remote';
 
@@ -68,17 +69,31 @@ export class Controller {
     private get callbacks(): SessionWrapperCallbacks {
         return {
             onMessage: (m) => this.postToApp(m),
-            onSessionReady: () => {},
+            // 读时快照（对齐 VSCode handleSessionReady）：按历史读过的文件补快照（按会话隔离）。
+            onSessionReady: (sid, data: any) => {
+                const ts = data?.readFileTimestamps;
+                if (ts && typeof ts === 'object') for (const filePath of Object.keys(ts)) this.addFileToSnapshotIfNew(sid, filePath);
+            },
             // 存档触发点（对齐 semaSidebarProvider）：状态回 idle、话题更新时防抖存历史。
             onStateChange: (sid, state) => { if (state === 'idle') this.debouncedSaveSession(sid); },
             onTopicUpdate: (sid) => this.debouncedSaveSession(sid),
-            // 快照触发点：write/edit 工具完成时，用 patch 反推出改动前的原始内容存快照（幂等）。
-            // 不在"读文件时"抓：sidecar 独立进程写盘，宿主异步快照有竞态会抓到写后内容。
-            onToolExecutionComplete: (_sid, data: any) => this.requestSnapshotFromPatch(data),
-            onFileReference: () => {},
+            // 读时快照（对齐 VSCode handleToolExecutionComplete）：view_file 首次读文件时打快照；
+            // 新建文件（write/patch 且 type==='new'）钉空基线，避免 fork 后重读把已改内容误当基线。
+            onToolExecutionComplete: (sid, data: any) => {
+                if (data?.toolName === TOOL_NAME_VIEW_FILE) {
+                    this.addFileToSnapshotIfNew(sid, data.title);
+                } else if (
+                    (data?.toolName === TOOL_NAME_WRITE_FILE || data?.toolName === TOOL_NAME_PATCH_FILE) &&
+                    data?.content && typeof data.content === 'object' && data.content.type === 'new'
+                ) {
+                    this.pinEmptySnapshotIfNew(sid, data.title);
+                }
+            },
+            // 读时快照（对齐 VSCode handleFileReference）：@ 引用文件时打快照（按会话隔离）。
+            onFileReference: (sid, data: any) => { for (const ref of data?.references ?? []) if (ref?.type === 'file' && ref?.name) this.addFileToSnapshotIfNew(sid, ref.name); },
             onTaskStart: (sessionId, data) => this.postToApp({ type: 'taskStart', sessionId, data }),
             onTaskEnd: (sessionId, data) => this.postToApp({ type: 'taskEnd', sessionId, data }),
-            onSessionCleared: (sessionId) => { this.t.editor('resetSnapshots'); this.clearPanels(sessionId); },
+            onSessionCleared: (sessionId) => { this.t.editor('resetSnapshots', { sessionId }); this.clearPanels(sessionId); },
             onOpenAgentDetail: (sessionId, taskId) => this.postToApp({ type: 'openAgentDetail', sessionId, taskId }),
             onUserResponded: () => {},
             onTitleUpdate: (sessionId, title) => this.postToApp({ type: 'sessionTitleUpdate', sessionId, title }),
@@ -136,17 +151,17 @@ export class Controller {
             // 文件校验 / 图片解析：Kotlin 原生处理后经 editor 通路回推 filePathVerified / imagePathResolved（对齐 VSCode，fire-and-forget）
             case 'verifyFilePath': this.t.editor('verifyFilePath', { filePath: msg.filePath, tempId: msg.tempId, originalCode: msg.originalCode, lineInfo: msg.lineInfo }); break;
             case 'resolveImagePath': this.t.editor('resolveImagePath', { filePath: msg.filePath, tempId: msg.tempId }); break;
-            case 'showFileDiff': this.t.editor('showFileDiff', { filePath: msg.filePath, minLine: msg.minLine }); break;
-            case 'showPermissionDiff': this.t.editor('showPermissionDiff', { filePath: msg.filePath, diffContent: msg.diffContent }); break;
+            case 'showFileDiff': this.t.editor('showFileDiff', { filePath: msg.filePath, minLine: msg.minLine, sessionId: sid }); break;
+            case 'showPermissionDiff': this.t.editor('showPermissionDiff', { filePath: msg.filePath, diffContent: msg.diffContent, sessionId: sid }); break;
             case 'getFileChangeStats': this.t.editor('getFileChangeStats', { filePath: msg.filePath, sessionId: sid }); break;
 
             // 拒绝/回滚：转发 Kotlin 用快照写回或删除，并同步清理 UI 面板（对齐 chatWebview）
             case 'restoreFromSnapshots':
-                this.t.editor('revertFiles', { filePaths: msg.filePaths });
+                this.t.editor('revertFiles', { filePaths: msg.filePaths, sessionId: sid });
                 this.postToApp({ type: 'clearFileChanges', sessionId: sid });
                 break;
             case 'restoreFromSnapshot':
-                this.t.editor('revertFile', { filePath: msg.filePath });
+                this.t.editor('revertFile', { filePath: msg.filePath, sessionId: sid });
                 this.postToApp({ type: 'removeFileChange', sessionId: sid, filePath: msg.filePath });
                 break;
 
@@ -188,6 +203,8 @@ export class Controller {
         const wrapper = new SemaSessionWrapper(remote as any, this.callbacks, opts.mode ?? 'Agent');
         this.sessions.set(res.sessionId, { wrapper, remote });
         this.activeSessionId = res.sessionId;
+        // 为该会话建立独立的快照作用域（清掉可能残留的同 id 旧状态）。
+        this.t.editor('resetSnapshots', { sessionId: res.sessionId });
 
         // 回放缓冲事件（如 session:ready）
         const buf = this.eventBuffer.get(res.sessionId);
@@ -310,6 +327,8 @@ export class Controller {
         if (timer) { clearTimeout(timer); this.saveTimers.delete(sid); }
         this.core.closeSession(sid);
         this.sessions.delete(sid);
+        // 释放该会话的快照与临时文件，避免泄漏。
+        this.t.editor('resetSnapshots', { sessionId: sid });
         if (this.activeSessionId === sid) {
             this.activeSessionId = this.sessions.keys().next().value ?? null;
         }
@@ -368,15 +387,14 @@ export class Controller {
         }
     }
 
-    /**
-     * write/edit 工具完成 → 让 Kotlin 用 patch 反推出改动前的原始内容并存快照（幂等）。
-     * type='new'（新建文件）不需要原始快照（回滚＝删除），Kotlin 侧跳过。
-     */
-    private requestSnapshotFromPatch(data: any): void {
-        const content = data?.content;
-        const title: string | undefined = data?.title;
-        if (!title || !content || (content.type !== 'diff' && content.type !== 'new') || !Array.isArray(content.patch)) return;
-        this.t.editor('snapshotFromPatch', { filePath: title, patchType: content.type, patch: content.patch });
+    /** 读文件时打快照（对齐 VSCode addFileToSnapshotIfNew）：传路径给 Kotlin 回读磁盘存原版，按会话隔离、幂等。 */
+    private addFileToSnapshotIfNew(sessionId: string, filePath: any): void {
+        if (sessionId && typeof filePath === 'string' && filePath) this.t.editor('addFileToSnapshotIfNew', { sessionId, filePath });
+    }
+
+    /** 新建文件时钉一条空基线（对齐 VSCode pinEmptySnapshotIfNew）：避免 fork 后重读把已改内容误当基线。 */
+    private pinEmptySnapshotIfNew(sessionId: string, filePath: any): void {
+        if (sessionId && typeof filePath === 'string' && filePath) this.t.editor('pinEmptySnapshotIfNew', { sessionId, filePath });
     }
 
     // ─── 会话历史存档（对齐 SessionHistoryManager，存盘在 Kotlin）──────────────

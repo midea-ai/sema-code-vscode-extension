@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { FileChange, TokenInfo, AppProps, SelectedFile, TodoItem, Message, AgentMode, PermissionLevel, SessionMeta, ForkPreview, ImageAttachment } from './types';
+import { FileChange, TokenInfo, AppProps, SelectedFile, TodoItem, Message, AgentMode, PermissionLevel, SessionMeta, ForkPreview, ImageAttachment, VscodeApi } from './types';
 import { streamingStore } from './utils/StreamingStore';
 import InputBox, { InputBoxHandle } from './components/input/InputBox';
 import MessageItem from './MessageItem';
@@ -36,7 +36,22 @@ interface ChatSessionProps {
  * 单个会话视图。每个会话一个实例，自带独立 state；非 active 时隐藏但保持挂载，
  * 后台事件持续更新其内存状态。
  */
-const ChatSession: React.FC<ChatSessionProps> = ({ vscode, sessionId, active, onWaitingChange }) => {
+const ChatSession: React.FC<ChatSessionProps> = ({ vscode: rawVscode, sessionId, active, onWaitingChange }) => {
+    // 包一层：给本会话子树发出的所有消息自动补 sessionId（未显式设置时），
+    // 避免 FileChangesPanel/EditBlock 等子组件发的 showFileDiff/restore 因缺 sessionId
+    // 落到后端后取不到本会话快照（diff 左侧空、恢复失败）。
+    const vscode = useMemo<VscodeApi>(() => ({
+        postMessage: (message: any) => {
+            if (message && typeof message === 'object' && message.sessionId === undefined) {
+                rawVscode.postMessage({ ...message, sessionId });
+            } else {
+                rawVscode.postMessage(message);
+            }
+        },
+        getState: () => rawVscode.getState(),
+        setState: (state: any) => rawVscode.setState(state),
+    }), [rawVscode, sessionId]);
+
     const [messages, setMessages] = useState<Message[]>([]);
     const [streamingAssistantId, setStreamingAssistantId] = useState<string | null>(null);
     const [streamingToolId, setStreamingToolId] = useState<string | null>(null);

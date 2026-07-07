@@ -84,8 +84,8 @@ export class ChatWebviewProvider {
                 restoreFromSnapshot: () => this.restoreFromSnapshot(sid, msg.filePath),
                 getForkPreview: () => this.handleGetForkPreview(sid, msg.uuid, msg.reqId),
                 forkSession: () => this.handleForkSession(sid, msg.uuid, msg.restoreFiles, msg.reqId),
-                showFileDiff: () => this.fileStateDiffManager.showFileDiff(msg.filePath, msg.minLine),
-                showPermissionDiff: () => this.fileStateDiffManager.showPermissionDiff(msg.filePath, msg.diffContent),
+                showFileDiff: () => this.fileStateDiffManager.showFileDiff(sid!, msg.filePath, msg.minLine),
+                showPermissionDiff: () => this.fileStateDiffManager.showPermissionDiff(sid!, msg.filePath, msg.diffContent),
                 getFileChangeStats: () => this.getFileChangeStats(sid, msg.filePath),
                 searchContentInFiles: () => this.searchContentInFiles(msg.content),
                 requestClipboardFiles: () => this.requestClipboardFiles(),
@@ -251,13 +251,14 @@ export class ChatWebviewProvider {
     }
 
     private async restoreFromSnapshots(sessionId: string | undefined, filePaths: string[]): Promise<void> {
-        await this.fileStateDiffManager.revertAllChanges(filePaths);
+        if (!sessionId) return;
+        await this.fileStateDiffManager.revertAllChanges(sessionId, filePaths);
         this.postMessage({ type: 'clearFileChanges', sessionId });
     }
 
     private async restoreFromSnapshot(sessionId: string | undefined, filePath: string): Promise<void> {
-        if (!filePath) return;
-        await this.fileStateDiffManager.revertAllChanges([filePath]);
+        if (!sessionId || !filePath) return;
+        await this.fileStateDiffManager.revertAllChanges(sessionId, [filePath]);
         this.postMessage({ type: 'removeFileChange', sessionId, filePath });
     }
 
@@ -296,9 +297,9 @@ export class ChatWebviewProvider {
     }
 
     private async getFileChangeStats(sessionId: string | undefined, filePath: string): Promise<void> {
-        if (!filePath) return;
+        if (!sessionId || !filePath) return;
         try {
-            const stats = await this.fileStateDiffManager.getFileChangeStats(filePath);
+            const stats = await this.fileStateDiffManager.getFileChangeStats(sessionId, filePath);
             this.postMessage({ type: 'fileChangeStats', sessionId, fullPath: filePath, stats });
         } catch (error) {
             console.error('Failed to get file change stats:', error);

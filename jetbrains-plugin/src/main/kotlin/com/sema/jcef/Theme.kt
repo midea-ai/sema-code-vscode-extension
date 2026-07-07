@@ -5,6 +5,7 @@ import com.intellij.openapi.Disposable
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.editor.colors.EditorColorsListener
 import com.intellij.openapi.editor.colors.EditorColorsManager
+import com.intellij.openapi.util.Disposer
 import com.intellij.ui.JBColor
 import com.intellij.ui.jcef.JBCefBrowser
 import com.intellij.util.ui.UIUtil
@@ -28,6 +29,10 @@ object Theme {
         val tipBg = UIUtil.getToolTipBackground()
         val tipFg = UIUtil.getToolTipForeground()
         val link = if (JBColor.isBright()) Color(0x00, 0x66, 0xCC) else Color(0x37, 0x94, 0xFF)
+        // chat 内 React diff 的行底色，取 IDE 配色方案里原生 diff 的 DIFF_INSERTED/DIFF_DELETED 背景，
+        // 与「点开文件」弹出的原生 diff 窗口同源 → 两处颜色一致，且自动随明/暗主题变化。
+        val diffInsBg = scheme.getAttributes(com.intellij.openapi.diff.DiffColors.DIFF_INSERTED)?.backgroundColor
+        val diffDelBg = scheme.getAttributes(com.intellij.openapi.diff.DiffColors.DIFF_DELETED)?.backgroundColor
 
         val sb = StringBuilder(":root{")
         fun v(name: String, value: String) { sb.append("--vscode-").append(name).append(':').append(value).append(';') }
@@ -81,8 +86,9 @@ object Theme {
         v("terminal-ansiBrightCyan", "#29b8db")
         v("charts-green", "#4ec9b0")
         v("charts-purple", "#9575ff")
-        v("diffEditor-insertedLineBackground", "rgba(78,201,176,0.15)")
-        v("diffEditor-removedLineBackground", "rgba(244,135,113,0.15)")
+        // 与原生 diff 同源；配色方案缺省时回退到原写死值。
+        v("diffEditor-insertedLineBackground", diffInsBg?.let { hex(it) } ?: "rgba(78,201,176,0.15)")
+        v("diffEditor-removedLineBackground", diffDelBg?.let { hex(it) } ?: "rgba(244,135,113,0.15)")
         v("notificationsWarningIcon-foreground", "#ffba49")
         v("inputValidation-warningBackground", "rgba(255,186,73,0.15)")
         v("inputValidation-warningForeground", hex(fg))
@@ -109,9 +115,18 @@ object Theme {
     /** 订阅 IDE 换肤/配色变化，重算变量写回 <style id="sema-theme">，面板无需重载即随主题刷新（绑 parent，随面板注销）。 */
     fun installLiveUpdate(browser: JBCefBrowser, parent: Disposable) {
         val conn = ApplicationManager.getApplication().messageBus.connect(parent)
+        // 关键：换肤事件（LafManagerListener）是在换肤过程中同步触发的，此刻 JBColor/UIUtil 的颜色缓存
+        // 与 EditorColorsManager 的编辑器配色都可能还没刷完 —— 直接读会得到新旧混合的颜色，导致样式割裂。
+        // 因此推迟到下一个 EDT 周期再读（善后已跑完），并用 pending 合并 LAF + 编辑器配色两个事件为最终一次稳定读取。
+        val pending = java.util.concurrent.atomic.AtomicBoolean(false)
         val refresh = Runnable {
-            val js = "var s=document.getElementById('sema-theme'); if(s) s.textContent=${jsLiteral(cssVariables())};"
-            browser.cefBrowser.executeJavaScript(js, browser.cefBrowser.url, 0)
+            if (!pending.compareAndSet(false, true)) return@Runnable
+            ApplicationManager.getApplication().invokeLater {
+                pending.set(false)
+                if (Disposer.isDisposed(parent)) return@invokeLater
+                val js = "var s=document.getElementById('sema-theme'); if(s) s.textContent=${jsLiteral(cssVariables())};"
+                browser.cefBrowser.executeJavaScript(js, browser.cefBrowser.url, 0)
+            }
         }
         conn.subscribe(LafManagerListener.TOPIC, LafManagerListener { refresh.run() })
         conn.subscribe(EditorColorsManager.TOPIC, EditorColorsListener { refresh.run() })

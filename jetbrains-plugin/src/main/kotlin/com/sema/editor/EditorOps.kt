@@ -3,19 +3,29 @@ package com.sema.editor
 import com.google.gson.Gson
 import com.google.gson.JsonObject
 import com.intellij.diff.DiffContentFactory
-import com.intellij.diff.DiffManager
+import com.intellij.diff.chains.SimpleDiffRequestChain
 import com.intellij.diff.comparison.ComparisonManager
 import com.intellij.diff.comparison.ComparisonPolicy
 import com.intellij.diff.contents.DiffContent
+import com.intellij.diff.editor.ChainDiffVirtualFile
+import com.intellij.diff.editor.DiffEditorTabFilesManager
 import com.intellij.diff.requests.SimpleDiffRequest
+import com.intellij.diff.tools.fragmented.UnifiedDiffTool
+import com.intellij.diff.tools.util.base.HighlightPolicy
+import com.intellij.diff.tools.util.base.TextDiffSettingsHolder.TextDiffSettings
+import com.intellij.diff.util.DiffUserDataKeys
+import com.intellij.diff.util.DiffUserDataKeysEx
+import com.intellij.diff.util.Side
 import com.intellij.ide.BrowserUtil
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.command.WriteCommandAction
 import com.intellij.openapi.diagnostic.logger
+import com.intellij.openapi.fileEditor.FileEditorManager
 import com.intellij.openapi.fileEditor.OpenFileDescriptor
 import com.intellij.openapi.fileTypes.FileTypeManager
 import com.intellij.openapi.progress.DumbProgressIndicator
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.util.Pair
 import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.openapi.vfs.VfsUtil
 import java.io.File
@@ -25,12 +35,10 @@ import java.security.MessageDigest
  * 编辑器侧操作（VFS / diff / 打开文件 / 快照回滚）。
  *
  * 对标 VSCode 端 FileStateDiffManager：sema-core 子进程直接写盘，宿主只做两件事——
- * (a) write/edit 完成后用 patch 反推出改动前的原始内容存快照；(b) 用户点「拒绝」时用快照写回或删除。
+ * (a) 读文件时（会话就绪补历史、view_file、@ 引用）回读磁盘存改动前原版快照（幂等）；(b) 用户点「拒绝」时用快照写回或删除。
  * 「决定给哪个文件拍快照」的编排在 webview 的 controller.ts，这里只做实际 fs + diff。
  *
- * 两个跨进程坑（VSCode 同进程没有，JB 必须绕）：
- * - 快照不能靠「读文件时抓」：sidecar 独立进程写盘，异步桥抓快照有竞态会抓到写后内容。
- *   改为从「写后磁盘内容 + 反向套用 patch」反推原始内容 → race-free。
+ * 跨进程坑（VSCode 同进程没有，JB 必须绕）：
  * - 读「当前内容」一律直读磁盘（File.readText），不走 VFS：VFS 不知道外部进程的写入，会返回陈旧内容。
  */
 class EditorOps(
@@ -59,11 +67,16 @@ class EditorOps(
 
     private data class Snapshot(val hash: String, val size: Long, val tempFile: File)
 
-    /** key = 绝对路径 */
-    private val snapshots = HashMap<String, Snapshot>()
+    /** sessionId -> (绝对路径 -> 快照)：按会话隔离，避免多会话共享一份基线导致统计错乱、清空互相波及。 */
+    private val sessionSnapshots = HashMap<String, HashMap<String, Snapshot>>()
+    private fun snapshotsOf(sessionId: String): HashMap<String, Snapshot> =
+        sessionSnapshots.getOrPut(sessionId) { HashMap() }
 
     /** bash 输出 tab 复用：key(=toolId||command) → 已打开的只读文件（对齐 VSCode 按 uri 复用）。 */
     private val bashOutputFiles = HashMap<String, com.intellij.testFramework.LightVirtualFile>()
+
+    /** diff tab 复用：key(=路径) → 已打开的 diff 文件（平台不按路径自动复用，需自持实例，对齐 VSCode 单窗口）。 */
+    private val openDiffFiles = HashMap<String, ChainDiffVirtualFile>()
     private val tempDir: File = File(System.getProperty("java.io.tmpdir"), "sema-snapshots-jb")
 
     fun handle(msg: JsonObject) {
@@ -81,13 +94,14 @@ class EditorOps(
             "requestInputHistory" -> sendInputHistory()
             "saveInputHistory" -> saveInputHistory(msg.getAsJsonObject("item"))
             "openAgentDetail" -> openAgentDetail(str(msg, "taskId"), str(msg, "sessionId"))
-            "snapshotFromPatch" -> snapshotFromPatch(str(msg, "filePath"), str(msg, "patchType"), msg.getAsJsonArray("patch"))
-            "resetSnapshots" -> resetSnapshots()
-            "showFileDiff" -> showFileDiff(str(msg, "filePath"), intOrNull(msg, "minLine"))
-            "showPermissionDiff" -> showPermissionDiff(str(msg, "filePath"), msg.getAsJsonObject("diffContent"))
-            "revertFiles" -> revertFiles(strList(msg, "filePaths"))
-            "revertFile" -> revertFiles(listOfNotNull(str(msg, "filePath")))
-            "getFileChangeStats" -> getFileChangeStats(str(msg, "filePath"), str(msg, "sessionId") ?: "")
+            "addFileToSnapshotIfNew" -> addFileToSnapshotIfNew(str(msg, "sessionId") ?: "", str(msg, "filePath"))
+            "pinEmptySnapshotIfNew" -> pinEmptySnapshotIfNew(str(msg, "sessionId") ?: "", str(msg, "filePath"))
+            "resetSnapshots" -> resetSnapshots(str(msg, "sessionId") ?: "")
+            "showFileDiff" -> showFileDiff(str(msg, "sessionId") ?: "", str(msg, "filePath"), intOrNull(msg, "minLine"))
+            "showPermissionDiff" -> showPermissionDiff(str(msg, "sessionId") ?: "", str(msg, "filePath"), msg.getAsJsonObject("diffContent"))
+            "revertFiles" -> revertFiles(str(msg, "sessionId") ?: "", strList(msg, "filePaths"))
+            "revertFile" -> revertFiles(str(msg, "sessionId") ?: "", listOfNotNull(str(msg, "filePath")))
+            "getFileChangeStats" -> getFileChangeStats(str(msg, "sessionId") ?: "", str(msg, "filePath"))
             else -> log.info("editor op 尚未实现: $type")
         }
     }
@@ -216,70 +230,59 @@ class EditorOps(
 
     // ─── 快照 ────────────────────────────────────────────────────────────────
 
-    /**
-     * write/edit 完成后，用 patch 反推出改动前的原始内容存快照（幂等）。
-     * 关键：不依赖"读文件时抓快照"（那有跨进程竞态会抓到写后内容）。这里从"当前磁盘内容 + 反向套用 patch"
-     * 得到原始内容——无论何时执行，当前磁盘都是写后稳定态，反推结果确定，因此 race-free。
-     * type='new'（新建文件）无原始内容 → 不存快照（回滚＝删除）。多次编辑只在首次存（保留真正的原始）。
-     */
-    private fun snapshotFromPatch(filePath: String?, patchType: String?, patch: com.google.gson.JsonArray?) {
+    /** 某会话的临时文件目录。 */
+    private fun sessionTempDir(sessionId: String): File = File(tempDir, sessionId)
+
+    /** 读文件时打快照（对齐 VSCode addFileToSnapshotIfNew）：回读当前磁盘内容存为"原版"，按会话隔离、幂等只在首次存。 */
+    private fun addFileToSnapshotIfNew(sessionId: String, filePath: String?) {
         val full = resolveFullPath(filePath) ?: return
-        if (snapshots.containsKey(full)) return
-        if (patchType == "new" || patch == null) return
+        val snaps = snapshotsOf(sessionId)
+        if (snaps.containsKey(full)) return
         val src = File(full)
         if (!src.isFile) return
-        val current = runCatching { src.readText() }.getOrNull() ?: return
-        val original = reverseApplyPatch(current, patch) ?: run {
-            log.warn("[sema] snapshotFromPatch 反推失败（patch 位置对不上）: $full")
-            return
-        }
+        val original = runCatching { src.readText() }.getOrNull() ?: return
         try {
-            tempDir.mkdirs()
-            val tempFile = File(tempDir, md5(full))
+            val dir = sessionTempDir(sessionId)
+            dir.mkdirs()
+            val tempFile = File(dir, md5(full))
             tempFile.writeText(original)
-            snapshots[full] = Snapshot(md5(original), original.length.toLong(), tempFile)
+            snaps[full] = Snapshot(md5(original), original.length.toLong(), tempFile)
         } catch (e: Exception) {
-            log.warn("snapshotFromPatch 写快照失败: $full", e)
+            log.warn("addFileToSnapshotIfNew 写快照失败: $full", e)
         }
     }
 
-    /** 用 patch(原始→当前) 反推：current + 反向 patch → original。位置对不上返回 null。 */
-    private fun reverseApplyPatch(current: String, patch: com.google.gson.JsonArray): String? {
-        val curLines = current.split("\n")
-        val result = ArrayList<String>()
-        var idx = 0
-        for (h in patch) {
-            val hunk = h.asJsonObject
-            val newStart = (hunk.get("newStart")?.asInt ?: return null) - 1 // 当前内容里的 0-based 起点
-            if (newStart < idx || newStart > curLines.size) return null
-            while (idx < newStart) { result.add(curLines[idx]); idx++ }
-            for (l in hunk.getAsJsonArray("lines")) {
-                val line = l.asString
-                when {
-                    line.startsWith("+") -> { if (idx >= curLines.size) return null; idx++ }        // 当前有、原始无 → 跳过
-                    line.startsWith("-") -> result.add(line.substring(1))                            // 原始有、当前无 → 补回
-                    else -> { if (idx >= curLines.size) return null; result.add(curLines[idx]); idx++ } // 上下文，两边都有
-                }
-            }
+    /** 新建文件时钉一条空基线并锁定（对齐 VSCode pinEmptySnapshotIfNew）：避免 fork 后重读把已改内容误当基线；已在快照中则不动。 */
+    private fun pinEmptySnapshotIfNew(sessionId: String, filePath: String?) {
+        val full = resolveFullPath(filePath) ?: return
+        val snaps = snapshotsOf(sessionId)
+        if (snaps.containsKey(full)) return
+        try {
+            val dir = sessionTempDir(sessionId)
+            dir.mkdirs()
+            val tempFile = File(dir, md5(full))
+            tempFile.writeText("")
+            snaps[full] = Snapshot(md5(""), 0L, tempFile)
+        } catch (e: Exception) {
+            log.warn("pinEmptySnapshotIfNew 写空快照失败: $full", e)
         }
-        while (idx < curLines.size) { result.add(curLines[idx]); idx++ }
-        return result.joinToString("\n")
     }
 
-    private fun resetSnapshots() {
-        snapshots.clear()
-        runCatching { tempDir.deleteRecursively() }
+    /** 只重置指定会话的快照与临时文件（对齐 VSCode createSnapshot(sessionId)），不波及其他会话。 */
+    private fun resetSnapshots(sessionId: String) {
+        sessionSnapshots.remove(sessionId)
+        runCatching { sessionTempDir(sessionId).deleteRecursively() }
     }
 
-    private fun readSnapshotContent(fullPath: String): String? =
-        snapshots[fullPath]?.tempFile?.let { runCatching { it.readText() }.getOrNull() }
+    private fun readSnapshotContent(sessionId: String, fullPath: String): String? =
+        snapshotsOf(sessionId)[fullPath]?.tempFile?.let { runCatching { it.readText() }.getOrNull() }
 
     // ─── diff 预览 ────────────────────────────────────────────────────────────
 
-    private fun showFileDiff(filePath: String?, minLine: Int?) {
+    private fun showFileDiff(sessionId: String, filePath: String?, minLine: Int?) {
         val full = resolveFullPath(filePath) ?: return
         val fileName = File(full).name
-        val original = readSnapshotContent(full) ?: ""
+        val original = readSnapshotContent(sessionId, full) ?: ""
         // 直读磁盘：VFS 缓存陈旧会拿到编辑前内容，diff 就看不到改动
         val current = runCatching { File(full).readText() }.getOrNull() ?: ""
 
@@ -287,10 +290,11 @@ class EditorOps(
             openFile(filePath, (minLine ?: 1) - 1)
             return
         }
-        openDiff(fileName, original, current, "快照", "当前")
+        // diff tab 复用 key 带 sessionId，避免多会话对同一文件的 diff 互相覆盖。
+        openDiff("$sessionId:$full", fileName, original, current, "快照", "当前", maxOf(0, (minLine ?: 1) - 1))
     }
 
-    private fun showPermissionDiff(filePath: String?, diffContent: JsonObject?) {
+    private fun showPermissionDiff(sessionId: String, filePath: String?, diffContent: JsonObject?) {
         val full = resolveFullPath(filePath) ?: return
         if (diffContent == null) { openFile(filePath, 0); return }
         val fileName = File(full).name
@@ -307,11 +311,16 @@ class EditorOps(
             openFile(filePath, 0)
             return
         }
-        // VSCode 顺序：左=当前，右=proposed
-        openDiff(fileName, current, proposed, "当前", "提议修改")
+        // VSCode 顺序：左=当前，右=proposed；滚动到首个 hunk 的 newStart（1-based，对齐 VSCode）。
+        val minLine = patch?.firstOrNull()?.asJsonObject?.get("newStart")?.asInt ?: 1
+        openDiff("permission:$sessionId:$full", fileName, current, proposed, "当前", "提议修改", maxOf(0, minLine - 1))
     }
 
-    private fun openDiff(fileName: String, leftText: String, rightText: String, leftTitle: String, rightTitle: String) {
+    /**
+     * @param pathKey  复用同一 tab 的依据（用绝对路径；权限预览另加前缀以与快照 diff 区分）。
+     * @param scrollLine0  滚动定位到的行，0-based，作用在 RIGHT（新/当前）侧。
+     */
+    private fun openDiff(pathKey: String, fileName: String, leftText: String, rightText: String, leftTitle: String, rightTitle: String, scrollLine0: Int) {
         ApplicationManager.getApplication().invokeLater {
             try {
                 val factory = DiffContentFactory.getInstance()
@@ -319,7 +328,18 @@ class EditorOps(
                 val left: DiffContent = factory.create(project, leftText, fileType)
                 val right: DiffContent = factory.create(project, rightText, fileType)
                 val request = SimpleDiffRequest(fileName, left, right, leftTitle, rightTitle)
-                DiffManager.getInstance().showDiff(project, request)
+                // 默认一栏 unified + split-changes 高亮（均保留工具栏可切）；new 隔离实例，不污染用户全局设置。
+                request.putUserData(DiffUserDataKeysEx.FORCE_DIFF_TOOL, UnifiedDiffTool.INSTANCE)
+                request.putUserData(TextDiffSettings.KEY, TextDiffSettings().apply { highlightPolicy = HighlightPolicy.BY_WORD_SPLIT })
+                // 滚动到首个变更行（RIGHT=新/当前侧，0-based）。
+                request.putUserData(DiffUserDataKeys.SCROLL_TO_LINE, Pair.create(Side.RIGHT, scrollLine0))
+                // 单窗口复用（对齐 VSCode）：关掉该文件已开的 diff tab 再以编辑器 tab 重开——顺带刷新内容
+                // （ChainDiffVirtualFile 的 processor 只在首次创建时跑一次，复用旧实例会显示旧 diff）。
+                val fem = FileEditorManager.getInstance(project)
+                openDiffFiles.remove(pathKey)?.let { fem.closeFile(it) }
+                val diffFile = ChainDiffVirtualFile(SimpleDiffRequestChain(request), fileName)
+                openDiffFiles[pathKey] = diffFile
+                DiffEditorTabFilesManager.getInstance(project).showDiffFile(diffFile, true)
             } catch (e: Exception) {
                 log.warn("openDiff 失败: $fileName", e)
             }
@@ -329,10 +349,10 @@ class EditorOps(
     // ─── 拒绝 / 回滚 ──────────────────────────────────────────────────────────
 
     /** 有快照＝写回原内容；无快照但文件存在＝新建文件，删除。都走 VFS 保证编辑器同步。 */
-    private fun revertFiles(filePaths: List<String>) {
+    private fun revertFiles(sessionId: String, filePaths: List<String>) {
         for (raw in filePaths) {
             val full = resolveFullPath(raw) ?: continue
-            val snapshotContent = readSnapshotContent(full)
+            val snapshotContent = readSnapshotContent(sessionId, full)
             ApplicationManager.getApplication().invokeLater {
                 WriteCommandAction.runWriteCommandAction(project) {
                     try {
@@ -354,10 +374,10 @@ class EditorOps(
 
     // ─── 变更统计 ─────────────────────────────────────────────────────────────
 
-    private fun getFileChangeStats(filePath: String?, sessionId: String) {
+    private fun getFileChangeStats(sessionId: String, filePath: String?) {
         val originalPath = filePath ?: return
         val full = resolveFullPath(originalPath) ?: return
-        val original = readSnapshotContent(full) ?: ""
+        val original = readSnapshotContent(sessionId, full) ?: ""
         // 直读磁盘：sema-core 在 IDE 外写盘，VFS 缓存陈旧，contentsToByteArray 会拿到编辑前内容
         val current = runCatching { File(full).readText() }.getOrNull() ?: ""
 
