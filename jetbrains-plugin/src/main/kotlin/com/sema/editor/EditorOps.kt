@@ -65,7 +65,8 @@ class EditorOps(
         )
     }
 
-    private data class Snapshot(val hash: String, val size: Long, val tempFile: File)
+    // isNew：仅 pinEmptySnapshotIfNew 打的空基线为 true，放弃即删除文件（对齐 VSCode）
+    private data class Snapshot(val hash: String, val size: Long, val tempFile: File, val isNew: Boolean = false)
 
     /** sessionId -> (绝对路径 -> 快照)：按会话隔离，避免多会话共享一份基线导致统计错乱、清空互相波及。 */
     private val sessionSnapshots = HashMap<String, HashMap<String, Snapshot>>()
@@ -244,7 +245,7 @@ class EditorOps(
             dir.mkdirs()
             val tempFile = File(dir, md5(full))
             tempFile.writeText("")
-            snaps[full] = Snapshot(md5(""), 0L, tempFile)
+            snaps[full] = Snapshot(md5(""), 0L, tempFile, isNew = true)
         } catch (e: Exception) {
             log.warn("pinEmptySnapshotIfNew 写空快照失败: $full", e)
         }
@@ -334,7 +335,15 @@ class EditorOps(
     private fun revertFiles(sessionId: String, filePaths: List<String>) {
         for (raw in filePaths) {
             val full = resolveFullPath(raw) ?: continue
-            val snapshotContent = readSnapshotContent(sessionId, full)
+            val snapshot = snapshotsOf(sessionId)[full]
+            // 无快照或新建文件的空基线（isNew）：原本文件不存在，放弃即删除（对齐 VSCode）
+            val shouldDelete = snapshot == null || snapshot.isNew
+            val snapshotContent = if (shouldDelete) null else readSnapshotContent(sessionId, full)
+            if (!shouldDelete && snapshotContent == null) {
+                // 有快照但临时文件读取失败：跳过，避免误删/误清用户文件
+                log.warn("读取快照失败，跳过回滚: $full")
+                continue
+            }
             ApplicationManager.getApplication().invokeLater {
                 WriteCommandAction.runWriteCommandAction(project) {
                     try {
