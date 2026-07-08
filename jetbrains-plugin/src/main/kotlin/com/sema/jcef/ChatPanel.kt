@@ -70,6 +70,8 @@ class ChatPanel(project: Project) : Disposable {
         BrowserNav.install(browser)
         // 收敛原生右键菜单：只留编辑项，移除「重新加载/后退」等会毁掉 SPA 会话状态的导航项。
         BrowserContextMenu.install(browser)
+        // 撤销/重做/删词等快捷键从 IDE keymap 抢回给输入框（详见 JcefKeyForwarder）
+        JcefKeyForwarder.install(browser, this)
     }
 
     private fun loadUi() {

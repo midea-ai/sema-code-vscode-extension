@@ -597,12 +597,13 @@ class EditorOps(
 
     // ─── 工具 ────────────────────────────────────────────────────────────────
 
+    // 出口统一正斜杠：Windows 上 File.path 吐反斜杠，IntelliJ VFS 只认正斜杠（喂反斜杠→null→跳转失效/新建文件删不掉）。
     private fun resolveFullPath(filePath: String?): String? {
         if (filePath.isNullOrBlank()) return null
         val f = File(filePath)
-        if (f.isAbsolute) return f.path
-        val base = project.basePath ?: return f.path
-        return File(base, filePath).path
+        if (f.isAbsolute) return com.intellij.openapi.util.io.FileUtil.toSystemIndependentName(f.path)
+        val base = project.basePath ?: return com.intellij.openapi.util.io.FileUtil.toSystemIndependentName(f.path)
+        return com.intellij.openapi.util.io.FileUtil.toSystemIndependentName(File(base, filePath).path)
     }
 
     private fun md5(s: String): String =

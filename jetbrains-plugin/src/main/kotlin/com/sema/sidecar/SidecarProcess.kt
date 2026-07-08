@@ -46,7 +46,8 @@ class SidecarProcess(
                 .redirectErrorStream(true)
             val env = pb.environment()
             env["SEMA_BRIDGE_PORT"] = "0"
-            env["SEMA_WORKING_DIR"] = workingDir
+            // 对齐 VSCode 的 uri.fsPath（原生分隔符、已验证可跑）；basePath 是正斜杠，Unix 上 no-op。
+            env["SEMA_WORKING_DIR"] = com.intellij.openapi.util.io.FileUtil.toSystemDependentName(workingDir)
 
             // 搜索用 PATH：登录 shell 真实 PATH（含 nvm/homebrew/volta）> IDE 继承的精简 PATH。
             // 关键：IDE 从 Finder/图标启动时只继承 launchd 精简 PATH，读不到 nvm/homebrew 的 node/git；
