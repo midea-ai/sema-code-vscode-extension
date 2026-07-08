@@ -4,10 +4,10 @@
     <vendor>SemaCode</vendor>
 
     <description><![CDATA[
-        <b>Sema Code — AI programming assistant for JetBrains IDEs.</b>
-        <p>Sema Code brings an out-of-the-box AI coding experience to IntelliJ IDEA, PyCharm, GoLand, WebStorm, CLion and other JetBrains IDEs, powered by the Sema Code Core engine.</p>
+        <b>Sema Code (SemaCode) — AI Coding Assistant / AI programming assistant for JetBrains IDEs.</b>
+        <p>Sema Code is an AI coding assistant and code copilot that brings an out-of-the-box AI programming experience to IntelliJ IDEA, PyCharm, GoLand, WebStorm, CLion and other JetBrains IDEs, powered by the Sema Code Core engine. Supports AI code generation, chat-based coding, and agent-driven development workflows.</p>
         <hr/>
-        <b>基于 Sema Code Core 的 JetBrains 智能编程插件</b>
+        <b>基于 Sema Code Core 的 JetBrains AI 编程助手 / 智能代码助手</b>
         <p>为开发者提供开箱即用的 AI 编程体验，支持 IntelliJ IDEA / PyCharm / GoLand / WebStorm / CLion 等 JetBrains 全家桶。</p>
         <p><b>Sema Code</b> 是基于 <a href="https://github.com/midea-ai/sema-code-core">Sema Code Core</a> 引擎的智能编程插件。</p>
         <b>核心特性</b>
