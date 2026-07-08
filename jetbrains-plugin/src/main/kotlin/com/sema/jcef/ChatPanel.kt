@@ -66,6 +66,8 @@ class ChatPanel(project: Project) : Disposable {
         Theme.installLiveUpdate(browser, this)
         // JCEF 不渲染原生 title 提示，接管 onTooltip 转 Swing tooltip。
         Tooltips.install(browser)
+        // 拦截外链导航：欢迎页/消息里的链接改用系统浏览器打开，避免整页替换 React 应用后关不掉。
+        BrowserNav.install(browser)
     }
 
     private fun loadUi() {

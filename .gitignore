@@ -14,4 +14,4 @@ test
 
 scripts/
 
-# jetbrains-plugin/
+.idea
