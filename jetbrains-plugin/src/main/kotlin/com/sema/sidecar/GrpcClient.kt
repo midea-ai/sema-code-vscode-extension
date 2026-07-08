@@ -25,6 +25,8 @@ class GrpcClient(
     fun connect() {
         val ch = OkHttpChannelBuilder.forAddress("127.0.0.1", port)
             .usePlaintext()
+            // 默认单条 4MB，收 BridgeEvent 时贴图/大 diff 会超限断连；抬到 64MB 留足余量
+            .maxInboundMessageSize(64 * 1024 * 1024)
             .build()
         channel = ch
         val stub = SemaBridgeGrpc.newStub(ch)

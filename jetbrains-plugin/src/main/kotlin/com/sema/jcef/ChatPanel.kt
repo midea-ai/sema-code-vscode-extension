@@ -68,6 +68,8 @@ class ChatPanel(project: Project) : Disposable {
         Tooltips.install(browser)
         // 拦截外链导航：欢迎页/消息里的链接改用系统浏览器打开，避免整页替换 React 应用后关不掉。
         BrowserNav.install(browser)
+        // 收敛原生右键菜单：只留编辑项，移除「重新加载/后退」等会毁掉 SPA 会话状态的导航项。
+        BrowserContextMenu.install(browser)
     }
 
     private fun loadUi() {
