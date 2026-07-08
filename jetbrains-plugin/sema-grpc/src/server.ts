@@ -329,6 +329,10 @@ server.bindAsync(
   },
 );
 
+// 进程级兜底：MCP/插件/cron 的脱离上下文异步异常不再掀翻整进程（sidecar 无自愈），降级为日志。
+process.on('uncaughtException', (err) => console.error('[sema-grpc] uncaughtException（已兜底）:', err));
+process.on('unhandledRejection', (reason) => console.error('[sema-grpc] unhandledRejection（已兜底）:', reason));
+
 process.on('SIGTERM', () => {
   console.log('[sema-grpc] Shutting down...');
   void manager.dispose().finally(() => server.tryShutdown(() => process.exit(0)));

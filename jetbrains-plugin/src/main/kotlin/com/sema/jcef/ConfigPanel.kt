@@ -25,12 +25,17 @@ class ConfigPanel(project: Project) : Disposable {
     private val log = logger<ConfigPanel>()
     private val browser = JBCefBrowser()
     private val hostQuery = JBCefJSQuery.create(browser as JBCefBrowserBase)
-    private val bridge = MessageBridge(project, ::pushToWeb)
+    private val bridge = MessageBridge(project, ::pushToWeb, com.sema.bridge.PanelKind.CONFIG)
     private var tempDir: File? = null
+    // 注册进面板总线：让聊天页「打开配置/任务」深链能把 navigateTo 推进本配置 webview。
+    // 存成 val 以保证 register/unregister 用同一引用（方法引用 ::pushToWeb 每次是新对象，无法按 === 注销）。
+    private val bus = project.getService(com.sema.bridge.SemaPanelBus::class.java)
+    private val pushRef: (String) -> Unit = ::pushToWeb
 
     val component: JComponent get() = browser.component
 
     init {
+        bus.registerConfig(pushRef)
         hostQuery.addHandler { req ->
             bridge.onWebMessage(req)
             null
@@ -94,6 +99,7 @@ class ConfigPanel(project: Project) : Disposable {
         "\"" + s.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n").replace("\r", "") + "\""
 
     override fun dispose() {
+        bus.unregisterConfig(pushRef)
         bridge.dispose()
         hostQuery.dispose()
         browser.dispose()

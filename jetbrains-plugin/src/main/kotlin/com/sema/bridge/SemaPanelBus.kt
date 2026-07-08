@@ -62,6 +62,44 @@ class SemaPanelBus {
         if (p != null && chatReady) p(json) else pendingChat.add(json)
     }
 
+    // ── 配置面板 ──────────────────────────────────────────────────────────────
+    // 让「聊天页深链打开配置子页」能把 navigateTo 送进配置 webview（配置那条 gRPC 连接推不到，只能经总线）。
+
+    @Volatile private var configPush: ((String) -> Unit)? = null
+    @Volatile private var configReady = false
+    private val pendingConfig = ConcurrentLinkedQueue<String>()
+
+    @Synchronized
+    fun registerConfig(push: (String) -> Unit) {
+        configPush = push
+        configReady = false // 新面板/新 webview：等首帧入站再视为就绪
+    }
+
+    @Synchronized
+    fun unregisterConfig(push: (String) -> Unit) {
+        if (configPush === push) {
+            configPush = null
+            configReady = false
+        }
+    }
+
+    /** 配置 webview 就绪（首帧入站即视为 React 已挂载）→ flush 缓冲的深链导航消息。 */
+    @Synchronized
+    fun setConfigReady() {
+        val p = configPush
+        if (!configReady && p != null) {
+            configReady = true
+            while (true) { val m = pendingConfig.poll() ?: break; p(m) }
+        }
+    }
+
+    /** 向配置 webview 推一帧（未就绪则缓冲）。 */
+    @Synchronized
+    fun pushToConfig(json: String) {
+        val p = configPush
+        if (p != null && configReady) p(json) else pendingConfig.add(json)
+    }
+
     // ── 历史面板 ──────────────────────────────────────────────────────────────
 
     fun registerHistory(push: (String) -> Unit) { historyPush = push }

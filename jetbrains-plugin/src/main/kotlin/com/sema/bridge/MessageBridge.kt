@@ -4,7 +4,9 @@ import com.google.gson.Gson
 import com.google.gson.JsonObject
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.diagnostic.logger
+import com.intellij.openapi.fileEditor.FileEditorManager
 import com.intellij.openapi.project.Project
+import com.sema.config.SemaConfigVirtualFile
 import com.sema.config.SessionHistoryManager
 import com.sema.config.SystemConfigManager
 import com.sema.editor.EditorOps
@@ -20,11 +22,17 @@ import java.io.File
  * 协议逻辑全在 webview JS（复用 semaSessionWrapper / config-controller），这里只搬运。
  * 每个面板一个 MessageBridge → 一条独立 gRPC 连接（Conn）。
  */
+/** 面板类型：让桥区分自己承载的是哪个 webview（当前仅用于配置页的就绪信号）。 */
+enum class PanelKind { CHAT, CONFIG, HISTORY, OTHER }
+
 class MessageBridge(
     private val project: Project,
     private val pushToWeb: (String) -> Unit,
+    private val panel: PanelKind = PanelKind.OTHER,
 ) {
     private val log = logger<MessageBridge>()
+    /** 配置页首帧入站即上报就绪，让缓冲的深链 navigateTo flush（只标记一次）。 */
+    private var configReadyMarked = false
     private val gson = Gson()
     private val sidecar = project.getService(SidecarService::class.java)
     private val editorOps = EditorOps(project, pushToWeb)
@@ -49,6 +57,11 @@ class MessageBridge(
             log.warn("无法解析 web 消息: $json")
             return
         }
+        // 配置页收到首条 web 消息 → React 已挂载并接好 message 监听 → 就绪，flush 缓冲的深链导航。
+        if (panel == PanelKind.CONFIG && !configReadyMarked) {
+            configReadyMarked = true
+            bus.setConfigReady()
+        }
         when (obj.str("channel")) {
             "grpc" -> {
                 val action = obj.str("action")
@@ -62,6 +75,9 @@ class MessageBridge(
                     "systemConfig" -> handleSystemConfig(obj)
                     "history" -> handleHistory(obj)
                     "confirm" -> handleConfirm(obj)
+                    // 跨面板深链（页面各持独立连接，pushToWeb 只能推自己面板，必须经总线）：
+                    "openConfig" -> handleOpenConfig(obj)          // 聊天页 → 配置页定位子页
+                    "openAgentDetail" -> handleOpenAgentDetail(obj) // 配置页任务详情 → 聊天页弹子代理详情
                     else -> editorOps.handle(obj)
                 }
             }
@@ -127,6 +143,51 @@ class MessageBridge(
             ) == com.intellij.openapi.ui.Messages.YES
             replyEditor(reqId, mapOf("confirmed" to ok))
         }
+    }
+
+    /**
+     * 聊天页深链打开配置子页（对齐 VSCode openConfig → configWebview.show → navigateTo）。
+     * 打开/聚焦配置 tab（复用 SemaConfigVirtualFile，等价 VSCode panel.reveal），再把 navigateTo
+     * 经总线推给配置 webview——配置页那条 gRPC 连接推不到，只能走 SemaPanelBus。空 page 默认模型配置。
+     */
+    private fun handleOpenConfig(obj: JsonObject) {
+        val page = obj.str("page").ifEmpty { "models" } // 对齐 VSCode 的 page || 'models'
+        val taskId = obj.str("taskId")
+        ApplicationManager.getApplication().invokeLater {
+            FileEditorManager.getInstance(project).openFile(SemaConfigVirtualFile.get(project), true)
+        }
+        val uiMsg = linkedMapOf<String, Any?>("command" to "navigateTo", "page" to page)
+        if (taskId.isNotEmpty()) uiMsg["taskId"] = taskId
+        bus.pushToConfig(editorFrame(uiMsg))
+    }
+
+    /**
+     * 配置页任务面板「任务详情」→ 聊天页弹子代理详情（对齐 VSCode openAgentDetail → 聊天页 openAgentDetail 弹窗）。
+     * 跨面板走总线推聊天 webview；任务归属会话非当前活跃时先切会话（React 按 sessionId 渲染对应消息列表，
+     * 弹窗才能命中），并激活聊天 ToolWindow 让其可见。
+     */
+    private fun handleOpenAgentDetail(obj: JsonObject) {
+        val taskId = obj.str("taskId")
+        if (taskId.isEmpty()) return
+        val sessionId = obj.str("sessionId")
+        if (sessionId.isNotEmpty() && sessionId != bus.activeId) {
+            bus.pushToChat(editorFrame(linkedMapOf("type" to "switchToSession", "sessionId" to sessionId)))
+        }
+        val detail = linkedMapOf<String, Any?>("type" to "openAgentDetail", "taskId" to taskId)
+        if (sessionId.isNotEmpty()) detail["sessionId"] = sessionId
+        bus.pushToChat(editorFrame(detail))
+        ApplicationManager.getApplication().invokeLater {
+            com.intellij.openapi.wm.ToolWindowManager.getInstance(project).getToolWindow("Sema Code")?.activate(null)
+        }
+    }
+
+    /** 包一条 UI 消息为 editor message 帧（transport 会以 window.message 灌给 React App）。 */
+    private fun editorFrame(uiMsg: Map<String, Any?>): String {
+        val frame = JsonObject().apply {
+            addProperty("channel", "editor")
+            addProperty("message", gson.toJson(uiMsg))
+        }
+        return gson.toJson(frame)
     }
 
     /**

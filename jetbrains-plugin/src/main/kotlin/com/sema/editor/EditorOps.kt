@@ -83,7 +83,6 @@ class EditorOps(
         when (val type = str(msg, "type")) {
             "openFile" -> openFile(str(msg, "filePath"), intOr(msg, "line", 0), intOrNull(msg, "endLine"))
             "openExternal" -> openExternal(str(msg, "url"))
-            "openConfig" -> openConfig(str(msg, "page"), str(msg, "taskId"))
             "openBashOutput" -> openBashOutput(str(msg, "content"), str(msg, "command") ?: str(msg, "title"), str(msg, "toolId"))
             "verifyFilePath" -> verifyFilePath(str(msg, "filePath"), str(msg, "tempId"), str(msg, "originalCode"), str(msg, "lineInfo"))
             "resolveImagePath" -> resolveImagePath(str(msg, "filePath"), str(msg, "tempId"))
@@ -93,7 +92,6 @@ class EditorOps(
             "requestClipboardFiles" -> requestClipboardFiles()
             "requestInputHistory" -> sendInputHistory()
             "saveInputHistory" -> saveInputHistory(msg.getAsJsonObject("item"))
-            "openAgentDetail" -> openAgentDetail(str(msg, "taskId"), str(msg, "sessionId"))
             "addFileToSnapshotIfNew" -> addFileToSnapshotIfNew(str(msg, "sessionId") ?: "", str(msg, "filePath"))
             "pinEmptySnapshotIfNew" -> pinEmptySnapshotIfNew(str(msg, "sessionId") ?: "", str(msg, "filePath"))
             "resetSnapshots" -> resetSnapshots(str(msg, "sessionId") ?: "")
@@ -131,16 +129,6 @@ class EditorOps(
 
     private fun openExternal(url: String?) {
         if (!url.isNullOrBlank()) BrowserUtil.browse(url)
-    }
-
-    /** 打开配置页（编辑器主区域的独立 tab，对齐 VSCode 的 createWebviewPanel(ViewColumn.One)）。 */
-    private fun openConfig(page: String? = null, taskId: String? = null) {
-        ApplicationManager.getApplication().invokeLater {
-            val vf = com.sema.config.SemaConfigVirtualFile.get(project)
-            com.intellij.openapi.fileEditor.FileEditorManager.getInstance(project).openFile(vf, true)
-            // TODO(JB 待完善)：page/taskId 深链导航尚未接入配置页 React 路由。
-            if (page != null || taskId != null) log.info("openConfig page=$page taskId=$taskId（深链导航待完善）")
-        }
     }
 
     /**
@@ -220,12 +208,6 @@ class EditorOps(
             addProperty("message", gson.toJson(message))
         }
         pushToWeb(gson.toJson(frame))
-    }
-
-    /** 查看子 agent 详情（D9 最小实现）：先打开配置页；子 agent 详情深链导航待完善。 */
-    private fun openAgentDetail(taskId: String?, sessionId: String?) {
-        log.info("openAgentDetail taskId=$taskId sessionId=$sessionId（打开配置页，深链待完善）")
-        openConfig(page = "tasks", taskId = taskId)
     }
 
     // ─── 快照 ────────────────────────────────────────────────────────────────
