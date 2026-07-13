@@ -117,5 +117,7 @@
   color: var(--chat-text-symbol);
   cursor: pointer;
   text-decoration: underline;
+  /* 裸 URL 或长链接文本可能是超长无空格串，避免撑破布局 */
+  word-break: break-all;
 }
 

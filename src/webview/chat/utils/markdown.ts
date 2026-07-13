@@ -132,8 +132,24 @@ export function renderMarkdownToHtml(content: string, vscode?: any): string {
       return placeholder;
     });
 
+    // markdown 链接占位 - [text](url)，scheme 白名单 http/https/file，天然挡掉 javascript: 等
+    // 必须晚于 ![alt](src) 图片提取（否则会抢走图片语法的 [alt](src) 部分）。
+    // "显示文本≠真实目标"的欺骗风险由两层缓解：title 悬停展示完整 URL；
+    // http(s) 经 openExternal 打开时受 VS Code Trusted Domains 弹窗兜底。
+    processedContent = processedContent.replace(
+      /\[([^\]]+)\]\(((?:https?|file):\/\/[^)\s]+)\)/g,
+      (_match, text, url) => {
+        const safeUrl = escapeHtml(url);
+        const placeholder = `\x00URL_${urlPlaceholders.length}\x00`;
+        urlPlaceholders.push(
+          `<a class="md-url-link" data-url="${safeUrl}" title="${safeUrl}">${escapeHtml(text)}</a>`
+        );
+        return placeholder;
+      }
+    );
+
     // 本地 loopback URL 占位 - 仅支持裸 URL，仅 localhost/127.0.0.1/0.0.0.0/[::1]
-    // 负向回顾排除 `](url)` 形式（不处理 markdown link，避免显示文本与目标分离的欺骗风险）
+    // 负向回顾排除 `](url)` 形式（markdown link 已在上一步提取，这里兜住文本含 ] 等未命中的残留）
     processedContent = processedContent.replace(
       /(?<!\]\()https?:\/\/(?:localhost|127\.0\.0\.1|0\.0\.0\.0|\[::1\])(?::\d+)?(?:\/[^\s<>"'`)\]]*)?/gi,
       (match) => {
@@ -213,7 +229,7 @@ export function renderMarkdownToHtml(content: string, vscode?: any): string {
     ALLOWED_ATTR: [
       'class', 'data-temp-id', 'data-file-path', 'data-line-info',
       'src', 'alt', 'data-img-path', 'data-img-url', 'data-img-temp-id', 'data-md-original',
-      'data-url'
+      'data-url', 'title'
     ],
   });
 
@@ -459,6 +475,7 @@ export function hasMarkdownFormatting(content: string): boolean {
     /^\|.+\|$/m,           // 表格行
     /!\[[^\]]*\]\([^)\s]+?\)/, // 图片
     /<img\b[^>]*?>/i,          // 原始 <img> 标签
+    /\[[^\]]+\]\((?:https?|file):\/\/[^)\s]+\)/, // markdown 链接
     /https?:\/\/(?:localhost|127\.0\.0\.1|0\.0\.0\.0|\[::1\])/i, // 本地 loopback URL
     /\$\$[\s\S]+?\$\$/,    // 块级公式
     /(?<![\\$])\$(?!\s)[^\n$]+?(?<!\s)\$(?!\d)/, // 行内公式
