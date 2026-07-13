@@ -10,6 +10,7 @@ import {
 } from '../../../../utils/tool';
 import { getToolName, getToolTitle, isExploratoryShellCommand, isFindShellCommand, isLsShellCommand, isPwdShellCommand } from '../../utils/groupMessages';
 import { formatSearchTitle } from './utils';
+import { hasTextSelection } from '../../utils/selection';
 
 interface GroupedToolBlockProps {
     messages: Message[];
@@ -381,6 +382,9 @@ const GroupedToolBlock: React.FC<GroupedToolBlockProps> = ({ messages, vscode })
     }, [messages, isExpanded]);
 
     const handleFileOpen = useCallback((filePath: string, line: number) => {
+        if (hasTextSelection()) {
+            return;
+        }
         vscode.postMessage({
             type: 'openFile',
             filePath,

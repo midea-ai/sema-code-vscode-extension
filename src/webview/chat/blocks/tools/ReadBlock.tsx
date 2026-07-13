@@ -1,6 +1,7 @@
 import React from 'react';
 import { VscodeApi } from '../../types';
 import { ToolContent } from '../../types';
+import { hasTextSelection } from '../../utils/selection';
 
 interface ReadBlockProps {
     content: ToolContent;
@@ -44,6 +45,9 @@ const ReadBlock: React.FC<ReadBlockProps> = React.memo(({ content, vscode }) => 
     const displayFileName = finalFileName.split('/').pop() || finalFileName;
 
     const handleOpenFile = () => {
+        if (hasTextSelection()) {
+            return;
+        }
         if (finalFileName) {
             const lineNumber = offset !== null ? offset + 1 : 1;
             vscode.postMessage({

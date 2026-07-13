@@ -4,6 +4,7 @@ import { ToggleIcon } from '../../components/ui/IconButton';
 import FileIcon from '../../components/ui/FileIcon';
 import { ToolContent } from '../../types';
 import UpdateCodeDiff from '../../components/ui/UpdateCodeDiff';
+import { hasTextSelection } from '../../utils/selection';
 
 interface NotebookEditBlockProps {
     content: ToolContent;
@@ -114,6 +115,9 @@ const NotebookEditBlock: React.FC<NotebookEditBlockProps> = React.memo(({
 
     const handleShowDiff = useCallback((e: React.MouseEvent) => {
         e.stopPropagation();
+        if (hasTextSelection()) {
+            return;
+        }
         if (fileName) {
             vscode.postMessage({
                 type: 'showFileDiff',
@@ -124,6 +128,10 @@ const NotebookEditBlock: React.FC<NotebookEditBlockProps> = React.memo(({
     }, [fileName, cellNum, vscode]);
 
     const handleHeaderClick = useCallback(() => {
+        // 拖拽选中标题文本时不折叠/展开
+        if (hasTextSelection()) {
+            return;
+        }
         handleToggle();
     }, [handleToggle]);
 

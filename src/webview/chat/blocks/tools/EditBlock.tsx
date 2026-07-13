@@ -7,6 +7,7 @@ import CollapsibleDiff from '../../components/ui/CollapsibleDiff';
 import { langMap } from '../../utils/fileLangTypeMap';
 import { countDiffChanges } from '../../utils/diffParser';
 import { TOOL_NAME_WRITE_FILE } from '../../../../utils/tool';
+import { hasTextSelection } from '../../utils/selection';
 
 interface EditBlockProps {
     content: ToolContent;
@@ -111,6 +112,9 @@ const EditBlock: React.FC<EditBlockProps> = React.memo(({
 
     const handleShowDiff = useCallback((e: React.MouseEvent) => {
         e.stopPropagation();
+        if (hasTextSelection()) {
+            return;
+        }
         if (fileName) {
             vscode.postMessage({
                 type: 'showFileDiff',
@@ -121,6 +125,10 @@ const EditBlock: React.FC<EditBlockProps> = React.memo(({
     }, [fileName, minLine, vscode]);
 
     const handleHeaderClick = useCallback(() => {
+        // 拖拽选中标题文本时不折叠/展开
+        if (hasTextSelection()) {
+            return;
+        }
         handleToggle();
     }, [handleToggle]);
 

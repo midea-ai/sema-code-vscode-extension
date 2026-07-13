@@ -3,6 +3,7 @@ import React, { useContext, useEffect, useRef, useState, useMemo } from 'react';
 import { renderMarkdownToHtml, hasMarkdownFormatting } from '../utils/markdown';
 import { getResponseDot } from '../utils/symbols';
 import { streamingStore } from '../utils/StreamingStore';
+import { hasTextSelection } from '../utils/selection';
 import { SessionContext } from '../SessionContext';
 import { CopyIcon, CheckIcon } from '../components/ui/IconButton';
 import '../style/markdown.css';
@@ -67,6 +68,10 @@ const AiResponseBlock: React.FC<AiResponseBlockProps> = React.memo(({
         };
 
         const handleFilePathClick = (event: Event) => {
+            // 用户正在选择文字时不响应点击（打开文件/链接或切换 actions）
+            if (hasTextSelection()) {
+                return;
+            }
             const target = event.target as HTMLElement;
             if (target.classList.contains('file-path-code')) {
                 event.preventDefault();
@@ -122,9 +127,6 @@ const AiResponseBlock: React.FC<AiResponseBlockProps> = React.memo(({
                 }
                 return;
             }
-            // 用户正在选择文字时不切换 actions
-            const selection = window.getSelection();
-            if (selection && selection.toString().length > 0) return;
             setShowActions(prev => !prev);
         };
 

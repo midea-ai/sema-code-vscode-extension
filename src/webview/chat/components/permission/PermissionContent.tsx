@@ -13,6 +13,7 @@ import {
     stringToDiffContent
 } from '../../utils/permissionUtils';
 import { countDiffChanges } from '../../utils/diffParser';
+import { hasTextSelection } from '../../utils/selection';
 import { TOOL_NAME_PATCH_FILE, TOOL_NAME_WRITE_FILE, TOOL_NAME_RUN_SHELL, TOOL_NAME_FETCH_URL, TOOL_NAME_VIEW_FILE } from '../../../../utils/tool';
 
 interface PermissionContentProps {
@@ -94,6 +95,9 @@ const PermissionContent: React.FC<PermissionContentProps> = ({
             : content as DiffContent;
 
         const handleFileClick = () => {
+            if (hasTextSelection()) {
+                return;
+            }
             if (vscode && filePath) {
                 vscode.postMessage({
                     type: 'showFileDiff',
@@ -248,6 +252,9 @@ const PermissionContent: React.FC<PermissionContentProps> = ({
         const displayFileName = fileName.split('/').pop() || fileName;
 
         const handleFileClick = () => {
+            if (hasTextSelection()) {
+                return;
+            }
             if (vscode && fileName) {
                 vscode.postMessage({
                     type: 'openFile',
@@ -287,6 +294,9 @@ const PermissionContent: React.FC<PermissionContentProps> = ({
     // 渲染Bash命令内容
     const renderBashContent = () => {
         const handleBashTitleClick = () => {
+            if (hasTextSelection()) {
+                return;
+            }
             if (vscode) {
                 vscode.postMessage({
                     type: 'openBashOutput',
@@ -325,6 +335,9 @@ const PermissionContent: React.FC<PermissionContentProps> = ({
         const url = typeof title === 'string' ? title : '';
 
         const handleOpenUrl = () => {
+            if (hasTextSelection()) {
+                return;
+            }
             if (vscode) {
                 vscode.postMessage({
                     type: 'openBashOutput',

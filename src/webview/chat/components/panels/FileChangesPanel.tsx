@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { VscodeApi, FileChange } from '../../types';
 import { CheckIcon, ToggleIcon, CancelCircleIcon } from '../ui/IconButton';
 import FileIcon from '../ui/FileIcon';
+import { hasTextSelection } from '../../utils/selection';
 
 
 interface FileChangesPanelProps {
@@ -44,6 +45,9 @@ const FileChangesPanel: React.FC<FileChangesPanelProps> = ({ changes, vscode, on
     };
 
     const handleFileClick = async (fullPath: string, minLine: number) => {
+        if (hasTextSelection()) {
+            return;
+        }
         // 使用vscode.postMessage直接调用后端的showFileDiff方法
         vscode.postMessage({
             type: 'showFileDiff',
