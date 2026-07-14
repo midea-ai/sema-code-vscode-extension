@@ -353,10 +353,44 @@ $$P_{\\text{Bash}}(c) = \\text{allow} \\iff \\begin{cases} \\text{head}(c) \\in 
                 content: `## 图片渲染示例
 远程图片（点击在浏览器打开）：
 ![shields](https://img.shields.io/badge/build-passing-brightgreen)
-<img src="https://camo.githubusercontent.com/726bc0232eb0c58a7a55648919ebc89ee4b937ae1c63c5f0b9d8de5ec3f2a6a1/68747470733a2f2f7777772e7479706575692e73682f72656769737472792d6578616d706c65732f61727469737469632e706e67" />
- `,
+<img src="https://github.com/midea-ai/sema-code-core/raw/main/images/semacode-logo.png" />
+`,
             },
         },
+        {
+            id: nextId(),
+            type: 'assistant',
+            content: {
+                content: `- **概述**
+  - [项目概述](https://midea-ai.github.io/sema-code-core/#/wiki/overview/project)
+  - [架构设计](sort.py)
+`,
+            },
+        },
+        {
+            id: nextId(),
+            type: 'assistant',
+            content: {
+                content: `**Layout 在 iiQWorks.PLC UNI 中指的是 VS（Visual Components / iiQWorks.Sim）的 3D 场景视图**，用于查看和操作虚拟设备模型。
+
+关键引用：
+> **"PLC工程无法单独保存，layout中新建任意元素才可保存工程"** — 来自 \`(CN) iiQWorks.PLC UNI 1.0.pdf\` p.20 [1]
+
+### 请确认
+
+你说的 **"layout"** 具体是指：
+- **iiQWorks.PLC UNI 中的编程布局界面**（软件主界面）
+- **iiQWorks.Sim / Visual Components 中的 3D Layout 场景视图**（虚拟调试的 3D 场景）
+
+可以告诉我你的具体场景，我给出更精确的操作指引。
+
+---
+
+## 参考文献
+[1] [iiQWorks.PLC UNI 1.0 手册 p.20](file:///Users/allen/.cache/plc-knowledge-base/originals/iiqworks/%28CN%29%20iiQWorks.PLC%20UNI%201.0.pdf#page=20)
+[2] [iiQWorks.PLC UNI 入门指南 (虚拟调试) p.18](file:///Users/allen/.cache/plc-knowledge-base/originals/iiqworks/%28CN%29%20iiQWorks.PLC%20UNI%20%E5%85%A5%E9%97%A8%E6%8C%87%E5%8D%97%20%28%E8%99%9A%E6%8B%9F%E8%B0%83%E8%AF%95%29%20.pdf#page=18)`,
+            },
+        }
     ],
 
     AskQuestion: [

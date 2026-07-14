@@ -102,6 +102,16 @@
 
 /* 表格内的内联代码 / 文件路径沿用统一的 .inline-code / .file-path-code 样式 */
 
+/* 引用块样式 - > 引用行，用 VS Code 原生 blockquote 主题变量，与编辑器 markdown 预览观感一致 */
+.markdown-content .md-blockquote {
+  margin: 4px 0;
+  padding: 4px 10px;
+  border-left: 3px solid var(--vscode-textBlockQuote-border, var(--chat-border));
+  background: var(--vscode-textBlockQuote-background, var(--chat-bg-hover));
+  color: var(--vscode-descriptionForeground, inherit);
+  border-radius: 0 var(--chat-radius-sm) var(--chat-radius-sm) 0;
+}
+
 /* 图片样式 - ![alt](path) 渲染结果 */
 .markdown-content .md-image {
   max-width: 100%;
@@ -121,3 +131,17 @@
   word-break: break-all;
 }
 
+/* 本地路径链接 - [text](wiki/foo.md) 无 scheme 路径
+   待验证阶段与正文同色、不可点（title 悬停可看真实路径）；
+   verifyFilePath 确认存在后加 file-path-code，需覆盖此规则恢复可点样式 */
+.markdown-content .md-local-link {
+  color: inherit;
+  cursor: text;
+  text-decoration: none;
+}
+
+.markdown-content .md-local-link.file-path-code {
+  color: var(--chat-text-symbol);
+  cursor: pointer;
+  text-decoration: underline;
+}

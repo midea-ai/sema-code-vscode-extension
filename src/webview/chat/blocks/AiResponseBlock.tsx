@@ -47,6 +47,13 @@ const AiResponseBlock: React.FC<AiResponseBlockProps> = React.memo(({
                         if (lineInfo) {
                             element.setAttribute('data-line-info', lineInfo);
                         }
+                    } else {
+                        // 本地路径链接（带 data-md-original）不存在时回退为原始 markdown 文本；
+                        // 内联代码文件路径无此属性，保持原样
+                        const original = element.getAttribute('data-md-original');
+                        if (original) {
+                            element.parentNode?.replaceChild(document.createTextNode(original), element);
+                        }
                     }
                     element.removeAttribute('data-temp-id');
                 }
@@ -58,10 +65,14 @@ const AiResponseBlock: React.FC<AiResponseBlockProps> = React.memo(({
                         element.setAttribute('src', src);
                         element.removeAttribute('data-img-temp-id');
                     } else {
-                        // 本地图片不存在：退回展示原始 markdown 文本（保留 alt 与 path 信息）
+                        // 本地图片不存在：退回展示原始 markdown 文本（保留 alt 与 path 信息）。
+                        // 图片前后的 <br> 在渲染时已被移除（间距靠 .md-image 的 margin），
+                        // 回退文本用块级 span 独占一行，避免与前后文字挤在同一行。
                         const original = element.getAttribute('data-md-original') || '';
-                        const textNode = document.createTextNode(original);
-                        element.parentNode?.replaceChild(textNode, element);
+                        const fallback = document.createElement('span');
+                        fallback.style.display = 'block';
+                        fallback.textContent = original;
+                        element.parentNode?.replaceChild(fallback, element);
                     }
                 }
             }

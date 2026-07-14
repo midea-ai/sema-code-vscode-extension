@@ -148,6 +148,20 @@ export function renderMarkdownToHtml(content: string, vscode?: any): string {
       }
     );
 
+    // 本地路径链接占位 - [text](wiki/foo.md) 等无 scheme 路径（单字母盘符 C:\ 除外）
+    // 路径须含 / 或 . 以排除普通括号写法（如 "数组[i](见下文)"）；
+    // 先渲染为待验证纯文本（md-local-link），扩展端 verifyFilePath 确认存在后
+    // 由 AiResponseBlock 加 file-path-code 升级为可点链接（openFile 在编辑器打开）；
+    // 不存在则回退展示原始 markdown 文本。必须晚于图片与 scheme 链接提取。
+    processedContent = processedContent.replace(
+      /\[([^\]\x00]+)\]\((?![a-zA-Z][a-zA-Z0-9+.\-]+:)(?=[^)\s\x00]*[/.])([^)\s\x00#][^)\s\x00]*)\)/g,
+      (match, text, path) => {
+        const placeholder = `\x00URL_${urlPlaceholders.length}\x00`;
+        urlPlaceholders.push(createLocalLinkHtml(text, path, vscode, match));
+        return placeholder;
+      }
+    );
+
     // 本地 loopback URL 占位 - 仅支持裸 URL，仅 localhost/127.0.0.1/0.0.0.0/[::1]
     // 负向回顾排除 `](url)` 形式（markdown link 已在上一步提取，这里兜住文本含 ] 等未命中的残留）
     processedContent = processedContent.replace(
@@ -167,6 +181,11 @@ export function renderMarkdownToHtml(content: string, vscode?: any): string {
       }
     );
   }
+
+  // 步骤3.7: 引用块处理 - 连续的 "> " 行合并为 <blockquote>
+  // 行级纯文本变换，不依赖 vscode，流式阶段可安全执行（整行匹配，无 partial regex 抖动）。
+  // 须早于表格处理：引用行若含 |，先被包进 blockquote，避免被表格扫描误收
+  processedContent = processBlockquoteMarkdown(processedContent);
 
   // 步骤4: 表格处理
   processedContent = processTableMarkdown(processedContent);
@@ -218,14 +237,19 @@ export function renderMarkdownToHtml(content: string, vscode?: any): string {
   // 而 <table> 前的 <br> 会被块级开头吸收一次（<br><br> 只显示 1 个空行，属正常）。
   // 因此只收敛表格"后面"的连续 <br>，前面保持不动，避免标题/文字与表格之间的空行被吃掉。
   processedContent = processedContent.replace(/<\/table>(<br>)+/g, '</table><br>');
-  // 图片（.md-image 为 display:block）同理为块级元素，收敛其后面的连续 <br>。
-  processedContent = processedContent.replace(/(<img\b[^>]*>)(<br>)+/gi, '$1<br>');
+  // 引用块同表格：块级元素后的连续 <br> 收敛为 1 个，避免渲染出 2 个空行
+  processedContent = processedContent.replace(/<\/blockquote>(<br>)+/g, '</blockquote><br>');
+  // 图片（.md-image 为 display:block）与表格不同：自带上下 margin，段落间距交给 margin，
+  // 前后的连续 <br> 全部移除，避免 margin + 空行叠加出双重间距。
+  // 图片不存在回退为原始文本时的换行由 AiResponseBlock 用块级 span 兜底。
+  processedContent = processedContent.replace(/(<br>)+(?=<img\b)/gi, '');
+  processedContent = processedContent.replace(/(<img\b[^>]*>)(<br>)+/gi, '$1');
 
   // console.log(JSON.stringify(processedContent));
 
   // 步骤11: DOMPurify最终消毒，防止XSS
   processedContent = DOMPurify.sanitize(processedContent, {
-    ALLOWED_TAGS: ['strong', 'br', 'pre', 'code', 'table', 'thead', 'tbody', 'tr', 'th', 'td', 'img', 'a'],
+    ALLOWED_TAGS: ['strong', 'br', 'pre', 'code', 'table', 'thead', 'tbody', 'tr', 'th', 'td', 'img', 'a', 'blockquote'],
     ALLOWED_ATTR: [
       'class', 'data-temp-id', 'data-file-path', 'data-line-info',
       'src', 'alt', 'data-img-path', 'data-img-url', 'data-img-temp-id', 'data-md-original',
@@ -246,6 +270,37 @@ export function renderMarkdownToHtml(content: string, vscode?: any): string {
   processedContent = processedContent.replace(/<\/div>(<br>)+/g, '</div><br>');
 
   return processedContent;
+}
+
+/**
+ * 处理Markdown引用块 - 连续的 "> " 行合并为一个 <blockquote>
+ * 引用内的粗体/内联代码占位符由后续步骤统一处理；多行内容用 <br> 连接。
+ * 行首允许最多 3 个空格缩进（CommonMark 约定），"> " 后的空格可省略
+ */
+function processBlockquoteMarkdown(content: string): string {
+  const lines = content.split('\n');
+  const result: string[] = [];
+  let quoteLines: string[] = [];
+
+  const flushQuote = () => {
+    if (quoteLines.length === 0) return;
+    result.push(`<blockquote class="md-blockquote">${quoteLines.join('<br>')}</blockquote>`);
+    quoteLines = [];
+  };
+
+  for (const line of lines) {
+    // (?!>) 排除 >>、>>> 开头（嵌套引用不支持，避免误伤 Python REPL 提示符等）
+    const match = line.match(/^\s{0,3}>(?!>)\s?(.*)$/);
+    if (match) {
+      quoteLines.push(match[1]);
+    } else {
+      flushQuote();
+      result.push(line);
+    }
+  }
+  flushQuote();
+
+  return result.join('\n');
 }
 
 /**
@@ -406,6 +461,31 @@ function createInlineCodeHtml(originalCode: string, escapedCode: string, vscode?
 }
 
 /**
+ * 创建本地路径链接 HTML - [text](wiki/foo.md) 等无 scheme 路径
+ * 初始为待验证纯文本样式（title 悬停显示真实路径），verifyFilePath 确认存在后
+ * 由 AiResponseBlock 加 file-path-code 变为可点；不存在时用 data-md-original
+ * 回退展示原始 markdown 文本，避免误判普通括号写法时吞掉原文
+ */
+function createLocalLinkHtml(text: string, path: string, vscode: any, originalMd: string): string {
+  // 剥掉锚点（wiki/foo.md#章节）后交给 parseFilePath 拆出可能的 :12 / :12-20 行号后缀
+  const { filePath, lineInfo } = parseFilePath(path.replace(/#.*$/, ''));
+  const randomStr = Array.from(crypto.getRandomValues(new Uint8Array(5)), b => b.toString(36)).join('').slice(0, 9);
+  const tempId = `file-check-${Date.now()}-${randomStr}`;
+
+  setTimeout(() => {
+    vscode.postMessage({
+      type: 'verifyFilePath',
+      filePath: filePath,
+      tempId: tempId,
+      originalCode: path,
+      lineInfo: lineInfo
+    });
+  }, 0);
+
+  return `<a class="md-local-link" data-temp-id="${tempId}" data-md-original="${escapeHtml(originalMd)}" title="${escapeHtml(path)}">${escapeHtml(text)}</a>`;
+}
+
+/**
  * 判断是否可能是文件路径格式（仅做基本格式检查）
  */
 function isPotentialFilePath(code: string): boolean {
@@ -476,9 +556,11 @@ export function hasMarkdownFormatting(content: string): boolean {
     /!\[[^\]]*\]\([^)\s]+?\)/, // 图片
     /<img\b[^>]*?>/i,          // 原始 <img> 标签
     /\[[^\]]+\]\((?:https?|file):\/\/[^)\s]+\)/, // markdown 链接
+    /\[[^\]]+\]\((?![a-zA-Z][a-zA-Z0-9+.\-]+:)(?=[^)\s]*[/.])[^)\s#][^)\s]*\)/, // 本地路径链接
     /https?:\/\/(?:localhost|127\.0\.0\.1|0\.0\.0\.0|\[::1\])/i, // 本地 loopback URL
     /\$\$[\s\S]+?\$\$/,    // 块级公式
     /(?<![\\$])\$(?!\s)[^\n$]+?(?<!\s)\$(?!\d)/, // 行内公式
+    /^\s{0,3}>\s/m,        // 引用块（要求 > 后有空格，避开 >>> 等误判）
   ];
 
   return markdownPatterns.some(pattern => pattern.test(content));
