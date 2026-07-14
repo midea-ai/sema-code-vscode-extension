@@ -23,7 +23,8 @@ object HtmlShell {
         <style>$extraCss</style>
         </head>
         <!-- spellcheck=false：关掉 JCEF(Chromium) 的拼写检查红波浪线，子元素(input/textarea)继承 -->
-        <body spellcheck="false">
+        <!-- 主题类对齐 VSCode webview 宿主行为（vscode-light/dark），换肤时由 Theme.installLiveUpdate 同步切换 -->
+        <body spellcheck="false" class="${Theme.themeClass()}">
           <div id="root"></div>
           <script>$injection</script>
           <script src="$bundle"></script>

@@ -29,10 +29,15 @@ object Theme {
         val tipBg = UIUtil.getToolTipBackground()
         val tipFg = UIUtil.getToolTipForeground()
         val link = if (JBColor.isBright()) Color(0x00, 0x66, 0xCC) else Color(0x37, 0x94, 0xFF)
-        // chat 内 React diff 的行底色，取 IDE 配色方案里原生 diff 的 DIFF_INSERTED/DIFF_DELETED 背景，
-        // 与「点开文件」弹出的原生 diff 窗口同源 → 两处颜色一致，且自动随明/暗主题变化。
-        val diffInsBg = scheme.getAttributes(com.intellij.openapi.diff.DiffColors.DIFF_INSERTED)?.backgroundColor
-        val diffDelBg = scheme.getAttributes(com.intellij.openapi.diff.DiffColors.DIFF_DELETED)?.backgroundColor
+        // chat 内 React diff 配色对齐 IDE 原生 diff 的词级模式（TextDiffTypeFactory）：
+        // 词级块 = DIFF_INSERTED/DIFF_DELETED 的背景主色；整行 = "ignored" 浅色 ——
+        // 配色方案在前景色字段显式定义了就用它，否则按 IDE 同款算法向编辑器背景混 60%。
+        val diffInsAttr = scheme.getAttributes(com.intellij.openapi.diff.DiffColors.DIFF_INSERTED)
+        val diffDelAttr = scheme.getAttributes(com.intellij.openapi.diff.DiffColors.DIFF_DELETED)
+        val diffInsBg = diffInsAttr?.backgroundColor
+        val diffDelBg = diffDelAttr?.backgroundColor
+        val diffInsLineBg = diffInsAttr?.foregroundColor ?: diffInsBg?.let { mix(it, editorBg, 0.6) }
+        val diffDelLineBg = diffDelAttr?.foregroundColor ?: diffDelBg?.let { mix(it, editorBg, 0.6) }
 
         val sb = StringBuilder(":root{")
         fun v(name: String, value: String) { sb.append("--vscode-").append(name).append(':').append(value).append(';') }
@@ -86,9 +91,11 @@ object Theme {
         v("terminal-ansiBrightCyan", "#29b8db")
         v("charts-green", "#4ec9b0")
         v("charts-purple", "#9575ff")
-        // 与原生 diff 同源；配色方案缺省时回退到原写死值。
-        v("diffEditor-insertedLineBackground", diffInsBg?.let { hex(it) } ?: "rgba(78,201,176,0.15)")
-        v("diffEditor-removedLineBackground", diffDelBg?.let { hex(it) } ?: "rgba(244,135,113,0.15)")
+        // 与原生 diff 词级模式同源；配色方案缺省时回退到原写死值。
+        v("diffEditor-insertedLineBackground", diffInsLineBg?.let { hex(it) } ?: "rgba(78,201,176,0.15)")
+        v("diffEditor-removedLineBackground", diffDelLineBg?.let { hex(it) } ?: "rgba(244,135,113,0.15)")
+        v("diffEditor-insertedTextBackground", diffInsBg?.let { hex(it) } ?: "rgba(78,201,176,0.35)")
+        v("diffEditor-removedTextBackground", diffDelBg?.let { hex(it) } ?: "rgba(244,135,113,0.35)")
         v("notificationsWarningIcon-foreground", "#ffba49")
         v("inputValidation-warningBackground", "rgba(255,186,73,0.15)")
         v("inputValidation-warningForeground", hex(fg))
@@ -100,6 +107,12 @@ object Theme {
         sb.append("}")
         return sb.toString()
     }
+
+    /**
+     * VSCode webview 宿主会按主题在 body 挂 vscode-light / vscode-dark 类，共享样式
+     * （如 highlight.css 的 light 语法配色）依赖它选择配色，JB 侧按 IDE 明暗补齐同名类。
+     */
+    fun themeClass(): String = if (JBColor.isBright()) "vscode-light" else "vscode-dark"
 
     /** chat 页覆盖 CSS：把背景 token 重指到 Project 树背景，使整个 chat 底色与 Project 一致（html:root 压过 bundle）。 */
     fun chatPageBgOverrideCss(): String =
@@ -124,7 +137,8 @@ object Theme {
             ApplicationManager.getApplication().invokeLater {
                 pending.set(false)
                 if (Disposer.isDisposed(parent)) return@invokeLater
-                val js = "var s=document.getElementById('sema-theme'); if(s) s.textContent=${jsLiteral(cssVariables())};"
+                val js = "var s=document.getElementById('sema-theme'); if(s) s.textContent=${jsLiteral(cssVariables())};" +
+                    "var b=document.body; if(b){b.classList.remove('vscode-light','vscode-dark');b.classList.add('${themeClass()}');}"
                 browser.cefBrowser.executeJavaScript(js, browser.cefBrowser.url, 0)
             }
         }
@@ -137,6 +151,12 @@ object Theme {
         "\"" + s.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n").replace("\r", "") + "\""
 
     private fun hex(c: Color) = String.format("#%02x%02x%02x", c.red, c.green, c.blue)
+    /** c1 向 c2 线性混合 ratio（0=纯 c1，1=纯 c2），同 ColorUtil.mix。 */
+    private fun mix(c1: Color, c2: Color, ratio: Double): Color = Color(
+        (c1.red + (c2.red - c1.red) * ratio).toInt().coerceIn(0, 255),
+        (c1.green + (c2.green - c1.green) * ratio).toInt().coerceIn(0, 255),
+        (c1.blue + (c2.blue - c1.blue) * ratio).toInt().coerceIn(0, 255)
+    )
     private fun rgba(c: Color, a: Double) = "rgba(${c.red},${c.green},${c.blue},$a)"
     private fun shade(c: Color): Color = if (JBColor.isBright()) c.darker() else c.brighter()
 }

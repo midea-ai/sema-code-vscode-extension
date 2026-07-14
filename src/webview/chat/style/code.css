@@ -355,6 +355,9 @@
     padding-left: 8px;
     color: var(--chat-text-editor);
     vertical-align: top;
+    /* 词级高亮块的上下 padding 会溢出 16px 行盒，相邻行的半透明色块叠加出一条深色缝；
+       在单元格边界裁掉溢出，让相邻块精确拼接、每处只画一次 */
+    clip-path: inset(0);
 }
 
 /* 高亮样式 */
@@ -363,5 +366,15 @@
     box-decoration-break: clone;
     padding-top: 2px;
     padding-bottom: 2px;
+}
+
+/* 词级 diff 的 token 深色块：叠在行级淡底色之上，取 VSCode diff 编辑器同款词级色，
+   缺省时回退到与行级同色系但更高不透明度的颜色 */
+.diff-highlight-added {
+    background-color: var(--vscode-diffEditor-insertedTextBackground, rgba(46, 160, 67, 0.4));
+}
+
+.diff-highlight-removed {
+    background-color: var(--vscode-diffEditor-removedTextBackground, rgba(248, 81, 73, 0.4));
 }
 
