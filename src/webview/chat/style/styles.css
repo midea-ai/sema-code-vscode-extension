@@ -1207,10 +1207,27 @@ html.jb #output-container {
     flex: 1 1 0;
     min-width: 60px;
     max-width: 160px;
-    cursor: pointer;
     font-size: var(--chat-font-base);
     color: var(--chat-text-secondary, var(--vscode-descriptionForeground));
     white-space: nowrap;
+    user-select: none;
+    cursor: grab;
+}
+
+.session-tab:active {
+    cursor: grabbing;
+}
+
+.session-tab.dragging {
+    opacity: 0.55;
+}
+
+.session-tab.drag-over-before {
+    box-shadow: inset 2px 0 0 var(--vscode-focusBorder, #007acc);
+}
+
+.session-tab.drag-over-after {
+    box-shadow: inset -2px 0 0 var(--vscode-focusBorder, #007acc);
 }
 
 /* 悬浮/活跃的圆角高亮背景:四周内缩,与分隔线和上下边缘都留出距离 */
