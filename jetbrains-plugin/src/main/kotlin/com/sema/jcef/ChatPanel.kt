@@ -72,6 +72,8 @@ class ChatPanel(project: Project) : Disposable {
         BrowserContextMenu.install(browser)
         // 撤销/重做/删词等快捷键从 IDE keymap 抢回给输入框（详见 JcefKeyForwarder）
         JcefKeyForwarder.install(browser, this)
+        // 工具窗口收起再打开后，CEF 内部 dpr 可能滞留在错误值（整页放大）→ 显示当帧重同步屏幕 scale
+        OsrRepaintFix.install(browser, this)
     }
 
     private fun loadUi() {

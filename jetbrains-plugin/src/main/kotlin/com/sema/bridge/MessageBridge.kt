@@ -57,6 +57,9 @@ class MessageBridge(
             log.warn("无法解析 web 消息: $json")
             return
         }
+        // OSR 取证上报是宿主注入 JS 发出的，页面 shell 一解析就可能到达，不代表 React 已挂载：
+        // 必须在就绪判定之前短路，否则会提前 flush 深链导航到还没接监听的页面上（导航丢失）。
+        if (obj.str("channel") == "osrDiag") { log.warn("[sema][osr][page] $json"); return }
         // 配置页收到首条 web 消息 → React 已挂载并接好 message 监听 → 就绪，flush 缓冲的深链导航。
         if (panel == PanelKind.CONFIG && !configReadyMarked) {
             configReadyMarked = true

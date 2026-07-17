@@ -66,6 +66,8 @@ class ConfigPanel(project: Project) : Disposable {
         BrowserNav.install(browser)
         // 收敛原生右键菜单：只留编辑项，移除「重新加载/后退」等会毁掉 SPA 状态的导航项。
         BrowserContextMenu.install(browser)
+        // 编辑器 tab 切走再切回后，CEF 内部 dpr 可能滞留在错误值（整页放大）→ 显示当帧重同步屏幕 scale
+        OsrRepaintFix.install(browser, this)
     }
 
     private fun loadUi() {
