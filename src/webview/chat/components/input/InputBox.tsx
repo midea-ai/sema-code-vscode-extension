@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect, useMemo, forwardRef, useImperativeHandle } from 'react';
 import { VscodeApi, TokenInfo, InputMention, AgentMode, PermissionLevel, ImageAttachment } from '../../types';
 import Tooltip from '../ui/Tooltip';
+import ProviderLogo, { parseProviderKey, stripProviderSuffix } from '../../../common/ProviderLogo';
 import ImageThumbnail from '../ImageThumbnail';
 import ImagePreviewModal from '../ImagePreviewModal';
 import { usePendingImages } from './hooks/usePendingImages';
@@ -1153,8 +1154,11 @@ const InputBox = forwardRef<InputBoxHandle, InputBoxProps>(({
                                 onClick={modelMenu.handleToggleModelMenu}
                                 disabled={disabled || modelMenu.isModelLoading}
                             >
+                                {!modelMenu.isModelLoading && modelMenu.currentModel && (
+                                    <ProviderLogo provider={parseProviderKey(modelMenu.currentModel)} className="model-btn-logo" />
+                                )}
                                 <span className="model-name-text">
-                                    {modelMenu.isModelLoading ? '加载中...' : (modelMenu.currentModel || '未设置')}
+                                    {modelMenu.isModelLoading ? '加载中...' : (modelMenu.currentModel ? stripProviderSuffix(modelMenu.currentModel) : '未设置')}
                                 </span>
                                 <ChevronDownIcon />
                             </button>

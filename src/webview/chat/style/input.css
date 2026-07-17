@@ -739,6 +739,14 @@
     stroke: currentColor;
 }
 
+/* 模型按钮内的提供商 logo（覆盖 .model-info-btn svg 的通用尺寸与描边） */
+.model-info-btn .model-btn-logo {
+    width: 12px;
+    height: 12px;
+    flex-shrink: 0;
+    stroke: none;
+}
+
 /* 模型名文本 */
 .model-name-text {
     flex: 1;
@@ -840,6 +848,25 @@
 
 .model-menu-item.model-current:hover {
     background: var(--chat-bg-hover);
+}
+
+/* 模型菜单提供商 logo */
+.model-menu-logo {
+    width: 14px;
+    height: 14px;
+    flex-shrink: 0;
+    display: block;
+}
+
+/* OpenRouter 品牌色：深色主题荧光绿，浅色主题紫色（对齐官网 favicon）
+   注意用 svg 限定提升特指度，压过 .model-info-btn svg 的 color: inherit */
+svg.provider-logo-openrouter {
+    color: #C8FF00;
+}
+
+.vscode-light svg.provider-logo-openrouter,
+.vscode-high-contrast-light svg.provider-logo-openrouter {
+    color: #7624F4;
 }
 
 /* 模型菜单文本 */

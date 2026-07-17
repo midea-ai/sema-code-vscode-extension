@@ -1,5 +1,6 @@
 import React from 'react';
 import { CheckIcon } from '../../ui/IconButton';
+import ProviderLogo, { parseProviderKey, stripProviderSuffix } from '../../../../common/ProviderLogo';
 
 interface ModelMenuProps {
     show: boolean;
@@ -35,16 +36,19 @@ const ModelMenu: React.FC<ModelMenuProps> = ({
                         key={model}
                         className={`model-menu-item ${model === currentModel ? 'model-current' : ''}`}
                         onClick={() => onModelSwitch(model)}
+                        title={model}
                     >
-                        <span className="model-menu-text">{model}</span>
+                        <ProviderLogo provider={parseProviderKey(model)} className="model-menu-logo" />
+                        <span className="model-menu-text">{stripProviderSuffix(model)}</span>
                         {model === currentModel && (
                             <CheckIcon />
                         )}
                     </div>
                 ))
             ) : (
-                <div className="model-menu-item model-current">
-                    <span className="model-menu-text">{currentModel || '未设置模型'}</span>
+                <div className="model-menu-item model-current" title={currentModel || undefined}>
+                    {currentModel && <ProviderLogo provider={parseProviderKey(currentModel)} className="model-menu-logo" />}
+                    <span className="model-menu-text">{currentModel ? stripProviderSuffix(currentModel) : '未设置模型'}</span>
                 </div>
             )}
 
