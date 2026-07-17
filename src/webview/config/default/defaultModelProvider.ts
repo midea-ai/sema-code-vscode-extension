@@ -45,6 +45,7 @@ export const DEFAULT_PROVIDER = 'deepseek';
 
 /** 提供商显示顺序 */
 export const PROVIDER_ORDER = [
+    'custom',
     'deepseek',
     'minimax',
     'glm',
@@ -53,8 +54,7 @@ export const PROVIDER_ORDER = [
     'kimi',
     'openrouter',
     'anthropic',
-    'openai',
-    'custom'
+    'openai'
 ];
 
 export const defaultModelProvider: Record<string, ProviderDefaults> = {
@@ -77,7 +77,7 @@ export const defaultModelProvider: Record<string, ProviderDefaults> = {
         baseURL: 'https://api.moonshot.cn/v1',
         baseURLPlaceholder: 'https://api.moonshot.cn/v1',
         apiKeyPlaceholder: '输入您的 Moonshot API Key',
-        defaultModel: 'kimi-k2.7-code',
+        defaultModel: 'kimi-k3',
         apikeyUrl: 'https://platform.moonshot.cn/console/api-keys',
         defaultAdapt: 'openai',
     },

@@ -1,5 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { VscodeApi } from './types';
+import ProviderLogo from '../common/ProviderLogo';
+import IconSelect from './IconSelect';
+import { OpenIcon } from './utils/svgIcons';
 import {
     defaultModelProvider,
     DEFAULT_PROVIDER,
@@ -48,11 +51,11 @@ const AddModelForm: React.FC<AddModelFormProps> = ({ onSuccess, vscode }) => {
     const [isManualInput, setIsManualInput] = useState(false);
     const [availableModels, setAvailableModels] = useState<Model[]>([]);
     const [selectedModel, setSelectedModel] = useState('');
-    const [modelFilter, setModelFilter] = useState('');
     const [modelDocUrls, setModelDocUrls] = useState<Record<string, string>>({});
     const [testStatus, setTestStatus] = useState<{ message: string; type: 'testing' | 'success' | 'error' | '' }>({ message: '', type: '' });
     const [message, setMessage] = useState<{ text: string; type: 'success' | 'error' | '' }>({ text: '', type: '' });
     const [isFetchingModels, setIsFetchingModels] = useState(false);
+    const [fetchModelsFailed, setFetchModelsFailed] = useState(false);
     const [connectionTested, setConnectionTested] = useState(false);
     const [connectionSuccess, setConnectionSuccess] = useState(false);
     const [lastFetchedConfig, setLastFetchedConfig] = useState({ baseURL: '', apiKey: '' });
@@ -102,8 +105,8 @@ const AddModelForm: React.FC<AddModelFormProps> = ({ onSuccess, vscode }) => {
 
                     if (msg.success) {
                         if (msg.models && msg.models.length > 0) {
+                            setFetchModelsFailed(false);
                             setAvailableModels(msg.models);
-                            setModelFilter('');
 
                             const docUrls: Record<string, string> = {};
                             msg.models.forEach((model: Model) => {
@@ -132,6 +135,7 @@ const AddModelForm: React.FC<AddModelFormProps> = ({ onSuccess, vscode }) => {
                             setTimeout(() => setTestStatus({ message: '', type: '' }), 3000);
                         } else {
                             // 请求成功但没有模型
+                            setFetchModelsFailed(true);
                             setTestStatus({
                                 message: '✗ 请求成功，但没有返回可用模型',
                                 type: 'error'
@@ -139,6 +143,7 @@ const AddModelForm: React.FC<AddModelFormProps> = ({ onSuccess, vscode }) => {
                         }
                     } else {
                         // 请求失败
+                        setFetchModelsFailed(true);
                         setTestStatus({
                             message: `✗ ${msg.message || '获取模型列表失败'}`,
                             type: 'error'
@@ -160,12 +165,12 @@ const AddModelForm: React.FC<AddModelFormProps> = ({ onSuccess, vscode }) => {
         setModelName('');
         setAvailableModels([]);
         setSelectedModel('');
-        setModelFilter('');
         setModelDocUrls({});
         setConnectionTested(false);
         setConnectionSuccess(false);
         setTestStatus({ message: '', type: '' });
         setLastFetchedConfig({ baseURL: '', apiKey: '' });
+        setFetchModelsFailed(false);
         setIsManualInput(false);
         setMaxTokens(String(defaults.defaultMaxTokens ?? DEFAULT_MAX_TOKENS));
         setSelectedModelMaxTokens(null);
@@ -276,28 +281,6 @@ const AddModelForm: React.FC<AddModelFormProps> = ({ onSuccess, vscode }) => {
         ? modelDocUrls[selectedModel]
         : (defaultModelProvider[provider].apikeyUrl || '');
 
-    const filteredModels = availableModels.filter(model =>
-        !modelFilter ||
-        model.id.toLowerCase().includes(modelFilter.toLowerCase()) ||
-        (model.name && model.name.toLowerCase().includes(modelFilter.toLowerCase()))
-    );
-
-    useEffect(() => {
-        if (isManualInput || filteredModels.length === 0) return;
-        if (!filteredModels.find(m => m.id === selectedModel)) {
-            const newModel = filteredModels[0].id;
-            setSelectedModel(newModel);
-            setConnectionTested(false);
-            setConnectionSuccess(false);
-            const selectedModelData = availableModels.find(m => m.id === newModel);
-            if (selectedModelData?.recommended_max_tokens) {
-                setMaxTokens(String(selectedModelData.recommended_max_tokens));
-            }
-            setSelectedModelMaxTokens(selectedModelData?.max_tokens ?? null);
-            vscode.postMessage({ command: 'getModelAdapter', provider, modelName: newModel, baseURL });
-        }
-    }, [modelFilter]);
-
     const defaults = defaultModelProvider[provider];
 
     return (
@@ -305,17 +288,16 @@ const AddModelForm: React.FC<AddModelFormProps> = ({ onSuccess, vscode }) => {
             <form onSubmit={handleSubmit}>
                 <div className="form-group">
                     <label htmlFor="provider">服务提供商</label>
-                    <select
+                    <IconSelect
                         id="provider"
                         value={provider}
-                        onChange={(e) => handleProviderChange(e.target.value)}
-                    >
-                        {PROVIDER_ORDER.filter(key => defaultModelProvider[key]).map(key => (
-                            <option key={key} value={key}>
-                                {defaultModelProvider[key].name}
-                            </option>
-                        ))}
-                    </select>
+                        onChange={handleProviderChange}
+                        options={PROVIDER_ORDER.filter(key => defaultModelProvider[key]).map(key => ({
+                            value: key,
+                            label: defaultModelProvider[key].name,
+                            icon: <ProviderLogo provider={key} className="icon-select-logo" />
+                        }))}
+                    />
                 </div>
 
                 <div className="form-group">
@@ -335,7 +317,21 @@ const AddModelForm: React.FC<AddModelFormProps> = ({ onSuccess, vscode }) => {
                 </div>
 
                 <div className="form-group">
-                    <label htmlFor="apiKey">API Key</label>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+                        <label htmlFor="apiKey">API Key</label>
+                        {currentModelDocUrl && (
+                            <a
+                                className="label-action"
+                                href={currentModelDocUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                title={currentModelDocUrl}
+                            >
+                                获取 API Key
+                                <OpenIcon size={11} />
+                            </a>
+                        )}
+                    </div>
                     <div className="input-group">
                         <input
                             type={showPassword ? 'text' : 'password'}
@@ -357,10 +353,10 @@ const AddModelForm: React.FC<AddModelFormProps> = ({ onSuccess, vscode }) => {
                 </div>
 
                 <div className="form-group">
-                    <label htmlFor="modelName">模型名称</label>
-                    <div className="description" style={{ marginBottom: '8px', marginTop: 0 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+                        <label htmlFor="modelName">模型名称</label>
                         <span
-                            style={{ color: 'var(--vscode-textLink-foreground)', cursor: 'pointer', textDecoration: 'underline' }}
+                            className="label-action"
                             onClick={() => setIsManualInput(!isManualInput)}
                         >
                             {isManualInput ? '从列表选择' : '手动输入'}
@@ -369,44 +365,30 @@ const AddModelForm: React.FC<AddModelFormProps> = ({ onSuccess, vscode }) => {
 
                     {!isManualInput ? (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                            {availableModels.length > 20 && (
-                                <input
-                                    type="text"
-                                    placeholder="模型列表超过20，搜索模型..."
-                                    value={modelFilter}
-                                    onChange={(e) => setModelFilter(e.target.value)}
-                                    style={{ width: '100%' }}
-                                />
-                            )}
                             <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                                <select
-                                    id="modelNameSelect"
-                                    value={selectedModel}
-                                    onChange={(e) => {
-                                        setSelectedModel(e.target.value);
-                                        setConnectionTested(false);
-                                        setConnectionSuccess(false);
-                                        const selectedModelData = availableModels.find(m => m.id === e.target.value);
-                                        if (selectedModelData?.recommended_max_tokens) {
-                                            setMaxTokens(String(selectedModelData.recommended_max_tokens));
-                                        }
-                                        setSelectedModelMaxTokens(selectedModelData?.max_tokens ?? null);
-                                        vscode.postMessage({ command: 'getModelAdapter', provider, modelName: e.target.value, baseURL });
-                                    }}
-                                    style={{ flex: 1 }}
-                                >
-                                    {availableModels.length === 0 ? (
-                                        <option value="">-- 请先获取模型列表 --</option>
-                                    ) : filteredModels.length === 0 ? (
-                                        <option value="">-- 无匹配模型 --</option>
-                                    ) : (
-                                        filteredModels.map((model) => (
-                                            <option key={model.id} value={model.id}>
-                                                {model.name || model.id}
-                                            </option>
-                                        ))
-                                    )}
-                                </select>
+                                <div style={{ flex: 1, minWidth: 0 }}>
+                                    <IconSelect
+                                        id="modelNameSelect"
+                                        value={selectedModel}
+                                        onChange={(value) => {
+                                            setSelectedModel(value);
+                                            setConnectionTested(false);
+                                            setConnectionSuccess(false);
+                                            const selectedModelData = availableModels.find(m => m.id === value);
+                                            if (selectedModelData?.recommended_max_tokens) {
+                                                setMaxTokens(String(selectedModelData.recommended_max_tokens));
+                                            }
+                                            setSelectedModelMaxTokens(selectedModelData?.max_tokens ?? null);
+                                            vscode.postMessage({ command: 'getModelAdapter', provider, modelName: value, baseURL });
+                                        }}
+                                        options={availableModels.map(model => ({
+                                            value: model.id,
+                                            label: model.name || model.id
+                                        }))}
+                                        disabled={availableModels.length === 0}
+                                        placeholder="-- 请先获取模型列表 --"
+                                    />
+                                </div>
                                 <button
                                     type="button"
                                     className={`secondary ${isFetchingModels ? 'btn-loading' : ''}`}
@@ -418,6 +400,17 @@ const AddModelForm: React.FC<AddModelFormProps> = ({ onSuccess, vscode }) => {
                                     {isFetchingModels ? '获取中...' : '获取模型'}
                                 </button>
                             </div>
+                            {fetchModelsFailed && availableModels.length === 0 && (
+                                <div className="description" style={{ marginTop: 0 }}>
+                                    获取不到模型列表？该服务商可能不支持列出模型，可以
+                                    <span
+                                        style={{ color: 'var(--vscode-textLink-foreground)', cursor: 'pointer', textDecoration: 'underline' }}
+                                        onClick={() => setIsManualInput(true)}
+                                    >
+                                        手动输入模型名称
+                                    </span>
+                                </div>
+                            )}
                         </div>
                     ) : (
                         <input
@@ -429,52 +422,51 @@ const AddModelForm: React.FC<AddModelFormProps> = ({ onSuccess, vscode }) => {
                                 setConnectionTested(false);
                                 setConnectionSuccess(false);
                             }}
-                            placeholder="手动输入模型名称"
+                            placeholder={defaults.defaultModel ? `输入模型名称，例如: ${defaults.defaultModel}` : '输入模型名称'}
                         />
                     )}
 
-                    {currentModelDocUrl && (
-                        <div className="description" style={{ marginTop: '8px', wordBreak: 'break-all', overflowWrap: 'anywhere' }}>
-                            api_key申请详见: <a href={currentModelDocUrl} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--vscode-textLink-foreground)', textDecoration: 'underline' }}>{currentModelDocUrl}</a>
-                        </div>
-                    )}
                 </div>
 
                 <div className="form-group">
                     <label htmlFor="adapt">API 类型</label>
-                    <select
+                    <IconSelect
                         id="adapt"
                         value={adapt}
-                        onChange={(e) => setAdapt(e.target.value as AdapterType)}
-                    >
-                        <option value="openai">OpenAI 格式</option>
-                        <option value="anthropic">Anthropic 格式</option>
-                    </select>
+                        onChange={(value) => setAdapt(value as AdapterType)}
+                        options={[
+                            { value: 'openai', label: 'OpenAI 格式' },
+                            { value: 'anthropic', label: 'Anthropic 格式' }
+                        ]}
+                    />
                 </div>
 
                 <div className="form-row">
                     <div className="form-group">
                         <label htmlFor="maxTokens">最大生成token数</label>
-                        <select id="maxTokens" value={maxTokens} onChange={(e) => setMaxTokens(e.target.value)}>
-                            {(defaults.maxTokensOptions ?? DEFAULT_MAX_TOKENS_OPTIONS).map(val => (
-                                <option
-                                    key={val}
-                                    value={val}
-                                    disabled={selectedModelMaxTokens !== null && val > selectedModelMaxTokens}
-                                >
-                                    {formatTokenCount(val)}
-                                </option>
-                            ))}
-                        </select>
+                        <IconSelect
+                            id="maxTokens"
+                            value={maxTokens}
+                            onChange={setMaxTokens}
+                            options={(defaults.maxTokensOptions ?? DEFAULT_MAX_TOKENS_OPTIONS).map(val => ({
+                                value: String(val),
+                                label: formatTokenCount(val),
+                                disabled: selectedModelMaxTokens !== null && val > selectedModelMaxTokens
+                            }))}
+                        />
                     </div>
 
                     <div className="form-group">
                         <label htmlFor="contextLength">上下文窗口大小</label>
-                        <select id="contextLength" value={contextLength} onChange={(e) => setContextLength(e.target.value)}>
-                            {(defaults.contextLengthOptions ?? DEFAULT_CONTEXT_LENGTH_OPTIONS).map(val => (
-                                <option key={val} value={val}>{formatTokenCount(val)}</option>
-                            ))}
-                        </select>
+                        <IconSelect
+                            id="contextLength"
+                            value={contextLength}
+                            onChange={setContextLength}
+                            options={(defaults.contextLengthOptions ?? DEFAULT_CONTEXT_LENGTH_OPTIONS).map(val => ({
+                                value: String(val),
+                                label: formatTokenCount(val)
+                            }))}
+                        />
                     </div>
                 </div>
 

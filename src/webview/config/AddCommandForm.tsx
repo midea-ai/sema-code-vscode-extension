@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { VscodeApi } from './types';
+import IconSelect from './IconSelect';
 
 const initialFormState = {
     name: '',
@@ -168,13 +169,14 @@ const AddCommandForm: React.FC<AddCommandFormProps> = ({ vscode, onSuccess, onCl
 
             <div className="agent-form-group">
                 <label>位置</label>
-                <select
+                <IconSelect
                     value={formData.locate}
-                    onChange={(e) => handleFormChange('locate', e.target.value as 'project' | 'user')}
-                >
-                    <option value="project">项目级 (默认)</option>
-                    <option value="user">用户级</option>
-                </select>
+                    onChange={(value) => handleFormChange('locate', value as 'project' | 'user')}
+                    options={[
+                        { value: 'project', label: '项目级 (默认)' },
+                        { value: 'user', label: '用户级' }
+                    ]}
+                />
             </div>
 
             <div className="add-agent-form-footer">

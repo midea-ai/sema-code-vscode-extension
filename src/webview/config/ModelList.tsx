@@ -1,5 +1,8 @@
 import React from 'react';
 import { Config, VscodeApi } from './types';
+import ProviderLogo from '../common/ProviderLogo';
+import { TrashIcon } from './utils/svgIcons';
+import './style/section.css';
 
 interface ModelListProps {
     config: Config | null;
@@ -87,7 +90,12 @@ const ModelList: React.FC<ModelListProps> = ({ config, vscode }) => {
 
                             return (
                                 <tr key={index}>
-                                    <td>{provider}</td>
+                                    <td>
+                                        <span className="provider-cell">
+                                            <ProviderLogo provider={provider.toLowerCase()} className="provider-cell-logo" />
+                                            {provider}
+                                        </span>
+                                    </td>
                                     <td>{modelDisplayName}</td>
                                     <td>
                                         {taskType !== '-' && (
@@ -98,13 +106,11 @@ const ModelList: React.FC<ModelListProps> = ({ config, vscode }) => {
                                     </td>
                                     <td>
                                         <button
-                                            className="delete-btn"
+                                            className="section-icon-btn section-icon-btn-danger"
                                             onClick={() => handleDelete(fullName)}
                                             title="删除此模型"
                                         >
-                                            <svg viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg">
-                                                <path d="M10 3h3v1h-1v9c0 .55-.45 1-1 1H5c-.55 0-1-.45-1-1V4H3V3h3V2c0-.55.45-1 1-1h2c.55 0 1 .45 1 1v1zM6 2v1h4V2H6zm5 2H5v9h6V4zm-1 1v7H9V5h1zm-2 0v7H7V5h1z"/>
-                                            </svg>
+                                            <TrashIcon />
                                         </button>
                                     </td>
                                 </tr>
@@ -118,4 +124,3 @@ const ModelList: React.FC<ModelListProps> = ({ config, vscode }) => {
 };
 
 export default ModelList;
-

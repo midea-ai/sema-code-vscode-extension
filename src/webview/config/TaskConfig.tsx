@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Config, VscodeApi } from './types';
 import { RECOMMENDED_MAIN_MODEL, RECOMMENDED_QUICK_MODEL } from './default/defaultModelProvider';
+import ProviderLogo, { parseProviderKey, stripProviderSuffix } from '../common/ProviderLogo';
+import IconSelect from './IconSelect';
 
 interface TaskConfigProps {
     config: Config | null;
@@ -19,15 +21,8 @@ const TaskConfig: React.FC<TaskConfigProps> = ({ config, vscode }) => {
     const [hasChanges, setHasChanges] = useState(false);
     const [message, setMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
 
-    // 解析模型名称以显示友好的名称
-    const parseModelName = (modelName: string) => {
-        // 模型名称格式例如: "Claude-Sonnet-4-20250514-v1.0[custom]"
-        const providerMatch = modelName.match(/\[([^\]]+)\]$/);
-        const provider = providerMatch ? providerMatch[1] : 'unknown';
-        const modelDisplayName = modelName.replace(/\[[^\]]+\]$/, '');
-
-        return `${modelDisplayName} [${provider}]`;
-    };
+    // 解析模型名称以显示友好的名称（提供商由选项前的 logo 标识，不再重复文字后缀）
+    const parseModelName = (modelName: string) => stripProviderSuffix(modelName);
 
     useEffect(() => {
         if (config && config.taskConfig) {
@@ -83,6 +78,12 @@ const TaskConfig: React.FC<TaskConfigProps> = ({ config, vscode }) => {
     // 使用 modelList 中的所有模型作为可选项
     const availableModels = config?.modelList || [];
 
+    const modelOptions = availableModels.map(modelName => ({
+        value: modelName,
+        label: parseModelName(modelName),
+        icon: <ProviderLogo provider={parseProviderKey(modelName)} className="icon-select-logo" />
+    }));
+
     return (
         <div className="task-config">
             <h2 className="section-title">任务配置</h2>
@@ -90,22 +91,14 @@ const TaskConfig: React.FC<TaskConfigProps> = ({ config, vscode }) => {
             <div className="task-row">
                 <label className="task-label" htmlFor="mainModel">Main</label>
                 <div className="task-select-wrapper">
-                    <select
+                    <IconSelect
                         id="mainModel"
                         value={taskConfig.main}
-                        onChange={(e) => handleChange('main', e.target.value)}
+                        onChange={(value) => handleChange('main', value)}
+                        options={modelOptions}
                         disabled={availableModels.length === 0}
-                    >
-                        {availableModels.length === 0 ? (
-                            <option value="">无可用模型</option>
-                        ) : (
-                            availableModels.map((modelName, index) => (
-                                <option key={index} value={modelName}>
-                                    {parseModelName(modelName)}
-                                </option>
-                            ))
-                        )}
-                    </select>
+                        placeholder="无可用模型"
+                    />
                     {RECOMMENDED_MAIN_MODEL && <span className="task-recommend">推荐使用 {RECOMMENDED_MAIN_MODEL}</span>}
                 </div>
             </div>
@@ -113,22 +106,14 @@ const TaskConfig: React.FC<TaskConfigProps> = ({ config, vscode }) => {
             <div className="task-row">
                 <label className="task-label" htmlFor="quickModel">Quick</label>
                 <div className="task-select-wrapper">
-                    <select
+                    <IconSelect
                         id="quickModel"
                         value={taskConfig.quick}
-                        onChange={(e) => handleChange('quick', e.target.value)}
+                        onChange={(value) => handleChange('quick', value)}
+                        options={modelOptions}
                         disabled={availableModels.length === 0}
-                    >
-                        {availableModels.length === 0 ? (
-                            <option value="">无可用模型</option>
-                        ) : (
-                            availableModels.map((modelName, index) => (
-                                <option key={index} value={modelName}>
-                                    {parseModelName(modelName)}
-                                </option>
-                            ))
-                        )}
-                    </select>
+                        placeholder="无可用模型"
+                    />
                     {RECOMMENDED_QUICK_MODEL && <span className="task-recommend">推荐使用 {RECOMMENDED_QUICK_MODEL}</span>}
                 </div>
             </div>
