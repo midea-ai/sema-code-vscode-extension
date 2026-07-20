@@ -1,26 +1,27 @@
 /**
- * 文件搜索结果评分。query 传入前需自行 trim；rawQuery 保留原始大小写，query 为其小写形式。
+ * 文件搜索结果评分。query 传入前需自行 trim 并小写化。
  *
  * bucket 越小越优先：
  *   0 - basename 完全相等
  *   1 - basename 去扩展名后相等（仅文件）
  *   2 - basename 前缀匹配
- *   3 - basename 单词边界命中（驼峰/分隔符/数字-字母切换处起始的子串，或驼峰首字母子序列匹配）
+ *   3 - basename 词边界子串命中（-_./ 分隔符、驼峰、数字-字母切换处起始）
  *   4 - basename 普通子串命中（非词首）
- *   5 - 仅路径命中（一般为目录条目，或 query 含路径分隔符的特殊场景）
+ *   5 - 仅路径命中（目录条目，或 query 含路径分隔符的浏览式搜索）
  *
- * 同 bucket 内排序：
- *   目录优先 → matchIdx 越靠左优先 → 大小写完全匹配优先 → 路径深度浅优先 → 路径短优先。
- *   "大小写完全匹配"指 path 中包含原始大小写的 rawQuery；用户键入小写 'skill' 时
- *   skill.json 应排在 SKILL.md 之前。
+ * 同 bucket 平级链按命中位置分两组：
+ *   basename 命中（0-4）：目录优先 → isOpen → 主干短优先 → 路径浅优先 → 字典序
+ *   仅路径命中（5）  ：目录优先 → isOpen → 字典序（浏览目录场景，长度信号无意义）
+ * 字典序兜底由调用方 localeCompare 承担。
+ *
+ * 主干长度用去扩展名后的长度：bucket 1 内主干全等自动退化到 depth，
+ * 避免 index.ts 仅因扩展名短而压过 index.html。
  */
 
 export interface FileScore {
     bucket: number;
-    matchIdx: number;
-    caseExact: boolean;
+    stemLen: number;
     depth: number;
-    len: number;
 }
 
 const SEPARATOR_RE = /[-_./\\ ]/;
@@ -46,83 +47,41 @@ const isWordBoundaryAt = (s: string, i: number): boolean => {
     return false;
 };
 
-/**
- * 在 name 中按"单词起点子序列"匹配 query。
- * 例：query="fcm" 在 "FileChangeManager" 命中（F、C、M 均在词首）。
- * query 已小写化，name 保留原大小写以判断驼峰边界。
- */
-const matchAtWordBoundaries = (name: string, query: string): boolean => {
-    if (!query) {
-        return false;
-    }
-    const lowerName = name.toLowerCase();
-    let qi = 0;
-    for (let i = 0; i < name.length && qi < query.length; i++) {
-        if (lowerName[i] === query[qi] && isWordBoundaryAt(name, i)) {
-            qi++;
-        }
-    }
-    return qi === query.length;
-};
-
 export const scoreItem = (
     path: string,
     isDirectory: boolean,
-    query: string,
-    rawQuery: string
+    query: string
 ): FileScore => {
     const name = path.split('/').pop() || path;
     const lowerName = name.toLowerCase();
-    const lowerPath = path.toLowerCase();
+    const dotIdx = name.lastIndexOf('.');
+    const stem = !isDirectory && dotIdx > 0 ? name.substring(0, dotIdx) : name;
 
     let bucket: number;
-    let matchIdx: number;
-
     if (lowerName === query) {
         bucket = 0;
-        matchIdx = 0;
-    } else if (!isDirectory && (() => {
-        const dotIdx = name.lastIndexOf('.');
-        const stem = dotIdx > 0 ? name.substring(0, dotIdx) : name;
-        return stem.toLowerCase() === query;
-    })()) {
+    } else if (!isDirectory && stem.toLowerCase() === query) {
         bucket = 1;
-        matchIdx = 0;
     } else if (lowerName.startsWith(query)) {
         bucket = 2;
-        matchIdx = 0;
     } else if (lowerName.includes(query)) {
-        const idx = lowerName.indexOf(query);
-        bucket = isWordBoundaryAt(name, idx) ? 3 : 4;
-        matchIdx = idx;
-    } else if (matchAtWordBoundaries(name, query)) {
-        bucket = 3;
-        matchIdx = 0;
+        bucket = isWordBoundaryAt(name, lowerName.indexOf(query)) ? 3 : 4;
     } else {
-        // basename 不命中，落到路径命中（多为目录条目）
+        // basename 不命中，落到路径命中（目录条目或浏览式搜索）
         bucket = 5;
-        const idx = lowerPath.indexOf(query);
-        matchIdx = idx >= 0 ? idx : Number.MAX_SAFE_INTEGER;
     }
 
-    // caseExact 要看真正承载命中的目标：
-    //   bucket 0-4 看 basename（避免被祖先目录里的小写 query 干扰）
-    //   bucket 5 才看完整 path
-    // 例：query='skill' 时 .sema/skills/cron/SKILL.md 的 basename 'SKILL.md' 不含原始 'skill'，
-    //     而 .sema/skills/cron/skill.json 的 basename 'skill.json' 含——后者才该胜出。
-    const caseExactTarget = bucket === 5 ? path : name;
     return {
         bucket,
-        matchIdx,
-        caseExact: rawQuery.length > 0 && caseExactTarget.includes(rawQuery),
-        depth: (path.match(/\//g) || []).length,
-        len: path.length
+        stemLen: stem.length,
+        depth: (path.match(/\//g) || []).length
     };
 };
 
 export interface ScoredItem {
     score: FileScore;
     isDirectory: boolean;
+    isOpen: boolean;
 }
 
 export const compareScored = (a: ScoredItem, b: ScoredItem): number => {
@@ -133,18 +92,19 @@ export const compareScored = (a: ScoredItem, b: ScoredItem): number => {
     if (a.isDirectory !== b.isDirectory) {
         return a.isDirectory ? -1 : 1;
     }
-    if (a.score.matchIdx !== b.score.matchIdx) {
-        return a.score.matchIdx - b.score.matchIdx;
+    // 已打开文件优先：正在编辑的文件意图信号最强（仅 bucket 内，不跨档置顶）
+    if (a.isOpen !== b.isOpen) {
+        return a.isOpen ? -1 : 1;
     }
-    // 大小写完全匹配优先：键入小写 'skill' 时让 skill.json 排在 SKILL.md 之前
-    if (a.score.caseExact !== b.score.caseExact) {
-        return a.score.caseExact ? -1 : 1;
+    // 仅路径命中：basename 长短与相关性无关，直接交给调用方字典序
+    if (a.score.bucket === 5) {
+        return 0;
+    }
+    if (a.score.stemLen !== b.score.stemLen) {
+        return a.score.stemLen - b.score.stemLen;
     }
     if (a.score.depth !== b.score.depth) {
         return a.score.depth - b.score.depth;
-    }
-    if (a.score.len !== b.score.len) {
-        return a.score.len - b.score.len;
     }
     return 0;
 };

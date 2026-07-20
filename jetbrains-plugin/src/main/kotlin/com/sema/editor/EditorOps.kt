@@ -478,7 +478,11 @@ class EditorOps(
         pushFiles(reqId, items)
     }
 
-    /** 按关键字搜工作区文件（有界 DFS，跳过排除目录），按 精确>前缀>包含、路径长度、字典序 排序取前 100。对齐 searchWorkspaceFiles。 */
+    /**
+     * 按关键字搜工作区文件，行为完全对齐 VSCode FileOperationManager.searchWorkspaceFiles：
+     *   命中面：相对路径含 query 的文件（含已打开文件）；目录仅由命中文件父链反推（父路径含 query 才出现，无匹配文件的目录不列）；
+     *   排序：见 fileScoring（bucket 0-5 → 目录优先 → isOpen → 主干短 → 路径浅 → 字典序），取前 500。
+     */
     private fun searchWorkspaceFilesOp(query: String, reqId: com.google.gson.JsonElement?) {
         val q = query.trim().trimEnd('/').lowercase().replace(Regex("[*?{}\\[\\]]"), "")
         if (q.isEmpty()) { sendWorkspaceFiles(reqId); return }
@@ -488,29 +492,101 @@ class EditorOps(
                 ?: return@compute emptyList<Map<String, Any?>>()
             val openPaths = com.intellij.openapi.fileEditor.FileEditorManager.getInstance(project).openFiles
                 .map { relPath(it.path, base) }.toHashSet()
-            val matches = ArrayList<com.intellij.openapi.vfs.VirtualFile>()
+
+            // rel -> 元数据；有界 DFS。对齐 VSCode：只收「相对路径含 q 的文件」，
+            // 目录条目一律由命中文件的父链反推（父路径含 q 才加）——因此子树内没有匹配文件的目录不会出现。
+            // 命中判据用相对路径而非单段文件名：q 不含 '/' 时等价于某段含 q；含 '/' 时 '/' 对齐真实目录边界。
+            val collected = LinkedHashMap<String, FileMeta>()
+            // 收一个命中文件：文件本体入集合，并沿父链把「路径含 q」的祖先目录补成目录条目（对齐 descendantMatches 反推）
+            fun addHitFile(rel: String, isOpen: Boolean) {
+                if (collected.containsKey(rel)) return
+                collected[rel] = FileMeta(false, isOpen)
+                val parts = rel.split('/')
+                val acc = StringBuilder()
+                for (i in 0 until parts.size - 1) {
+                    if (i > 0) acc.append('/')
+                    acc.append(parts[i])
+                    val dirPath = acc.toString()
+                    if (dirPath.lowercase().contains(q) && !collected.containsKey(dirPath)) {
+                        collected[dirPath] = FileMeta(true, false)
+                    }
+                }
+            }
             val stack = ArrayDeque<com.intellij.openapi.vfs.VirtualFile>()
             baseVf.children?.forEach { stack.addLast(it) }
             var visited = 0
-            while (stack.isNotEmpty() && matches.size < 500 && visited < 20000) {
+            while (stack.isNotEmpty() && collected.size < 2000 && visited < 50000) {
                 val vf = stack.removeLast(); visited++
                 if (vf.name in EXCLUDED_NAMES) continue
-                if (vf.name.lowercase().contains(q)) matches.add(vf)
-                if (vf.isDirectory) vf.children?.forEach { stack.addLast(it) }
+                if (vf.isDirectory) {
+                    vf.children?.forEach { stack.addLast(it) }
+                    continue // 目录不直接作为条目，只由其下命中文件反推
+                }
+                val rel = relPath(vf.path, base)
+                if (rel.lowercase().contains(q)) addHitFile(rel, openPaths.contains(rel))
             }
-            matches.map { vf -> Triple(relPath(vf.path, base), vf.isDirectory, openPaths.contains(relPath(vf.path, base))) }
-                .sortedWith(compareBy({ nameRank(File(it.first).name.lowercase(), q) }, { it.first.length }, { it.first.lowercase() }))
-                .take(100)
+            // 已打开且路径含 q 的文件补入（可能位于被跳过的排除目录，对齐 VSCode openHits 先入集合）
+            for (rel in openPaths) {
+                if (rel.lowercase().contains(q)) addHitFile(rel, true)
+            }
+
+            collected.entries
+                .map { Triple(it.key, it.value.isDir, it.value.isOpen) }
+                .sortedWith(Comparator { a, b ->
+                    val c = compareScored(
+                        scoreItem(a.first, a.second, q), a.second, a.third,
+                        scoreItem(b.first, b.second, q), b.second, b.third
+                    )
+                    if (c != 0) c else a.first.compareTo(b.first) // 字典序兜底（近似 VSCode localeCompare）
+                })
+                .take(500)
                 .map { mapOf("path" to it.first, "isDirectory" to it.second, "isOpen" to it.third) }
         }
         pushFiles(reqId, items)
     }
 
-    /** 名称匹配排序权重：精确=0 前缀=1 包含=2。 */
-    private fun nameRank(name: String, q: String): Int = when {
-        name == q -> 0
-        name.startsWith(q) -> 1
-        else -> 2
+    private val FILE_SEPARATORS = charArrayOf('-', '_', '.', '/', '\\', ' ')
+
+    /** 词边界判定（对齐 fileScoring.isWordBoundaryAt）：分隔符后 / camelCase / 数字-字母交界。 */
+    private fun isWordBoundaryAt(s: String, i: Int): Boolean {
+        if (i <= 0) return true
+        val prev = s[i - 1]; val cur = s[i]
+        if (prev in FILE_SEPARATORS) return true
+        if (prev in 'a'..'z' && cur in 'A'..'Z') return true
+        return prev.isDigit() != cur.isDigit()
+    }
+
+    private data class FileMeta(val isDir: Boolean, val isOpen: Boolean)
+    private data class FileScore(val bucket: Int, val stemLen: Int, val depth: Int)
+
+    /** 文件搜索评分（对齐 fileScoring.scoreItem）；query 需已 trim+lowercase。 */
+    private fun scoreItem(path: String, isDirectory: Boolean, query: String): FileScore {
+        val name = path.substringAfterLast('/')
+        val lowerName = name.lowercase()
+        val dotIdx = name.lastIndexOf('.')
+        val stem = if (!isDirectory && dotIdx > 0) name.substring(0, dotIdx) else name
+        val bucket = when {
+            lowerName == query -> 0
+            !isDirectory && stem.lowercase() == query -> 1
+            lowerName.startsWith(query) -> 2
+            lowerName.contains(query) -> if (isWordBoundaryAt(name, lowerName.indexOf(query))) 3 else 4
+            else -> 5
+        }
+        return FileScore(bucket, stem.length, path.count { it == '/' })
+    }
+
+    /** 同 bucket 平级比较（对齐 fileScoring.compareScored）。 */
+    private fun compareScored(
+        a: FileScore, aDir: Boolean, aOpen: Boolean,
+        b: FileScore, bDir: Boolean, bOpen: Boolean
+    ): Int {
+        if (a.bucket != b.bucket) return a.bucket - b.bucket
+        if (aDir != bDir) return if (aDir) -1 else 1
+        if (aOpen != bOpen) return if (aOpen) -1 else 1
+        if (a.bucket == 5) return 0
+        if (a.stemLen != b.stemLen) return a.stemLen - b.stemLen
+        if (a.depth != b.depth) return a.depth - b.depth
+        return 0
     }
 
     /** 在已打开编辑器（活动优先）中按内容定位文件与行区间（对齐 searchContentInFiles/searchInDocument，1-based）。 */

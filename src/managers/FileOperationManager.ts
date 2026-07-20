@@ -299,8 +299,10 @@ export class FileOperationManager {
         if (!globSafe) {
             return [];
         }
+        // findFiles 的 glob 匹配大小写敏感，把字母展开成 [gG] 字符类实现不敏感匹配
+        const globPattern = globSafe.replace(/[a-z]/g, c => `[${c}${c.toUpperCase()}]`);
 
-        const MAX_RESULTS = 100;
+        const MAX_RESULTS = 500;
         // 单次 findFiles 的硬上限：留余量给评分排序，最终仍按 MAX_RESULTS 截断
         const FIND_LIMIT = 2000;
 
@@ -319,8 +321,8 @@ export class FileOperationManager {
             //    A. basename 含 query 的文件（高优先级，bucket 0-4）
             //    B. 祖先目录名含 query 的所有后代文件（用作 bucket 5 文件 + 反推目录条目）
             const [fileMatches, descendantMatches] = await Promise.all([
-                vscode.workspace.findFiles(`**/*${globSafe}*`, EXCLUDE_GLOB, FIND_LIMIT),
-                vscode.workspace.findFiles(`**/*${globSafe}*/**`, EXCLUDE_GLOB, FIND_LIMIT)
+                vscode.workspace.findFiles(`**/*${globPattern}*`, EXCLUDE_GLOB, FIND_LIMIT),
+                vscode.workspace.findFiles(`**/*${globPattern}*/**`, EXCLUDE_GLOB, FIND_LIMIT)
             ]);
 
             const collected = new Map<string, { path: string; isDirectory: boolean; isOpen: boolean }>();
@@ -373,15 +375,15 @@ export class FileOperationManager {
                 }
             }
 
-            // 3. 评分排序：有查询值时由 fileScoring 统一决定顺序，不再按 isOpen 置顶
+            // 3. 评分排序：有查询值时由 fileScoring 统一决定顺序，isOpen 仅作 bucket 内平级信号
             const scored = [...collected.values()].map(item => ({
                 item,
-                score: scoreItem(item.path, item.isDirectory, cleanQuery, rawQuery)
+                score: scoreItem(item.path, item.isDirectory, cleanQuery)
             }));
             scored.sort((a, b) => {
                 const cmp = compareScored(
-                    { score: a.score, isDirectory: a.item.isDirectory },
-                    { score: b.score, isDirectory: b.item.isDirectory }
+                    { score: a.score, isDirectory: a.item.isDirectory, isOpen: a.item.isOpen },
+                    { score: b.score, isDirectory: b.item.isDirectory, isOpen: b.item.isOpen }
                 );
                 if (cmp !== 0) return cmp;
                 return a.item.path.localeCompare(b.item.path);
