@@ -24,6 +24,7 @@ class SidecarProcess(
 ) {
     private val log = logger<SidecarProcess>()
     @Volatile private var process: Process? = null
+    @Volatile private var stopped = false
     private val portFuture = CompletableFuture<Int>()
 
     fun start(): CompletableFuture<Int> {
@@ -86,6 +87,11 @@ class SidecarProcess(
                 return
             }
             process = proc
+            // 竞态兜底：boot 期间（如首启下载 node）项目已关闭、stop() 先行 → 进程刚起就回收，不留孤儿。
+            if (stopped) {
+                proc.destroy()
+                return
+            }
 
             // 本线程直接读 stdout（阻塞本 boot 线程即可，无需再开线程）。
             BufferedReader(InputStreamReader(proc.inputStream)).useLines { lines ->
@@ -114,6 +120,7 @@ class SidecarProcess(
     ).firstOrNull { it.exists() }
 
     fun stop() {
+        stopped = true
         process?.let {
             it.destroy()
             if (!it.waitFor(3, TimeUnit.SECONDS)) it.destroyForcibly()

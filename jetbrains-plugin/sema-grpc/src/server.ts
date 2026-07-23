@@ -337,6 +337,23 @@ server.bindAsync(
 process.on('uncaughtException', (err) => console.error('[sema-grpc] uncaughtException（已兜底）:', err));
 process.on('unhandledRejection', (reason) => console.error('[sema-grpc] unhandledRejection（已兜底）:', reason));
 
+// 孤儿自检：stdin 是宿主（JVM ProcessBuilder）建的管道，宿主活着管道就一直开着；
+// 宿主死亡（含 SIGKILL / 崩溃 / 关机强杀，此时收不到任何信号）管道必然关闭 → 自行退出，不留孤儿。
+// 手动调试若 stdin 非管道（如 < /dev/null）会误触发，可设 SEMA_NO_PARENT_WATCH=1 关闭。
+if (!process.env.SEMA_NO_PARENT_WATCH) {
+  let exiting = false;
+  const orphanExit = () => {
+    if (exiting) return;
+    exiting = true;
+    console.log('[sema-grpc] stdin closed (host gone), exiting...');
+    setTimeout(() => process.exit(0), 3000).unref(); // dispose 卡住时兜底强退
+    void manager.dispose().finally(() => process.exit(0));
+  };
+  process.stdin.resume();
+  process.stdin.on('end', orphanExit);
+  process.stdin.on('close', orphanExit);
+}
+
 process.on('SIGTERM', () => {
   console.log('[sema-grpc] Shutting down...');
   void manager.dispose().finally(() => server.tryShutdown(() => process.exit(0)));
