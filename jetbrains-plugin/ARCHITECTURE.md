@@ -2,7 +2,7 @@
 
 > 面向维护者的**实现级架构参考**：讲清楚「一条消息从 React 点击到 sema-core 再回到界面」这条链路上，每一层是什么、为什么这么设计、代码在哪。
 >
-> 相关文档：[`README.md`](README.md) 讲选型与目录，[`DEVELOPMENT.md`](DEVELOPMENT.md) 讲怎么跑起来，[`docs/build.md`](docs/build.md) 是 JCEF↔Kotlin 线上协议的单一真源，[`sema-grpc/README.md`](sema-grpc/README.md) 是完整 action/event 清单。本文是这些文档的架构性总纲。
+> 相关文档：[`README.md`](README.md) 讲选型与目录，[`DEVELOPMENT.md`](DEVELOPMENT.md) 讲怎么跑起来，[`docs/build.md`](docs/build.md) 是 JCEF↔Kotlin 线上协议的单一真源，完整 action/event 清单见 sema-core 仓库 `sdks/shared/bridge/README.md`。本文是这些文档的架构性总纲。
 
 ---
 
@@ -13,7 +13,7 @@
 **真正复杂的两块——Agent 大脑（`sema-core`，纯 Node）和界面（React）——都与编辑器无关，被 VSCode 与 JB 两端高比例复用；JB 版本的全部新增工作，是用 Kotlin 重写一层「哑适配」，并把大脑从「进程内库」改造成「独立 sidecar 进程」。**
 
 - VSCode 端：React UI 在扩展宿主进程里**直接 `new SemaCore()`**，同进程调方法、听事件。
-- JB 端：JVM 里没有 Node 运行时，大脑必须拆成**独立 Node 进程**；UI 够不着 `SemaCore` 对象，于是中间插入一层 **gRPC 透明镜像（`sema-grpc`）** 当替身。
+- JB 端：JVM 里没有 Node 运行时，大脑必须拆成**独立 Node 进程**；UI 够不着 `SemaCore` 对象，于是中间插入一层 **gRPC 透明镜像**当替身——即 sema-core 官方桥（`sdks/shared/bridge`），随 **sema-core Java SDK**（maven `io.github.midea-ai:sema-core`）内嵌分发，进程托管与连接管理也由 SDK 提供。
 
 核心等式：**「JB 调 gRPC 桥」≡「VSCode 调 sema-core」**，只差一层序列化边界。上层编排代码（`SemaSessionWrapper`、React `App`）因此得以原样复用。
 
@@ -30,17 +30,17 @@
 │   └───────┬────────┘   └───────┬────────┘   └───────┬────────┘                               │
 │           │ MessageBridge      │ MessageBridge      │ MessageBridge   （每面板一个，哑转发）  │
 │   ┌───────┴────────────────────┴────────────────────┴────────┐                               │
-│   │ SidecarService（project 级单例）                          │                               │
-│   │   · 一个 SidecarProcess（整个 project 共享）              │                               │
-│   │   · N 条独立 GrpcClient 连接（每面板一条）                │                               │
+│   │ SidecarService（project 级单例，委托 Java SDK）           │                               │
+│   │   · 一个 SidecarManager（整个 project 共享，SDK 托管）    │                               │
+│   │   · N 条独立 BridgeConnection 连接（每面板一条）          │                               │
 │   └───────────────────────────┬──────────────────────────────┘                               │
 │                               │ gRPC 双向流（明文，127.0.0.1:动态端口）                       │
 └───────────────────────────────┼──────────────────────────────────────────────────────────────┘
                                  │
              ┌───────────────────▼────────────────────┐
-             │  Node sidecar 进程（server.js 单文件）  │   ← esbuild 把 sema-grpc + sema-core
-             │  ┌────────────────────────────────────┐ │      打成一个文件，用系统/私有 node 跑
-             │  │ sema-grpc（透明镜像）              │ │
+             │  Node sidecar 进程（server.js 单文件）  │   ← sema-core 官方桥产物（内嵌 SDK jar，
+             │  ┌────────────────────────────────────┐ │      运行时释放），用系统/私有 node 跑
+             │  │ 官方桥 sdks/shared/bridge（镜像）  │ │
              │  │   SemaCoreManager（进程级单 Core） │ │
              │  │   SessionBinder（会话事件→gRPC）   │ │
              │  └──────────────┬─────────────────────┘ │
@@ -54,7 +54,7 @@
 | 维度 | 取值 | 说明 |
 |---|---|---|
 | **进程数** | 每个 project 1 个 sidecar | `SidecarService` 是 `@Service(PROJECT)`，`project.basePath` 即 sema-core 工作目录 |
-| **gRPC 连接数** | 每个 JCEF 面板 1 条 | chat / config / history 各开一条 `GrpcClient`，互不串扰、`cmdId` 不撞车 |
+| **gRPC 连接数** | 每个 JCEF 面板 1 条 | chat / config / history 各开一条 `BridgeConnection`（SDK），互不串扰、`cmdId` 不撞车 |
 | **sema-core 实例数** | 每个 sidecar 1 个 | 进程级单 `SemaCore` + 会话池；多面板/多会话共享，与 VSCode「一宿主一 Core」对齐 |
 | **端口** | 动态（`SEMA_BRIDGE_PORT=0`） | OS 分配空闲端口，sidecar 用 `SEMA_BRIDGE_PORT_ACTUAL=<n>` 写回 stdout，宿主读取；避免多 IDE 窗口撞端口 |
 | **传输** | gRPC over OkHttp，明文 | 全程 `127.0.0.1`，明文足够；OkHttp 传输比 netty-shaded 小 ~8MB |
@@ -73,26 +73,20 @@
 
 ### 1.4 目录结构
 
-代码分两处：Kotlin 宿主 + gRPC 桥在本插件工程内，JS 适配层在主工程内（与 React UI 同仓，方便复用）。
+代码分两处：Kotlin 宿主在本插件工程内，JS 适配层在主工程内（与 React UI 同仓，方便复用）；
+gRPC 桥（③）不再驻留本仓库——用 sema-core 官方桥（`sdks/shared/bridge`），随 Java SDK maven 依赖内嵌引入。
 
 ```
 jetbrains-plugin/
 ├── ARCHITECTURE.md / README.md / DEVELOPMENT.md      # 本文 / 选型·目录 / 怎么跑
-├── build.gradle.kts · gradle.properties · gradlew    # Gradle 构建（含 syncSidecar/syncWeb/generateProto）
-│
-├── sema-grpc/                        # ③ gRPC 桥（独立 npm 工程 = sema-core 透明镜像）
-│   ├── proto/sema.proto              #    帧定义（同时生成 Kotlin/Java stub）
-│   ├── src/server.ts                 #    action 路由表
-│   ├── src/core.ts                   #    SemaCoreManager：进程级单 Core + 会话池
-│   ├── src/session.ts                #    SessionBinder：会话事件桥接到 gRPC 流
-│   └── esbuild.mjs                   #    打成单文件 dist/server.js
+├── build.gradle.kts · gradle.properties · gradlew    # Gradle 构建（含 syncWeb）
 │
 └── src/main/
     ├── kotlin/com/sema/              # ② Kotlin 宿主（哑转发 + 编辑器集成）
     │   ├── toolwindow/               #    工具窗口入口 + 标题栏三按钮
     │   ├── jcef/                     #    三个浏览器面板 + HtmlShell/Theme/Tooltips
     │   ├── bridge/                   #    MessageBridge（转发）+ SemaPanelBus（跨面板总线）
-    │   ├── sidecar/                  #    进程 / gRPC 客户端 / node·rg 供给
+    │   ├── sidecar/                  #    SidecarService：SDK SidecarManager/BridgeConnection 薄封装
     │   ├── editor/                   #    EditorOps：diff / 快照 / 统计 / 回滚
     │   └── config/                   #    系统配置·会话历史持久化 + 配置/历史页 FileEditor
     └── resources/META-INF/plugin.xml #    扩展点注册（工具窗口 / 服务 / FileEditorProvider）
@@ -101,9 +95,14 @@ jetbrains-plugin/
 ├── chat/jb/{transport,remote,controller,bridge}.ts + jb-index.tsx     → jb-chat.js
 ├── config/jb/{config-controller,config-bridge}.ts + jb-index.tsx      → jb-config.js
 └── sessionHistory/jb/{history-controller,history-bridge}.ts + jb-index.tsx → jb-sessionHistory.js
+
+<sema-core>/sdks/                     # ③ gRPC 桥 + Java SDK（sema-core 仓库，maven 依赖引入）
+├── shared/proto/sema.proto           #    帧定义（单一真源）
+├── shared/bridge/                    #    官方桥：server/core/session/rg（esbuild 单文件，内嵌 SDK jar）
+└── java/                             #    Java SDK：transport/protocol/runtime（通信层 + sidecar 托管）
 ```
 
-①②③ 对应 §1.3 的三层：① UI（复用）、② 宿主适配（Kotlin 重写）、③ 大脑桥接（gRPC 镜像，把复用的 sema-core 包在里面）。
+①②③ 对应 §1.3 的三层：① UI（复用）、② 宿主适配（Kotlin 重写）、③ 大脑桥接（gRPC 镜像，把复用的 sema-core 包在里面，由 sema-core 仓库统一维护）。
 
 ---
 
@@ -126,7 +125,7 @@ React App  ──postMessage──►  createJbBridge (vscode shim)
                     ══════════│═════════════════════════════════│══════════  JCEF ↔ JVM 边界
                               ▼                                  │
                             MessageBridge（哑转发，按 channel 路由）
-                              ├── channel=grpc  ──► SidecarService.Conn ──► GrpcClient ═══► sema-grpc ──► sema-core
+                              ├── channel=grpc  ──► BridgeConnection（SDK） ═══► 官方桥 ──► sema-core
                               ├── channel=editor ─► EditorOps / SystemConfigManager / SessionHistoryManager（本地处理）
                               └── channel=host  ◄── SemaPanelBus（宿主主动下发入站命令）
 ```
@@ -137,7 +136,7 @@ React App  ──postMessage──►  createJbBridge (vscode shim)
 
 | channel | 方向 | 用途 | 处理者 |
 |---|---|---|---|
-| **`grpc`** | 双向 | 转发给 sidecar，sema-core 的透明镜像，桥不解释内容 | `MessageBridge` → `GrpcClient` |
+| **`grpc`** | 双向 | 转发给 sidecar，sema-core 的透明镜像，桥不解释内容 | `MessageBridge` → `BridgeConnection`（SDK） |
 | **`editor`** | 双向 | 编辑器本地操作（开文件、diff、快照、系统配置、历史读写），**不进 sidecar** | `EditorOps` / `SystemConfigManager` / `SessionHistoryManager` |
 | **`host`** | 宿主→web | 标题栏按钮 / 历史面板主动向聊天页下发的入站命令（`createSession` / `loadHistorySession`） | `SemaPanelBus` → `Controller` |
 
@@ -149,13 +148,13 @@ React App  ──postMessage──►  createJbBridge (vscode shim)
 
 1. **能同步的别假设同步**——所有调用变异步往返（`await`）；回调型 API（如 `watchTask`）改造成上行事件（`task:watch:delta`）。
 2. **要扇出的必须走真事件**——多面板各开独立 gRPC 连接，返回值不跨连接；跨面板同步（如配置页改模型后刷新聊天页的模型指示器）只能靠 sidecar **广播**合成事件。
-3. **要容错的自己补**——超时、断流重连、重连后按 `sessionId` 重建会话（当前重连能力尚未实现）。
+3. **要容错的自己补**——超时由调用方把控；断流重连由 SDK `BridgeConnection` 内置（指数退避）；重连后按 `sessionId` 重建会话的续流逻辑仍在上层（待补）。
 
 ### 2.3 四条关键链路
 
 用这几条典型流程说明各层如何协作、以及跨进程后哪些地方需要额外绕一下。
 
-**① 首个面板打开 → sidecar 就绪。** 面板一创建就向进程管理层要一条连接，此时 sidecar 可能还没起（首启甚至要下载 node），于是**连接先返回、命令先入队缓冲**；界面加载完成才触发进程引导，进程在后台线程里拉起、通过 stdout 回报实际端口，进程管理层拿到端口后给每条连接回填真通道并把缓冲的命令 flush 出去。核心是**「连接」与「进程」解耦**,避开「命令早于进程就绪」的竞态。
+**① 首个面板打开 → sidecar 就绪。** 面板一创建就向 `SidecarService` 要一条连接并异步引导进程（SDK `SidecarManager` 在守护线程拉起 Node、释放内嵌桥产物、通过 stdout 回报实际端口），此时 sidecar 可能还没起（首启甚至要下载 node），于是**连接先返回、命令先入队缓冲**（SDK `BridgeConnection` 内置），端口就绪后自动建流并把缓冲的命令 flush 出去。核心是**「连接」与「进程」解耦**,避开「命令早于进程就绪」的竞态。
 
 **② 发一条消息（下行命令 + 上行事件的完整往返）。** 用户输入经浏览器内的编排层做 @file 编码/斜杠展开,交给会话代理 → 传输层 → 跨越 JCEF 边界 → 转发桥按 `grpc` 通道送进 sidecar → sema-core 处理。回程是**流式事件**：sema-core 每吐一段就经 gRPC 回到转发桥、跨回浏览器,编排层按 `sessionId` 派发到对应会话,由翻译层把原始事件转成 UI 消息喂给 React 渲染。这就是「命令下行、事件上行」在跨进程下的完整体现。
 
@@ -167,13 +166,13 @@ React App  ──postMessage──►  createJbBridge (vscode shim)
 
 ## 3. gRPC 桥（sema-core 的透明镜像）
 
-独立 npm 工程，用 esbuild 打成单文件 `dist/server.js`。**核心原则：桥是 sema-core 的 1:1 透明镜像，不做任何协议翻译。**
+sema-core 官方桥（sema-core 仓库 `sdks/shared/bridge`，Java/Python/C# SDK 共享同一实现），esbuild 打成单文件 `server.js` 内嵌 Java SDK jar，运行时由 SDK 释放拉起。**核心原则：桥是 sema-core 的 1:1 透明镜像，不做任何协议翻译。**
 
 - **action 名 = sema-core 方法名**（`createSession` / `processUserInput` / `addModel`…）。`init` 是唯一例外（对应 Core 构造，core 无同名方法）。
 - **事件名 = sema-core 原始事件名**（`message:text:chunk` / `tool:permission:request`…），桥只做哑转发。
 - **路由规则**：`session_id` 空 → 调 `SemaCore`；非空 → 调对应 `SemaSession`。
 
-### 3.1 Proto（`proto/sema.proto`）
+### 3.1 Proto（`sdks/shared/proto/sema.proto`）
 
 单个双向流 RPC，两个泛化帧：
 
@@ -184,7 +183,7 @@ message BridgeCommand { string id; string action; string payload;  string sessio
 message BridgeEvent   { string event; string data;   string cmd_id; string session_id; }  // Node → 宿主
 ```
 
-`payload`/`data` 一律是 JSON 字符串——桥不关心内容，序列化边界因此极薄。proto 带 `java_package="com.sema.grpc"` 供 Gradle 生成 Kotlin/Java stub；proto-loader 的 JS 侧忽略这些选项。
+`payload`/`data` 一律是 JSON 字符串——桥不关心内容，序列化边界因此极薄。Java stub 由 SDK 构建期生成并随 jar 分发，插件工程不再生成 proto 代码。
 
 ### 3.2 三个源文件
 
@@ -234,8 +233,8 @@ React 界面整体复用，JB 端只做两件事：**提供一个假的 `vscode`
 
 Kotlin 侧只做「搬运 + 编辑器集成」，不含任何 Agent/协议逻辑。按职责分四类：
 
-**① 进程与连接管理**——把「一个 sidecar 进程 + 每面板一条 gRPC 连接」的生命周期管起来。难点有二：一是**启动异步**，面板打开时进程可能还没起（首启甚至要下载 node），所以连接对象先返回、命令先入队缓冲，进程就绪后再回填真连接并 flush；二是**启动不能卡界面**，进程引导全在后台线程跑，端口通过子进程 stdout 回传。
-*地标：`SidecarService`（连接编排）、`SidecarProcess`（进程引导）、`GrpcClient`（单条流）。*
+**① 进程与连接管理**——把「一个 sidecar 进程 + 每面板一条 gRPC 连接」的生命周期管起来，重活（异步引导、就绪前缓冲、断线重连、Node 探测/下载、端口握手）全部委托 sema-core Java SDK，Kotlin 侧只剩 project 级的薄封装。
+*地标：`SidecarService`（薄封装）；SDK 侧 `SidecarManager`（进程托管）、`BridgeConnection`（单条流）。*
 
 **② 消息转发与跨面板同步**——每个面板一个转发器，按通道把 web 消息分流到 gRPC 或本地编辑器操作。两个要点：`init` 时把宿主持久化的系统配置合并进去做 seed（sema-core 自己不存 core 配置）；以及一条**跨面板总线**——标题栏「新建会话」按钮、历史面板「加载会话」需要主动推进聊天页，但聊天页是临时对象没有稳定引用，于是走总线中转，并处理「聊天页还没就绪先缓冲」的时序。
 *地标：`MessageBridge`（转发）、`SemaPanelBus`（跨面板总线）。*
@@ -256,18 +255,15 @@ Kotlin 侧只做「搬运 + 编辑器集成」，不含任何 Agent/协议逻辑
 
 ### 5.1 构建管线
 
-**两条独立构建，Gradle 负责汇合：**
+**两个输入，Gradle 负责汇合：**
 
-1. **sidecar**（`sema-grpc/`）：`npm run build` → esbuild 把 `server.ts` + sema-core 打成单文件 `dist/server.js`（`target=node18`、`external:['@vscode/ripgrep']`、保留动态 require 供 MCP/插件运行时加载）。
+1. **sema-core Java SDK**（maven `io.github.midea-ai:sema-core`）：通信层 + sidecar 托管 + 内嵌桥产物，gradle 从 Maven Central 按 `semaCoreSdkVersion` 自动拉取。
 2. **React bundle**（主工程）：webpack 的 `chatWebviewJbConfig`/`configWebviewJbConfig`/`sessionHistoryWebviewJbConfig` 三个入口 → `dist/webview/jb-{chat,config,sessionHistory}.js`。
 
 **Gradle（`build.gradle.kts`）汇合：**
 
 | 任务 | 作用 |
 |---|---|
-| `generateProto` | 从 `sema-grpc/proto/sema.proto`（单一真源）生成 Kotlin/Java gRPC stub；`compileKotlin` 依赖它 |
-| `syncSidecar` | 把 `sema-grpc/dist/server.js` 拷进 `resources/main/sidecar/`（缺产物则报错提示先 `npm run build`） |
-| `syncSidecarProto` | 把 proto 拷进 `resources/main/sidecar/proto/`（运行时 sidecar 需同级 proto） |
 | `syncWeb` | 从 `../dist/webview` 同步 **仅 `jb-*.js`**（VSCode 版 bundle 从不加载，省 ~3.8MB） |
 | `buildPlugin` | 出 `sema-jetbrains-plugin-<ver>.zip`（落在插件根目录） |
 
@@ -275,11 +271,11 @@ Kotlin 侧只做「搬运 + 编辑器集成」，不含任何 Agent/协议逻辑
 
 ### 5.2 运行时依赖供给（node / rg）
 
-统一范式：**本地有就用本地 → 没有按平台下载到 `~/.sema/{node,rg}/`**（插件私有缓存，不写系统目录、不改 shell 配置、不影响插件外的 node/rg）。
+统一范式：**本地有就用本地 → 没有按平台下载到 `~/.sema/{node,rg}/`**（私有缓存，不写系统目录、不改 shell 配置、不影响插件外的 node/rg）。node 由 SDK `NodeProviders` 供给，rg 由桥进程自己供给（`shared/bridge/src/rg.ts`）。
 
 | 依赖 | 要求 | 覆写点 | 缓存 |
 |---|---|---|---|
-| **node** | ≥18（打包锚 20.18.0 LTS） | `SEMA_NODE_PATH` 指现成 node，`SEMA_NODE_BASE_URL` 指镜像（默认 nodejs.org） | `~/.sema/node/20.18.0/<triple>/` |
-| **rg** | 任意可运行版本 | `SEMA_RG_PATH` 指现成 rg，`SEMA_RG_BASE_URL` 指镜像（默认 GitHub Release） | `~/.sema/rg/14.1.0/<triple>/` |
-| **sidecar** | — | `SEMA_SIDECAR_DIR`/`-Dsema.sidecar.dir`（dev 指 sema-grpc） | `~/.sema/jb-sidecar/`（从 jar 释放） |
+| **node** | ≥18 | `SEMA_NODE_PATH` 指现成 node，`SEMA_NODE_BASE_URL` 指镜像（默认 nodejs.org） | `~/.sema/node/` |
+| **rg** | 任意可运行版本 | `SEMA_RG_PATH` 指现成 rg，`SEMA_RG_BASE_URL` 指镜像（默认 GitHub Release） | `~/.sema/rg/` |
+| **sidecar** | — | `SEMA_SIDECAR_DIR`/`-Dsema.sidecar.dir`（dev 指桥产物目录） | `~/.sema/java-sdk-sidecar/`（从 SDK jar 释放） |
 </content>

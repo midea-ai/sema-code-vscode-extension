@@ -45,8 +45,7 @@ class ChatPanel(project: Project) : Disposable {
         browser.jbCefClient.addLoadHandler(object : CefLoadHandlerAdapter() {
             override fun onLoadEnd(b: CefBrowser?, frame: CefFrame?, httpStatusCode: Int) {
                 log.warn("[sema] onLoadEnd status=$httpStatusCode url=${b?.url}")
-                // __semaHostQuery 已内联在页面里（bundle 之前），此处只需启动 sidecar
-                bridge.startSidecar()
+                // __semaHostQuery 已内联在页面里（bundle 之前）；sidecar 随 MessageBridge 构造即异步引导
                 // 设了 SEMA_JCEF_DEVTOOLS 就自动弹出 JCEF DevTools（排查前端用，CEF 原生窗口，不依赖调试端口）
                 if (!System.getenv("SEMA_JCEF_DEVTOOLS").isNullOrBlank()) {
                     com.intellij.openapi.application.ApplicationManager.getApplication().invokeLater { openDevtools() }

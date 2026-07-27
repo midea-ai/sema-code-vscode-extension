@@ -10,9 +10,9 @@ import com.sema.config.SemaConfigVirtualFile
 import com.sema.config.SessionHistoryManager
 import com.sema.config.SystemConfigManager
 import com.sema.editor.EditorOps
-import com.sema.grpc.BridgeEvent
 import com.sema.sidecar.SidecarService
-import java.io.File
+import semacore.transport.BridgeConnection
+import semacore.transport.SemaEvent
 
 /**
  * 哑转发桥：连接单个 JCEF 面板与共享 sidecar。
@@ -39,17 +39,8 @@ class MessageBridge(
     private val sysConfig = ApplicationManager.getApplication().getService(SystemConfigManager::class.java)
     private val history = project.getService(SessionHistoryManager::class.java)
     private val bus = project.getService(SemaPanelBus::class.java)
-    // 构造即注册连接：命令先入缓冲队列，避免 web 的命令早于 onLoadEnd（startSidecar）时被丢弃。
-    private val conn: SidecarService.Conn = sidecar.connect { ev -> pushGrpcEvent(ev) }
-
-    fun startSidecar() {
-        val dir = resolveSidecarDir()
-        if (dir == null) {
-            log.error("未找到 sema-grpc sidecar 目录；请设置 JVM 参数 -Dsema.sidecar.dir=<绝对路径>")
-            return
-        }
-        sidecar.startProcess(dir)
-    }
+    // 构造即注册连接并异步引导 sidecar：就绪前命令由 SDK 连接缓冲，避免 web 的命令早于进程就绪时被丢弃。
+    private val conn: BridgeConnection = sidecar.connect { ev -> pushGrpcEvent(ev) }
 
     /** 来自 webview 的消息（JSON 字符串）。 */
     fun onWebMessage(json: String) {
@@ -279,13 +270,13 @@ class MessageBridge(
         return gson.toJson(merged)
     }
 
-    private fun pushGrpcEvent(ev: BridgeEvent) {
+    private fun pushGrpcEvent(ev: SemaEvent) {
         val frame = JsonObject().apply {
             addProperty("channel", "grpc")
-            addProperty("event", ev.event)
-            addProperty("data", ev.data)
-            addProperty("cmdId", ev.cmdId)
-            addProperty("sessionId", ev.sessionId)
+            addProperty("event", ev.event())
+            addProperty("data", ev.data())
+            addProperty("cmdId", ev.cmdId())
+            addProperty("sessionId", ev.sessionId())
         }
         pushToWeb(gson.toJson(frame))
     }
@@ -343,41 +334,6 @@ class MessageBridge(
         return null
     }
 
-    /**
-     * 定位 sidecar 目录（含可执行的 server.js + proto）。
-     * - dev：环境变量 SEMA_SIDECAR_DIR（沙箱 IDE 子进程继承）/ 系统属性 -Dsema.sidecar.dir，指向 sema-grpc。
-     * - 打包：sidecar 资源在插件 jar 内，node 无法直接执行 → 从 classpath 释放到 ~/.sema/jb-sidecar 再用。
-     */
-    private fun resolveSidecarDir(): File? {
-        val candidate = System.getenv("SEMA_SIDECAR_DIR") ?: System.getProperty("sema.sidecar.dir")
-        candidate?.let { File(it) }?.takeIf { it.exists() }?.let { return it }
-        return extractBundledSidecar()
-    }
-
-    /** 把插件 jar 里的 sidecar/server.js(+proto) 释放到用户缓存目录，返回该目录。 */
-    private fun extractBundledSidecar(): File? {
-        val loader = javaClass.classLoader
-        val home = System.getProperty("user.home") ?: return null
-        val dir = File(home, ".sema/jb-sidecar").apply { mkdirs() }
-        val serverOut = File(dir, "server.js")
-        return try {
-            val input = loader.getResourceAsStream("sidecar/server.js")
-            if (input == null) {
-                if (serverOut.exists()) return dir // 释放不到但有旧的，凑合用
-                log.error("插件内未找到 sidecar/server.js（打包缺失？）")
-                return null
-            }
-            input.use { i -> serverOut.outputStream().use { i.copyTo(it) } }
-            loader.getResourceAsStream("sidecar/proto/sema.proto")?.use { i ->
-                val protoDir = File(dir, "proto").apply { mkdirs() }
-                File(protoDir, "sema.proto").outputStream().use { i.copyTo(it) }
-            }
-            dir
-        } catch (e: Exception) {
-            log.warn("释放 sidecar 失败：${e.message}", e)
-            if (serverOut.exists()) dir else null
-        }
-    }
-
     private fun JsonObject.str(key: String): String = get(key)?.takeIf { !it.isJsonNull }?.asString ?: ""
 }
+

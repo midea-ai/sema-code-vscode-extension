@@ -4,110 +4,73 @@ import com.intellij.openapi.Disposable
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.diagnostic.logger
 import com.intellij.openapi.project.Project
-import com.sema.grpc.BridgeEvent
-import java.io.File
-import java.util.concurrent.ConcurrentLinkedQueue
+import semacore.runtime.SidecarManager
+import semacore.transport.BridgeConnection
+import semacore.transport.SemaEvent
+import java.nio.file.Path
 import java.util.concurrent.CopyOnWriteArrayList
 
 /**
- * 项目级服务：管理该 project 的 sidecar 生命周期 + 多条 gRPC 连接。
+ * 项目级服务：托管该 project 的 sidecar 进程与多条 gRPC 连接，通信层全部委托 sema-core Java SDK。
  * IDE / 项目关闭时随之释放（Disposable）。
  *
- * 一个 project 只拉起**一个** sidecar 进程（共享同一 SemaCore + 会话池），
- * 但每个 UI 面板（聊天 ToolWindow / 配置编辑器 tab）各自开一条**独立 gRPC 连接**（Conn）。
- * 对齐 sema-grpc 的多连接设计：每连接独立 binders、事件流互不串扰、cmdId 不冲突，
- * 进程级事件（cron:update / mcp:server:status）两条连接都能收到。
+ * 一个 project 只拉起**一个** sidecar 进程（SidecarManager：内嵌桥产物释放、Node 探测/下载、
+ * 端口握手、SIGTERM 回收），每个 UI 面板（聊天 ToolWindow / 配置编辑器 tab）各自开一条
+ * **独立 BridgeConnection**（事件流互不串扰、cmdId 不冲突，进程级事件每条连接都能收到）。
  *
- * sidecar 启动是异步的（要等 Node 打印端口），连接就绪前每个 Conn 的指令先入队，就绪后 flush。
+ * 就绪前缓冲与断线指数退避重连由 SDK 连接内置；首条连接创建即异步引导进程（boot 在
+ * SDK 守护线程执行，EDT 安全）。dev 用 SEMA_SIDECAR_DIR / -Dsema.sidecar.dir 覆盖桥产物目录。
  */
 @Service(Service.Level.PROJECT)
 class SidecarService(private val project: Project) : Disposable {
     private val log = logger<SidecarService>()
 
-    private var sidecar: SidecarProcess? = null
-    @Volatile private var port: Int = -1
-    @Volatile private var ready = false
-    private val connections = CopyOnWriteArrayList<Conn>()
+    @Volatile private var manager: SidecarManager? = null
+    private val connections = CopyOnWriteArrayList<BridgeConnection>()
 
-    private data class Command(val id: String, val action: String, val payload: String, val sessionId: String)
-
-    /** 一条面板连接：拥有自己的 GrpcClient 与就绪前缓冲队列。 */
-    inner class Conn(private val onEvent: (BridgeEvent) -> Unit) {
-        @Volatile private var client: GrpcClient? = null
-        private val pending = ConcurrentLinkedQueue<Command>()
-
-        fun send(id: String, action: String, payload: String, sessionId: String) {
-            val c = client
-            if (c != null) c.send(id, action, payload, sessionId)
-            else pending.add(Command(id, action, payload, sessionId))
+    @Synchronized
+    private fun ensureManager(): SidecarManager {
+        manager?.let { return it }
+        val workingDir = project.basePath ?: System.getProperty("user.home")
+        val m = SidecarManager.builder()
+            .workingDir(Path.of(workingDir))
+            .logConsumer { line -> log.info("[sidecar] $line") }
+            .onExit { code -> log.warn("sidecar 进程退出，exit=$code") }
+            .build()
+        manager = m
+        m.start().whenComplete { p, err ->
+            if (err != null) log.error("sidecar 启动失败", err)
+            else log.info("sidecar 就绪，端口 $p")
         }
-
-        @Synchronized
-        internal fun attach(p: Int) {
-            if (client != null) return
-            val c = GrpcClient(p, onEvent) { /* stream closed: 后续做重连 */ }
-            c.connect()
-            client = c
-            while (true) {
-                val cmd = pending.poll() ?: break
-                c.send(cmd.id, cmd.action, cmd.payload, cmd.sessionId)
-            }
-        }
-
-        internal fun shutdown() {
-            client?.shutdown()
-            client = null
-        }
+        return m
     }
 
     /**
-     * 注册一条面板连接（立即返回，命令先入该连接的缓冲队列）。进程就绪后自动 attach。
-     * 与 startProcess 解耦：面板构造时即可 connect 拿到可缓冲的 Conn，避免"命令早于 onLoadEnd"竞态。
-     * @param onEvent 该连接收到的所有 BridgeEvent（含 ack / error / 会话事件 / 进程事件）
+     * 注册一条面板连接（立即返回）。进程/连接就绪前的指令由 SDK 缓冲，就绪后按序 flush，
+     * 避免"命令早于进程就绪"竞态；事件监听先于 connect 挂好，不丢首帧。
+     * @param onEvent 该连接收到的所有事件帧（含 ack / error / 会话事件 / 进程事件）
      */
-    @Synchronized
-    fun connect(onEvent: (BridgeEvent) -> Unit): Conn {
-        val conn = Conn(onEvent)
+    fun connect(onEvent: (SemaEvent) -> Unit): BridgeConnection {
+        val conn = ensureManager().connectionBuilder().build()
+        conn.onEvent { ev -> onEvent(ev) }
+        conn.onStateChange { state, error ->
+            if (error != null) log.warn("sidecar 连接状态 $state", error)
+        }
+        conn.connect()
         connections.add(conn)
-        if (ready) conn.attach(port) // 进程已就绪（非首个面板）→ 立即 attach；否则等就绪回调统一 attach
         return conn
     }
 
-    /** 拉起 sidecar 进程（幂等）；就绪后为所有已注册连接 attach。首个面板在 onLoadEnd 调用。 */
-    @Synchronized
-    fun startProcess(sidecarDir: File) {
-        if (sidecar != null) return
-        startProcessInternal(sidecarDir)
-    }
-
     /** 面板关闭时断开其连接（不影响 sidecar 进程与其它面板）。 */
-    fun disconnect(conn: Conn) {
+    fun disconnect(conn: BridgeConnection) {
         connections.remove(conn)
-        conn.shutdown()
-    }
-
-    private fun startProcessInternal(sidecarDir: File) {
-        val workingDir = project.basePath ?: System.getProperty("user.home")
-        val proc = SidecarProcess(sidecarDir, workingDir)
-        sidecar = proc
-        proc.start().whenComplete { p, err ->
-            if (err != null) {
-                log.error("sidecar 启动失败", err)
-                return@whenComplete
-            }
-            port = p
-            ready = true
-            connections.forEach { it.attach(p) }
-            log.info("sidecar 就绪，端口 $p")
-        }
+        conn.close()
     }
 
     override fun dispose() {
-        connections.forEach { it.shutdown() }
+        connections.forEach { runCatching { it.close() } }
         connections.clear()
-        sidecar?.stop()
-        sidecar = null
-        ready = false
-        port = -1
+        manager?.close()
+        manager = null
     }
 }

@@ -58,12 +58,13 @@ export class RemoteCore {
     switchModel(modelName: string): Promise<any> { return this.t.call('switchModel', { modelName }, ''); }
     closeSession(sessionId: string): void { void this.t.call('closeSession', undefined, sessionId); }
 
-    async createSession(opts: { sessionId?: string; permissionLevel?: any; mode?: any } = {}): Promise<{ ok: boolean; sessionId?: string; error?: string }> {
+    async createSession(opts: { sessionId?: string; permissionLevel?: any; agentMode?: any } = {}): Promise<{ ok: boolean; sessionId?: string; error?: string }> {
         try {
             // 建会话即透传 per-session 档位/模式（D7）；仅在有值时带上。
+            // 字段名对齐 core 的 CreateSessionOptions.agentMode（旧桥的 mode 会被 core 静默忽略）。
             const payload: Record<string, any> = { sessionId: opts.sessionId };
             if (opts.permissionLevel) payload.permissionLevel = opts.permissionLevel;
-            if (opts.mode) payload.mode = opts.mode;
+            if (opts.agentMode) payload.agentMode = opts.agentMode;
             const data = await this.t.call('createSession', payload, '');
             return { ok: true, sessionId: data?.sessionId };
         } catch (e: any) {
@@ -101,17 +102,17 @@ export class RemoteCore {
     disablePlugin(pluginName: string, marketplaceName: string, scope: string, projectPath?: string): Promise<any> { return this.t.call('disablePlugin', { pluginName, marketplaceName, scope, projectPath }, ''); }
     updatePlugin(pluginName: string, marketplaceName: string, scope: string, projectPath?: string): Promise<any> { return this.t.call('updatePlugin', { pluginName, marketplaceName, scope, projectPath }, ''); }
 
-    // Agents
-    getAgentsInfo(refresh?: boolean): Promise<any> { return this.t.call('getAgentsInfo', { refresh }, ''); }
+    // Agents / Skills / Commands 均取精简信息（concise 显式传真；桥镜像化后不再默认 true）
+    getAgentsInfo(refresh?: boolean): Promise<any> { return this.t.call('getAgentsInfo', { concise: true, refresh }, ''); }
     addAgentConf(agentConf: any): Promise<any> { return this.t.call('addAgentConf', agentConf, ''); }
     removeAgentConf(name: string): Promise<any> { return this.t.call('removeAgentConf', { name }, ''); }
 
     // Skills
-    getSkillsInfo(refresh?: boolean): Promise<any> { return this.t.call('getSkillsInfo', { refresh }, ''); }
+    getSkillsInfo(refresh?: boolean): Promise<any> { return this.t.call('getSkillsInfo', { concise: true, refresh }, ''); }
     removeSkillConf(name: string): Promise<any> { return this.t.call('removeSkillConf', { name }, ''); }
 
     // Commands
-    getCommandsInfo(refresh?: boolean): Promise<any> { return this.t.call('getCommandsInfo', { refresh }, ''); }
+    getCommandsInfo(refresh?: boolean): Promise<any> { return this.t.call('getCommandsInfo', { concise: true, refresh }, ''); }
     addCommandConf(commandConf: any): Promise<any> { return this.t.call('addCommandConf', commandConf, ''); }
     removeCommandConf(name: string): Promise<any> { return this.t.call('removeCommandConf', { name }, ''); }
 
@@ -131,12 +132,39 @@ export class RemoteCore {
     enableCronTask(id: string): Promise<any> { return this.t.call('enableCronTask', { id }, ''); }
     disableCronTask(id: string): Promise<any> { return this.t.call('disableCronTask', { id }, ''); }
 
-    // 后台任务面板（进程级，跨会话聚合；D4）。watchTask 流式：不再传回调，
-    // 起停由 watch/unwatch 控制，实际 delta 走进程级事件 task:watch:delta 上行。
-    getTaskList(): Promise<any[]> { return this.t.call('getTaskList', undefined, ''); }
-    stopTask(taskId: string): Promise<any> { return this.t.call('stopTask', { taskId }, ''); }
-    watchTask(taskId: string): Promise<any> { return this.t.call('watchTask', { taskId }, ''); }
-    unwatchTask(taskId: string): Promise<any> { return this.t.call('unwatchTask', { taskId }, ''); }
+    // 后台任务面板（D4）。桥镜像 core 后任务 action 均为会话级（须带 session_id），
+    // 跨会话聚合上移到这里——与 VSCode semaProcessWrapper.getTaskList 同层同构。
+    // watchTask 流式：不传回调，起停由 watch/unwatch 控制，delta 走 task:watch:delta 事件上行（带会话 id，按 taskId 归属）。
+    /** 标记 core 的活跃会话（cron 通知等按此定位目标会话；对齐 VSCode wrapper.setActiveSession，返回值丢弃）。 */
+    setActiveSession(sessionId: string): void { void this.t.call('setActiveSession', { sessionId }, ''); }
+
+    /** 桥的 ack 是 { sessions: [...] } 包装（server.ts listSessions），此处解包成 id 数组。 */
+    async listSessions(): Promise<string[]> {
+        const res = await this.t.call('listSessions', undefined, '');
+        return res?.sessions ?? [];
+    }
+
+    /** 聚合所有会话的后台任务，并为每项打上归属 sessionId（供 openAgentDetail 定位，D8）。 */
+    async getTaskList(): Promise<any[]> {
+        const sessions = await this.listSessions();
+        const lists = await Promise.all(sessions.map(async (sid) => {
+            try {
+                const tasks = await this.t.call('getTaskList', undefined, sid);
+                return (tasks ?? []).map((task: any) => ({ ...task, sessionId: sid }));
+            } catch { return []; } // 单会话失败不影响聚合
+        }));
+        return lists.flat();
+    }
+
+    /** taskId 全局唯一，stop/watch 借任一会话转发即可（对齐 VSCode wrapper anySession）。 */
+    private async anySessionId(): Promise<string> {
+        const sessions = await this.listSessions();
+        if (!sessions.length) throw new Error('无可用会话');
+        return sessions[0];
+    }
+    async stopTask(taskId: string): Promise<any> { return this.t.call('stopTask', { taskId }, await this.anySessionId()); }
+    async watchTask(taskId: string): Promise<any> { return this.t.call('watchTask', { taskId }, await this.anySessionId()); }
+    async unwatchTask(taskId: string): Promise<any> { return this.t.call('unwatchTask', { taskId }, await this.anySessionId()); }
 
     // Memory / Rule / Design
     getMemoryInfo(refresh?: boolean): Promise<any> { return this.t.call('getMemoryInfo', { refresh }, ''); }

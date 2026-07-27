@@ -106,13 +106,13 @@ export class Controller {
         switch (msg.type) {
             case 'frontendReady':
                 await this.ensureInit();
-                await this.createSession({ mode: msg.mode, permissionLevel: msg.permissionLevel });
+                await this.createSession({ agentMode: msg.mode, permissionLevel: msg.permissionLevel });
                 await this.checkConfiguration();
                 break;
-            case 'createSession': await this.createSession({ mode: msg.mode, permissionLevel: msg.permissionLevel }); break;
+            case 'createSession': await this.createSession({ agentMode: msg.mode, permissionLevel: msg.permissionLevel }); break;
             // 从历史面板加载会话（跨 JCEF：Kotlin bus → host 通路下发）
             case 'loadHistorySession': await this.loadHistorySession(msg.session); break;
-            case 'switchSession': if (sid) { this.activeSessionId = sid; this.reportState(); } break;
+            case 'switchSession': if (sid) { this.activeSessionId = sid; this.core.setActiveSession(sid); this.reportState(); } break;
             case 'closeSession': this.closeSession(sid); break;
             case 'webviewSessionReady': this.sessions.get(sid ?? '')?.wrapper.sendInitialState(); break;
 
@@ -187,22 +187,23 @@ export class Controller {
      * 建会话。复刻 VSCode createNewSession 的历史重放：传 sessionId → sema-core 按 id 重新
      * 水合 LLM 上下文（可续聊）；传 historyContent → 纯客户端把历史 UI 消息灌回 React。
      */
-    private async createSession(opts: { mode?: any; permissionLevel?: any; sessionId?: string; historyContent?: any[]; title?: string } = {}): Promise<void> {
+    private async createSession(opts: { agentMode?: any; permissionLevel?: any; sessionId?: string; historyContent?: any[]; title?: string } = {}): Promise<void> {
         // 会话数上限（对齐 VSCode createNewSession）。已打开的历史会话走切 tab 不到这里。
         if (this.sessions.size >= MAX_SESSIONS) {
             this.postToApp({ type: 'sessionCreateFailed', error: `最多同时打开 ${MAX_SESSIONS} 个会话，请先关闭已有会话` });
             return;
         }
         // 建会话即透传 per-session 档位/模式（D7）；无值时回落 core 默认档位。
-        const res = await this.core.createSession({ sessionId: opts.sessionId, permissionLevel: opts.permissionLevel, mode: opts.mode });
+        const res = await this.core.createSession({ sessionId: opts.sessionId, permissionLevel: opts.permissionLevel, agentMode: opts.agentMode });
         if (!res.ok || !res.sessionId) {
             this.postToApp({ type: 'sessionCreateFailed', error: res.error });
             return;
         }
         const remote = new RemoteSession(res.sessionId, this.t);
-        const wrapper = new SemaSessionWrapper(remote as any, this.callbacks, opts.mode ?? 'Agent');
+        const wrapper = new SemaSessionWrapper(remote as any, this.callbacks, opts.agentMode ?? 'Agent');
         this.sessions.set(res.sessionId, { wrapper, remote });
         this.activeSessionId = res.sessionId;
+        this.core.setActiveSession(res.sessionId); // 对齐 VSCode：建会话即标记 core 活跃会话（cron 通知定位用）
         // 为该会话建立独立的快照作用域（清掉可能残留的同 id 旧状态）。
         this.t.editor('resetSnapshots', { sessionId: res.sessionId });
 
@@ -230,6 +231,7 @@ export class Controller {
         if (!session?.id) return;
         if (this.sessions.has(session.id)) {
             this.activeSessionId = session.id;
+            this.core.setActiveSession(session.id);
             this.postToApp({ type: 'switchToSession', sessionId: session.id });
             this.reportState();
             return;
@@ -238,7 +240,7 @@ export class Controller {
             sessionId: session.id,
             historyContent: session.content,
             title: session.title,
-            mode: session.agentMode,
+            agentMode: session.agentMode,
         });
     }
 
@@ -331,6 +333,7 @@ export class Controller {
         this.t.editor('resetSnapshots', { sessionId: sid });
         if (this.activeSessionId === sid) {
             this.activeSessionId = this.sessions.keys().next().value ?? null;
+            if (this.activeSessionId) this.core.setActiveSession(this.activeSessionId); // 对齐 VSCode：关闭后活跃权交给下一个会话
         }
         this.postToApp({ type: 'sessionClosed', sessionId: sid, nextActiveId: this.activeSessionId });
         this.reportState();

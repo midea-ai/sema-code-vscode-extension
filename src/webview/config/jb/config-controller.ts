@@ -24,6 +24,9 @@ export class ConfigController {
         this.core = new RemoteCore(t);
         // 进程级事件（session_id 空）：cron:update / mcp:server:status / task:watch:delta → 翻成配置页出站 command
         t.setEventHandler((event, data, sessionId) => {
+            // watchTask 实时增量（D4b）：任务 action 会话级化后 delta 帧带 session_id，
+            // 但归属按 taskId 判定、与会话无关，先于进程级过滤处理（对齐 VSCode watchTask onDelta）。
+            if (event === 'task:watch:delta') { this.postToApp({ command: 'taskWatchUpdate', taskId: data?.taskId, data: data?.delta }); return; }
             if (sessionId) return; // 会话级事件与配置页无关
             if (event === 'mcp:server:status') this.postToApp({ command: 'mcpServerStatusUpdate', data });
             else if (event === 'cron:update') this.postToApp({ command: 'cronUpdate' });
@@ -34,8 +37,6 @@ export class ConfigController {
             // 配置页任务面板据此实时增删（对齐 VSCode handleTaskStart/End → pushTaskStart/pushTaskEnd）。
             else if (event === 'task:start' || event === 'task:transfer') this.postToApp({ command: 'taskStart', data });
             else if (event === 'task:end') this.postToApp({ command: 'taskEnd', data });
-            // watchTask 实时增量（D4b）：桥合成帧，delta 携带 taskId（对齐 VSCode watchTask onDelta）。
-            else if (event === 'task:watch:delta') this.postToApp({ command: 'taskWatchUpdate', taskId: data?.taskId, data: data?.delta });
         });
         t.setAppMessageHandler((m) => this.postToApp(m));
     }
@@ -331,7 +332,16 @@ export class ConfigController {
                 break;
             case 'watchTask': try { await this.ensureInit(); await this.core.watchTask(m.taskId); } catch { /* ignore */ } break;
             case 'unwatchTask': try { await this.ensureInit(); await this.core.unwatchTask(m.taskId); } catch { /* ignore */ } break;
-            case 'stopTask': try { await this.ensureInit(); await this.core.stopTask(m.taskId); } catch { /* ignore */ } break;
+            // 成功即回帧让 Kill 按钮立即置 killed（对齐 VSCode configWebview.stopTask）；task:end 广播随后兜底刷新
+            case 'stopTask':
+                try {
+                    await this.ensureInit();
+                    await this.core.stopTask(m.taskId);
+                    this.postToApp({ command: 'stopTaskResult', success: true, taskId: m.taskId });
+                } catch (e: any) {
+                    this.postToApp({ command: 'stopTaskResult', success: false, taskId: m.taskId, message: e?.message || '停止任务失败' });
+                }
+                break;
 
             // ─── Claw（后置：入口应隐藏，命令到达则忽略）──────────────────
             case 'clawLoadStatus': case 'clawEnable': case 'clawDisable': case 'clawStartBind':

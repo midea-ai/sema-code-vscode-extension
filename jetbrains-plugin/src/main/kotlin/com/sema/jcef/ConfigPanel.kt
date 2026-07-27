@@ -43,7 +43,6 @@ class ConfigPanel(project: Project) : Disposable {
         browser.jbCefClient.addLoadHandler(object : CefLoadHandlerAdapter() {
             override fun onLoadEnd(b: CefBrowser?, frame: CefFrame?, httpStatusCode: Int) {
                 log.warn("[sema] config onLoadEnd status=$httpStatusCode url=${b?.url}")
-                bridge.startSidecar()
                 if (!System.getenv("SEMA_JCEF_DEVTOOLS").isNullOrBlank()) {
                     com.intellij.openapi.application.ApplicationManager.getApplication().invokeLater { openDevtools() }
                 }
