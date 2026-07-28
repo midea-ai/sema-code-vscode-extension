@@ -21,6 +21,7 @@ interface SystemConfigData {
     customRules?: string;
     enableLLMCache?: boolean;
     disableBackgroundTasks?: boolean;
+    enableToolSearch?: boolean;
     enablePet?: boolean;
 }
 
@@ -193,17 +194,17 @@ const SystemConfig: React.FC<SystemConfigProps> = ({ vscode }) => {
                     </div>
                 </div>
 
-                {/* 缓存设置 & 后台任务控制 */}
+                {/* LLM回放 & 后台任务控制 */}
                 <div className="form-row">
                     <div className="form-group">
-                        <label className="checkbox-label" title="启用LLM响应缓存，建议仅在测试时使用">
+                        <label className="checkbox-label" title="命中相同输入时直接回放上次回复，不发真实请求。仅用于开发调试，日常使用请勿开启">
                             <input
                                 type="checkbox"
                                 checked={config.enableLLMCache || false}
                                 onChange={(e) => handleChange('enableLLMCache', e.target.checked)}
                             />
                             <span className="checkmark"></span>
-                            启用LLM缓存
+                            启用LLM回放
                         </label>
                     </div>
 
@@ -220,8 +221,21 @@ const SystemConfig: React.FC<SystemConfigProps> = ({ vscode }) => {
                     </div>
                 </div>
 
-                {!IS_JB && (
-                    <div className="form-row">
+                {/* 工具搜索 & 桌宠 */}
+                <div className="form-row">
+                    <div className="form-group">
+                        <label className="checkbox-label" title="MCP 工具较多时建议开启：仅默认工具集进入模型上下文，其余工具由 AI 按需搜索加载，可明显减小请求体积。修改后下一次提问生效。">
+                            <input
+                                type="checkbox"
+                                checked={config.enableToolSearch || false}
+                                onChange={(e) => handleChange('enableToolSearch', e.target.checked)}
+                            />
+                            <span className="checkmark"></span>
+                            启用工具搜索
+                        </label>
+                    </div>
+
+                    {!IS_JB && (
                         <div className="form-group">
                             <label
                                 className="checkbox-label"
@@ -240,8 +254,8 @@ const SystemConfig: React.FC<SystemConfigProps> = ({ vscode }) => {
                                 启用桌宠{petSupported ? '' : '（暂仅支持 macOS / Windows / Linux）'}
                             </label>
                         </div>
-                    </div>
-                )}
+                    )}
+                </div>
             </div>
 
             {/* 开关配置 */}
