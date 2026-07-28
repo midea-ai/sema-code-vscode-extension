@@ -223,7 +223,7 @@ const App: React.FC<AppProps> = ({ vscode }) => {
                 {/* MCP页面 */}
                 {currentPage === 'mcp' && (
                     <div className="page active">
-                        <MCPConfig vscode={vscode} />
+                        <MCPConfig vscode={vscode} onOpenSystemConfig={() => setCurrentPage('system')} />
                     </div>
                 )}
 

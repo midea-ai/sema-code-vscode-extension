@@ -494,6 +494,16 @@
     opacity: 0.85;
 }
 
+.mcp-tool-warning-link {
+    color: var(--s-color-warning);
+    text-decoration: underline;
+    cursor: pointer;
+}
+
+.mcp-tool-warning-actions {
+    margin-top: 8px;
+}
+
 /* 禁用的开关样式 */
 .mcp-switch-disabled .section-switch-slider {
     cursor: not-allowed;

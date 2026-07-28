@@ -512,12 +512,16 @@ const MCPMarketCard: React.FC<{
 
 interface MCPConfigProps {
     vscode: VscodeApi;
+    onOpenSystemConfig?: () => void;
 }
 
-const MCPConfig: React.FC<MCPConfigProps> = ({ vscode }) => {
+const MCPConfig: React.FC<MCPConfigProps> = ({ vscode, onOpenSystemConfig }) => {
     const [activeTab, setActiveTab] = useState<MCPTabType>('installed');
     const [servers, setServers] = useState<MCPServerInfo[]>([]);
     const [systemTools, setSystemTools] = useState<SystemToolInfo[]>([]);
+    // null = 尚未加载,不渲染告警,避免已开启工具搜索的用户看到告警闪现
+    const [toolSearchEnabled, setToolSearchEnabled] = useState<boolean | null>(null);
+    const [enablingToolSearch, setEnablingToolSearch] = useState(false);
     const [loading, setLoading] = useState(true);
     const [isRefreshing, setIsRefreshing] = useState(false);
     const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set());
@@ -604,6 +608,17 @@ const MCPConfig: React.FC<MCPConfigProps> = ({ vscode }) => {
                     setEditingServer(null);
                     if (message.success && message.data) setServers(flattenServers(message.data));
                     break;
+                case 'loadSystemConfigResult':
+                    if (message.success && message.data) {
+                        setToolSearchEnabled(!!message.data.enableToolSearch);
+                    }
+                    break;
+                case 'saveSystemConfigByKeyResult':
+                    if (message.key === 'enableToolSearch') {
+                        setEnablingToolSearch(false);
+                        if (message.success) setToolSearchEnabled(!!message.value);
+                    }
+                    break;
                 case 'loadSystemToolsResult':
                     if (message.success && message.data) {
                         setSystemTools((message.data as ToolInfo[]).map(tool => ({
@@ -632,6 +647,7 @@ const MCPConfig: React.FC<MCPConfigProps> = ({ vscode }) => {
         window.addEventListener('message', handleMessage);
         vscode.postMessage({ command: 'loadMCPConfig' });
         vscode.postMessage({ command: 'loadSystemTools' });
+        vscode.postMessage({ command: 'loadSystemConfig' });
 
         return () => window.removeEventListener('message', handleMessage);
     }, [vscode]);
@@ -719,6 +735,11 @@ const MCPConfig: React.FC<MCPConfigProps> = ({ vscode }) => {
         vscode.postMessage({ command: 'updateDisabledTools', disabledTools: disabledTools.length === 0 ? null : disabledTools });
     };
 
+    const handleEnableToolSearch = () => {
+        setEnablingToolSearch(true);
+        vscode.postMessage({ command: 'saveSystemConfigByKey', key: 'enableToolSearch', value: true });
+    };
+
     const toggleSection = (key: string) => {
         setCollapsedSections(prev => {
             const next = new Set(prev);
@@ -765,13 +786,28 @@ const MCPConfig: React.FC<MCPConfigProps> = ({ vscode }) => {
                         <div className="section-loading">加载中...</div>
                     ) : (
                         <div className="section-groups">
-                            {totalToolCount > MAX_TOOL_COUNT && (
+                            {totalToolCount > MAX_TOOL_COUNT && toolSearchEnabled === false && (
                                 <div className="mcp-tool-warning">
                                     <div className="mcp-tool-warning-icon"><WarningCircleIcon /></div>
                                     <div className="mcp-tool-warning-content">
                                         <div className="mcp-tool-warning-title">工具数量过多（当前 {totalToolCount} 个）</div>
                                         <div className="mcp-tool-warning-desc">
                                             建议启用的工具总数不超过 {MAX_TOOL_COUNT} 个，过多的工具可能会影响 AI 的选择准确性。
+                                            开启<a
+                                                href="#"
+                                                className="mcp-tool-warning-link"
+                                                onClick={(e) => { e.preventDefault(); onOpenSystemConfig?.(); }}
+                                                title="前往系统配置查看"
+                                            >「工具搜索」</a>后仅默认工具集进入模型上下文，其余工具由 AI 按需搜索加载。
+                                        </div>
+                                        <div className="mcp-tool-warning-actions">
+                                            <button
+                                                className="section-btn primary small"
+                                                onClick={handleEnableToolSearch}
+                                                disabled={enablingToolSearch}
+                                            >
+                                                {enablingToolSearch ? '开启中...' : '开启工具搜索'}
+                                            </button>
                                         </div>
                                     </div>
                                 </div>
