@@ -5,7 +5,7 @@ import InputBox, { InputBoxHandle } from './components/input/InputBox';
 import MessageItem from './MessageItem';
 import GroupedToolBlock from './blocks/tools/GroupedToolBlock';
 import SessionTabs from './components/SessionTabs';
-import { SessionContext } from './SessionContext';
+import { SessionActiveContext, SessionContext } from './SessionContext';
 
 import FileChangesPanel from './components/panels/FileChangesPanel';
 import TodosPanel from './components/panels/TodosPanel';
@@ -446,6 +446,13 @@ const ChatSession: React.FC<ChatSessionProps> = ({ vscode: rawVscode, sessionId,
 
     useEffect(() => { runningTasksRef.current = runningTasks; }, [runningTasks]);
 
+    // 会话切走（新建/切换 tab）时清掉外部触发的子代理详情，弹窗本体由 SessionActiveContext 关闭
+    useEffect(() => {
+        if (!active) {
+            setOpenAgentTaskId(null);
+        }
+    }, [active]);
+
     const isSpinnerVisible = processingState === 'processing' && !progressMessage && !activeDialog;
 
     useEffect(() => {
@@ -787,6 +794,7 @@ const ChatSession: React.FC<ChatSessionProps> = ({ vscode: rawVscode, sessionId,
 
     return (
         <SessionContext.Provider value={sessionId}>
+            <SessionActiveContext.Provider value={active}>
             <div className="chat-session" style={{ display: active ? 'flex' : 'none' }}>
                 <div id="output-container" ref={outputContainerRef}>
                     {renderedContent}
@@ -906,6 +914,7 @@ const ChatSession: React.FC<ChatSessionProps> = ({ vscode: rawVscode, sessionId,
                     onPermissionLevelChange={handlePermissionLevelChange}
                 />
             </div>
+            </SessionActiveContext.Provider>
         </SessionContext.Provider>
     );
 };

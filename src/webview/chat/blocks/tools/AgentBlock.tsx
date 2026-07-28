@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useEffect, useRef, useContext } from 'react';
 import { DiffContent, FileChange, Message, ToolContent, VscodeApi } from '../../types';
 import TaskDetailModal from '../../TaskDetailModal';
-import { SessionContext } from '../../SessionContext';
+import { SessionActiveContext, SessionContext } from '../../SessionContext';
 import { countDiffChanges } from '../../utils/diffParser';
 import { TOOL_NAME_EDIT_NOTEBOOK, TOOL_NAME_PATCH_FILE, TOOL_NAME_WRITE_FILE } from '../../../../utils/tool';
 
@@ -100,13 +100,14 @@ const AgentBlock: React.FC<AgentBlockProps> = React.memo(({ content, vscode, for
     const [isModalOpen, setIsModalOpen] = useState(false);
     const reportedChangeKeysRef = useRef<Set<string>>(new Set());
     const sessionId = useContext(SessionContext);
+    const sessionActive = useContext(SessionActiveContext);
 
-    // 当有权限请求时自动关闭详情弹窗
+    // 有权限请求、或会话切走（弹窗 portal 到 body 不随会话容器隐藏）时自动关闭详情弹窗
     useEffect(() => {
-        if (forceClose && isModalOpen) {
+        if ((forceClose || !sessionActive) && isModalOpen) {
             setIsModalOpen(false);
         }
-    }, [forceClose]);
+    }, [forceClose, sessionActive]);
 
     // 外部触发打开
     useEffect(() => {
