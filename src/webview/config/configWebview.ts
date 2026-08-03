@@ -99,6 +99,8 @@ export class ConfigWebviewProvider {
                 removeSkill:                () => this.removeSkill(m.name),
                 searchSkillHub:             () => this.searchSkillHub(m.query),
                 installSkillFromHub:        () => this.installSkillFromHub(m.slug, m.scope),
+                loadHooksInfo:              () => this.loadHooksInfo(),
+                refreshHooks:               () => this.refreshHooksInfo(),
                 loadCommandsInfo:           () => this.loadCommandsInfo(),
                 refreshCommandsInfo:        () => this.refreshCommandsInfo(),
                 addCommand:                 () => this.addCommand(m.data),
@@ -638,6 +640,28 @@ export class ConfigWebviewProvider {
         } catch (error) {
             this.postMessage({ command: 'installSkillFromHubResult', success: false, slug, message: (error as Error).message });
             vscode.window.showErrorMessage(`安装 Skill "${slug}" 失败: ${(error as Error).message}`);
+        }
+    }
+
+    // ─── Hooks ────────────────────────────────────────────────────────────────
+
+    private async loadHooksInfo() {
+        try {
+            await this.ensureCoreReady();
+            const hooksInfo = await this.coreManager.getHooksInfo();
+            console.log('[loadHooksInfo] data:', hooksInfo);
+            this.postMessage({ command: 'loadHooksInfoResult', success: true, data: hooksInfo });
+        } catch (error) {
+            this.postMessage({ command: 'loadHooksInfoResult', success: false, data: null, message: (error as Error).message });
+        }
+    }
+
+    private async refreshHooksInfo() {
+        try {
+            await this.ensureCoreReady();
+            this.postMessage({ command: 'refreshHooksInfoResult', success: true, data: await this.coreManager.getHooksInfo(true) });
+        } catch (error) {
+            this.postMessage({ command: 'refreshHooksInfoResult', success: false, data: null, message: (error as Error).message });
         }
     }
 

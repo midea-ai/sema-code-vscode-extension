@@ -1,0 +1,80 @@
+/* Hooks 配置页面样式 */
+
+/* 顶部提示条（配置解析错误） */
+.hook-banner {
+    padding: 8px 12px;
+    margin-bottom: 10px;
+    border-radius: var(--s-radius-sm);
+    border: 1px solid var(--s-card-border);
+    font-size: var(--s-font-sm);
+    line-height: 1.5;
+    word-break: break-word;
+}
+
+.hook-banner-error {
+    color: var(--vscode-errorForeground, #f48771);
+    background: rgba(244, 135, 113, 0.08);
+}
+
+/* 卡片内单条 hook（同一事件多条时纵向排列，虚线分隔） */
+.hook-entry {
+    padding-bottom: 10px;
+}
+
+.hook-entry + .hook-entry {
+    border-top: 1px dashed var(--s-card-border);
+}
+
+.hook-entry .agent-tools {
+    margin-bottom: 0;
+}
+
+/* 命令行 */
+.hook-command-row {
+    display: flex;
+    align-items: baseline;
+    gap: var(--s-gap-sm);
+    padding: 0 14px;
+    margin-top: var(--s-gap-sm);
+}
+
+.hook-command {
+    font-family: var(--vscode-editor-font-family, monospace);
+    font-size: var(--s-font-xs);
+    color: var(--vscode-foreground);
+    background: var(--vscode-textCodeBlock-background, rgba(128, 128, 128, 0.1));
+    padding: 2px 6px;
+    border-radius: var(--s-radius-sm);
+    word-break: break-all;
+}
+
+/* 状态标签（ok 不展示） */
+.hook-status-tag {
+    font-size: var(--s-font-xs);
+    font-weight: 500;
+    padding: 1px 6px;
+    border-radius: var(--s-radius-sm);
+    border: 1px solid var(--s-card-border);
+    flex-shrink: 0;
+    white-space: nowrap;
+    align-self: center;
+}
+
+.hook-status-skipped {
+    color: var(--vscode-editorWarning-foreground, #cca700);
+    background: rgba(204, 167, 0, 0.1);
+}
+
+.hook-status-invalid {
+    color: var(--vscode-errorForeground, #f48771);
+    background: rgba(244, 135, 113, 0.1);
+}
+
+/* 状态原因说明 */
+.hook-status-reason {
+    padding: 0 14px;
+    margin-top: 4px;
+    font-size: var(--s-font-xs);
+    color: var(--vscode-descriptionForeground);
+    word-break: break-word;
+}

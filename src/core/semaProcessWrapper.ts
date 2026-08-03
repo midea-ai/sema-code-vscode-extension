@@ -21,6 +21,7 @@ import {
     MCPServerInfo,
     MemoryConfig,
     RuleConfig,
+    HooksInfo,
     TaskListItem,
     CronTask
 } from 'sema-core/types';
@@ -265,6 +266,12 @@ export class SemaProcessWrapper {
 
     public removeSkillConf(name: string): Promise<SkillConfig[]> {
         return this.semaCore.removeSkillConf(name);
+    }
+
+    // ===== Hooks =====
+
+    public getHooksInfo(refresh?: boolean): Promise<HooksInfo> {
+        return this.semaCore.getHooksInfo(refresh);
     }
 
     // ===== Design 资源 =====

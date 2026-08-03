@@ -27,6 +27,7 @@ import {
     TaskTransferData,
     ConversationUsageData,
     PermissionLevelUpdateData,
+    HookNoticeData,
     Usage
 } from 'sema-core/event';
 import { MAIN_AGENT_ID } from 'sema-core/types';
@@ -412,6 +413,22 @@ export class SemaSessionWrapper {
             };
             this.messageHistory.push(sessionErrorMsg);
             this.sendAppendMessages([sessionErrorMsg]);
+        });
+
+        // hook:notice 只在三种情况发出：脚本输出 systemMessage、hook 超时等告警、输入被 UserPromptSubmit 拦截
+        this.session.on<HookNoticeData>('hook:notice', (data) => {
+            if (!data?.message) return;
+            const label = data.kind === 'warning' ? 'Hook 警告'
+                : data.kind === 'blocked' ? 'Hook 拦截'
+                : 'Hook';
+            const event = data.hookEvent ? `[${data.hookEvent}]` : '';
+            const noticeMsg: Message = {
+                id: this.generateId(),
+                type: 'system',
+                content: { type: 'hook_notice', content: `${label}${event}: ${data.message}`, kind: data.kind },
+            };
+            this.messageHistory.push(noticeMsg);
+            this.sendAppendMessages([noticeMsg]);
         });
 
         this.session.on<{ sessionId: string | null }>('session:cleared', (_data) => {

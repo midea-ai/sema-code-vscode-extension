@@ -169,7 +169,7 @@ const MessageItem: React.FC<MessageItemProps> = React.memo(({
                         content={message.content.content || ''}
                     />
                 );
-            } else if (['compact', 'clear', 'session_error'].includes(message.content.type)) {
+            } else if (['compact', 'clear', 'session_error', 'hook_notice'].includes(message.content.type)) {
                 return <SupplementaryInfo items={[message.content.content]} />;
             } else if (message.content.type === 'file_reference') {
                 return <SupplementaryInfo items={message.content.content || []} />;

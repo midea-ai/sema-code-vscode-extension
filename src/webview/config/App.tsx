@@ -7,6 +7,7 @@ import SystemConfig from './SystemConfig';
 import MCPConfig from './MCPConfig';
 import SkillConfig from './SkillConfig';
 import AgentConfig from './AgentConfig';
+import HooksConfig from './HooksConfig';
 import PluginConfig from './PluginConfig';
 import CommandConfig from './CommandConfig';
 import RuleMemoryConfig from './RuleMemoryConfig';
@@ -16,7 +17,7 @@ import DesignConfig from './DesignConfig';
 import ClawConfig from './ClawConfig';
 import { RefreshIcon } from './utils/svgIcons';
 
-type PageType = 'models' | 'system' | 'memory' | 'mcp' | 'skill' | 'agent' | 'command' | 'plugin' | 'task' | 'design' | 'claw';
+type PageType = 'models' | 'system' | 'memory' | 'mcp' | 'skill' | 'agent' | 'hooks' | 'command' | 'plugin' | 'task' | 'design' | 'claw';
 type ModelTabType = 'list' | 'add';
 type TaskTabType = 'background' | 'cron';
 
@@ -148,6 +149,16 @@ const App: React.FC<AppProps> = ({ vscode }) => {
                     Agents
                 </div>
 
+                {/* JB 侧 config-controller 暂未实现 hooks 命令，先隐藏入口 */}
+                {!IS_JB && (
+                    <div
+                        className={`nav-item nav-main ${currentPage === 'hooks' ? 'active' : ''}`}
+                        onClick={() => setCurrentPage('hooks')}
+                    >
+                        Hooks
+                    </div>
+                )}
+
                 <div
                     className={`nav-item nav-main ${currentPage === 'plugin' ? 'active' : ''}`}
                     onClick={() => setCurrentPage('plugin')}
@@ -245,6 +256,13 @@ const App: React.FC<AppProps> = ({ vscode }) => {
                 {currentPage === 'skill' && (
                     <div className="page active">
                         <SkillConfig vscode={vscode} />
+                    </div>
+                )}
+
+                {/* Hooks页面 */}
+                {!IS_JB && currentPage === 'hooks' && (
+                    <div className="page active">
+                        <HooksConfig vscode={vscode} />
                     </div>
                 )}
 
