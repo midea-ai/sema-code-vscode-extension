@@ -82,7 +82,8 @@ class EditorOps(
 
     fun handle(msg: JsonObject) {
         when (val type = str(msg, "type")) {
-            "openFile" -> openFile(str(msg, "filePath"), intOr(msg, "line", 0), intOrNull(msg, "endLine"))
+            // web 侧 line/endLine 为 1 基（对齐 VSCode openFileAtLine 的减一转换），入口转成内部 0 基约定
+            "openFile" -> openFile(str(msg, "filePath"), maxOf(0, intOr(msg, "line", 1) - 1), intOrNull(msg, "endLine")?.minus(1))
             "openExternal" -> openExternal(str(msg, "url"))
             "openBashOutput" -> openBashOutput(str(msg, "content"), str(msg, "command") ?: str(msg, "title"), str(msg, "toolId"))
             "verifyFilePath" -> verifyFilePath(str(msg, "filePath"), str(msg, "tempId"), str(msg, "originalCode"), str(msg, "lineInfo"))
