@@ -149,15 +149,12 @@ const App: React.FC<AppProps> = ({ vscode }) => {
                     Agents
                 </div>
 
-                {/* JB 侧 config-controller 暂未实现 hooks 命令，先隐藏入口 */}
-                {!IS_JB && (
-                    <div
-                        className={`nav-item nav-main ${currentPage === 'hooks' ? 'active' : ''}`}
-                        onClick={() => setCurrentPage('hooks')}
-                    >
-                        Hooks
-                    </div>
-                )}
+                <div
+                    className={`nav-item nav-main ${currentPage === 'hooks' ? 'active' : ''}`}
+                    onClick={() => setCurrentPage('hooks')}
+                >
+                    Hooks
+                </div>
 
                 <div
                     className={`nav-item nav-main ${currentPage === 'plugin' ? 'active' : ''}`}
@@ -260,7 +257,7 @@ const App: React.FC<AppProps> = ({ vscode }) => {
                 )}
 
                 {/* Hooks页面 */}
-                {!IS_JB && currentPage === 'hooks' && (
+                {currentPage === 'hooks' && (
                     <div className="page active">
                         <HooksConfig vscode={vscode} />
                     </div>

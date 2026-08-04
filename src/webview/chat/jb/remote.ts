@@ -166,9 +166,10 @@ export class RemoteCore {
     async watchTask(taskId: string): Promise<any> { return this.t.call('watchTask', { taskId }, await this.anySessionId()); }
     async unwatchTask(taskId: string): Promise<any> { return this.t.call('unwatchTask', { taskId }, await this.anySessionId()); }
 
-    // Memory / Rule / Design
+    // Memory / Rule / Hooks / Design
     getMemoryInfo(refresh?: boolean): Promise<any> { return this.t.call('getMemoryInfo', { refresh }, ''); }
     getRuleInfo(refresh?: boolean): Promise<any> { return this.t.call('getRuleInfo', { refresh }, ''); }
+    getHooksInfo(refresh?: boolean): Promise<any> { return this.t.call('getHooksInfo', { refresh }, ''); }
     getDesignSkillsInfo(refresh?: boolean): Promise<any> { return this.t.call('getDesignSkillsInfo', { refresh }, ''); }
     getDesignSystemsInfo(refresh?: boolean): Promise<any> { return this.t.call('getDesignSystemsInfo', { refresh }, ''); }
 }

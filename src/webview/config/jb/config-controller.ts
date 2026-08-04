@@ -291,6 +291,14 @@ export class ConfigController {
                 await this.respond('refreshRuleInfoResult', () => this.core.getRuleInfo(true), (data) => ({ data }), null);
                 break;
 
+            // ─── Hooks ─────────────────────────────────────────────────
+            case 'loadHooksInfo':
+                await this.respond('loadHooksInfoResult', () => this.core.getHooksInfo(), (data) => ({ data }), null);
+                break;
+            case 'refreshHooks':
+                await this.respond('refreshHooksInfoResult', () => this.core.getHooksInfo(true), (data) => ({ data }), null);
+                break;
+
             // ─── Cron ──────────────────────────────────────────────────
             case 'loadCronTasks':
                 await this.respond('loadCronTasksResult', () => this.core.getCronTasks(), (data) => ({ data }));
