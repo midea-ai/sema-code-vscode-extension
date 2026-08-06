@@ -98,6 +98,8 @@ const ChatSession: React.FC<ChatSessionProps> = ({ vscode: rawVscode, sessionId,
     const outputContainerRef = useRef<HTMLDivElement>(null);
     const inputBoxRef = useRef<InputBoxHandle>(null);
     const userScrolledUpRef = useRef<boolean>(false);
+    const programmaticScrollRef = useRef<boolean>(false);
+    const lastScrollTopRef = useRef<number>(0);
     const spinnerStartTimeRef = useRef<number>(0);
     const runningTasksRef = useRef(runningTasks);
     const prevMessagesLenRef = useRef<number>(0);
@@ -185,9 +187,7 @@ const ChatSession: React.FC<ChatSessionProps> = ({ vscode: rawVscode, sessionId,
                         streamingAssistantIdRef.current = message.id;
                         setStreamingAssistantId(message.id);
                     }
-                    if (!userScrolledUpRef.current && outputContainerRef.current) {
-                        outputContainerRef.current.scrollTop = outputContainerRef.current.scrollHeight;
-                    }
+                    scrollToBottom();
                     break;
                 }
                 case 'completeUpdate': {
@@ -211,9 +211,7 @@ const ChatSession: React.FC<ChatSessionProps> = ({ vscode: rawVscode, sessionId,
                         streamingToolIdRef.current = message.id;
                         setStreamingToolId(message.id);
                     }
-                    if (!userScrolledUpRef.current && outputContainerRef.current) {
-                        outputContainerRef.current.scrollTop = outputContainerRef.current.scrollHeight;
-                    }
+                    scrollToBottom();
                     break;
                 }
                 case 'showProgress':
@@ -489,7 +487,7 @@ const ChatSession: React.FC<ChatSessionProps> = ({ vscode: rawVscode, sessionId,
         if (activeDialog && outputContainerRef.current) {
             setTimeout(() => {
                 if (outputContainerRef.current) {
-                    outputContainerRef.current.scrollTop = outputContainerRef.current.scrollHeight;
+                    doScrollToBottom();
                     if (activeDialog.type === 'permission' && window.hljs) {
                         outputContainerRef.current.querySelectorAll('pre code').forEach((block) => {
                             if (!block.classList.contains('hljs')) {
@@ -510,9 +508,20 @@ const ChatSession: React.FC<ChatSessionProps> = ({ vscode: rawVscode, sessionId,
         return bottom - position < threshold;
     };
 
+    // 程序触发的置底:打标志位,让 scroll 监听能区分“程序滚的”和“用户滚的”
+    const doScrollToBottom = () => {
+        const el = outputContainerRef.current;
+        if (!el) return;
+        // scrollTop 已在最底时赋值不会触发 scroll 事件,此时不能留下标志位,否则会吞掉下一次用户滚动
+        if (el.scrollTop < el.scrollHeight - el.clientHeight - 1) {
+            programmaticScrollRef.current = true;
+        }
+        el.scrollTop = el.scrollHeight;
+    };
+
     const scrollToBottom = () => {
-        if (!userScrolledUpRef.current && outputContainerRef.current) {
-            outputContainerRef.current.scrollTop = outputContainerRef.current.scrollHeight;
+        if (!userScrolledUpRef.current) {
+            doScrollToBottom();
         }
     };
 
@@ -521,15 +530,34 @@ const ChatSession: React.FC<ChatSessionProps> = ({ vscode: rawVscode, sessionId,
         if (!container) return;
 
         const handleScroll = () => {
-            if (isUserAtBottom()) {
+            const scrollTop = container.scrollTop;
+            if (programmaticScrollRef.current) {
+                programmaticScrollRef.current = false;
+                lastScrollTopRef.current = scrollTop;
+                return;
+            }
+            const scrolledUp = scrollTop < lastScrollTopRef.current;
+            lastScrollTopRef.current = scrollTop;
+            if (scrolledUp) {
+                userScrolledUpRef.current = true;
+            } else if (isUserAtBottom()) {
                 userScrolledUpRef.current = false;
-            } else {
+            }
+        };
+
+        // wheel 在 scroll 事件之前触发,能在流式置底与用户滚动合并成一次 scroll 事件时保住用户的上划意图
+        const handleWheel = (e: WheelEvent) => {
+            if (e.deltaY < 0) {
                 userScrolledUpRef.current = true;
             }
         };
 
         container.addEventListener('scroll', handleScroll, { passive: true });
-        return () => container.removeEventListener('scroll', handleScroll);
+        container.addEventListener('wheel', handleWheel, { passive: true });
+        return () => {
+            container.removeEventListener('scroll', handleScroll);
+            container.removeEventListener('wheel', handleWheel);
+        };
     }, []);
 
     const handleSend = (text: string, files: SelectedFile[], attachments: ImageAttachment[] = []) => {
@@ -726,6 +754,20 @@ const ChatSession: React.FC<ChatSessionProps> = ({ vscode: rawVscode, sessionId,
             return null;
         }
 
+        // 末尾的「仅思考、无正文」assistant 消息不算最后一个块：
+        // Bash 块保持展开，直到出现正文或新的工具块才折叠
+        let lastMessageId = '';
+        for (let i = messages.length - 1; i >= 0; i--) {
+            const m = messages[i];
+            if (m.type === 'assistant') {
+                const hasContent = streamingAssistantId === m.id
+                    || !!(m.content?.content && m.content.content.trim());
+                if (!hasContent) continue;
+            }
+            lastMessageId = m.id;
+            break;
+        }
+
         let lastUserInputIndex = -1;
         for (let i = messages.length - 1; i >= 0; i--) {
             if (messages[i].type === 'user') {
@@ -784,6 +826,7 @@ const ChatSession: React.FC<ChatSessionProps> = ({ vscode: rawVscode, sessionId,
                                 showThinkingText={shouldShowThinkingText}
                                 processingState={processingState}
                                 onFork={handleFork}
+                                isLastMessage={message.id === lastMessageId}
                             />
                         </div>
                     );

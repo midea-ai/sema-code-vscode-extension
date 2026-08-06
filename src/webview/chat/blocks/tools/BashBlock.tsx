@@ -12,6 +12,7 @@ interface BashBlockProps {
     content: ToolContent;
     messageId: string;
     vscode?: any;
+    isLast?: boolean;
 }
 
 // 模拟终端 \r 行为：\r 将光标移到行首，后续字符覆盖原内容
@@ -51,10 +52,12 @@ const processTerminalOutput = (text: string): string[] => {
     return resultLines;
 };
 
-const BashBlock: React.FC<BashBlockProps> = ({ content: toolContent, messageId, vscode }) => {
+const BashBlock: React.FC<BashBlockProps> = ({ content: toolContent, messageId, vscode, isLast = false }) => {
     // console.log('BashBlock:', JSON.stringify(toolContent));
     const sessionId = useContext(SessionContext);
-    const [isExpanded, setIsExpanded] = useState(true);
+    // null = 用户未手动操作过，展开状态跟随「是否为最后一个块」；手动操作后钉住用户设的状态
+    const [manualExpanded, setManualExpanded] = useState<boolean | null>(null);
+    const isExpanded = manualExpanded ?? isLast;
     const streamContentRef = useRef('');
     const [streamContent, setStreamContent] = useState('');
 
@@ -104,7 +107,7 @@ const BashBlock: React.FC<BashBlockProps> = ({ content: toolContent, messageId, 
     const isStreaming = toolContent.completed === false;
 
     const handleToggle = () => {
-        setIsExpanded(!isExpanded);
+        setManualExpanded(!isExpanded);
     };
 
     const handleCopy = (e: React.MouseEvent) => {

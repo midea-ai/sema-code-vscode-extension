@@ -13,6 +13,14 @@ jetbrains-plugin/**
 dist/webview/jb-*.js
 dist/webview/jb-*.js.map
 
+# sourcemap 不参与运行时，本地 dist/ 保留即可，无需进 vsix
+dist/**/*.map
+
+# IDE / 工具配置目录
+.idea/**
+.claude/**
+.sema/**
+
 # 配置文件
 tsconfig*.json
 webpack.config.js

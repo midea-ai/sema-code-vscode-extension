@@ -31,6 +31,7 @@ interface MessageItemProps {
     showThinkingText?: boolean;
     processingState?: 'idle' | 'processing';
     onFork?: (uuid: string) => void;
+    isLastMessage?: boolean;
 }
 
 const MessageItem: React.FC<MessageItemProps> = React.memo(({
@@ -45,6 +46,7 @@ const MessageItem: React.FC<MessageItemProps> = React.memo(({
     showThinkingText = true,
     processingState,
     onFork,
+    isLastMessage = false,
 }) => {
     const renderToolContent = () => {
         switch (message.toolName) {
@@ -68,7 +70,7 @@ const MessageItem: React.FC<MessageItemProps> = React.memo(({
             case TOOL_NAME_VIEW_FILE:
                 return <ReadBlock content={message.content} vscode={vscode} />;
             case TOOL_NAME_RUN_SHELL:
-                return <BashBlock content={message.content} messageId={message.id} vscode={vscode} />;
+                return <BashBlock content={message.content} messageId={message.id} vscode={vscode} isLast={isLastMessage} />;
             case TOOL_NAME_PEEK_BG_JOB:
                 return <BackgroundJobBlock content={message.content} messageId={message.id} vscode={vscode} />;
             case 'Agent':
@@ -201,7 +203,8 @@ const MessageItem: React.FC<MessageItemProps> = React.memo(({
         && prev.openAgentTaskId === next.openAgentTaskId
         && prev.showThinkingText === next.showThinkingText
         && prev.processingState === next.processingState
-        && prev.onFork === next.onFork;
+        && prev.onFork === next.onFork
+        && prev.isLastMessage === next.isLastMessage;
 
     const prevStreamingIsForThis =
         prev.streamingAssistantId === prev.message.id ||

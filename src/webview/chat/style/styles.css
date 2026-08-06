@@ -224,6 +224,8 @@ html.jb #output-container {
     font-size: var(--chat-font-sm);
     line-height: 1.4;
     cursor: pointer;
+    /* 按钮文字是真实文本节点，禁止选中，避免划选复制消息时把“展开/收起”带进剪贴板 */
+    user-select: none;
 }
 
 .user-input-toggle:hover {
@@ -385,6 +387,8 @@ html.jb #output-container {
     gap: 4px;
     margin-top: 6px;
     padding-left: 8px;
+    /* 按钮文字是真实文本节点，禁止选中，避免划选复制消息时把“复制”带进剪贴板 */
+    user-select: none;
 }
 
 .ai-resp-action-btn {

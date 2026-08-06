@@ -108,6 +108,8 @@
     flex-shrink: 0;
     white-space: nowrap;
     opacity: 0;
+    /* 按钮文字是真实文本节点，禁止选中，避免划选复制消息时把“复制”带进剪贴板 */
+    user-select: none;
 }
 
 .edit-block-header:hover .edit-copy-btn,
