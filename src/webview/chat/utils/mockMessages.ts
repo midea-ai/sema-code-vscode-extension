@@ -450,6 +450,23 @@ $$P_{\\text{Bash}}(c) = \\text{allow} \\iff \\begin{cases} \\text{head}(c) \\in 
             id: nextId(),
             type: 'assistant',
             content: {
+                content: `## 关键结论
+
+| 项目 | 情况 |
+|---|---|
+| **技术栈** | 纯 Python 3 标准库，零第三方依赖 |
+| **源码** | 仅 \`src/sort.py\`，递归实现**快速排序**（非原地、纯函数式写法，取首元素为 pivot） |
+| **入口** | \`if __name__ == "__main__":\` 块（第 11–13 行），对 \`[5, 2, 9, 1, 7, 3]\` 排序输出 \`[1, 2, 3, 5, 7, 9]\` |
+| **运行方式** | \`python3 src/sort.py\` |
+| **工程化配置** | 全部缺失：无测试、无构建配置、无 CI、无 Dockerfile、无 lint 配置 |
+| **Git** | 非 Git 仓库（无 \`.git\` 目录） |
+`,
+            },
+        },
+        {
+            id: nextId(),
+            type: 'assistant',
+            content: {
                 content: `## 图片渲染示例
 远程图片（点击在浏览器打开）：
 ![shields](https://img.shields.io/badge/build-passing-brightgreen)

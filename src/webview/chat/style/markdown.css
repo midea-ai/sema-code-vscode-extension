@@ -89,15 +89,24 @@
   width: 100%;
 }
 
+/* 去掉竖向边框，只保留行间横线：表头底线略深，最后一行不带底线 */
 .markdown-content .markdown-table th,
 .markdown-content .markdown-table td {
-  border: 1px solid var(--chat-border);
-  padding: var(--chat-spacing-xs) var(--chat-spacing-md);
+  border: none;
+  border-bottom: 1px solid var(--chat-border);
+  padding: var(--chat-spacing-sm) var(--chat-spacing-md);
   text-align: left;
+  vertical-align: top;
 }
 
 .markdown-content .markdown-table th {
   font-weight: 600;
+  /* 略深于普通行线：取前景色 35% 透明度，深浅主题下均比 panel-border 明显一档 */
+  border-bottom-color: color-mix(in srgb, var(--vscode-foreground, currentColor) 35%, transparent);
+}
+
+.markdown-content .markdown-table tbody tr:last-child td {
+  border-bottom: none;
 }
 
 /* 表格内的内联代码 / 文件路径沿用统一的 .inline-code / .file-path-code 样式 */

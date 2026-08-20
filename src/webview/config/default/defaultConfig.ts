@@ -16,6 +16,6 @@ export const defaultConfig = {
     customRules: "- 中文回答",
     enableLLMCache: false,
     disableBackgroundTasks: false,
-    enableToolSearch: false,
+    enableToolSearch: true,
     enablePet: false
 };
