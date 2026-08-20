@@ -161,6 +161,12 @@ const iconColors: { [key: string]: string } = {
     default: colors.white
 };
 
+/** 文件图标的 SVG 与颜色（给非 React 场景使用，如 markdown 渲染后按文件名动态插入图标） */
+export function getFileIconHtml(fileName: string): { svg: string; color: string } {
+    const iconName = getFileIconName(fileName, false);
+    return { svg: fileIconSvgs[iconName] || fileIconSvgs.default, color: iconColors[iconName] || colors.white };
+}
+
 /**
  * 文件图标组件
  * 根据文件名和类型动态显示对应的SVG图标；

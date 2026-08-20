@@ -152,7 +152,7 @@ export function renderMarkdownToHtml(content: string, vscode?: any): string {
         const safeUrl = escapeHtml(url);
         const placeholder = `\x00URL_${urlPlaceholders.length}\x00`;
         urlPlaceholders.push(
-          `<a class="md-url-link" data-url="${safeUrl}" title="${safeUrl}">${escapeHtml(text)}</a>`
+          `<a class="md-url-link" data-url="${safeUrl}" title="${safeUrl}">${createLinkIconHtml(url)}${escapeHtml(text)}</a>`
         );
         return placeholder;
       }
@@ -172,10 +172,10 @@ export function renderMarkdownToHtml(content: string, vscode?: any): string {
       }
     );
 
-    // 本地 loopback URL 占位 - 仅支持裸 URL，仅 localhost/127.0.0.1/0.0.0.0/[::1]
+    // 本地/局域网 URL 占位 - 仅支持裸 URL，host 限 loopback 与私网网段（10/172.16-31/192.168），与 isPrivateHost 一致
     // 负向回顾排除 `](url)` 形式（markdown link 已在上一步提取，这里兜住文本含 ] 等未命中的残留）
     processedContent = processedContent.replace(
-      /(?<!\]\()https?:\/\/(?:localhost|127\.0\.0\.1|0\.0\.0\.0|\[::1\])(?::\d+)?(?:\/[^\s<>"'`)\]]*)?/gi,
+      /(?<!\]\()https?:\/\/(?:localhost|127\.0\.0\.1|0\.0\.0\.0|\[::1\]|10\.\d{1,3}\.\d{1,3}\.\d{1,3}|192\.168\.\d{1,3}\.\d{1,3}|172\.(?:1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3})(?::\d+)?(?:\/[^\s<>"'`)\]]*)?/gi,
       (match) => {
         let url = match;
         let trailing = '';
@@ -186,7 +186,7 @@ export function renderMarkdownToHtml(content: string, vscode?: any): string {
         }
         const safeUrl = escapeHtml(url);
         const placeholder = `\x00URL_${urlPlaceholders.length}\x00`;
-        urlPlaceholders.push(`<a class="md-url-link" data-url="${safeUrl}">${safeUrl}</a>`);
+        urlPlaceholders.push(`<a class="md-url-link" data-url="${safeUrl}">${createLinkIconHtml(url)}${safeUrl}</a>`);
         return placeholder + trailing;
       }
     );
@@ -196,6 +196,10 @@ export function renderMarkdownToHtml(content: string, vscode?: any): string {
   // 行级纯文本变换，不依赖 vscode，流式阶段可安全执行（整行匹配，无 partial regex 抖动）。
   // 须早于表格处理：引用行若含 |，先被包进 blockquote，避免被表格扫描误收
   processedContent = processBlockquoteMarkdown(processedContent);
+
+  // 步骤3.8: 无序列表处理 - 连续的 "- " 行合并为 <ul>
+  // 只支持 "-" 符号、平铺不嵌套（缩进一律视为同级），有序列表/任务列表不处理，稳定性优先
+  processedContent = processListMarkdown(processedContent);
 
   // 步骤4: 表格处理
   processedContent = processTableMarkdown(processedContent);
@@ -249,6 +253,8 @@ export function renderMarkdownToHtml(content: string, vscode?: any): string {
   processedContent = processedContent.replace(/<\/table>(<br>)+/g, '</table><br>');
   // 引用块同表格：块级元素后的连续 <br> 收敛为 1 个，避免渲染出 2 个空行
   processedContent = processedContent.replace(/<\/blockquote>(<br>)+/g, '</blockquote><br>');
+  // 列表同理
+  processedContent = processedContent.replace(/<\/ul>(<br>)+/g, '</ul><br>');
   // 图片（.md-image 为 display:block）与表格不同：自带上下 margin，段落间距交给 margin，
   // 前后的连续 <br> 全部移除，避免 margin + 空行叠加出双重间距。
   // 图片不存在回退为原始文本时的换行由 AiResponseBlock 用块级 span 兜底。
@@ -259,7 +265,7 @@ export function renderMarkdownToHtml(content: string, vscode?: any): string {
 
   // 步骤11: DOMPurify最终消毒，防止XSS
   processedContent = DOMPurify.sanitize(processedContent, {
-    ALLOWED_TAGS: ['strong', 'br', 'pre', 'code', 'table', 'thead', 'tbody', 'tr', 'th', 'td', 'img', 'a', 'blockquote', 'div', 'span'],
+    ALLOWED_TAGS: ['strong', 'br', 'pre', 'code', 'table', 'thead', 'tbody', 'tr', 'th', 'td', 'img', 'a', 'blockquote', 'div', 'span', 'ul', 'li'],
     ALLOWED_ATTR: [
       'class', 'data-temp-id', 'data-file-path', 'data-line-info', 'data-action',
       'src', 'alt', 'data-img-path', 'data-img-url', 'data-img-temp-id', 'data-md-original',
@@ -309,6 +315,36 @@ function processBlockquoteMarkdown(content: string): string {
     }
   }
   flushQuote();
+
+  return result.join('\n');
+}
+
+/**
+ * 处理Markdown无序列表 - 连续的 "- " 行合并为一个 <ul>
+ * 行首允许最多 3 个空格缩进；"-" 后必须有空格，避开 "--flag" / "-1" 等写法。
+ * 列表项内的粗体/内联代码/链接占位符由后续步骤统一处理。
+ */
+function processListMarkdown(content: string): string {
+  const lines = content.split('\n');
+  const result: string[] = [];
+  let items: string[] = [];
+
+  const flushList = () => {
+    if (items.length === 0) return;
+    result.push(`<ul class="md-list">${items.map(item => `<li>${item}</li>`).join('')}</ul>`);
+    items = [];
+  };
+
+  for (const line of lines) {
+    const match = line.match(/^\s{0,3}-\s+(\S.*)$/);
+    if (match) {
+      items.push(match[1]);
+    } else {
+      flushList();
+      result.push(line);
+    }
+  }
+  flushList();
 
   return result.join('\n');
 }
@@ -471,6 +507,29 @@ function createInlineCodeHtml(originalCode: string, escapedCode: string, vscode?
 }
 
 /**
+ * 链接前的站点图标：
+ * - 本机 / 局域网 / 非 https：CSS mask 地球图标（span，不依赖外部资源）
+ * - 外网 https：直接引用站点 /favicon.ico（CSP 已放行 https: 图片），加载失败由 AiResponseBlock
+ *   的 error 捕获监听替换为地球图标
+ */
+function createLinkIconHtml(url: string): string {
+  const globe = '<span class="md-link-icon md-link-globe"></span>';
+  try {
+    const u = new URL(url);
+    if (u.protocol !== 'https:' || isPrivateHost(u.hostname)) return globe;
+    return `<img class="md-link-icon md-link-favicon" src="${escapeHtml(u.origin)}/favicon.ico" alt="" />`;
+  } catch {
+    return globe;
+  }
+}
+
+function isPrivateHost(h: string): boolean {
+  return h === 'localhost' || h === '127.0.0.1' || h === '0.0.0.0' || h === '[::1]' || h === '::1'
+    || h.endsWith('.localhost') || h.endsWith('.local') || h.endsWith('.internal')
+    || /^10\.\d+\.\d+\.\d+$/.test(h) || /^192\.168\.\d+\.\d+$/.test(h) || /^172\.(1[6-9]|2\d|3[01])\.\d+\.\d+$/.test(h);
+}
+
+/**
  * 创建本地路径链接 HTML - [text](wiki/foo.md) 等无 scheme 路径
  * 初始为待验证纯文本样式（title 悬停显示真实路径），verifyFilePath 确认存在后
  * 由 AiResponseBlock 加 file-path-code 变为可点；不存在时用 data-md-original
@@ -567,10 +626,11 @@ export function hasMarkdownFormatting(content: string): boolean {
     /<img\b[^>]*?>/i,          // 原始 <img> 标签
     /\[[^\]]+\]\((?:https?|file):\/\/[^)\s]+\)/, // markdown 链接
     /\[[^\]]+\]\((?![a-zA-Z][a-zA-Z0-9+.\-]+:)(?=[^)\s]*[/.])[^)\s#][^)\s]*\)/, // 本地路径链接
-    /https?:\/\/(?:localhost|127\.0\.0\.1|0\.0\.0\.0|\[::1\])/i, // 本地 loopback URL
+    /https?:\/\/(?:localhost|127\.0\.0\.1|0\.0\.0\.0|\[::1\]|10\.\d{1,3}\.\d{1,3}\.\d{1,3}|192\.168\.\d{1,3}\.\d{1,3}|172\.(?:1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3})/i, // 本地/局域网 URL
     /\$\$[\s\S]+?\$\$/,    // 块级公式
     /(?<![\\$])\$(?!\s)[^\n$]+?(?<!\s)\$(?!\d)/, // 行内公式
     /^\s{0,3}>\s/m,        // 引用块（要求 > 后有空格，避开 >>> 等误判）
+    /^\s{0,3}-\s+\S/m,      // 无序列表（要求 - 后有空格且有内容）
   ];
 
   return markdownPatterns.some(pattern => pattern.test(content));

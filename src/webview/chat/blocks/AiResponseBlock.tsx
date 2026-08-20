@@ -6,6 +6,7 @@ import { streamingStore } from '../utils/StreamingStore';
 import { hasTextSelection } from '../utils/selection';
 import { SessionContext } from '../SessionContext';
 import { CopyIcon, CheckIcon } from '../components/ui/IconButton';
+import { getFileIconHtml } from '../components/ui/FileIcon';
 import '../style/markdown.css';
 
 interface AiResponseBlockProps {
@@ -46,6 +47,15 @@ const AiResponseBlock: React.FC<AiResponseBlockProps> = React.memo(({
                         element.setAttribute('data-file-path', filePath);
                         if (lineInfo) {
                             element.setAttribute('data-line-info', lineInfo);
+                        }
+                        // 前置文件类型图标（SVG 来自内置常量，非用户内容，可直接 innerHTML）
+                        if (!element.querySelector('.md-file-icon')) {
+                            const { svg, color } = getFileIconHtml(String(filePath).split(/[\\/]/).pop() || String(filePath));
+                            const icon = document.createElement('span');
+                            icon.className = 'md-file-icon';
+                            icon.style.color = color;
+                            icon.innerHTML = svg;
+                            element.prepend(icon);
                         }
                     } else {
                         // 本地路径链接（带 data-md-original）不存在时回退为原始 markdown 文本；
@@ -109,11 +119,13 @@ const AiResponseBlock: React.FC<AiResponseBlockProps> = React.memo(({
                 }
                 return;
             }
-            if (target.classList.contains('file-path-code')) {
+            // 用 closest：点击落在前置图标（子元素）上也要命中
+            const fileEl = target.closest<HTMLElement>('.file-path-code');
+            if (fileEl) {
                 event.preventDefault();
 
-                const filePath = target.getAttribute('data-file-path');
-                const lineInfo = target.getAttribute('data-line-info');
+                const filePath = fileEl.getAttribute('data-file-path');
+                const lineInfo = fileEl.getAttribute('data-line-info');
 
                 if (filePath) {
                     let startLine = 1;
@@ -142,7 +154,7 @@ const AiResponseBlock: React.FC<AiResponseBlockProps> = React.memo(({
                 }
                 return;
             }
-            if (target.tagName === 'IMG') {
+            if (target.tagName === 'IMG' && !target.classList.contains('md-link-icon')) {
                 const imgPath = target.getAttribute('data-img-path');
                 const imgUrl = target.getAttribute('data-img-url');
                 if (imgPath) {
@@ -155,9 +167,10 @@ const AiResponseBlock: React.FC<AiResponseBlockProps> = React.memo(({
                     return;
                 }
             }
-            if (target.tagName === 'A' && target.classList.contains('md-url-link')) {
+            const linkEl = target.closest<HTMLElement>('a.md-url-link');
+            if (linkEl) {
                 event.preventDefault();
-                const url = target.getAttribute('data-url');
+                const url = linkEl.getAttribute('data-url');
                 if (url) {
                     vscode.postMessage({ type: 'openExternal', url });
                 }
@@ -166,11 +179,24 @@ const AiResponseBlock: React.FC<AiResponseBlockProps> = React.memo(({
             setShowActions(prev => !prev);
         };
 
-        contentRef.current.addEventListener('click', handleFilePathClick);
+        // 外网 favicon 加载失败 → 换成地球图标（error 不冒泡，需捕获阶段监听）
+        const handleIconError = (event: Event) => {
+            const el = event.target as HTMLElement;
+            if (el?.tagName === 'IMG' && el.classList.contains('md-link-favicon')) {
+                const globe = document.createElement('span');
+                globe.className = 'md-link-icon md-link-globe';
+                el.replaceWith(globe);
+            }
+        };
+
+        const root = contentRef.current;
+        root.addEventListener('click', handleFilePathClick);
+        root.addEventListener('error', handleIconError, true);
         window.addEventListener('message', handleFilePathVerification);
 
         return () => {
-            contentRef.current?.removeEventListener('click', handleFilePathClick);
+            root.removeEventListener('click', handleFilePathClick);
+            root.removeEventListener('error', handleIconError, true);
             window.removeEventListener('message', handleFilePathVerification);
         };
     }, [vscode]);

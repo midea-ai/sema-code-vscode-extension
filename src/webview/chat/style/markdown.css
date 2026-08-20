@@ -39,12 +39,46 @@
   border-radius: var(--chat-radius-sm);
 }
 
-/* 文件路径内联代码样式 - 可点击的文件路径，颜色与内联代码一致，仅用下划线区分，不加背景 */
+/* 文件路径内联代码样式 - 可点击的文件路径：前置文件类型图标，悬停下划线 */
 .markdown-content .file-path-code {
   color: var(--chat-text-symbol);
   background: none;
   cursor: pointer;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3em;
+  vertical-align: baseline;
+}
+
+.markdown-content .file-path-code:hover {
   text-decoration: underline;
+}
+
+/* 文件类型图标（verifyFilePath 确认后由 AiResponseBlock 动态插入，SVG 走 currentColor） */
+.markdown-content .md-file-icon {
+  display: inline-flex;
+  width: 13px;
+  height: 13px;
+  flex-shrink: 0;
+}
+
+/* 链接前的站点图标：外网 https 为 favicon <img>，其余为 CSS mask 地球 */
+.markdown-content .md-link-icon {
+  display: inline-block;
+  width: 13px;
+  height: 13px;
+  flex-shrink: 0;
+  border-radius: 2px;
+  vertical-align: -2px;
+  margin-right: 0.25em;
+}
+
+.markdown-content .md-link-globe {
+  background: currentColor;
+  -webkit-mask: var(--md-globe-icon) no-repeat center / contain;
+  mask: var(--md-globe-icon) no-repeat center / contain;
+  --md-globe-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='10'/%3E%3Cpath d='M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20'/%3E%3Cpath d='M2 12h20'/%3E%3C/svg%3E");
 }
 
 /* 代码块容器 - 承载右上角悬浮工具栏（自动换行开关 / 复制） */
@@ -216,9 +250,13 @@
 .markdown-content .md-url-link {
   color: var(--chat-text-symbol);
   cursor: pointer;
-  text-decoration: underline;
+  text-decoration: none;
   /* 裸 URL 或长链接文本可能是超长无空格串，避免撑破布局 */
   word-break: break-all;
+}
+
+.markdown-content .md-url-link:hover {
+  text-decoration: underline;
 }
 
 /* 本地路径链接 - [text](wiki/foo.md) 无 scheme 路径
@@ -233,5 +271,14 @@
 .markdown-content .md-local-link.file-path-code {
   color: var(--chat-text-symbol);
   cursor: pointer;
-  text-decoration: underline;
+}
+
+/* 无序列表：收紧默认间距，与引用块/表格的块级节奏一致 */
+.markdown-content .md-list {
+  margin: 2px 0;
+  padding-left: 1.4em;
+}
+
+.markdown-content .md-list li {
+  margin: 1px 0;
 }
