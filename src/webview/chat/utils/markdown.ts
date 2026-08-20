@@ -48,7 +48,17 @@ export function renderMarkdownToHtml(content: string, vscode?: any): string {
 
     const escapedCode = escapeHtml(processedCode);
     const placeholder = `\x00CODE_BLOCK_${codeBlockPlaceholders.length}\x00`;
-    codeBlockPlaceholders.push(`<pre class="code-block"><code${langClass}>${escapedCode}</code></pre>`);
+    // 外层 .code-block-wrap 承载右上角悬浮工具栏（自动换行开关 / 复制），按钮用 data-action 标记，
+    // 点击由 AiResponseBlock 事件委托处理；图标走 CSS mask，不必给 DOMPurify 放行 svg
+    codeBlockPlaceholders.push(
+      `<div class="code-block-wrap">` +
+      `<div class="code-block-toolbar">` +
+      `<span class="code-block-btn code-block-btn-wrap" data-action="toggle-wrap" title="关闭自动换行"></span>` +
+      `<span class="code-block-btn code-block-btn-copy" data-action="copy-code" title="复制"></span>` +
+      `</div>` +
+      `<pre class="code-block"><code${langClass}>${escapedCode}</code></pre>` +
+      `</div>`
+    );
     return placeholder;
   });
 
@@ -232,7 +242,7 @@ export function renderMarkdownToHtml(content: string, vscode?: any): string {
 
   // 步骤10: 清理多余的<br>标签
   processedContent = processedContent.replace(/(<br>){3,}/g, '<br><br>');
-  processedContent = processedContent.replace(/<\/code><\/pre><br><br>/g, '</code></pre><br>');
+  processedContent = processedContent.replace(/<\/code><\/pre><\/div><\/div>(<br>)+/g, '</code></pre></div></div><br>');
   // 表格是块级元素：</table> 后的 <br> 会完整生效，<br><br> 会渲染成 2 个空行，
   // 而 <table> 前的 <br> 会被块级开头吸收一次（<br><br> 只显示 1 个空行，属正常）。
   // 因此只收敛表格"后面"的连续 <br>，前面保持不动，避免标题/文字与表格之间的空行被吃掉。
@@ -249,9 +259,9 @@ export function renderMarkdownToHtml(content: string, vscode?: any): string {
 
   // 步骤11: DOMPurify最终消毒，防止XSS
   processedContent = DOMPurify.sanitize(processedContent, {
-    ALLOWED_TAGS: ['strong', 'br', 'pre', 'code', 'table', 'thead', 'tbody', 'tr', 'th', 'td', 'img', 'a', 'blockquote'],
+    ALLOWED_TAGS: ['strong', 'br', 'pre', 'code', 'table', 'thead', 'tbody', 'tr', 'th', 'td', 'img', 'a', 'blockquote', 'div', 'span'],
     ALLOWED_ATTR: [
-      'class', 'data-temp-id', 'data-file-path', 'data-line-info',
+      'class', 'data-temp-id', 'data-file-path', 'data-line-info', 'data-action',
       'src', 'alt', 'data-img-path', 'data-img-url', 'data-img-temp-id', 'data-md-original',
       'data-url', 'title'
     ],

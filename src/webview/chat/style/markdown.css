@@ -47,6 +47,87 @@
   text-decoration: underline;
 }
 
+/* 代码块容器 - 承载右上角悬浮工具栏（自动换行开关 / 复制） */
+.markdown-content .code-block-wrap {
+  position: relative;
+  margin: 0;
+}
+
+.markdown-content .code-block-toolbar {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  display: flex;
+  gap: 2px;
+  opacity: 0;
+  transition: opacity 0.15s;
+  /* 不占布局、不被划选 */
+  user-select: none;
+}
+
+.markdown-content .code-block-wrap:hover .code-block-toolbar {
+  opacity: 1;
+}
+
+.markdown-content .code-block-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 2px;
+  color: var(--chat-color-muted);
+  background: var(--chat-bg-hover);
+  cursor: pointer;
+  transition: background-color 0.15s, color 0.15s;
+}
+
+.markdown-content .code-block-btn:hover {
+  color: var(--chat-color-muted-hover);
+  background: var(--chat-bg-active);
+}
+
+/* 图标走 mask-image + currentColor：复用 IconButton 里的 SVG 线稿，无需给 DOMPurify 放行 svg */
+.markdown-content .code-block-btn::before {
+  content: '';
+  width: 12px;
+  height: 12px;
+  background: currentColor;
+  -webkit-mask: var(--code-btn-icon) no-repeat center / contain;
+  mask: var(--code-btn-icon) no-repeat center / contain;
+}
+
+.markdown-content .code-block-btn-wrap {
+  --code-btn-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='black' stroke-width='1.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M2 4h12M2 8h9a2.5 2.5 0 0 1 0 5H9M2 12h4'/%3E%3Cpath d='M10.5 11.5 9 13l1.5 1.5'/%3E%3C/svg%3E");
+}
+
+/* 自动换行开启中（默认）：按钮高亮提示当前为开启状态 */
+.markdown-content .code-block-wrap:not(.is-nowrap) .code-block-btn-wrap {
+  color: var(--chat-color-muted-hover);
+}
+
+.markdown-content .code-block-btn-copy {
+  --code-btn-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='black' stroke-width='1.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect x='5' y='5' width='8' height='8' rx='1'/%3E%3Cpath d='M3 11V3C3 2.44772 3.44772 2 4 2H11'/%3E%3C/svg%3E");
+}
+
+.markdown-content .code-block-btn-copy.is-copied {
+  --code-btn-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='3,8 6,11 13,4'/%3E%3C/svg%3E");
+}
+
+/* 关闭自动换行：恢复 pre 原生横向滚动 */
+.markdown-content .code-block-wrap.is-nowrap .code-block,
+.markdown-content .code-block-wrap.is-nowrap .code-block code {
+  white-space: pre;
+  word-wrap: normal;
+  word-break: normal;
+  overflow-wrap: normal;
+}
+
+.markdown-content .code-block-wrap.is-nowrap .code-block code {
+  width: max-content;
+  max-width: none;
+}
+
 /* 代码块样式 - ``` 代码块高亮 */
 .markdown-content .code-block {
   color: var(--chat-text-editor);

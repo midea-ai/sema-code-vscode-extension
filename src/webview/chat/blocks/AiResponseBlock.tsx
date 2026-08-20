@@ -84,6 +84,31 @@ const AiResponseBlock: React.FC<AiResponseBlockProps> = React.memo(({
                 return;
             }
             const target = event.target as HTMLElement;
+            // 代码块右上角工具栏：自动换行开关 / 复制
+            const codeBtn = target.closest<HTMLElement>('.code-block-btn');
+            if (codeBtn) {
+                event.preventDefault();
+                event.stopPropagation();
+                const wrap = codeBtn.closest<HTMLElement>('.code-block-wrap');
+                if (!wrap) return;
+                const action = codeBtn.getAttribute('data-action');
+                if (action === 'toggle-wrap') {
+                    const nowrap = wrap.classList.toggle('is-nowrap');
+                    codeBtn.title = nowrap ? '开启自动换行' : '关闭自动换行';
+                } else if (action === 'copy-code') {
+                    const code = wrap.querySelector('code')?.textContent ?? '';
+                    if (!code) return;
+                    navigator.clipboard.writeText(code).then(() => {
+                        codeBtn.classList.add('is-copied');
+                        codeBtn.title = '已复制';
+                        window.setTimeout(() => {
+                            codeBtn.classList.remove('is-copied');
+                            codeBtn.title = '复制';
+                        }, 1000);
+                    }).catch(() => { /* ignore */ });
+                }
+                return;
+            }
             if (target.classList.contains('file-path-code')) {
                 event.preventDefault();
 
