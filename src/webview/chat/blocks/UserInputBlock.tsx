@@ -1,16 +1,36 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { CopyIcon, CheckIcon, ForkIcon } from '../components/ui/IconButton';
-import { ImageAttachment } from '../types';
+import { CopyIcon, CheckIcon, ForkIcon, ClockIcon } from '../components/ui/IconButton';
+import { ImageAttachment, InputSource } from '../types';
 import ImageThumbnail from '../components/ImageThumbnail';
 import ImagePreviewModal from '../components/ImagePreviewModal';
 
 interface UserInputBlockProps {
     content: string;
     attachments?: ImageAttachment[];    // 用户发送时携带的图片（core 回吐）
+    source?: InputSource;               // 输入来源；非 user 时气泡上方渲染来源标签
     uuid?: string;                      // 有值才可 fork（旧历史消息无锚点）
     canFork?: boolean;                  // = 会话处于 idle
     onFork?: (uuid: string) => void;
 }
+
+// 非 user 来源的标签文案；未登记的来源不渲染
+const SOURCE_LABEL: Partial<Record<InputSource, string>> = {
+    cron: '由定时任务发送',
+};
+
+// 气泡上方右对齐的来源小标签（pending 气泡和正式气泡共用）
+export const UserInputSourceTag: React.FC<{ source?: InputSource }> = ({ source }) => {
+    const label = source ? SOURCE_LABEL[source] : undefined;
+    if (!label) {
+        return null;
+    }
+    return (
+        <div className="user-input-source">
+            <ClockIcon />
+            <span>{label}</span>
+        </div>
+    );
+};
 
 // 气泡里的单张图片：core 回吐只有 {data,media_type}，尺寸用 new Image() 现算、文件名缺省
 const BubbleImage: React.FC<{ attachment: ImageAttachment; onOpen: (src: string) => void }> = ({ attachment, onOpen }) => {
@@ -36,7 +56,7 @@ const BubbleImage: React.FC<{ attachment: ImageAttachment; onOpen: (src: string)
 // 当前为 line-height 1.5 * 字号 12px * 3 行 = 54px
 const COLLAPSED_MAX_PX = 54;
 
-const UserInputBlock: React.FC<UserInputBlockProps> = React.memo(({ content, attachments, uuid, canFork, onFork }) => {
+const UserInputBlock: React.FC<UserInputBlockProps> = React.memo(({ content, attachments, source, uuid, canFork, onFork }) => {
 
     const [isExpanded, setIsExpanded] = useState<boolean>(false);
     const [isOverflowing, setIsOverflowing] = useState<boolean>(false);
@@ -83,7 +103,7 @@ const UserInputBlock: React.FC<UserInputBlockProps> = React.memo(({ content, att
         }).catch(() => { /* ignore */ });
     };
 
-    return (
+    const bubble = (
         <div className="user-input-block">
             {attachments && attachments.length > 0 && (
                 <div className="user-input-images">
@@ -125,6 +145,17 @@ const UserInputBlock: React.FC<UserInputBlockProps> = React.memo(({ content, att
             {previewSrc && (
                 <ImagePreviewModal src={previewSrc} onClose={() => setPreviewSrc(null)} />
             )}
+        </div>
+    );
+
+    // 无来源标签时不额外包裹，保持原 DOM 结构
+    if (!source || !SOURCE_LABEL[source]) {
+        return bubble;
+    }
+    return (
+        <div className="user-input-wrap">
+            <UserInputSourceTag source={source} />
+            {bubble}
         </div>
     );
 });

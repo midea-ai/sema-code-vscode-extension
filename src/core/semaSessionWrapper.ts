@@ -34,6 +34,9 @@ import { MAIN_AGENT_ID } from 'sema-core/types';
 import type { TaskListItem, AgentMode, PermissionLevel } from 'sema-core/types';
 import type { InputImageAttachment } from 'sema-core';
 
+// core 未顶层导出 InputSource，从事件数据类型推导
+type InputSource = NonNullable<InputProcessingData['source']>;
+
 import { TOOL_NAME_SEARCH_FILES, TOOL_NAME_SEARCH_CONTENT, TOOL_NAME_SUB_AGENT } from '../utils/tool';
 
 export type { AgentMode, PermissionLevel };
@@ -47,6 +50,7 @@ export interface Message {
     type: 'user' | 'assistant' | 'tool' | 'system' | 'permission_request' | 'askForm';
     content: any;
     attachments?: InputImageAttachment[];  // 用户消息携带的图片（core input:processing 回吐）
+    source?: InputSource;                  // 输入来源；非 user（如 cron）时气泡上方渲染来源标签，随历史持久化
     toolName?: string;
     toolArgs?: any;
     reasoning?: string;
@@ -470,6 +474,7 @@ export class SemaSessionWrapper {
                 type: 'user',
                 content: content,
                 attachments: data.attachments,  // core 回吐的规范化图片，按 inputId 天然对应
+                source: data.source,
             };
             this.messageHistory.push(userMsg);
             this.sendAppendMessages([userMsg]);

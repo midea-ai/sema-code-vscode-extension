@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { FileChange, TokenInfo, AppProps, SelectedFile, TodoItem, Message, AgentMode, PermissionLevel, SessionMeta, ForkPreview, ImageAttachment, VscodeApi } from './types';
+import { FileChange, TokenInfo, AppProps, SelectedFile, TodoItem, Message, AgentMode, PermissionLevel, SessionMeta, ForkPreview, ImageAttachment, VscodeApi, InputSource } from './types';
 import { streamingStore } from './utils/StreamingStore';
 import InputBox, { InputBoxHandle } from './components/input/InputBox';
 import MessageItem from './MessageItem';
+import { UserInputSourceTag } from './blocks/UserInputBlock';
 import GroupedToolBlock from './blocks/tools/GroupedToolBlock';
 import SessionTabs from './components/SessionTabs';
 import { SessionActiveContext, SessionContext } from './SessionContext';
@@ -91,7 +92,7 @@ const ChatSession: React.FC<ChatSessionProps> = ({ vscode: rawVscode, sessionId,
     const [skipFileEditPermission, setSkipFileEditPermission] = useState<boolean>(false);
     const [thinkingEnabled, setThinkingEnabled] = useState<boolean>(true);
     const [showThinkingText, setShowThinkingText] = useState<boolean>(false);
-    const [pendingInputs, setPendingInputs] = useState<Array<{ inputId: string; content: string }>>([]);
+    const [pendingInputs, setPendingInputs] = useState<Array<{ inputId: string; content: string; source?: InputSource }>>([]);
     const [runningTasks, setRunningTasks] = useState<Map<string, { taskId: string; filepath: string; type: string; startTime: number }>>(new Map());
     const [openAgentTaskId, setOpenAgentTaskId] = useState<string | null>(null);
 
@@ -337,7 +338,8 @@ const ChatSession: React.FC<ChatSessionProps> = ({ vscode: rawVscode, sessionId,
                     if (message.data) {
                         setPendingInputs(prev => [...prev, {
                             inputId: message.data.inputId,
-                            content: message.data.originalInput || message.data.input
+                            content: message.data.originalInput || message.data.input,
+                            source: message.data.source,
                         }]);
                     }
                     break;
@@ -879,8 +881,11 @@ const ChatSession: React.FC<ChatSessionProps> = ({ vscode: rawVscode, sessionId,
                         );
                     })()}
                     {pendingInputs.map(p => (
-                        <div key={p.inputId} className="user-input-block pending">
-                            <div className="user-input-content pending">{p.content}</div>
+                        <div key={p.inputId}>
+                            <UserInputSourceTag source={p.source} />
+                            <div className="user-input-block pending">
+                                <div className="user-input-content pending">{p.content}</div>
+                            </div>
                         </div>
                     ))}
                     {activeDialog?.type === 'quickchat' && (

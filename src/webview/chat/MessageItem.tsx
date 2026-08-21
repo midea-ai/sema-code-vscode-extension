@@ -95,6 +95,7 @@ const MessageItem: React.FC<MessageItemProps> = React.memo(({
                 <UserInputBlock
                     content={message.content}
                     attachments={message.attachments}
+                    source={message.source}
                     uuid={message.uuid}
                     canFork={processingState === 'idle'}
                     onFork={onFork}

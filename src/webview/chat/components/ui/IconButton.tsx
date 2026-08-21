@@ -62,6 +62,25 @@ export const CopyIcon: React.FC = () => {
     );
 };
 
+// 时钟图标（用户输入来源标签：定时任务）
+export const ClockIcon: React.FC = () => {
+    return (
+        <svg
+            width="12"
+            height="12"
+            viewBox="0 0 16 16"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.4"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+        >
+            <circle cx="8" cy="8" r="6" />
+            <path d="M8 4.5V8l2.5 1.5" />
+        </svg>
+    );
+};
+
 // 用户输入块 Fork / 撤销图标（git-fork 样式）
 export const ForkIcon: React.FC = () => {
     return (

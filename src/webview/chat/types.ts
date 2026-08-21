@@ -101,6 +101,9 @@ export interface FileReferenceInfo {
     content: string;
 }
 
+// 用户输入来源（与 sema-core InputSource 镜像）
+export type InputSource = 'user' | 'cron';
+
 export interface Message {
     id: string;
     /** fork 句柄（== 后端 input:processing 的 inputId）；仅本会话内由用户输入创建的消息才有 */
@@ -111,6 +114,7 @@ export interface Message {
     toolArgs?: any;
     reasoning?: string;  // 用于存储思考过程（thinking）
     attachments?: ImageAttachment[];  // 用户消息携带的图片（来自 core input:processing 回吐）
+    source?: InputSource;             // 输入来源；'cron' 等非 user 来源在气泡上方显示标签
 }
 
 // ─── Fork / 撤销（与 sema-core types/fork 镜像，前端独立定义） ──────────────────
