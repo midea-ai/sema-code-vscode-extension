@@ -15,6 +15,7 @@ interface CronTask {
     id: string;
     schedule: string;
     task: string;
+    title?: string;         // 选填；新建任务必有，旧任务缺省回退显示 id
     repeat: boolean;
     persist: boolean;
     status: boolean;
@@ -45,9 +46,10 @@ const CronTaskCard: React.FC<{
                 >
                     <ExpandArrowIcon />
                 </button>
-                <span className="section-card-name">
-                    <span style={{ color: 'var(--vscode-descriptionForeground)', fontWeight: 'normal', fontSize: '11px' }}>{task.id}</span> {task.describeCronExpression}
-                </span>
+                <div className="section-card-name-group section-card-name-group-truncate">
+                    <span className="section-card-name section-card-name-truncate" title={task.title || task.id}>{task.title || task.id}</span>
+                    <span className="section-card-name-sub">{task.describeCronExpression}</span>
+                </div>
                 <div className="section-card-actions" onClick={(e) => e.stopPropagation()}>
                     {task.filePath && (
                         <button
@@ -89,7 +91,7 @@ const CronTaskCard: React.FC<{
                 <>
                     <div className="task-detail-info">
                         <div><strong>Cron:</strong> <span className="cron-expression-tag">{task.schedule.split('').map((ch, i) => ch === '*' ? ch : <span key={i} className="cron-highlight">{ch}</span>)}</span> <span className="readonly-tab">{task.repeat ? '周期' : '一次性'}</span>{task.persist && <> <span className="readonly-tab">持久化</span></>}</div>
-                        <div style={{ color: 'var(--vscode-descriptionForeground)', opacity: 0.8 }}>创建时间: {formatDateTime(task.createdAt)}</div>
+                        <div style={{ color: 'var(--vscode-descriptionForeground)', opacity: 0.8 }}>{task.id} · {formatDateTime(task.createdAt)}</div>
                     </div>
                     <div className="cron-card-body">
                         <div className="task-detail-output-label">Prompt:</div>
@@ -107,7 +109,7 @@ const CronTaskCard: React.FC<{
                                         onClick={() => vscode.postMessage({
                                             command: 'openBashOutput',
                                             content: task.task,
-                                            title: `${task.id} (${task.describeCronExpression})`,
+                                            title: `${task.title || task.id} (${task.describeCronExpression})`,
                                             toolId: task.id,
                                         })}
                                     >...省略了 {omitted} 行</div>
