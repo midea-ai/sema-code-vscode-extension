@@ -4,6 +4,8 @@ import { SessionHistoryManager } from '../../managers/SessionHistoryManager';
 // 定义回调函数类型
 export interface SessionHistoryCallbacks {
     loadSession?: (sessionId: string) => Promise<void>;
+    /** 会话从历史列表删除后触发（用于同步清理 core 侧历史文件） */
+    onSessionDeleted?: (sessionId: string) => void;
 }
 
 /**
@@ -83,6 +85,11 @@ export class SessionHistoryWebviewProvider {
                     }
 
                     await this.sessionHistoryManager.deleteSession(message.sessionId);
+                    try {
+                        this.callbacks.onSessionDeleted?.(message.sessionId);
+                    } catch (e) {
+                        console.warn('[sema] 清理会话历史文件失败:', e);
+                    }
                     await this.refreshSessionList();
                     break;
             }

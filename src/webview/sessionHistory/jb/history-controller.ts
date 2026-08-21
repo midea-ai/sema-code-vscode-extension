@@ -5,7 +5,7 @@ import { Transport } from '../../chat/jb/transport';
  * 但数据源换成 Kotlin 本地存储（callEditor('history', ...)）。
  * - webviewReady → 拉列表并回 updateSessions
  * - loadSession  → 转 Kotlin（Kotlin 经 bus 推给聊天 webview 重放，即发即忘）
- * - deleteSession→ 转 Kotlin 删除后刷新列表
+ * - deleteSession→ 转 Kotlin 删除，成功后经 gRPC 通知 core 清理历史文件，再刷新列表
  * Kotlin 主动推的 updateSessions（会话变化时）经 transport.appMessageHandler 灌回 App。
  */
 export class HistoryController {
@@ -23,7 +23,11 @@ export class HistoryController {
                 break;
             case 'deleteSession':
                 // 已打开的会话 Kotlin 会拒绝（抛错），忽略即可；列表随后刷新
-                try { await this.t.callEditor('history', { op: 'delete', sessionId: msg.sessionId }); } catch { /* ignore */ }
+                try {
+                    await this.t.callEditor('history', { op: 'delete', sessionId: msg.sessionId });
+                    // 本地存档删除成功后，同步清理 core 侧 ~/.sema/history 下的会话历史文件（core 未支持时静默）
+                    try { await this.t.call('deleteSessionHistory', { sessionId: msg.sessionId }, ''); } catch { /* ignore */ }
+                } catch { /* ignore */ }
                 await this.sendList();
                 break;
             default:

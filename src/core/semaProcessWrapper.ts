@@ -60,7 +60,7 @@ export class SemaProcessWrapper {
     private systemConfigManager: SystemConfigManager;
 
     constructor(
-        workingDir: string,
+        private readonly workingDir: string,
         systemConfigManager: SystemConfigManager,
         private callbacks: ProcessWrapperCallbacks = {}
     ) {
@@ -161,6 +161,11 @@ export class SemaProcessWrapper {
 
     public getModelAdapter(provider: string, modelName: string, baseURL: string): string | undefined {
         return this.semaCore.getModelAdapter(provider, modelName, baseURL);
+    }
+
+    /** 删除单个会话在 ~/.sema/history 下的历史文件（会话从历史列表删除时同步清理） */
+    public deleteSessionHistory(sessionId: string): void {
+        this.semaCore.deleteSessionHistory(sessionId, this.workingDir);
     }
 
     // ===== 工具管理 =====

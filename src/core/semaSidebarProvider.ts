@@ -137,7 +137,10 @@ export class SemaSidebarProvider implements vscode.WebviewViewProvider {
         });
         this.sessionHistoryWebviewProvider = new SessionHistoryWebviewProvider(
             this.sessionHistoryManager,
-            { loadSession: (sessionId) => this.loadHistorySession(sessionId) }
+            {
+                loadSession: (sessionId) => this.loadHistorySession(sessionId),
+                onSessionDeleted: (sessionId) => this.processWrapper.deleteSessionHistory(sessionId),
+            }
         );
     }
 
