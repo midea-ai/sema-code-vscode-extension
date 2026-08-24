@@ -32,6 +32,9 @@ interface MessageItemProps {
     processingState?: 'idle' | 'processing';
     onFork?: (uuid: string) => void;
     isLastMessage?: boolean;
+    /** 该 assistant 消息是否显示「分支到新聊天」 */
+    canBranch?: boolean;
+    onBranch?: () => void;
 }
 
 const MessageItem: React.FC<MessageItemProps> = React.memo(({
@@ -47,6 +50,8 @@ const MessageItem: React.FC<MessageItemProps> = React.memo(({
     processingState,
     onFork,
     isLastMessage = false,
+    canBranch = false,
+    onBranch,
 }) => {
     const renderToolContent = () => {
         switch (message.toolName) {
@@ -128,6 +133,8 @@ const MessageItem: React.FC<MessageItemProps> = React.memo(({
                             messageId={message.id}
                             isStreaming={isCurrentlyStreaming || !isCompleted}
                             vscode={vscode}
+                            canBranch={canBranch}
+                            onBranch={onBranch}
                         />
                     )}
                 </React.Fragment>
@@ -205,7 +212,9 @@ const MessageItem: React.FC<MessageItemProps> = React.memo(({
         && prev.showThinkingText === next.showThinkingText
         && prev.processingState === next.processingState
         && prev.onFork === next.onFork
-        && prev.isLastMessage === next.isLastMessage;
+        && prev.isLastMessage === next.isLastMessage
+        && prev.canBranch === next.canBranch
+        && prev.onBranch === next.onBranch;
 
     const prevStreamingIsForThis =
         prev.streamingAssistantId === prev.message.id ||

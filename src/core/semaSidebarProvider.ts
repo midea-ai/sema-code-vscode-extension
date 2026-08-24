@@ -27,6 +27,8 @@ export interface SessionController {
     createSession(agentMode?: AgentMode): Promise<{ ok: boolean; error?: string }>;
     switchSession(sessionId: string): void;
     closeSession(sessionId: string): Promise<void>;
+    /** 分支到新聊天：全量复制源会话历史到新会话并以新 tab 打开 */
+    branchSession(sessionId: string): Promise<{ ok: boolean; error?: string }>;
 }
 
 export class SemaSidebarProvider implements vscode.WebviewViewProvider {
@@ -89,6 +91,7 @@ export class SemaSidebarProvider implements vscode.WebviewViewProvider {
             createSession: (agentMode) => this.createNewSession({ agentMode }),
             switchSession: (sessionId) => this.switchActiveSession(sessionId),
             closeSession: (sessionId) => this.closeSession(sessionId),
+            branchSession: (sessionId) => this.branchToNewChat(sessionId),
         };
 
         this.chatWebviewProvider = new ChatWebviewProvider(
@@ -559,6 +562,50 @@ export class SemaSidebarProvider implements vscode.WebviewViewProvider {
         } catch (error) {
             console.error('Error loading history session:', error);
             vscode.window.showErrorMessage(`加载会话失败：${error instanceof Error ? error.message : '未知错误'}`);
+        }
+    }
+
+    /**
+     * 分支到新聊天：core 侧 branch() 新建会话并全量复制历史（editlog 副本一并复制，
+     * 源会话与工作区文件不动），插件侧把源会话的消息列表复制给新 wrapper 并以新 tab 打开。
+     * 失败时通过 sessionCreateFailed 在页面顶部展示错误。
+     */
+    private async branchToNewChat(sourceId: string): Promise<{ ok: boolean; error?: string }> {
+        const fail = (error: string) => {
+            this.chatWebviewProvider.postMessage({ type: 'sessionCreateFailed', error });
+            return { ok: false, error };
+        };
+        const source = this.sessions.get(sourceId);
+        if (!source) return fail('会话不可用');
+        // 先于 core 检查会话数上限：core branch 会落盘新历史文件，开不出 tab 会留下孤儿会话
+        if (this.sessions.size >= MAX_SESSIONS) {
+            return fail(`最多同时打开 ${MAX_SESSIONS} 个会话，请先关闭已有会话`);
+        }
+        if (source.getCurrentState() !== 'idle') return fail('会话处理中，请等待空闲后再分支');
+
+        try {
+            const result = await source.branch();
+            if (result.ok === false) return fail(`分支失败：${result.error}`);
+
+            const title = source.title ? `${source.title} (分支)` : '分支会话';
+            const created = await this.createNewSession({
+                sessionId: result.sessionId,
+                agentMode: source.getAgentMode(),
+                historyContent: source.getMessageHistory(),
+                title,
+            });
+            if (!created.ok) return created;
+
+            // 立即写入历史面板，不必等新会话首次 idle
+            const wrapper = this.sessions.get(result.sessionId);
+            if (wrapper) {
+                await this.sessionHistoryManager.saveSession(wrapper);
+                this.sessionHistoryWebviewProvider?.refreshSessionList();
+            }
+            return { ok: true };
+        } catch (error) {
+            console.error('Error branching session:', error);
+            return fail(`分支失败：${error instanceof Error ? error.message : '未知错误'}`);
         }
     }
 

@@ -5,7 +5,7 @@ import { getResponseDot } from '../utils/symbols';
 import { streamingStore } from '../utils/StreamingStore';
 import { hasTextSelection } from '../utils/selection';
 import { SessionContext } from '../SessionContext';
-import { CopyIcon, CheckIcon } from '../components/ui/IconButton';
+import { CopyIcon, CheckIcon, BranchIcon } from '../components/ui/IconButton';
 import { getFileIconHtml } from '../components/ui/FileIcon';
 import '../style/markdown.css';
 
@@ -14,13 +14,18 @@ interface AiResponseBlockProps {
     messageId: string;
     isStreaming?: boolean;
     vscode?: any;
+    /** 是否显示「分支到新聊天」：仅最后一轮、无工具调用、会话 idle 的文字结论才为 true */
+    canBranch?: boolean;
+    onBranch?: () => void;
 }
 
 const AiResponseBlock: React.FC<AiResponseBlockProps> = React.memo(({
     content,
     messageId,
     isStreaming = false,
-    vscode
+    vscode,
+    canBranch = false,
+    onBranch
 }) => {
     const sessionId = useContext(SessionContext);
     const contentRef = useRef<HTMLDivElement>(null);
@@ -283,6 +288,16 @@ const AiResponseBlock: React.FC<AiResponseBlockProps> = React.memo(({
                         {copied ? <CheckIcon /> : <CopyIcon />}
                         <span className="ai-resp-action-label">{copied ? '已复制' : '复制'}</span>
                     </button>
+                    {canBranch && onBranch && (
+                        <button
+                            className="ai-resp-action-btn"
+                            title="以当前对话为起点开一个新聊天，原对话与文件不受影响"
+                            onClick={(e) => { e.stopPropagation(); onBranch(); }}
+                        >
+                            <BranchIcon />
+                            <span className="ai-resp-action-label">分支到新聊天</span>
+                        </button>
+                    )}
                 </div>
             )}
         </div>
@@ -293,7 +308,9 @@ const AiResponseBlock: React.FC<AiResponseBlockProps> = React.memo(({
     // 非流式：比较 content
     if (!next.isStreaming) {
         return prev.content === next.content
-            && prev.messageId === next.messageId;
+            && prev.messageId === next.messageId
+            && prev.canBranch === next.canBranch
+            && prev.onBranch === next.onBranch;
     }
     // 流式中：由内部 state 驱动渲染，props 不变则跳过
     return prev.messageId === next.messageId;

@@ -1,5 +1,5 @@
 import { SemaSession } from 'sema-core';
-import type { ForkOptions, ForkPreview, ForkResult } from 'sema-core';
+import type { ForkOptions, ForkPreview, ForkResult, BranchResult } from 'sema-core';
 import {
     MessageCompleteData,
     StateUpdateData,
@@ -151,6 +151,14 @@ export class SemaSessionWrapper {
         const result = await this.session.fork(messageUuid, options);
         // console.log('[fork] fork', messageUuid, JSON.stringify(options), '=>', JSON.stringify(result));
         return result;
+    }
+
+    /**
+     * 分支到新聊天：core 新建 sessionId 并全量复制当前历史（截断后的 editlog 副本一并复制），
+     * 当前会话与工作区文件不动。调用方拿到新 id 后用 createSession({ sessionId }) 打开。
+     */
+    public async branch(beforeMessageUuid?: string): Promise<BranchResult> {
+        return this.session.branch(beforeMessageUuid);
     }
 
     public interruptSession(): void {

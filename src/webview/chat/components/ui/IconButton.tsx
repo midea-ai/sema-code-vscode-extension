@@ -103,6 +103,28 @@ export const ForkIcon: React.FC = () => {
     );
 };
 
+// AI 回复「分支到新聊天」图标（git-branch 样式，与 ForkIcon 区分）
+export const BranchIcon: React.FC = () => {
+    return (
+        <svg
+            width="12"
+            height="12"
+            viewBox="0 0 16 16"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.4"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+        >
+            <circle cx="4" cy="3" r="1.5" />
+            <circle cx="4" cy="13" r="1.5" />
+            <circle cx="12" cy="6" r="1.5" />
+            <path d="M4 4.5v7" />
+            <path d="M12 7.5c0 2.5-8 1-8 4" />
+        </svg>
+    );
+};
+
 // 文件变更面板 全部放弃按钮
 export const CancelCircleIcon: React.FC = () => {
     return (

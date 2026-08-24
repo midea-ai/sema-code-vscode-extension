@@ -105,6 +105,7 @@ const ChatSession: React.FC<ChatSessionProps> = ({ vscode: rawVscode, sessionId,
     const runningTasksRef = useRef(runningTasks);
     const prevMessagesLenRef = useRef<number>(0);
     const forkReqRef = useRef<string | null>(null);
+    const branchReqRef = useRef<string | null>(null);
 
     const handleFileChange = useCallback(async (change: FileChange) => {
         try {
@@ -146,6 +147,15 @@ const ChatSession: React.FC<ChatSessionProps> = ({ vscode: rawVscode, sessionId,
         const reqId = `fork-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
         forkReqRef.current = reqId;
         vscode.postMessage({ type: 'getForkPreview', sessionId, uuid, reqId });
+    }, [sessionId, vscode]);
+
+    // 点击 AI 回复下的「分支到新聊天」：core 全量复制当前历史到新会话，扩展侧以新 tab 打开。
+    // 新 tab 由 sessionOpened 打开、失败由 sessionCreateFailed 提示，这里只做防重复点击。
+    const handleBranch = useCallback(() => {
+        if (branchReqRef.current) return;
+        const reqId = `branch-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+        branchReqRef.current = reqId;
+        vscode.postMessage({ type: 'branchSession', sessionId, reqId });
     }, [sessionId, vscode]);
 
     useEffect(() => {
@@ -429,6 +439,14 @@ const ChatSession: React.FC<ChatSessionProps> = ({ vscode: rawVscode, sessionId,
                     // 3) todos：core 回档后会重发 todos:update，前端 todosUpdate 已整体替换，无需处理
                     break;
                 }
+                case 'branchResult':
+                    if (message.reqId && message.reqId === branchReqRef.current) {
+                        branchReqRef.current = null;
+                        if (!message.ok) {
+                            console.error('[branch] branch failed:', message.error);
+                        }
+                    }
+                    break;
             }
         };
 
@@ -788,6 +806,27 @@ const ChatSession: React.FC<ChatSessionProps> = ({ vscode: rawVscode, sessionId,
             groups[groups.length - 1].items.push({ message, index });
         });
 
+        // 「分支到新聊天」只挂在最后一轮最后一条有正文的 assistant 消息上，且会话 idle
+        // （无排队输入、无弹窗、无流式）。idle 时整轮已完整落盘，全量复制不会产生孤儿 tool_use，
+        // 因此不限制该轮是否有工具调用。
+        let branchMessageId = '';
+        const lastGroup = groups[groups.length - 1];
+        const canBranchNow = processingState === 'idle'
+            && pendingInputs.length === 0
+            && !activeDialog
+            && !streamingAssistantId
+            && lastGroup.items[0]?.message.type === 'user';
+        if (canBranchNow) {
+            for (let i = lastGroup.items.length - 1; i >= 0; i--) {
+                const m = lastGroup.items[i].message;
+                if (m.type === 'assistant' && m.content?.completed !== false
+                    && !!(m.content?.content && m.content.content.trim())) {
+                    branchMessageId = m.id;
+                    break;
+                }
+            }
+        }
+
         return groups.map(group => (
             <div key={group.key} className="turn-group">
                 {groupMessages(group.items.map(item => item.message), { streamingToolId, showThinkingText: shouldShowThinkingText }).map((item) => {
@@ -829,13 +868,15 @@ const ChatSession: React.FC<ChatSessionProps> = ({ vscode: rawVscode, sessionId,
                                 processingState={processingState}
                                 onFork={handleFork}
                                 isLastMessage={message.id === lastMessageId}
+                                canBranch={message.id === branchMessageId}
+                                onBranch={handleBranch}
                             />
                         </div>
                     );
                 })}
             </div>
         ));
-    }, [messages, modelName, availableModels, activeDialog, processingState, streamingAssistantId, streamingToolId, openAgentTaskId, agentMode, thinkingEnabled, showThinkingText, handleFork]);
+    }, [messages, modelName, availableModels, activeDialog, processingState, streamingAssistantId, streamingToolId, openAgentTaskId, agentMode, thinkingEnabled, showThinkingText, handleFork, handleBranch, pendingInputs]);
 
     return (
         <SessionContext.Provider value={sessionId}>
