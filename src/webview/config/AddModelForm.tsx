@@ -38,8 +38,29 @@ interface Model {
     max_tokens?: number;
 }
 
+/** 预设服务商名称，自定义别名不允许与之重名（custom 本身除外，等价于不填） */
+const RESERVED_PROVIDERS = PROVIDER_ORDER.filter(key => key !== 'custom');
+
+/** 校验自定义服务商别名：留空合法（回退 custom），否则 2~20 位小写字母/数字/短横线，字母开头、不以短横线结尾 */
+const validateCustomProviderName = (name: string): string | null => {
+    if (!name) {
+        return null;
+    }
+    if (name.length < 2 || name.length > 20) {
+        return '长度需为 2~20 个字符';
+    }
+    if (!/^[a-z][a-z0-9-]*[a-z0-9]$/.test(name)) {
+        return '仅支持小写字母、数字和短横线(-)，需以字母开头且不能以短横线结尾';
+    }
+    if (RESERVED_PROVIDERS.includes(name)) {
+        return `"${name}" 是预设服务商名称，请换一个`;
+    }
+    return null;
+};
+
 const AddModelForm: React.FC<AddModelFormProps> = ({ onSuccess, vscode }) => {
     const [provider, setProvider] = useState(DEFAULT_PROVIDER);
+    const [customProviderName, setCustomProviderName] = useState(DEFAULT_PROVIDER === 'custom' ? 'custom' : '');
     const [baseURL, setBaseURL] = useState(defaultModelProvider[DEFAULT_PROVIDER].baseURL);
     const [apiKey, setApiKey] = useState('');
     const [adapt, setAdapt] = useState<AdapterType>(defaultModelProvider[DEFAULT_PROVIDER].defaultAdapt ?? 'openai');
@@ -159,6 +180,7 @@ const AddModelForm: React.FC<AddModelFormProps> = ({ onSuccess, vscode }) => {
 
     const handleProviderChange = (newProvider: string) => {
         setProvider(newProvider);
+        setCustomProviderName(newProvider === 'custom' ? 'custom' : '');
         const defaults = defaultModelProvider[newProvider];
         setBaseURL(defaults.baseURL);
         setApiKey('');
@@ -258,11 +280,17 @@ const AddModelForm: React.FC<AddModelFormProps> = ({ onSuccess, vscode }) => {
             return;
         }
 
+        const aliasError = provider === 'custom' ? validateCustomProviderName(customProviderName) : null;
+        if (aliasError) {
+            setMessage({ text: `服务商名称不合法: ${aliasError}`, type: 'error' });
+            return;
+        }
+
         setIsSaving(true);
         vscode.postMessage({
             command: 'saveConfig',
             data: {
-                provider,
+                provider: provider === 'custom' && customProviderName ? customProviderName : provider,
                 baseURL,
                 apiKey,
                 modelName: currentModelName,
@@ -299,6 +327,24 @@ const AddModelForm: React.FC<AddModelFormProps> = ({ onSuccess, vscode }) => {
                         }))}
                     />
                 </div>
+
+                {provider === 'custom' && (
+                    <div className="form-group">
+                        <label htmlFor="customProviderName">服务商名称</label>
+                        <input
+                            type="text"
+                            id="customProviderName"
+                            value={customProviderName}
+                            onChange={(e) => setCustomProviderName(e.target.value.trim())}
+                            placeholder="为该服务命名以区分多个自定义服务，小写字母/数字/短横线，2~20 字符，留空默认为 custom"
+                        />
+                        {validateCustomProviderName(customProviderName) && (
+                            <div className="description" style={{ color: 'var(--vscode-errorForeground)' }}>
+                                {validateCustomProviderName(customProviderName)}
+                            </div>
+                        )}
+                    </div>
+                )}
 
                 <div className="form-group">
                     <label htmlFor="baseURL">模型地址</label>
