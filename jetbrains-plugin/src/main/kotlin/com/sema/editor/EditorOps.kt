@@ -101,6 +101,7 @@ class EditorOps(
             "showPermissionDiff" -> showPermissionDiff(str(msg, "sessionId") ?: "", str(msg, "filePath"), msg.getAsJsonObject("diffContent"))
             "revertFiles" -> revertFiles(str(msg, "sessionId") ?: "", strList(msg, "filePaths"))
             "revertFile" -> revertFiles(str(msg, "sessionId") ?: "", listOfNotNull(str(msg, "filePath")))
+            "refreshFiles" -> refreshFiles(strList(msg, "filePaths"))
             "getFileChangeStats" -> getFileChangeStats(str(msg, "sessionId") ?: "", str(msg, "filePath"))
             else -> log.info("editor op 尚未实现: $type")
         }
@@ -360,6 +361,25 @@ class EditorOps(
                         log.warn("回滚失败: $full", e)
                     }
                 }
+            }
+        }
+    }
+
+    /**
+     * core（sidecar 进程）直接写盘后（如 fork 回滚文件），IDE 的 VFS/已打开编辑器不感知外部改动，
+     * 按路径主动刷新让 VFS 重读磁盘——未改动的已打开文档随内容变更事件自动重载；
+     * 文件被 core 删除（回滚新建文件）时刷新父目录使删除生效。只刷显示，不写盘。
+     */
+    private fun refreshFiles(filePaths: List<String>) {
+        if (filePaths.isEmpty()) return
+        ApplicationManager.getApplication().invokeLater {
+            val lfs = LocalFileSystem.getInstance()
+            for (raw in filePaths) {
+                val full = resolveFullPath(raw) ?: continue
+                val vf = lfs.refreshAndFindFileByPath(full)
+                // refreshAndFindFileByPath 对已缓存的文件不重读内容，需再触发一次异步内容刷新
+                if (vf != null) vf.refresh(true, false)
+                else File(full).parent?.let { lfs.refreshAndFindFileByPath(it) }
             }
         }
     }

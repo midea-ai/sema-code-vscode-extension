@@ -121,6 +121,8 @@ export class Controller {
             // 撤销/回退（D1）：async 往返，按 reqId 回发预览/结果，避免弹窗挂起。
             case 'getForkPreview': await this.handleGetForkPreview(sid, msg.uuid, msg.reqId); break;
             case 'forkSession': await this.handleForkSession(sid, msg.uuid, msg.restoreFiles, msg.reqId); break;
+            // 分支到新聊天：core 复制截断历史到新会话，本端以新 tab 打开。
+            case 'branchSession': await this.handleBranchSession(sid, msg.reqId, msg.beforeMessageUuid); break;
             // 子 agent 转后台（D4，会话级）。
             case 'transferAgentToBackground': void this.sessions.get(sid ?? '')?.remote.transferAgentToBackground(msg.taskId); break;
             case 'toolPermissionResponse': this.sessions.get(sid ?? '')?.wrapper.respondToToolPermission(msg.response); break;
@@ -187,17 +189,18 @@ export class Controller {
      * 建会话。复刻 VSCode createNewSession 的历史重放：传 sessionId → sema-core 按 id 重新
      * 水合 LLM 上下文（可续聊）；传 historyContent → 纯客户端把历史 UI 消息灌回 React。
      */
-    private async createSession(opts: { agentMode?: any; permissionLevel?: any; sessionId?: string; historyContent?: any[]; title?: string } = {}): Promise<void> {
+    private async createSession(opts: { agentMode?: any; permissionLevel?: any; sessionId?: string; historyContent?: any[]; title?: string } = {}): Promise<{ ok: boolean; error?: string }> {
         // 会话数上限（对齐 VSCode createNewSession）。已打开的历史会话走切 tab 不到这里。
         if (this.sessions.size >= MAX_SESSIONS) {
-            this.postToApp({ type: 'sessionCreateFailed', error: `最多同时打开 ${MAX_SESSIONS} 个会话，请先关闭已有会话` });
-            return;
+            const error = `最多同时打开 ${MAX_SESSIONS} 个会话，请先关闭已有会话`;
+            this.postToApp({ type: 'sessionCreateFailed', error });
+            return { ok: false, error };
         }
         // 建会话即透传 per-session 档位/模式（D7）；无值时回落 core 默认档位。
         const res = await this.core.createSession({ sessionId: opts.sessionId, permissionLevel: opts.permissionLevel, agentMode: opts.agentMode });
         if (!res.ok || !res.sessionId) {
             this.postToApp({ type: 'sessionCreateFailed', error: res.error });
-            return;
+            return { ok: false, error: res.error };
         }
         const remote = new RemoteSession(res.sessionId, this.t);
         const wrapper = new SemaSessionWrapper(remote as any, this.callbacks, opts.agentMode ?? 'Agent');
@@ -221,6 +224,7 @@ export class Controller {
             wrapper.updateMessageHistory(opts.historyContent);
         }
         this.reportState();
+        return { ok: true };
     }
 
     /**
@@ -307,9 +311,71 @@ export class Controller {
         }
         try {
             const result = await entry.remote.fork(uuid, { restoreFiles: !!restoreFiles });
+            // core（sidecar 进程）直接写盘回滚，IDE 的 VFS/已打开编辑器不感知外部改动，
+            // 按实际回滚的文件列表（绝对路径）让 Kotlin 主动刷新 VFS 重读磁盘。
+            const restored = Array.isArray(result?.restoredFiles) ? result.restoredFiles : [];
+            if (restored.length > 0) this.t.editor('refreshFiles', { filePaths: restored });
             this.postToApp({ type: 'forkResult', sessionId: sid, reqId, uuid, result });
         } catch (e: any) {
             this.postToApp({ type: 'forkResult', sessionId: sid, reqId, uuid, result: { ok: false, error: e?.message || 'fork 失败' } });
+        }
+    }
+
+    /**
+     * 分支到新聊天（对齐 semaSidebarProvider.branchToNewChat + chatWebview.handleBranchSession）：
+     * core 侧 branch() 新建会话并复制历史（截断后的 editlog 副本一并复制，源会话与工作区文件不动），
+     * 本端把截断后的 UI 消息列表复制给新 wrapper 并以新 tab 打开（sessionOpened）。
+     * beforeMessageUuid 为截断锚点（core 语义：历史截到该用户输入之前），不传则全量复制。
+     * 无论成败都回 branchResult 解除前端「分支中」状态；失败另发 sessionCreateFailed 顶部提示。
+     */
+    private async handleBranchSession(sid: string | undefined, reqId: any, beforeMessageUuid?: string): Promise<void> {
+        const fail = (error: string) => {
+            this.postToApp({ type: 'sessionCreateFailed', error });
+            this.postToApp({ type: 'branchResult', sessionId: sid, reqId, ok: false, error });
+        };
+        const entry = sid ? this.sessions.get(sid) : undefined;
+        if (!entry) { fail('会话不可用'); return; }
+        // 先于 core 检查会话数上限：core branch 会落盘新历史文件，开不出 tab 会留下孤儿会话
+        if (this.sessions.size >= MAX_SESSIONS) {
+            fail(`最多同时打开 ${MAX_SESSIONS} 个会话，请先关闭已有会话`);
+            return;
+        }
+        if (entry.wrapper.getCurrentState() !== 'idle') { fail('会话处理中，请等待空闲后再分支'); return; }
+
+        try {
+            const result = await entry.remote.branch(beforeMessageUuid);
+            if (!result || result.ok === false || !result.sessionId) {
+                fail(`分支失败：${result?.error || '未知错误'}`);
+                return;
+            }
+
+            // 新 tab 的消息列表与 core 落盘历史保持一致：有锚点时截到该用户输入之前
+            // （锚点是用户输入的 uuid，即 core inputId）。锚点在列表里找不到时回退全量
+            // （core 已成功，以其结果为准，不再报错）。
+            let historyContent = entry.wrapper.getMessageHistory();
+            if (beforeMessageUuid) {
+                const cutIndex = historyContent.findIndex(m => m.uuid === beforeMessageUuid);
+                if (cutIndex >= 0) historyContent = historyContent.slice(0, cutIndex);
+            }
+
+            const title = entry.wrapper.title ? `${entry.wrapper.title} (分支)` : '分支会话';
+            const created = await this.createSession({
+                sessionId: result.sessionId,
+                agentMode: entry.wrapper.getAgentMode(),
+                historyContent,
+                title,
+            });
+            if (!created.ok) {
+                // createSession 内部已发 sessionCreateFailed，这里只补 branchResult
+                this.postToApp({ type: 'branchResult', sessionId: sid, reqId, ok: false, error: created.error });
+                return;
+            }
+
+            // 立即写入历史存档，不必等新会话首次 idle（Kotlin save 后自动推 updateSessions 刷新历史面板）
+            this.saveSession(result.sessionId);
+            this.postToApp({ type: 'branchResult', sessionId: sid, reqId, ok: true });
+        } catch (e: any) {
+            fail(`分支失败：${e?.message || '未知错误'}`);
         }
     }
 

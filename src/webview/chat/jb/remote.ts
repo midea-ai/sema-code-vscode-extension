@@ -43,6 +43,8 @@ export class RemoteSession {
     // fork/撤销回退（D1）：同步语义在过界后变异步往返（A1），调用方 await。
     getForkPreview(messageUuid: string): Promise<any> { return this.t.call('getForkPreview', { messageUuid }, this.sessionId); }
     fork(messageUuid: string, options?: any): Promise<any> { return this.t.call('fork', { messageUuid, options }, this.sessionId); }
+    // 分支到新聊天：core 新建会话并复制截断历史（源会话与工作区不动），ack 回 BranchResult{ok,sessionId}。
+    branch(beforeMessageUuid?: string): Promise<any> { return this.t.call('branch', { beforeMessageUuid }, this.sessionId); }
     // Stop 时停后台子 agent（D3）；fire-and-forget（对齐 VSCode 丢弃返回值）。
     stopAllTasks(): Promise<number> { return this.t.call('stopAllTasks', undefined, this.sessionId); }
     // 子 agent 转后台（D4，会话级）。
