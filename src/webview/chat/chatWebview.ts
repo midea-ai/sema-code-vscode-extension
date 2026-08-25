@@ -84,7 +84,7 @@ export class ChatWebviewProvider {
                 restoreFromSnapshot: () => this.restoreFromSnapshot(sid, msg.filePath),
                 getForkPreview: () => this.handleGetForkPreview(sid, msg.uuid, msg.reqId),
                 forkSession: () => this.handleForkSession(sid, msg.uuid, msg.restoreFiles, msg.reqId),
-                branchSession: () => this.handleBranchSession(sid, msg.reqId),
+                branchSession: () => this.handleBranchSession(sid, msg.reqId, msg.beforeMessageUuid),
                 showFileDiff: () => this.fileStateDiffManager.showFileDiff(sid!, msg.filePath, msg.minLine),
                 showPermissionDiff: () => this.fileStateDiffManager.showPermissionDiff(sid!, msg.filePath, msg.diffContent),
                 getFileChangeStats: () => this.getFileChangeStats(sid, msg.filePath),
@@ -299,9 +299,9 @@ export class ChatWebviewProvider {
 
     /** 分支到新聊天：成功时由 createNewSession 发 sessionOpened 打开新 tab，失败由 controller 发 sessionCreateFailed；
      *  这里只把结果回给源会话，用于解除前端的「分支中」状态 */
-    private async handleBranchSession(sessionId: string | undefined, reqId: string): Promise<void> {
+    private async handleBranchSession(sessionId: string | undefined, reqId: string, beforeMessageUuid?: string): Promise<void> {
         if (!sessionId) return;
-        const result = await this.sessionController.branchSession(sessionId);
+        const result = await this.sessionController.branchSession(sessionId, beforeMessageUuid);
         this.postMessage({ type: 'branchResult', sessionId, reqId, ok: result.ok, error: result.error });
     }
 

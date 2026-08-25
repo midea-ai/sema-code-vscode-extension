@@ -34,7 +34,7 @@ interface MessageItemProps {
     isLastMessage?: boolean;
     /** 该 assistant 消息是否显示「分支到新聊天」 */
     canBranch?: boolean;
-    onBranch?: () => void;
+    onBranch?: (messageId: string) => void;
 }
 
 const MessageItem: React.FC<MessageItemProps> = React.memo(({

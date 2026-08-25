@@ -14,9 +14,9 @@ interface AiResponseBlockProps {
     messageId: string;
     isStreaming?: boolean;
     vscode?: any;
-    /** 是否显示「分支到新聊天」：仅最后一轮、无工具调用、会话 idle 的文字结论才为 true */
+    /** 是否显示「分支到新聊天」：每轮最后一条有正文的 assistant 消息、且会话 idle 时为 true */
     canBranch?: boolean;
-    onBranch?: () => void;
+    onBranch?: (messageId: string) => void;
 }
 
 const AiResponseBlock: React.FC<AiResponseBlockProps> = React.memo(({
@@ -291,8 +291,8 @@ const AiResponseBlock: React.FC<AiResponseBlockProps> = React.memo(({
                     {canBranch && onBranch && (
                         <button
                             className="ai-resp-action-btn"
-                            title="以当前对话为起点开一个新聊天，原对话与文件不受影响"
-                            onClick={(e) => { e.stopPropagation(); onBranch(); }}
+                            title="以此处为终点开一个新聊天（不含后续轮次），原对话与文件不受影响"
+                            onClick={(e) => { e.stopPropagation(); onBranch(messageId); }}
                         >
                             <BranchIcon />
                             <span className="ai-resp-action-label">分支到新聊天</span>

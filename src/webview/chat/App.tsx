@@ -149,14 +149,22 @@ const ChatSession: React.FC<ChatSessionProps> = ({ vscode: rawVscode, sessionId,
         vscode.postMessage({ type: 'getForkPreview', sessionId, uuid, reqId });
     }, [sessionId, vscode]);
 
-    // 点击 AI 回复下的「分支到新聊天」：core 全量复制当前历史到新会话，扩展侧以新 tab 打开。
+    // 点击 AI 回复下的「分支到新聊天」：core 复制截至该轮的历史到新会话，扩展侧以新 tab 打开。
+    // 锚点取被点消息之后的第一条用户输入（core branch 语义：截到该用户输入之前）；
+    // 最后一轮无后续用户输入，不传锚点即全量复制。
     // 新 tab 由 sessionOpened 打开、失败由 sessionCreateFailed 提示，这里只做防重复点击。
-    const handleBranch = useCallback(() => {
+    const handleBranch = useCallback((messageId: string) => {
         if (branchReqRef.current) return;
+        const clickedIndex = messages.findIndex(m => m.id === messageId);
+        if (clickedIndex < 0) return;
+        const nextUser = messages.slice(clickedIndex + 1).find(m => m.type === 'user');
+        // 锚点用 uuid（== core inputId）；中间轮次的按钮仅在下一轮用户输入有 uuid 时展示，
+        // 这里兜底：有下一轮却拿不到锚点时不发起，避免误发全量分支
+        if (nextUser && !nextUser.uuid) return;
         const reqId = `branch-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
         branchReqRef.current = reqId;
-        vscode.postMessage({ type: 'branchSession', sessionId, reqId });
-    }, [sessionId, vscode]);
+        vscode.postMessage({ type: 'branchSession', sessionId, reqId, beforeMessageUuid: nextUser?.uuid });
+    }, [sessionId, vscode, messages]);
 
     useEffect(() => {
         const handleMessage = (event: MessageEvent) => {
@@ -806,23 +814,29 @@ const ChatSession: React.FC<ChatSessionProps> = ({ vscode: rawVscode, sessionId,
             groups[groups.length - 1].items.push({ message, index });
         });
 
-        // 「分支到新聊天」只挂在最后一轮最后一条有正文的 assistant 消息上，且会话 idle
+        // 「分支到新聊天」挂在每一轮最后一条有正文的 assistant 消息上，且会话 idle
         // （无排队输入、无弹窗、无流式）。idle 时整轮已完整落盘，全量复制不会产生孤儿 tool_use，
-        // 因此不限制该轮是否有工具调用。
-        let branchMessageId = '';
-        const lastGroup = groups[groups.length - 1];
+        // 因此不限制该轮是否有工具调用。分支始终复制全量历史，按钮位置只是入口。
+        const branchMessageIds = new Set<string>();
         const canBranchNow = processingState === 'idle'
             && pendingInputs.length === 0
             && !activeDialog
-            && !streamingAssistantId
-            && lastGroup.items[0]?.message.type === 'user';
+            && !streamingAssistantId;
         if (canBranchNow) {
-            for (let i = lastGroup.items.length - 1; i >= 0; i--) {
-                const m = lastGroup.items[i].message;
-                if (m.type === 'assistant' && m.content?.completed !== false
-                    && !!(m.content?.content && m.content.content.trim())) {
-                    branchMessageId = m.id;
-                    break;
+            for (let gi = 0; gi < groups.length; gi++) {
+                const group = groups[gi];
+                if (group.items[0]?.message.type !== 'user') continue;
+                // 中间轮次需要下一轮用户输入的 uuid 作为 core 截断锚点；
+                // 旧历史恢复的消息无 uuid，无法截断，则该轮不显示按钮（最后一轮全量分支不受影响）
+                const nextGroup = groups[gi + 1];
+                if (nextGroup && !nextGroup.items[0]?.message.uuid) continue;
+                for (let i = group.items.length - 1; i >= 0; i--) {
+                    const m = group.items[i].message;
+                    if (m.type === 'assistant' && m.content?.completed !== false
+                        && !!(m.content?.content && m.content.content.trim())) {
+                        branchMessageIds.add(m.id);
+                        break;
+                    }
                 }
             }
         }
@@ -868,7 +882,7 @@ const ChatSession: React.FC<ChatSessionProps> = ({ vscode: rawVscode, sessionId,
                                 processingState={processingState}
                                 onFork={handleFork}
                                 isLastMessage={message.id === lastMessageId}
-                                canBranch={message.id === branchMessageId}
+                                canBranch={branchMessageIds.has(message.id)}
                                 onBranch={handleBranch}
                             />
                         </div>

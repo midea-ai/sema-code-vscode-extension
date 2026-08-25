@@ -28,7 +28,7 @@ export interface SessionController {
     switchSession(sessionId: string): void;
     closeSession(sessionId: string): Promise<void>;
     /** 分支到新聊天：全量复制源会话历史到新会话并以新 tab 打开 */
-    branchSession(sessionId: string): Promise<{ ok: boolean; error?: string }>;
+    branchSession(sessionId: string, beforeMessageUuid?: string): Promise<{ ok: boolean; error?: string }>;
 }
 
 export class SemaSidebarProvider implements vscode.WebviewViewProvider {
@@ -91,7 +91,7 @@ export class SemaSidebarProvider implements vscode.WebviewViewProvider {
             createSession: (agentMode) => this.createNewSession({ agentMode }),
             switchSession: (sessionId) => this.switchActiveSession(sessionId),
             closeSession: (sessionId) => this.closeSession(sessionId),
-            branchSession: (sessionId) => this.branchToNewChat(sessionId),
+            branchSession: (sessionId, beforeMessageUuid) => this.branchToNewChat(sessionId, beforeMessageUuid),
         };
 
         this.chatWebviewProvider = new ChatWebviewProvider(
@@ -566,11 +566,12 @@ export class SemaSidebarProvider implements vscode.WebviewViewProvider {
     }
 
     /**
-     * 分支到新聊天：core 侧 branch() 新建会话并全量复制历史（editlog 副本一并复制，
+     * 分支到新聊天：core 侧 branch() 新建会话并复制历史（editlog 副本一并复制，
      * 源会话与工作区文件不动），插件侧把源会话的消息列表复制给新 wrapper 并以新 tab 打开。
+     * beforeMessageUuid 为截断锚点（core 语义：历史截到该用户输入之前），不传则全量复制。
      * 失败时通过 sessionCreateFailed 在页面顶部展示错误。
      */
-    private async branchToNewChat(sourceId: string): Promise<{ ok: boolean; error?: string }> {
+    private async branchToNewChat(sourceId: string, beforeMessageUuid?: string): Promise<{ ok: boolean; error?: string }> {
         const fail = (error: string) => {
             this.chatWebviewProvider.postMessage({ type: 'sessionCreateFailed', error });
             return { ok: false, error };
@@ -584,14 +585,23 @@ export class SemaSidebarProvider implements vscode.WebviewViewProvider {
         if (source.getCurrentState() !== 'idle') return fail('会话处理中，请等待空闲后再分支');
 
         try {
-            const result = await source.branch();
+            const result = await source.branch(beforeMessageUuid);
             if (result.ok === false) return fail(`分支失败：${result.error}`);
+
+            // 新 tab 的消息列表与 core 落盘历史保持一致：有锚点时截到该用户输入之前
+            // （锚点是用户输入的 uuid，即 core inputId）。锚点在列表里找不到时回退全量
+            // （core 已成功，以其结果为准，不再报错）。
+            let historyContent = source.getMessageHistory();
+            if (beforeMessageUuid) {
+                const cutIndex = historyContent.findIndex(m => m.uuid === beforeMessageUuid);
+                if (cutIndex >= 0) historyContent = historyContent.slice(0, cutIndex);
+            }
 
             const title = source.title ? `${source.title} (分支)` : '分支会话';
             const created = await this.createNewSession({
                 sessionId: result.sessionId,
                 agentMode: source.getAgentMode(),
-                historyContent: source.getMessageHistory(),
+                historyContent,
                 title,
             });
             if (!created.ok) return created;
