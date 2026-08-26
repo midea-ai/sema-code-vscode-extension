@@ -14,7 +14,7 @@ JDK 17 · Node.js 18+（本地有则复用，无则首启按平台自动下载�
 起沙箱 IDE：
 
 ```bash
-# cd jetbrains-plugin/
+cd jetbrains-plugin
 ./gradlew --no-daemon runIde
 
 # SEMA_JCEF_DEVTOOLS=1 ./gradlew --no-daemon runIde  # 弹前端 DevTools
@@ -22,12 +22,28 @@ JDK 17 · Node.js 18+（本地有则复用，无则首启按平台自动下载�
 # 平台代码：IC=IDEA社区(默认) IU=IDEA旗舰 PC=PyCharm社区 PY=PyCharm专业 GO=GoLand WS=WebStorm CL=CLion
 ```
 
+### 用本地 sema-core 验证（未发版时）
+
+sidecar 是「桥 + core」的 esbuild 单文件，Java SDK 只是透明传输层——换 core 只需重打桥产物，不用动 `semaCoreSdkVersion`：
+
+```bash
+# sema-core 打包
+cd <sema-core>
+npm run build && npm pack              # 本地 core 打成 tgz
+cd sdks/shared/bridge && npm install --no-save ../../../sema-core-*.tgz && npm run build
+
+# 本项目重新编译
+rm -rf ~/.sema/java-sdk-sidecar                          # 清掉 jar 释放的旧缓存
+cd jetbrains-plugin
+SEMA_SIDECAR_DIR=$PWD/../../sema-core/sdks/shared/bridge/dist ./gradlew --no-daemon runIde
+```
+
 ## 打包安装
 
 打插件 zip：
 
 ```bash
-# cd jetbrains-plugin/
+cd jetbrains-plugin
 ./gradlew buildPlugin  # sema-jetbrains-plugin-0.1.0.zip
 ```
 
