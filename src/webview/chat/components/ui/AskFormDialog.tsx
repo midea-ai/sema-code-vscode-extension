@@ -136,7 +136,8 @@ const AskFormDialog: React.FC<AskFormDialogProps> = ({
     const [otherActive, setOtherActive] = useState<Record<string, boolean>>(initActive);
     const [otherText, setOtherText] = useState<Record<string, string>>(initText);
     const [errors, setErrors] = useState<Record<string, string>>({});
-    const [isExpanded, setIsExpanded] = useState<boolean>(true);
+    // 历史消息（readonly）默认收起，仅保留标题和状态徽标；待回答的保持展开
+    const [isExpanded, setIsExpanded] = useState<boolean>(!readonly);
     const containerRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {

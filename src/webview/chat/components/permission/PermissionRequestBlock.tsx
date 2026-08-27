@@ -17,7 +17,7 @@ interface PermissionRequestBlockProps {
 }
 
 const PermissionRequestBlock: React.FC<PermissionRequestBlockProps> = ({ permissionData, vscode }) => {
-    const [isExpanded, setIsExpanded] = useState(true);
+    const [isExpanded, setIsExpanded] = useState(false);
 
     // 获取状态文本和样式类
     const getStatusInfo = () => {
