@@ -673,11 +673,11 @@ const MCPConfig: React.FC<MCPConfigProps> = ({ vscode, onOpenSystemConfig }) => 
         vscode.postMessage({ command: 'removeMCPServer', name: server.config.name, scope });
     };
 
-    const handleToggle = (server: MCPServerInfo, scope: MCPGroupScope, enabled: boolean) => {
+    // 启停写入层由 core 按 server 所在层决定，不再传 scope
+    const handleToggle = (server: MCPServerInfo, _scope: MCPGroupScope, enabled: boolean) => {
         vscode.postMessage({
             command: enabled ? 'enableMCPServer' : 'disableMCPServer',
             name: server.config.name,
-            scope,
         });
     };
 
