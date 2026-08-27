@@ -275,6 +275,28 @@
     overflow: hidden;
 }
 
+/* 输入预测幽灵文本：覆盖在空编辑器上（对齐 .input-textarea 的 6px 8px 内边距），
+   不拦截鼠标，编辑器可正常点击聚焦；按 Tab 采纳 */
+.input-prediction-ghost {
+    position: absolute;
+    top: 6px;
+    left: 8px;
+    right: 8px;
+    display: flex;
+    align-items: center;
+    line-height: 1.4;
+    font-size: var(--chat-font-base);
+    color: var(--chat-text-placeholder);
+    pointer-events: none;
+}
+
+.input-prediction-text {
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
 /* @文件 高亮 / 快捷指令高亮（同款视觉） */
 .file-mention,
 .command-mention {

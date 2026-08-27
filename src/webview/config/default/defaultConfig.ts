@@ -17,5 +17,6 @@ export const defaultConfig = {
     enableLLMCache: false,
     disableBackgroundTasks: false,
     enableToolSearch: true,
+    enableInputPrediction: true,
     enablePet: false
 };

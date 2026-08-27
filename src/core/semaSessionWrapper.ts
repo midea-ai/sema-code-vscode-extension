@@ -490,6 +490,12 @@ export class SemaSessionWrapper {
             // 通知前端清除 pending 状态
             this.post({ type: 'inputProcessing', data });
         });
+
+        // enableInputPrediction 开启时，一轮回复自然结束后 core 用 quick 模型预测用户下一句；
+        // prediction 为空串表示"预计用户不会回复"，前端据此清除提示
+        this.session.on('input:predict', (data: any) => {
+            this.post({ type: 'inputPredict', data });
+        });
     }
 
     private setupMessageListeners(): void {

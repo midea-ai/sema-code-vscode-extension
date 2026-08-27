@@ -69,6 +69,8 @@ interface InputBoxProps {
     onAgentModeChange: (mode: AgentMode) => void;
     permissionLevel: PermissionLevel;
     onPermissionLevelChange: (level: PermissionLevel) => void;
+    /** 用户输入预测（core input:predict）；输入框为空时以幽灵文本提示，Tab 采纳 */
+    prediction?: string;
 }
 
 const InputBox = forwardRef<InputBoxHandle, InputBoxProps>(({
@@ -85,7 +87,8 @@ const InputBox = forwardRef<InputBoxHandle, InputBoxProps>(({
     agentMode,
     onAgentModeChange,
     permissionLevel,
-    onPermissionLevelChange
+    onPermissionLevelChange,
+    prediction
 }, ref) => {
     const [inputValue, setInputValue] = useState<string>('');
     const [mentions, setMentions] = useState<InputMention[]>([]);
@@ -669,6 +672,21 @@ const InputBox = forwardRef<InputBoxHandle, InputBoxProps>(({
 
     const handleStop = () => onStop();
 
+    // 输入预测幽灵文本：仅在输入框完全为空（无文字、无图片）且可输入时展示，与 placeholder 互斥
+    const showPrediction = !!prediction && inputValue === '' && pendingImages.images.length === 0 && !disabled;
+
+    // 采纳预测：整帧写入编辑器（同 setText 模式），采纳后 inputValue 非空、幽灵自动消失
+    const acceptPrediction = () => {
+        const el = inputBoxRef.current;
+        if (!el || !prediction) return;
+        renderEditorContent(el, prediction, []);
+        setInputValue(prediction);
+        setMentions([]);
+        setCaretOffset(el, prediction.length);
+        el.focus();
+        commitHistory({ text: prediction, mentions: [], caret: prediction.length }, 'op');
+    };
+
     const handleButtonClick = () => {
         if (canSend && isGenerating) handleSend();
         else if (isGenerating) handleStop();
@@ -880,6 +898,13 @@ const InputBox = forwardRef<InputBoxHandle, InputBoxProps>(({
             (e.key === 'Escape' && (isGenerating || showBashPermission))) {
             e.preventDefault();
             handleStop();
+            return;
+        }
+
+        // Tab 采纳输入预测（幽灵文本仅在输入框为空时出现，与文件选择器/快捷面板的 Tab 天然互斥）
+        if (e.key === 'Tab' && showPrediction) {
+            e.preventDefault();
+            acceptPrediction();
             return;
         }
 
@@ -1113,7 +1138,7 @@ const InputBox = forwardRef<InputBoxHandle, InputBoxProps>(({
                         className={`input-textarea input-editable ${isExpanded ? 'expanded' : ''}`}
                         contentEditable={!disabled}
                         suppressContentEditableWarning
-                        data-placeholder={placeholder}
+                        data-placeholder={showPrediction ? '' : placeholder}
                         onInput={handleEditorInput}
                         onKeyDown={handleKeyDown}
                         onPaste={handlePaste}
@@ -1121,6 +1146,11 @@ const InputBox = forwardRef<InputBoxHandle, InputBoxProps>(({
                         onCompositionEnd={handleCompositionEnd}
                         spellCheck={false}
                     />
+                    {showPrediction && (
+                        <div className="input-prediction-ghost">
+                            <span className="input-prediction-text">{prediction}</span>
+                        </div>
+                    )}
                 </div>
 
                 <div className="bottom-left-container">

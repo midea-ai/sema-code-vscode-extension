@@ -22,6 +22,7 @@ interface SystemConfigData {
     enableLLMCache?: boolean;
     disableBackgroundTasks?: boolean;
     enableToolSearch?: boolean;
+    enableInputPrediction?: boolean;
     enablePet?: boolean;
 }
 
@@ -221,7 +222,7 @@ const SystemConfig: React.FC<SystemConfigProps> = ({ vscode }) => {
                     </div>
                 </div>
 
-                {/* 工具搜索 & 桌宠 */}
+                {/* 工具搜索 & 输入预测 */}
                 <div className="form-row">
                     <div className="form-group">
                         <label className="checkbox-label" title="MCP 工具较多时建议开启：仅默认工具集进入模型上下文，其余工具由 AI 按需搜索加载，可明显减小请求体积。修改后下一次提问生效。">
@@ -235,7 +236,22 @@ const SystemConfig: React.FC<SystemConfigProps> = ({ vscode }) => {
                         </label>
                     </div>
 
-                    {!IS_JB && (
+                    <div className="form-group">
+                        <label className="checkbox-label" title="一轮回复结束后，用 quick 模型预测你可能的下一句输入，在输入框以灰色文本提示，按 Tab 采纳">
+                            <input
+                                type="checkbox"
+                                checked={config.enableInputPrediction || false}
+                                onChange={(e) => handleChange('enableInputPrediction', e.target.checked)}
+                            />
+                            <span className="checkmark"></span>
+                            启用输入预测
+                        </label>
+                    </div>
+                </div>
+
+                {/* 桌宠（JB 不支持，整行隐藏） */}
+                {!IS_JB && (
+                    <div className="form-row">
                         <div className="form-group">
                             <label
                                 className="checkbox-label"
@@ -254,8 +270,8 @@ const SystemConfig: React.FC<SystemConfigProps> = ({ vscode }) => {
                                 启用桌宠{petSupported ? '' : '（暂仅支持 macOS / Windows / Linux）'}
                             </label>
                         </div>
-                    )}
-                </div>
+                    </div>
+                )}
             </div>
 
             {/* 开关配置 */}

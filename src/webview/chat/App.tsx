@@ -93,6 +93,8 @@ const ChatSession: React.FC<ChatSessionProps> = ({ vscode: rawVscode, sessionId,
     const [thinkingEnabled, setThinkingEnabled] = useState<boolean>(true);
     const [showThinkingText, setShowThinkingText] = useState<boolean>(false);
     const [pendingInputs, setPendingInputs] = useState<Array<{ inputId: string; content: string; source?: InputSource }>>([]);
+    // 用户输入预测（core input:predict 事件；空串 = 预计不会回复，清除提示）
+    const [inputPrediction, setInputPrediction] = useState<string>('');
     const [runningTasks, setRunningTasks] = useState<Map<string, { taskId: string; filepath: string; type: string; startTime: number }>>(new Map());
     const [openAgentTaskId, setOpenAgentTaskId] = useState<string | null>(null);
 
@@ -365,6 +367,11 @@ const ChatSession: React.FC<ChatSessionProps> = ({ vscode: rawVscode, sessionId,
                     if (message.data) {
                         setPendingInputs(prev => prev.filter(p => p.inputId !== message.data.inputId));
                     }
+                    // 新一轮输入开始处理，上一轮的预测已过期
+                    setInputPrediction('');
+                    break;
+                case 'inputPredict':
+                    setInputPrediction(message.data?.prediction || '');
                     break;
                 case 'clearPendingInputs':
                     setPendingInputs([]);
@@ -590,6 +597,7 @@ const ChatSession: React.FC<ChatSessionProps> = ({ vscode: rawVscode, sessionId,
 
     const handleSend = (text: string, files: SelectedFile[], attachments: ImageAttachment[] = []) => {
         userScrolledUpRef.current = false;
+        setInputPrediction('');
         if (processingState !== 'processing') {
             setSpinnerAccumulatedSeconds(0);
             spinnerStartTimeRef.current = 0;
@@ -1015,6 +1023,7 @@ const ChatSession: React.FC<ChatSessionProps> = ({ vscode: rawVscode, sessionId,
                     onAgentModeChange={handleAgentModeChange}
                     permissionLevel={permissionLevel}
                     onPermissionLevelChange={handlePermissionLevelChange}
+                    prediction={inputPrediction}
                 />
             </div>
             </SessionActiveContext.Provider>
