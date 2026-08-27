@@ -89,6 +89,14 @@ const SkillConfig: React.FC<SkillConfigProps> = ({ vscode }) => {
                         vscode.postMessage({ command: 'loadSkillsInfo' });
                     }
                     break;
+                case 'toggleSkillResult':
+                    // 只在带回有效数据时覆盖列表；失败时重拉恢复真实状态（回滚乐观更新）
+                    if (message.success && Array.isArray(message.data)) {
+                        setSkills(message.data);
+                    } else if (!message.success) {
+                        vscode.postMessage({ command: 'loadSkillsInfo' });
+                    }
+                    break;
                 case 'searchSkillHubResult':
                     setHubLoading(false);
                     setHubSearched(true);
@@ -191,20 +199,38 @@ const SkillConfig: React.FC<SkillConfigProps> = ({ vscode }) => {
         vscode.postMessage({ command: 'removeSkill', name: skill.name });
     };
 
+    // 写入哪层 settings 由 core 按技能所在层决定（项目级技能→项目级，用户级/插件→用户级全局）
+    const handleToggleSkill = (skill: SkillConfigItem, enabled: boolean) => {
+        // 先本地乐观更新，结果消息回来后以真实数据为准
+        setSkills(prev => prev.map(s => s.name === skill.name ? { ...s, status: enabled } : s));
+        vscode.postMessage({ command: 'toggleSkill', name: skill.name, enabled });
+    };
+
     const renderSkillCard = (skill: SkillConfigItem, globalIndex: number) => {
         const DESC_MAX = 150;
         const description = skill.description || '暂无描述';
         const isDescExpanded = expandedDescriptions.has(globalIndex);
         const isLongDesc = description.length > DESC_MAX;
         const isReadonly = skill.locate === 'plugin';
+        const isDisabled = skill.status === false;
+        const skillSwitch = (
+            <label className="section-switch" title={isDisabled ? (skill.locate === 'project' ? '已禁用（当前项目）' : '已禁用（全局）') : '已启用'}>
+                <input
+                    type="checkbox"
+                    checked={!isDisabled}
+                    onChange={(e) => handleToggleSkill(skill, e.target.checked)}
+                />
+                <span className="section-switch-slider"></span>
+            </label>
+        );
 
         return (
             <div key={globalIndex} className="section-card">
                 <div className="section-card-header">
-                    <div className="section-card-icon" style={{ backgroundColor: getColorByName(skill.name) }}>
+                    <div className="section-card-icon" style={{ backgroundColor: getColorByName(skill.name), opacity: isDisabled ? 0.5 : 1 }}>
                         {getSkillInitial(skill.name)}
                     </div>
-                    <div className="section-card-name-group">
+                    <div className="section-card-name-group" style={{ opacity: isDisabled ? 0.5 : 1 }}>
                         <span className="section-card-name">{skill.name}</span>
                         {isReadonly && (
                             <span className="readonly-tab">只读</span>
@@ -226,17 +252,21 @@ const SkillConfig: React.FC<SkillConfigProps> = ({ vscode }) => {
                             >
                                 <TrashIcon />
                             </button>
+                            {skillSwitch}
                         </div>
                     )}
-                    {skill.locate === 'plugin' && skill.filePath && (
+                    {skill.locate === 'plugin' && (
                         <div className="section-card-actions">
-                            <button
-                                className="section-icon-btn"
-                                title="打开"
-                                onClick={(e) => { e.stopPropagation(); handleEditSkill(skill); }}
-                            >
-                                <OpenIcon />
-                            </button>
+                            {skill.filePath && (
+                                <button
+                                    className="section-icon-btn"
+                                    title="打开"
+                                    onClick={(e) => { e.stopPropagation(); handleEditSkill(skill); }}
+                                >
+                                    <OpenIcon />
+                                </button>
+                            )}
+                            {skillSwitch}
                         </div>
                     )}
                 </div>

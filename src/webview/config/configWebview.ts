@@ -97,6 +97,7 @@ export class ConfigWebviewProvider {
                 loadSkillsInfo:             () => this.loadSkillsInfo(),
                 refreshSkills:              () => this.refreshSkillsInfo(),
                 removeSkill:                () => this.removeSkill(m.name),
+                toggleSkill:                () => this.toggleSkill(m.name, m.enabled),
                 searchSkillHub:             () => this.searchSkillHub(m.query),
                 installSkillFromHub:        () => this.installSkillFromHub(m.slug, m.scope),
                 loadHooksInfo:              () => this.loadHooksInfo(),
@@ -593,6 +594,17 @@ export class ConfigWebviewProvider {
             const skills = await this.coreManager.removeSkillConf(name);
             this.postMessage({ command: 'removeSkillResult', success: true, message: 'Skill 已删除', data: skills });
         });
+    }
+
+    private async toggleSkill(name: string, enabled: boolean) {
+        // 写入哪层 settings 由 core 按技能所在层决定
+        // 成功消息由 execute 统一发送（successExtra 挂 data），fn 里不要再 postMessage，否则会多发一条无 data 的成功消息
+        await this.execute(
+            'toggleSkillResult',
+            enabled ? '启用 Skill' : '禁用 Skill',
+            async () => (enabled ? await this.coreManager.enableSkill(name) : await this.coreManager.disableSkill(name)),
+            (data) => ({ data }),
+        );
     }
 
     private async searchSkillHub(query: string) {

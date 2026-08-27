@@ -396,7 +396,8 @@ export class ChatWebviewProvider {
 
     private async sendSkills(): Promise<void> {
         try {
-            const skills = await this.processWrapper.getSkillsInfo();
+            // 禁用的 skill 不进聊天斜杠列表
+            const skills = (await this.processWrapper.getSkillsInfo()).filter(s => s.status !== false);
             this.postMessage({ type: 'skillsLoaded', skills });
         } catch (error) {
             console.error('Error loading skills:', error);

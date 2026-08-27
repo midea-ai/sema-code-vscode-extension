@@ -228,6 +228,10 @@ export class ConfigController {
                 if (!await this.confirm(`确定要删除 Skill "${m.name}" 吗？`, '删除')) break;
                 await this.respond('removeSkillResult', () => this.core.removeSkillConf(m.name), (data) => ({ message: 'Skill 已删除', data }));
                 break;
+            case 'toggleSkill':
+                // 写入哪层 settings 由 core 按技能所在层决定；失败时 UI 收到 success:false 会重拉恢复真实状态
+                await this.respond('toggleSkillResult', () => (m.enabled ? this.core.enableSkill(m.name) : this.core.disableSkill(m.name)), (data) => ({ data }));
+                break;
             case 'searchSkillHub':
                 this.postToApp({ command: 'searchSkillHubResult', success: false, data: [], message: 'JetBrains 版暂不支持 Skill Hub 在线搜索' });
                 break;

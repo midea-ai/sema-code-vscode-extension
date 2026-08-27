@@ -439,7 +439,8 @@ export class Controller {
         catch { this.postToApp({ type: 'customCommandsLoaded', commands: [] }); }
     }
     private async sendSkills(): Promise<void> {
-        try { this.postToApp({ type: 'skillsLoaded', skills: await this.core.getSkillsInfo() }); }
+        // 禁用的 skill 不进聊天斜杠列表（对齐 VSCode chatWebview.sendSkills）
+        try { this.postToApp({ type: 'skillsLoaded', skills: (await this.core.getSkillsInfo()).filter((s: any) => s.status !== false) }); }
         catch { this.postToApp({ type: 'skillsLoaded', skills: [] }); }
     }
     private async sendAgents(): Promise<void> {

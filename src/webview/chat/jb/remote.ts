@@ -112,6 +112,9 @@ export class RemoteCore {
     // Skills
     getSkillsInfo(refresh?: boolean): Promise<any> { return this.t.call('getSkillsInfo', { concise: true, refresh }, ''); }
     removeSkillConf(name: string): Promise<any> { return this.t.call('removeSkillConf', { name }, ''); }
+    // 启停写入层由 core 按技能所在层决定（用户级技能全局生效）
+    enableSkill(name: string): Promise<any> { return this.t.call('enableSkill', { name }, ''); }
+    disableSkill(name: string): Promise<any> { return this.t.call('disableSkill', { name }, ''); }
 
     // Commands
     getCommandsInfo(refresh?: boolean): Promise<any> { return this.t.call('getCommandsInfo', { concise: true, refresh }, ''); }

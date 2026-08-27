@@ -273,6 +273,15 @@ export class SemaProcessWrapper {
         return this.semaCore.removeSkillConf(name);
     }
 
+    // 启停写入层由 core 按技能所在层决定：用户级技能写 ~/.sema（全局生效），项目级技能写 <project>/.sema
+    public enableSkill(name: string): Promise<SkillConfig[]> {
+        return this.semaCore.enableSkill(name);
+    }
+
+    public disableSkill(name: string): Promise<SkillConfig[]> {
+        return this.semaCore.disableSkill(name);
+    }
+
     // ===== Hooks =====
 
     public getHooksInfo(refresh?: boolean): Promise<HooksInfo> {

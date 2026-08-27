@@ -6,4 +6,6 @@ export interface SkillConfig {
     prompt: string;
     locate?: SkillScope;
     filePath?: string;
+    /** 是否启用（settings 的 disabledSkills 控制；undefined 视为启用） */
+    status?: boolean;
 }
