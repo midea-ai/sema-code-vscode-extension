@@ -29,7 +29,7 @@ export const DEFAULT_MAX_TOKENS_OPTIONS = [16000, 32000, 64000, 128000];
 export const DEFAULT_CONTEXT_LENGTH_OPTIONS = [128000, 256000, 512000, 1000000];
 
 /** 全局默认最大生成token数 */
-export const DEFAULT_MAX_TOKENS = 32000;
+export const DEFAULT_MAX_TOKENS = 64000;
 
 /** Main 任务推荐模型，为空则不显示推荐提示 */
 export const RECOMMENDED_MAIN_MODEL = '';
@@ -38,7 +38,7 @@ export const RECOMMENDED_MAIN_MODEL = '';
 export const RECOMMENDED_QUICK_MODEL = '';
 
 /** 全局默认上下文窗口大小 */
-export const DEFAULT_CONTEXT_LENGTH = 256000;
+export const DEFAULT_CONTEXT_LENGTH = 512000;
 
 /** 默认提供商 key */
 export const DEFAULT_PROVIDER = 'deepseek';
