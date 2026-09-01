@@ -1,17 +1,22 @@
+# 依赖
 node_modules
-dist
 package-lock.json
-core-pack
-docs
-.sema
 
+# 构建产物
+dist
+.build/
+core-pack
 *.vsix
 
-.build/
+# 文档
+docs
+wiki/
+
+# 测试与脚本
 test
-
-.DS_Store
-
 scripts/
 
+# 工具与运行时
+.sema
 .idea
+.DS_Store
