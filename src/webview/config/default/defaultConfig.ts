@@ -18,5 +18,6 @@ export const defaultConfig = {
     disableBackgroundTasks: false,
     enableToolSearch: true,
     enableInputPrediction: true,
-    enablePet: false
+    enablePet: false,
+    defaultPermissionLevel: 'Ask'
 };

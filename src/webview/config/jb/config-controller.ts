@@ -14,7 +14,7 @@ import { defaultConfig } from '../default/defaultConfig';
  */
 
 // 仅落宿主本地、不推 sema-core 的系统配置键（对齐 semaProcessWrapper.LOCAL_SYSTEM_CONFIG_KEYS）
-const LOCAL_SYSTEM_CONFIG_KEYS = ['enablePet', 'showThinkingText'];
+const LOCAL_SYSTEM_CONFIG_KEYS = ['enablePet', 'showThinkingText', 'defaultPermissionLevel'];
 
 export class ConfigController {
     private core: RemoteCore;

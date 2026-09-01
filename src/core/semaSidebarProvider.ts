@@ -12,7 +12,7 @@ import { ChatWebviewProvider } from '../webview/chat/chatWebview';
 import { ConfigWebviewProvider } from '../webview/config/configWebview';
 import { SessionHistoryWebviewProvider } from '../webview/sessionHistory/sessionHistoryWebview';
 import { SemaProcessWrapper, MAX_SESSIONS } from './semaProcessWrapper';
-import { SemaSessionWrapper, SessionWrapperCallbacks, Message } from './semaSessionWrapper';
+import { SemaSessionWrapper, SessionWrapperCallbacks, Message, PermissionLevel } from './semaSessionWrapper';
 import { ClawCoordinator } from '../claw/coordinator';
 import { CLAW_SESSION_ID } from '../claw/paths';
 import { TOOL_NAME_VIEW_FILE, TOOL_NAME_WRITE_FILE, TOOL_NAME_PATCH_FILE } from '../utils/tool';
@@ -185,6 +185,12 @@ export class SemaSidebarProvider implements vscode.WebviewViewProvider {
 
     // ─── 会话生命周期 ─────────────────────────────────────────────────────────
 
+    /** 读系统配置里的默认权限档位（扩展端本地字段），非法值回落 'Ask' */
+    private getDefaultPermissionLevel(): PermissionLevel {
+        const level = (this.processWrapper.getSystemConfig() as Record<string, any>).defaultPermissionLevel;
+        return level === 'AutoEdit' || level === 'AutoRun' || level === 'Bypass' ? level : 'Ask';
+    }
+
     /**
      * 创建一个新会话。超限或 core 拒绝时向前端发送 sessionCreateFailed。
      */
@@ -201,9 +207,11 @@ export class SemaSidebarProvider implements vscode.WebviewViewProvider {
         }
 
         try {
+            const permissionLevel = this.getDefaultPermissionLevel();
             const result = await this.processWrapper.createSession({
                 sessionId: opts.sessionId,
                 agentMode: opts.agentMode,
+                permissionLevel,
             });
 
             if (!result.ok) {
@@ -214,7 +222,8 @@ export class SemaSidebarProvider implements vscode.WebviewViewProvider {
             const wrapper = new SemaSessionWrapper(
                 result.session,
                 this.sessionCallbacks,
-                opts.agentMode ?? 'Agent'
+                opts.agentMode ?? 'Agent',
+                permissionLevel
             );
             this.sessions.set(wrapper.sessionId, wrapper);
             // 为该会话建立独立的快照作用域（清掉可能残留的同 id 旧状态）

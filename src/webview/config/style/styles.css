@@ -775,6 +775,55 @@ button.small {
     cursor: help;
 }
 
+/* 默认权限档位：标签与选择框同行 */
+.perm-level-field {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.perm-level-field label {
+    margin-bottom: 0;
+    white-space: nowrap;
+}
+
+/* 展开的下拉列表显示「档位（说明）」，收起后框内只显示档位短名：
+   select 文字透明，由覆盖其上的 .perm-level-select-value 展示当前档位 */
+.perm-level-select-wrap {
+    position: relative;
+    display: inline-block;
+}
+
+.perm-level-select-wrap select {
+    width: 110px;
+    color: transparent;
+    padding-top: 4px;
+    padding-bottom: 4px;
+}
+
+.perm-level-select-wrap option {
+    color: var(--vscode-input-foreground);
+}
+
+.perm-level-select-value {
+    position: absolute;
+    left: 14px;
+    top: 50%;
+    transform: translateY(-50%);
+    pointer-events: none;
+    color: var(--vscode-input-foreground);
+    font-size: var(--s-font-md);
+}
+
+/* 窄面板时标签与选择框折成两行（断点与 .form-row 折单列一致） */
+@media (max-width: 600px) {
+    .perm-level-field {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 6px;
+    }
+}
+
 /* 复选框样式 */
 .checkbox-label {
     display: flex;

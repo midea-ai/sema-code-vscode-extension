@@ -24,7 +24,16 @@ interface SystemConfigData {
     enableToolSearch?: boolean;
     enableInputPrediction?: boolean;
     enablePet?: boolean;
+    defaultPermissionLevel?: string;
 }
+
+/** 可选的默认权限档位（与输入框权限菜单一致），desc 用于选中后旁侧提示 */
+const PERMISSION_LEVEL_OPTIONS: Array<{ value: string; desc: string }> = [
+    { value: 'Ask', desc: '每步操作前询问' },
+    { value: 'AutoEdit', desc: '自动批准文件编辑，其他询问' },
+    { value: 'AutoRun', desc: '自动批准，危险操作询问' },
+    { value: 'Bypass', desc: '跳过所有确认，危险' }
+];
 
 const SystemConfig: React.FC<SystemConfigProps> = ({ vscode }) => {
     // JB 插件不支持桌宠，隐藏「启用桌宠」开关（VSCode 下 __SEMA_JB__ 为 undefined，行为不变）。
@@ -283,6 +292,35 @@ const SystemConfig: React.FC<SystemConfigProps> = ({ vscode }) => {
                         title="以下「跳过…权限检查」开关优先级高于输入框的权限等级（Ask / AutoEdit / AutoRun）。勾选后对应操作将始终跳过确认，不受当前权限等级影响。"
                     >ⓘ</span>
                 </h3>
+                {/* 默认权限档位 */}
+                <div className="form-row">
+                    <div className="form-group">
+                        <div
+                            className="perm-level-field"
+                            title="新建会话的初始权限档位，会话内仍可通过输入框菜单随时切换"
+                        >
+                            <label htmlFor="defaultPermissionLevel">默认权限档位</label>
+                            {/* 展开的下拉列表显示「档位（说明）」，收起后框内只显示档位短名：
+                                select 文字设为透明，用覆盖在其上的 span 展示当前档位 */}
+                            <div className="perm-level-select-wrap">
+                                <select
+                                    id="defaultPermissionLevel"
+                                    value={config.defaultPermissionLevel || 'Ask'}
+                                    onChange={(e) => handleChange('defaultPermissionLevel', e.target.value)}
+                                >
+                                    {PERMISSION_LEVEL_OPTIONS.map(opt => (
+                                        <option key={opt.value} value={opt.value}>
+                                            {`${opt.value}（${opt.desc}）`}
+                                        </option>
+                                    ))}
+                                </select>
+                                <span className="perm-level-select-value">
+                                    {config.defaultPermissionLevel || 'Ask'}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
                 {/* 跳过权限第一行 */}
                 <div className="form-row">
                     <div className="form-group">

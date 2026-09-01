@@ -110,18 +110,20 @@ export class SemaSessionWrapper {
     private pendingTaskUpdates: Set<string> = new Set();
     private pendingAutoPermissions: Map<string, string> = new Map(); // toolId → content
     private _agentMode: AgentMode;
-    private _permissionLevel: PermissionLevel = 'Ask';
+    private _permissionLevel: PermissionLevel;
     private lastUsage: Usage | null = null;
     private lastTodos: any[] = [];
 
     constructor(
         session: SemaSession,
         private callbacks: SessionWrapperCallbacks,
-        agentMode: AgentMode = 'Agent'
+        agentMode: AgentMode = 'Agent',
+        permissionLevel: PermissionLevel = 'Ask'
     ) {
         this.session = session;
         this.sessionId = session.sessionId;
         this._agentMode = agentMode;
+        this._permissionLevel = permissionLevel;
         this.setupEventListeners();
     }
 

@@ -33,7 +33,7 @@ export type ProcessEventName = 'cron:update' | 'mcp:server:status';
 
 /** UI 层支持同时打开的会话数量上限 */
 export const MAX_SESSIONS = 5;
-const LOCAL_SYSTEM_CONFIG_KEYS = new Set(['enablePet', 'showThinkingText']);
+const LOCAL_SYSTEM_CONFIG_KEYS = new Set(['enablePet', 'showThinkingText', 'defaultPermissionLevel']);
 
 function toCoreSystemConfig(config: Record<string, any>): UpdatableCoreConfig {
     const coreConfig = { ...config };

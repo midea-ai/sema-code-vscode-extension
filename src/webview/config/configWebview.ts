@@ -409,8 +409,8 @@ export class ConfigWebviewProvider {
 
     private async saveSystemConfigByKey(key: string, value: any) {
         await this.execute('saveSystemConfigByKeyResult', '保存系统配置', async () => {
-            // enablePet/showThinkingText 是扩展端本地字段，不应推给 sema-core
-            if (key === 'enablePet' || key === 'showThinkingText') {
+            // enablePet/showThinkingText/defaultPermissionLevel 是扩展端本地字段，不应推给 sema-core
+            if (key === 'enablePet' || key === 'showThinkingText' || key === 'defaultPermissionLevel') {
                 await this.coreManager.saveLocalSystemConfigByKey(key, value);
             } else {
                 await this.coreManager.updateSystemConfigByKey(key, value);

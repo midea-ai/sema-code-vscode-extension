@@ -1,4 +1,4 @@
-import { SemaSessionWrapper, SessionWrapperCallbacks } from '../../../core/semaSessionWrapper';
+import { SemaSessionWrapper, SessionWrapperCallbacks, PermissionLevel } from '../../../core/semaSessionWrapper';
 import { transformCommandToPrompt } from '../../../utils/prompt';
 import { TOOL_NAME_VIEW_FILE, TOOL_NAME_WRITE_FILE, TOOL_NAME_PATCH_FILE } from '../../../utils/tool';
 import { Transport } from './transport';
@@ -196,14 +196,15 @@ export class Controller {
             this.postToApp({ type: 'sessionCreateFailed', error });
             return { ok: false, error };
         }
-        // 建会话即透传 per-session 档位/模式（D7）；无值时回落 core 默认档位。
-        const res = await this.core.createSession({ sessionId: opts.sessionId, permissionLevel: opts.permissionLevel, agentMode: opts.agentMode });
+        // 建会话即透传 per-session 档位/模式（D7）；无值时回落系统配置的默认档位。
+        const permissionLevel = opts.permissionLevel ?? await this.getDefaultPermissionLevel();
+        const res = await this.core.createSession({ sessionId: opts.sessionId, permissionLevel, agentMode: opts.agentMode });
         if (!res.ok || !res.sessionId) {
             this.postToApp({ type: 'sessionCreateFailed', error: res.error });
             return { ok: false, error: res.error };
         }
         const remote = new RemoteSession(res.sessionId, this.t);
-        const wrapper = new SemaSessionWrapper(remote as any, this.callbacks, opts.agentMode ?? 'Agent');
+        const wrapper = new SemaSessionWrapper(remote as any, this.callbacks, opts.agentMode ?? 'Agent', permissionLevel);
         this.sessions.set(res.sessionId, { wrapper, remote });
         this.activeSessionId = res.sessionId;
         this.core.setActiveSession(res.sessionId); // 对齐 VSCode：建会话即标记 core 活跃会话（cron 通知定位用）
@@ -411,6 +412,17 @@ export class Controller {
             this.postToApp({ type: 'updateModelInfo', modelName: d?.modelName || '', availableModels: d?.modelList || [] });
         } catch (e: any) {
             this.postToApp({ type: 'error', message: `获取模型信息失败: ${e?.message || ''}` });
+        }
+    }
+
+    /** 读系统配置里的默认权限档位（Kotlin 本地持久化，对齐 semaSidebarProvider.getDefaultPermissionLevel），非法值回落 'Ask' */
+    private async getDefaultPermissionLevel(): Promise<PermissionLevel> {
+        try {
+            const res = await this.t.callEditor('systemConfig', { op: 'get' });
+            const level = res?.config?.defaultPermissionLevel;
+            return level === 'AutoEdit' || level === 'AutoRun' || level === 'Bypass' ? level : 'Ask';
+        } catch {
+            return 'Ask';
         }
     }
 
