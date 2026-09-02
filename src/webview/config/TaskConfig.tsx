@@ -99,7 +99,7 @@ const TaskConfig: React.FC<TaskConfigProps> = ({ config, vscode }) => {
                         disabled={availableModels.length === 0}
                         placeholder="无可用模型"
                     />
-                    {RECOMMENDED_MAIN_MODEL && <span className="task-recommend">推荐使用 {RECOMMENDED_MAIN_MODEL}</span>}
+                    {RECOMMENDED_MAIN_MODEL && <span className="task-recommend">{RECOMMENDED_MAIN_MODEL}</span>}
                 </div>
             </div>
 
@@ -114,7 +114,7 @@ const TaskConfig: React.FC<TaskConfigProps> = ({ config, vscode }) => {
                         disabled={availableModels.length === 0}
                         placeholder="无可用模型"
                     />
-                    {RECOMMENDED_QUICK_MODEL && <span className="task-recommend">推荐使用 {RECOMMENDED_QUICK_MODEL}</span>}
+                    {RECOMMENDED_QUICK_MODEL && <span className="task-recommend">{RECOMMENDED_QUICK_MODEL}</span>}
                 </div>
             </div>
 

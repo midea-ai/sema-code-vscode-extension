@@ -32,10 +32,10 @@ export const DEFAULT_CONTEXT_LENGTH_OPTIONS = [128000, 256000, 512000, 1000000];
 export const DEFAULT_MAX_TOKENS = 64000;
 
 /** Main 任务推荐模型，为空则不显示推荐提示 */
-export const RECOMMENDED_MAIN_MODEL = '';
+export const RECOMMENDED_MAIN_MODEL = '主对话使用的模型';
 
 /** Quick 任务推荐模型，为空则不显示推荐提示 */
-export const RECOMMENDED_QUICK_MODEL = '';
+export const RECOMMENDED_QUICK_MODEL = '话题识别、命令前缀提取等轻量任务使用的模型';
 
 /** 全局默认上下文窗口大小 */
 export const DEFAULT_CONTEXT_LENGTH = 512000;
