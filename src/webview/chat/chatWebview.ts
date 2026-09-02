@@ -122,8 +122,8 @@ export class ChatWebviewProvider {
     // ─── 消息 handlers ────────────────────────────────────────────────────────
 
     private async onFrontendReady(): Promise<void> {
+        // 模型未配置横幅不在此一次性判断：前端按 updateModelInfo / modelUpdate 的模型列表实时派生
         await this.sessionController.createSession();
-        await this.checkConfiguration();
     }
 
     private async handleUserInput(sessionId: string | undefined, text: string, files?: Array<any>, attachments?: InputImageAttachment[]): Promise<void> {
@@ -410,19 +410,6 @@ export class ChatWebviewProvider {
             this.postMessage({ type: 'agentsLoaded', agents });
         } catch (error) {
             console.error('Error loading agents:', error);
-        }
-    }
-
-    private async checkConfiguration(): Promise<void> {
-        try {
-            const modelData = await this.processWrapper.getModelData();
-            if (!modelData.modelList || modelData.modelList.length === 0) {
-                this.postMessage({ type: 'showModelConfigReminder', message: 'Code Agent Model 尚未配置，请先配置模型信息' });
-            }
-        } catch (error) {
-            console.error('Error checking configuration:', error);
-            vscode.window.showWarningMessage('Code Agent Model 配置检查失败，请配置模型信息', '打开配置')
-                .then(selection => { if (selection === '打开配置') this.onOpenConfig(); });
         }
     }
 

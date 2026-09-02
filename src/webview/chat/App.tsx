@@ -85,7 +85,18 @@ const ChatSession: React.FC<ChatSessionProps> = ({ vscode: rawVscode, sessionId,
         onWaitingChange?.(sessionId, waiting);
     }, [dialogQueue, sessionId, onWaitingChange]);
 
-    const [modelConfigReminder, setModelConfigReminder] = useState<string>('');
+    /** 是否已收到过一次模型信息：未收到前不显示横幅，避免加载瞬间误报 */
+    const [modelInfoLoaded, setModelInfoLoaded] = useState<boolean>(false);
+    /** 用户主动关闭/点开配置后临时隐藏；模型列表一旦非空再变空会重新显示 */
+    const [modelReminderDismissed, setModelReminderDismissed] = useState<boolean>(false);
+    /** updateModelInfo / modelUpdate 两条通道统一入口：列表非空时复位关闭标记 */
+    const applyModelInfo = (name: string | undefined, list: string[] | undefined) => {
+        const models = Array.isArray(list) ? list : [];
+        setModelName(name || '');
+        setAvailableModels(models);
+        setModelInfoLoaded(true);
+        if (models.length > 0) setModelReminderDismissed(false);
+    };
     const [spinnerAccumulatedSeconds, setSpinnerAccumulatedSeconds] = useState<number>(0);
     const [agentMode, setAgentMode] = useState<AgentMode>('Agent');
     const [permissionLevel, setPermissionLevel] = useState<PermissionLevel>('Ask');
@@ -291,13 +302,11 @@ const ChatSession: React.FC<ChatSessionProps> = ({ vscode: rawVscode, sessionId,
                     setTodos([]);
                     break;
                 case 'updateModelInfo':
-                    setModelName(message.modelName || '');
-                    setAvailableModels(message.availableModels || []);
+                    applyModelInfo(message.modelName, message.availableModels);
                     break;
                 case 'modelUpdate':
                     if (message.data) {
-                        setModelName(message.data.modelName || '');
-                        setAvailableModels(message.data.modelList || []);
+                        applyModelInfo(message.data.modelName, message.data.modelList);
                     }
                     break;
                 case 'toolPermissionRequest':
@@ -326,9 +335,6 @@ const ChatSession: React.FC<ChatSessionProps> = ({ vscode: rawVscode, sessionId,
                     break;
                 case 'closePlanExitPanel':
                     setDialogQueue(prev => prev.filter(d => d.type !== 'planExit'));
-                    break;
-                case 'showModelConfigReminder':
-                    setModelConfigReminder(message.message || '');
                     break;
                 case 'resetTokenInfo':
                     setTokenInfo({ useTokens: 0, maxTokens: 0, promptTokens: 0 });
@@ -673,13 +679,18 @@ const ChatSession: React.FC<ChatSessionProps> = ({ vscode: rawVscode, sessionId,
     };
 
     const handleCloseModelConfigReminder = () => {
-        setModelConfigReminder('');
+        setModelReminderDismissed(true);
     };
 
     const handleOpenConfig = () => {
         vscode.postMessage({ type: 'openConfig' });
-        setModelConfigReminder('');
+        setModelReminderDismissed(true);
     };
+
+    /** 横幅文案：模型列表为空且未被用户关闭时显示 */
+    const modelReminderText = modelInfoLoaded && availableModels.length === 0 && !modelReminderDismissed
+        ? 'Code Agent Model 尚未配置，请先配置模型信息'
+        : '';
 
     const handleAgentModeChange = (mode: AgentMode) => {
         setAgentMode(mode);
@@ -996,9 +1007,9 @@ const ChatSession: React.FC<ChatSessionProps> = ({ vscode: rawVscode, sessionId,
                             vscode={vscode}
                         />
                     )}
-                    {modelConfigReminder && (
+                    {modelReminderText && (
                         <ModelConfigReminder
-                            message={modelConfigReminder}
+                            message={modelReminderText}
                             onClose={handleCloseModelConfigReminder}
                             onOpenConfig={handleOpenConfig}
                         />

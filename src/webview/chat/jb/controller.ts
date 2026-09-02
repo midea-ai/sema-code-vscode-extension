@@ -107,7 +107,6 @@ export class Controller {
             case 'frontendReady':
                 await this.ensureInit();
                 await this.createSession({ agentMode: msg.mode, permissionLevel: msg.permissionLevel });
-                await this.checkConfiguration();
                 break;
             case 'createSession': await this.createSession({ agentMode: msg.mode, permissionLevel: msg.permissionLevel }); break;
             // 从历史面板加载会话（跨 JCEF：Kotlin bus → host 通路下发）
@@ -458,15 +457,6 @@ export class Controller {
     private async sendAgents(): Promise<void> {
         try { this.postToApp({ type: 'agentsLoaded', agents: await this.core.getAgentsInfo() }); }
         catch { this.postToApp({ type: 'agentsLoaded', agents: [] }); }
-    }
-
-    private async checkConfiguration(): Promise<void> {
-        try {
-            const d = await this.core.getModelData();
-            if (!d?.modelName) this.postToApp({ type: 'showModelConfigReminder' });
-        } catch {
-            this.postToApp({ type: 'showModelConfigReminder' });
-        }
     }
 
     /** 读文件时打快照（对齐 VSCode addFileToSnapshotIfNew）：传路径给 Kotlin 回读磁盘存原版，按会话隔离、幂等。 */
