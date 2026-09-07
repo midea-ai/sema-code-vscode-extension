@@ -17,9 +17,9 @@ interface SystemConfigData {
     skipMCPToolPermission?: boolean;
     skipFetchUrlPermission?: boolean;
     skipExternalFileReadPermission?: boolean;
+    fetchUrlBrowserUserAgent?: boolean;
     systemPrompt?: string;
     customRules?: string;
-    enableLLMCache?: boolean;
     disableBackgroundTasks?: boolean;
     enableToolSearch?: boolean;
     enableInputPrediction?: boolean;
@@ -204,47 +204,8 @@ const SystemConfig: React.FC<SystemConfigProps> = ({ vscode }) => {
                     </div>
                 </div>
 
-                {/* LLM回放 & 后台任务控制 */}
+                {/* 输入预测 & 桌宠（JB 不支持桌宠，仅隐藏该项） */}
                 <div className="form-row">
-                    <div className="form-group">
-                        <label className="checkbox-label" title="命中相同输入时直接回放上次回复，不发真实请求。仅用于开发调试，日常使用请勿开启">
-                            <input
-                                type="checkbox"
-                                checked={config.enableLLMCache || false}
-                                onChange={(e) => handleChange('enableLLMCache', e.target.checked)}
-                            />
-                            <span className="checkmark"></span>
-                            启用LLM回放
-                        </label>
-                    </div>
-
-                    <div className="form-group">
-                        <label className="checkbox-label" title="启用后将禁止Bash后台运行、Agent后台执行、超时转后台等功能">
-                            <input
-                                type="checkbox"
-                                checked={config.disableBackgroundTasks || false}
-                                onChange={(e) => handleChange('disableBackgroundTasks', e.target.checked)}
-                            />
-                            <span className="checkmark"></span>
-                            禁止后台任务
-                        </label>
-                    </div>
-                </div>
-
-                {/* 工具搜索 & 输入预测 */}
-                <div className="form-row">
-                    <div className="form-group">
-                        <label className="checkbox-label" title="MCP 工具较多时建议开启：仅默认工具集进入模型上下文，其余工具由 AI 按需搜索加载，可明显减小请求体积。修改后下一次提问生效。">
-                            <input
-                                type="checkbox"
-                                checked={config.enableToolSearch || false}
-                                onChange={(e) => handleChange('enableToolSearch', e.target.checked)}
-                            />
-                            <span className="checkmark"></span>
-                            启用工具搜索
-                        </label>
-                    </div>
-
                     <div className="form-group">
                         <label className="checkbox-label" title="一轮回复结束后，用 quick 模型预测你可能的下一句输入，在输入框以灰色文本提示，按 Tab 采纳">
                             <input
@@ -256,11 +217,8 @@ const SystemConfig: React.FC<SystemConfigProps> = ({ vscode }) => {
                             启用输入预测
                         </label>
                     </div>
-                </div>
 
-                {/* 桌宠（JB 不支持，整行隐藏） */}
-                {!IS_JB && (
-                    <div className="form-row">
+                    {!IS_JB && (
                         <div className="form-group">
                             <label
                                 className="checkbox-label"
@@ -279,8 +237,54 @@ const SystemConfig: React.FC<SystemConfigProps> = ({ vscode }) => {
                                 启用桌宠{petSupported ? '' : '（暂仅支持 macOS / Windows / Linux）'}
                             </label>
                         </div>
+                    )}
+                </div>
+            </div>
+
+            {/* 工具设置 */}
+            <div className="config-section">
+                <h3 className="config-section-title">工具设置</h3>
+                {/* 工具搜索 & 后台任务 */}
+                <div className="form-row">
+                    <div className="form-group">
+                        <label className="checkbox-label" title="MCP 工具较多时建议开启：仅默认工具集进入模型上下文，其余工具由 AI 按需搜索加载，可明显减小请求体积。修改后下一次提问生效。">
+                            <input
+                                type="checkbox"
+                                checked={config.enableToolSearch || false}
+                                onChange={(e) => handleChange('enableToolSearch', e.target.checked)}
+                            />
+                            <span className="checkmark"></span>
+                            启用工具搜索
+                        </label>
                     </div>
-                )}
+
+                    <div className="form-group">
+                        <label className="checkbox-label" title="启用后将禁止Bash后台运行、Agent后台执行、超时转后台等功能">
+                            <input
+                                type="checkbox"
+                                checked={config.disableBackgroundTasks || false}
+                                onChange={(e) => handleChange('disableBackgroundTasks', e.target.checked)}
+                            />
+                            <span className="checkmark"></span>
+                            禁止后台任务
+                        </label>
+                    </div>
+                </div>
+
+                {/* FetchUrl 浏览器标识 */}
+                <div className="form-row">
+                    <div className="form-group">
+                        <label className="checkbox-label" title="FetchUrl 请求改用 Chrome 浏览器标识，可读取微信公众号等只放行浏览器的站点，需登录或验证码的页面不支持，请勿批量抓取">
+                            <input
+                                type="checkbox"
+                                checked={config.fetchUrlBrowserUserAgent || false}
+                                onChange={(e) => handleChange('fetchUrlBrowserUserAgent', e.target.checked)}
+                            />
+                            <span className="checkmark"></span>
+                            FetchUrl使用浏览器标识
+                        </label>
+                    </div>
+                </div>
             </div>
 
             {/* 开关配置 */}

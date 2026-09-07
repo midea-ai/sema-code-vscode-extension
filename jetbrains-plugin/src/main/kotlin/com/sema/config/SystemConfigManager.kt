@@ -35,15 +35,18 @@ class SystemConfigManager {
             "skipMCPToolPermission" to false,
             "skipFetchUrlPermission" to false,
             "skipExternalFileReadPermission" to true,
+            "fetchUrlBrowserUserAgent" to true,
             "systemPrompt" to "You are Sema, AIRC's Agent AI for coding.",
             "customRules" to "- 中文回答",
-            "enableLLMCache" to false,
             "disableBackgroundTasks" to false,
+            "enableToolSearch" to true,
+            "enableInputPrediction" to true,
             "enablePet" to false,
+            "defaultPermissionLevel" to "Ask",
         )
 
         // 仅落本地、不推 sema-core 的键（对齐 semaProcessWrapper.LOCAL_SYSTEM_CONFIG_KEYS）
-        private val LOCAL_KEYS = setOf("enablePet", "showThinkingText")
+        private val LOCAL_KEYS = setOf("enablePet", "showThinkingText", "defaultPermissionLevel")
     }
 
     /** 读取完整系统配置（缺省合并默认值，保证新增字段有值）。 */

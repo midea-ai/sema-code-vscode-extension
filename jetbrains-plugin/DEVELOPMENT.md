@@ -33,7 +33,6 @@ npm run build && npm pack              # 本地 core 打成 tgz
 cd sdks/shared/bridge && npm install --no-save ../../../sema-core-*.tgz && npm run build
 
 # 本项目重新编译
-rm -rf ~/.sema/java-sdk-sidecar                          # 清掉 jar 释放的旧缓存
 cd jetbrains-plugin
 SEMA_SIDECAR_DIR=$PWD/../../sema-core/sdks/shared/bridge/dist ./gradlew --no-daemon runIde
 ```
