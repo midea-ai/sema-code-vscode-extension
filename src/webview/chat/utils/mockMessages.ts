@@ -488,6 +488,43 @@ $$P_{\\text{Bash}}(c) = \\text{allow} \\iff \\begin{cases} \\text{head}(c) \\in 
             id: nextId(),
             type: 'assistant',
             content: {
+                // 链接识别与跳转用例：本机/局域网地址应在 Simple Browser 打开，公网系统浏览器；
+                // 反引号内地址可点；加粗/中文/尾标点处正确截断；file:// 与无 scheme 的 localhost 保持纯文本；代码块内不识别
+                content: `## 链接渲染示例
+1. 裸本地地址：服务已启动 http://localhost:4567
+2. 反引号本地地址：访问 \`http://localhost:4567\` 查看
+3. 加粗包裹：**http://localhost:5173/**
+4. 后接中文无空格：打开http://localhost:4567/docs查看效果
+5. 尾随标点：接口地址是 http://127.0.0.1:8080/api/health。
+6. 局域网地址：http://192.168.1.20:3000/login?next=/home
+7. markdown 链接本地：[本地文档](http://localhost:4567/docs#intro)
+8. 裸公网地址：项目主页 https://github.com/microsoft/vscode
+9. 反引号公网地址：参考 \`https://code.visualstudio.com/api\`
+10. markdown 链接公网：[VS Code 文档](https://code.visualstudio.com/docs)
+11. 带查询参数的公网地址：https://www.google.com/search?q=vscode+simple+browser&hl=zh-CN
+12. 文件协议（不可点）：file:///Users/zhoujie195/midea-code/sema-vscode-extension/README.md
+13. 无 scheme：www.example.com 可点，localhost:4567 不可点
+14. 列表内：
+- http://localhost:4567
+- https://example.com/path/to/page
+15. 表格内：
+| 环境 | 地址 |
+|---|---|
+| 本地 | http://localhost:4567 |
+| 线上 | https://example.com |
+16. 代码块内（不应变成链接）：
+\`\`\`bash
+npm run dev
+# Local: http://localhost:4567
+# Docs: https://example.com/docs
+\`\`\`
+17. 文件路径对照：\`src/webview/chat/utils/markdown.ts:178\` 与 \`package.json\``,
+            },
+        },
+        {
+            id: nextId(),
+            type: 'assistant',
+            content: {
                 content: `**Layout 在 iiQWorks.PLC UNI 中指的是 VS（Visual Components / iiQWorks.Sim）的 3D 场景视图**，用于查看和操作虚拟设备模型。
 
 关键引用：

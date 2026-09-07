@@ -63,14 +63,15 @@
   flex-shrink: 0;
 }
 
-/* 链接前的站点图标：外网 https 为 favicon <img>，其余为 CSS mask 地球 */
+/* 链接前的站点图标：外网 https 为 favicon <img>，其余为 CSS mask 地球
+   尺寸跟随正文字号（12px 正文下为 12px），固定 13px 会高过字母而显得偏大 */
 .markdown-content .md-link-icon {
   display: inline-block;
-  width: 13px;
-  height: 13px;
+  width: 1em;
+  height: 1em;
   flex-shrink: 0;
   border-radius: 2px;
-  vertical-align: -2px;
+  vertical-align: -0.15em;
   margin-right: 0.25em;
 }
 
@@ -78,7 +79,8 @@
   background: currentColor;
   -webkit-mask: var(--md-globe-icon) no-repeat center / contain;
   mask: var(--md-globe-icon) no-repeat center / contain;
-  --md-globe-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='10'/%3E%3Cpath d='M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20'/%3E%3Cpath d='M2 12h20'/%3E%3C/svg%3E");
+  /* 线宽 1.75：12px 下 2 会显得粗 */
+  --md-globe-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='10'/%3E%3Cpath d='M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20'/%3E%3Cpath d='M2 12h20'/%3E%3C/svg%3E");
 }
 
 /* 代码块容器 - 承载右上角悬浮工具栏（自动换行开关 / 复制） */
@@ -245,7 +247,7 @@
   cursor: pointer;
 }
 
-/* 本地 loopback URL 链接样式 - 仅匹配 localhost / 127.0.0.1 / 0.0.0.0 / [::1]
+/* URL 链接样式 - 裸 http(s) 地址与 [text](url) 共用；本机/局域网地址由扩展端在 Simple Browser 打开，其余系统浏览器
    颜色与内联代码一致，仅用下划线区分，避免正文出现多种高亮色 */
 .markdown-content .md-url-link {
   color: var(--chat-text-symbol);
@@ -257,6 +259,13 @@
 
 .markdown-content .md-url-link:hover {
   text-decoration: underline;
+}
+
+/* 反引号内的 URL - 在链接样式之上保留内联代码底色与内边距，提示它来自 `...` 写法 */
+.markdown-content .md-url-code {
+  background: var(--chat-bg-hover);
+  padding: 0.1em 0.35em;
+  border-radius: var(--chat-radius-sm);
 }
 
 /* 本地路径链接 - [text](wiki/foo.md) 无 scheme 路径

@@ -9,6 +9,23 @@ import type { InputImageAttachment } from 'sema-core';
 
 const FILE_REFERENCE_QUOTE_REGEX = /[\s。，、；：！？""''「」『』（）《》〈〉【】,;!?]/;
 
+/**
+ * 本机 / 局域网 http(s) 地址：loopback、10/172.16-31/192.168 私网段、.localhost/.local/.internal 域
+ * 与 webview 侧 markdown.ts 的 isPrivateHost 同一套规则（两个 bundle 独立构建，各持一份）
+ */
+function isPrivateHttpUrl(url: string): boolean {
+    try {
+        const u = new URL(url);
+        if (u.protocol !== 'http:' && u.protocol !== 'https:') return false;
+        const h = u.hostname;
+        return h === 'localhost' || h === '127.0.0.1' || h === '0.0.0.0' || h === '[::1]' || h === '::1'
+            || h.endsWith('.localhost') || h.endsWith('.local') || h.endsWith('.internal')
+            || /^10\.\d+\.\d+\.\d+$/.test(h) || /^192\.168\.\d+\.\d+$/.test(h) || /^172\.(1[6-9]|2\d|3[01])\.\d+\.\d+$/.test(h);
+    } catch {
+        return false;
+    }
+}
+
 function escapeQuotedFileReferencePath(filePath: string): string {
     return filePath.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
 }
@@ -359,8 +376,25 @@ export class ChatWebviewProvider {
         }
     }
 
+    /**
+     * 打开聊天正文里的链接（对齐 webui openLink 的分流策略）：
+     * - 本机 / 局域网 http(s) 地址：VS Code 内置 Simple Browser 打开（dev server 预览留在编辑器内），命令不可用时回退系统浏览器
+     * - 其余（公网、file:// 等）：系统浏览器 / 系统默认程序
+     * 不做"能否内嵌"探测：有延迟且行为不可预期，Simple Browser 自带"在浏览器打开"按钮可兜底
+     */
     private openExternal(url: string): void {
         if (!url) return;
+        if (isPrivateHttpUrl(url)) {
+            Promise.resolve(vscode.commands.executeCommand('simpleBrowser.show', url)).catch((error) => {
+                console.warn('simpleBrowser.show failed, fallback to system browser:', error);
+                this.openInSystemBrowser(url);
+            });
+            return;
+        }
+        this.openInSystemBrowser(url);
+    }
+
+    private openInSystemBrowser(url: string): void {
         try {
             vscode.env.openExternal(vscode.Uri.parse(url));
         } catch (error) {

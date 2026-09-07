@@ -172,21 +172,29 @@ export function renderMarkdownToHtml(content: string, vscode?: any): string {
       }
     );
 
-    // 本地/局域网 URL 占位 - 仅支持裸 URL，host 限 loopback 与私网网段（10/172.16-31/192.168），与 isPrivateHost 一致
-    // 负向回顾排除 `](url)` 形式（markdown link 已在上一步提取，这里兜住文本含 ] 等未命中的残留）
+    // 裸 URL 占位 - 任意 host 的 http(s) 地址（本机 / 局域网 / 公网）及 GFM 风格的 www. 无 scheme 写法，
+    // 去向由扩展端 openExternal 分流：私网地址在 VS Code 内置 Simple Browser 打开，其余系统浏览器。
+    // 负向回顾排除 `](url)` 形式（markdown link 已在上一步提取，这里兜住文本含 ] 等未命中的残留）；
+    // www. 分支额外要求前面不是单词字符 / . / / / @ / -，避免命中 foo.www.bar、user@www.x 等片段。
+    // 字符类用排除法：空白、HTML/markdown 定界符、`*`（加粗闭合标记，如 **http://x/**）、
+    // 占位符 \x00，以及 CJK 区段（U+3000-303F 中文标点、U+4E00-9FFF 汉字、U+FF00-FFEF 全角标点），
+    // 兜住"打开http://localhost:3000查看"这类 URL 与中文无空格相连的写法，与 webui linkifyLocalUrls 一致。
+    // \u{...} 写法需要 u 标志
     processedContent = processedContent.replace(
-      /(?<!\]\()https?:\/\/(?:localhost|127\.0\.0\.1|0\.0\.0\.0|\[::1\]|10\.\d{1,3}\.\d{1,3}\.\d{1,3}|192\.168\.\d{1,3}\.\d{1,3}|172\.(?:1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3})(?::\d+)?(?:\/[^\s<>"'`)\]]*)?/gi,
+      /(?<!\]\()(?:https?:\/\/|(?<![\w./@-])www\.)[^\s<>"'`)\]*\x00\u{3000}-\u{303f}\u{4e00}-\u{9fff}\u{ff00}-\u{ffef}]+/giu,
       (match) => {
-        let url = match;
+        let text = match;
         let trailing = '';
-        const trailMatch = url.match(/[.,;:!?。，；！？、]+$/);
+        const trailMatch = text.match(/[.,;:!?]+$/);
         if (trailMatch) {
           trailing = trailMatch[0];
-          url = url.slice(0, -trailing.length);
+          text = text.slice(0, -trailing.length);
         }
+        // 显示原文，跳转用补全 scheme 后的地址（www. 写法补 http://）
+        const url = toHttpUrl(text);
         const safeUrl = escapeHtml(url);
         const placeholder = `\x00URL_${urlPlaceholders.length}\x00`;
-        urlPlaceholders.push(`<a class="md-url-link" data-url="${safeUrl}">${createLinkIconHtml(url)}${safeUrl}</a>`);
+        urlPlaceholders.push(`<a class="md-url-link" data-url="${safeUrl}" title="${safeUrl}">${createLinkIconHtml(url)}${escapeHtml(text)}</a>`);
         return placeholder + trailing;
       }
     );
@@ -481,9 +489,18 @@ function escapeHtml(text: string): string {
 }
 
 /**
- * 创建内联代码HTML，如果是文件路径格式则添加点击事件
+ * 创建内联代码HTML，如果是文件路径格式则添加点击事件；反引号内的 http(s) 地址渲染为可点链接
  */
 function createInlineCodeHtml(originalCode: string, escapedCode: string, vscode?: any): string {
+  // 反引号内的 URL（模型常写成 `http://localhost:3000`，也含 `www.x.com` 写法）：与裸 URL 同一套 md-url-link 点击/跳转逻辑，
+  // 附加 md-url-code 保留代码底色。内联代码在步骤 2/3 已整体抽走，步骤 3.6 的裸 URL 识别看不到它，需在此单独处理。
+  // 与裸 URL 一样仅在非流式（vscode 已传入）阶段生效，流式阶段保持纯内联代码
+  if (vscode && /^(?:https?:\/\/|www\.)\S+$/i.test(originalCode)) {
+    const url = toHttpUrl(originalCode);
+    const safeUrl = escapeHtml(url);
+    return `<a class="md-url-link md-url-code" data-url="${safeUrl}" title="${safeUrl}">${createLinkIconHtml(url)}${escapedCode}</a>`;
+  }
+
   // 仅在 vscode 可用（非流式）时检测并发起文件路径校验；流式阶段一律按纯内联代码渲染，等结束后再走完整逻辑
   if (vscode && isPotentialFilePath(originalCode)) {
     const { filePath, lineInfo } = parseFilePath(originalCode);
@@ -504,6 +521,13 @@ function createInlineCodeHtml(originalCode: string, escapedCode: string, vscode?
   }
 
   return `<code class="inline-code">${escapedCode}</code>`;
+}
+
+/**
+ * 补全 scheme：www. 无 scheme 写法补 http://（与 GFM 自动链接的处理一致），其余原样返回
+ */
+function toHttpUrl(raw: string): string {
+  return /^www\./i.test(raw) ? `http://${raw}` : raw;
 }
 
 /**
@@ -626,7 +650,7 @@ export function hasMarkdownFormatting(content: string): boolean {
     /<img\b[^>]*?>/i,          // 原始 <img> 标签
     /\[[^\]]+\]\((?:https?|file):\/\/[^)\s]+\)/, // markdown 链接
     /\[[^\]]+\]\((?![a-zA-Z][a-zA-Z0-9+.\-]+:)(?=[^)\s]*[/.])[^)\s#][^)\s]*\)/, // 本地路径链接
-    /https?:\/\/(?:localhost|127\.0\.0\.1|0\.0\.0\.0|\[::1\]|10\.\d{1,3}\.\d{1,3}\.\d{1,3}|192\.168\.\d{1,3}\.\d{1,3}|172\.(?:1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3})/i, // 本地/局域网 URL
+    /(?:https?:\/\/|(?<![\w./@-])www\.)\S+/i, // 裸 URL（任意 host / www. 写法，与步骤 3.6 一致）
     /\$\$[\s\S]+?\$\$/,    // 块级公式
     /(?<![\\$])\$(?!\s)[^\n$]+?(?<!\s)\$(?!\d)/, // 行内公式
     /^\s{0,3}>\s/m,        // 引用块（要求 > 后有空格，避开 >>> 等误判）
