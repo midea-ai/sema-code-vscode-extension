@@ -5,6 +5,7 @@ import {
     TOOL_NAME_SEARCH_FILES,
     TOOL_NAME_VIEW_FILE,
 } from '../../../utils/tool';
+import { isMcpToolType, parseMcpToolName } from './permissionUtils';
 
 export type RenderItem =
     | { kind: 'message'; message: Message; originalIndex: number }
@@ -108,13 +109,40 @@ export const getGroupableToolKind = (message: Message): string | null => {
     return null;
 };
 
-const isGroupableToolMessage = (message: Message): boolean => {
+/** 消息所属 MCP 服务名；非 MCP 工具返回 null */
+export const getMcpServerName = (message: Message): string | null => {
     if (message.type !== 'tool') {
-        return false;
+        return null;
     }
 
     const toolName = getToolName(message);
-    return GROUPABLE_TOOL_NAMES.has(toolName) || getGroupableToolKind(message) !== null;
+    if (!isMcpToolType(toolName)) {
+        return null;
+    }
+
+    return parseMcpToolName(toolName).mcpName || null;
+};
+
+/**
+ * 可分组消息的 run key：相邻消息 key 相同才会合并进同一组。
+ * 探索类工具统一为 'explore'，MCP 工具按服务名区分为 'mcp:<服务名>'。
+ */
+const getRunKey = (message: Message): string | null => {
+    if (message.type !== 'tool') {
+        return null;
+    }
+
+    const mcpServerName = getMcpServerName(message);
+    if (mcpServerName) {
+        return `mcp:${mcpServerName}`;
+    }
+
+    const toolName = getToolName(message);
+    if (GROUPABLE_TOOL_NAMES.has(toolName) || getGroupableToolKind(message) !== null) {
+        return 'explore';
+    }
+
+    return null;
 };
 
 const isStreamingToolMessage = (message: Message, streamingToolId?: string | null): boolean => {
@@ -175,9 +203,17 @@ export const groupMessages = (
 ): RenderItem[] => {
     const items: RenderItem[] = [];
     let run: RunItem[] = [];
+    let runKey: string | null = null;
 
     messages.forEach((message, index) => {
-        if (isGroupableToolMessage(message)) {
+        const key = getRunKey(message);
+        if (key !== null) {
+            // 相邻但 key 不同（如 explore → mcp:xxx，或不同 MCP 服务）时先切段
+            if (runKey !== null && runKey !== key) {
+                flushRun(items, run, options.streamingToolId);
+                run = [];
+            }
+            runKey = key;
             run.push({ message, index });
             return;
         }
@@ -188,6 +224,7 @@ export const groupMessages = (
 
         flushRun(items, run, options.streamingToolId);
         run = [];
+        runKey = null;
         items.push({ kind: 'message', message, originalIndex: index });
     });
 

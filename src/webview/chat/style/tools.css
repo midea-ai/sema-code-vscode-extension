@@ -44,8 +44,9 @@
     display: flex;
 }
 
-/* “Explored N tools” 折叠图标始终显示 */
-.grouped-tool-block > .grouped-tool-header .grouped-tool-toggle-btn {
+/* “Explored N tools” / “Called xxx N times” 折叠图标始终显示 */
+.grouped-tool-block > .grouped-tool-header .grouped-tool-toggle-btn,
+.grouped-mcp-header .grouped-tool-toggle-btn {
     display: flex;
 }
 

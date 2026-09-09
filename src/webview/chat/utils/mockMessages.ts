@@ -131,6 +131,45 @@ export const mockMessageMap: Record<string, Message[]> = {
         },
     ],
 
+    // 同一 MCP 服务的连续调用会被 groupMessages 合并为 "Called github 3 times" 一组
+    McpToolGroup: [
+        {
+            id: nextId(),
+            type: 'tool',
+            toolName: 'mcp__github__search_repositories',
+            content: {
+                toolId: 'mcp-group-1',
+                toolName: 'mcp__github__search_repositories',
+                title: 'query: sema-code',
+                summary: '2 repositories found',
+                content: 'sema-code/vscode-extension ⭐ 128\nsema-code/cli ⭐ 56',
+            },
+        },
+        {
+            id: nextId(),
+            type: 'tool',
+            toolName: 'mcp__github__get_file_contents',
+            content: {
+                toolId: 'mcp-group-2',
+                toolName: 'mcp__github__get_file_contents',
+                title: 'sema-code/cli/README.md',
+                content: '# sema-code cli\n\nCommand line interface for sema-code.',
+            },
+        },
+        {
+            id: nextId(),
+            type: 'tool',
+            toolName: 'mcp__github__list_issues',
+            content: {
+                toolId: 'mcp-group-3',
+                toolName: 'mcp__github__list_issues',
+                title: 'sema-code/cli state:open',
+                summary: '3 issues found',
+                content: '#12 Support Windows paths\n#15 Add --json output\n#18 Improve error messages',
+            },
+        },
+    ],
+
     BackgroundJob: [
         {
             id: nextId(),
