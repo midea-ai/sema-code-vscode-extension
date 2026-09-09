@@ -89,10 +89,13 @@ const ChatSession: React.FC<ChatSessionProps> = ({ vscode: rawVscode, sessionId,
     const [modelInfoLoaded, setModelInfoLoaded] = useState<boolean>(false);
     /** 用户主动关闭/点开配置后临时隐藏；模型列表一旦非空再变空会重新显示 */
     const [modelReminderDismissed, setModelReminderDismissed] = useState<boolean>(false);
-    /** updateModelInfo / modelUpdate 两条通道统一入口：列表非空时复位关闭标记 */
+    /**
+     * updateModelInfo（会话级，带本会话生效模型名）/ modelUpdate（进程级，只带模型列表）统一入口。
+     * 模型是会话级的：name 为 undefined 时保留当前会话模型名不动，只更新列表；列表非空时复位关闭标记。
+     */
     const applyModelInfo = (name: string | undefined, list: string[] | undefined) => {
         const models = Array.isArray(list) ? list : [];
-        setModelName(name || '');
+        if (name !== undefined) setModelName(name || '');
         setAvailableModels(models);
         setModelInfoLoaded(true);
         if (models.length > 0) setModelReminderDismissed(false);
@@ -305,8 +308,9 @@ const ChatSession: React.FC<ChatSessionProps> = ({ vscode: rawVscode, sessionId,
                     applyModelInfo(message.modelName, message.availableModels);
                     break;
                 case 'modelUpdate':
+                    // 进程级：data.modelName 是全局主模型指针，不是本会话生效模型，这里只取列表
                     if (message.data) {
-                        applyModelInfo(message.data.modelName, message.data.modelList);
+                        applyModelInfo(undefined, message.data.modelList);
                     }
                     break;
                 case 'toolPermissionRequest':

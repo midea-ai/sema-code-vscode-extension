@@ -31,7 +31,7 @@ import {
     Usage
 } from 'sema-core/event';
 import { MAIN_AGENT_ID } from 'sema-core/types';
-import type { TaskListItem, AgentMode, PermissionLevel } from 'sema-core/types';
+import type { TaskListItem, AgentMode, PermissionLevel, ModelUpdateData } from 'sema-core/types';
 import type { InputImageAttachment } from 'sema-core';
 
 // core 未顶层导出 InputSource，从事件数据类型推导
@@ -111,6 +111,8 @@ export class SemaSessionWrapper {
     private pendingAutoPermissions: Map<string, string> = new Map(); // toolId → content
     private _agentMode: AgentMode;
     private _permissionLevel: PermissionLevel;
+    /** 本会话实际生效的主模型名；只由 core 的会话级 model:update 事件与 refreshModelInfo 赋值，不手写 */
+    private _modelName: string = '';
     private lastUsage: Usage | null = null;
     private lastTodos: any[] = [];
 
@@ -194,6 +196,36 @@ export class SemaSessionWrapper {
     public updatePermissionLevel(level: PermissionLevel): void {
         this._permissionLevel = level;
         this.session.updatePermissionLevel(level);
+    }
+
+    // ─── 模型（会话级）──────────────────────────────────────────────────────────
+    // 会话在 core 创建时钉住当时的全局主模型，之后只受本会话 switchModel 影响（全局指针再变也不跟）。
+    // 这里只发命令、不改显示：前端看到的模型名全部来自 core 事件或 refreshModelInfo 的拉取结果。
+    // 写全局默认由调用方另调 processWrapper.switchModel（输入框切换 = 本会话 + 全局）。
+
+    /** 切换本会话钉住的主模型（不落盘）。显示由 core 的会话级 model:update 事件驱动 */
+    public async switchModel(modelName: string): Promise<void> {
+        await this.session.switchModel(modelName);
+    }
+
+    /**
+     * 从 core 拉取本会话生效模型；默认只在变化时推前端，
+     * force 用于视图挂载回放（core 钉住模型时不发事件，首屏必须主动拉一次）。
+     */
+    public async refreshModelInfo(force: boolean = false): Promise<void> {
+        try {
+            this.applyModelData(await this.session.getModelData(), force);
+        } catch (error) {
+            console.error(`[${this.sessionId}] 获取会话模型信息失败:`, error);
+        }
+    }
+
+    private applyModelData(data: ModelUpdateData | undefined, force: boolean = false): void {
+        if (!data) return;
+        const name = data.modelName || '';
+        if (!force && name === this._modelName) return;
+        this._modelName = name;
+        this.post({ type: 'updateModelInfo', modelName: name, availableModels: data.modelList || [] });
     }
 
     public watchTask(taskId: string, onDelta: (delta: string) => void): () => void {
@@ -844,6 +876,10 @@ export class SemaSessionWrapper {
         this.session.on<PermissionLevelUpdateData>('permissionLevel:update', (data) => {
             this._permissionLevel = data.level;
             this.post({ type: 'permissionLevelUpdate', level: data.level });
+        });
+        // 会话级模型变化（本会话 switchModel、或被钉住的模型被删除后回退全局），core 只在生效模型变化时发
+        this.session.on<ModelUpdateData>('model:update', (data) => {
+            this.applyModelData(data);
         });
     }
 

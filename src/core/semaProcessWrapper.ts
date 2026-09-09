@@ -43,9 +43,12 @@ function toCoreSystemConfig(config: Record<string, any>): UpdatableCoreConfig {
     return coreConfig as UpdatableCoreConfig;
 }
 
+/** 触发全局模型数据变化的操作；switchModel / applyTaskModel 会改全局主模型指针，需同步到活跃会话 */
+export type ModelUpdateOrigin = 'addModel' | 'deleteModel' | 'switchModel' | 'applyTaskModel';
+
 export interface ProcessWrapperCallbacks {
-    /** 模型配置变化（addModel / switchModel 等触发） */
-    onModelUpdate?: (data: ModelUpdateData) => void;
+    /** 模型配置变化（addModel / switchModel 等触发），origin 标明来源 */
+    onModelUpdate?: (data: ModelUpdateData, origin: ModelUpdateOrigin) => void;
     /** 配置页任务面板请求查看子代理详情，sessionId 为任务所属会话 */
     onOpenAgentDetail?: (taskId: string, sessionId?: string) => void;
 }
@@ -125,25 +128,26 @@ export class SemaProcessWrapper {
 
     public async addModel(config: ModelConfig, skipValidation?: boolean): Promise<ModelUpdateData> {
         const result = await this.semaCore.addModel(config, skipValidation);
-        this.callbacks.onModelUpdate?.(result);
+        this.callbacks.onModelUpdate?.(result, 'addModel');
         return result;
     }
 
     public async deleteModel(modelName: string): Promise<ModelUpdateData> {
         const result = await this.semaCore.delModel(modelName);
-        this.callbacks.onModelUpdate?.(result);
+        this.callbacks.onModelUpdate?.(result, 'deleteModel');
         return result;
     }
 
+    /** 切换全局主模型指针（新建/加载会话的默认值）；已打开会话各自钉住创建时的模型，不受影响 */
     public async switchModel(modelName: string): Promise<ModelUpdateData> {
         const result = await this.semaCore.switchModel(modelName);
-        this.callbacks.onModelUpdate?.(result);
+        this.callbacks.onModelUpdate?.(result, 'switchModel');
         return result;
     }
 
     public async applyTaskModel(config: TaskConfig): Promise<ModelUpdateData> {
         const result = await this.semaCore.applyTaskModel(config);
-        this.callbacks.onModelUpdate?.(result);
+        this.callbacks.onModelUpdate?.(result, 'applyTaskModel');
         return result;
     }
 

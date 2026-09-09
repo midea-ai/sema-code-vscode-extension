@@ -34,6 +34,11 @@ export class Controller {
     private eventBuffer = new Map<string, Array<{ event: string; data: any }>>();
     /** 会话历史存档防抖定时器（对齐 semaSidebarProvider.saveSessionTimers，300ms）。 */
     private saveTimers = new Map<string, ReturnType<typeof setTimeout>>();
+    /**
+     * 最近一次看到的全局模型数据（主模型指针 + 列表）。桥广播的 model:update 不带来源，
+     * 靠它判断"全局主模型指针是否变化、是否由删模型引起"，对齐 VSCode handleModelUpdate 的 origin 分支。
+     */
+    private lastGlobalModel: { main: string; list: string[] } | null = null;
 
     constructor(private t: Transport, private postToApp: (msg: any) => void) {
         this.core = new RemoteCore(t);
@@ -60,9 +65,35 @@ export class Controller {
      */
     private onProcessEvent(event: string, data: any): void {
         switch (event) {
-            case 'model:update': this.postToApp({ type: 'modelUpdate', data }); break;
+            case 'model:update': this.handleGlobalModelUpdate(data); break;
             default: break;
         }
+    }
+
+    /**
+     * 全局模型数据变化（对齐 VSCode semaSidebarProvider.handleModelUpdate）。
+     * 前端 modelUpdate 只更新列表；各会话显示的模型名由会话级事件/拉取决定：
+     * 1. 全局主模型指针变化只同步到活跃会话，其他已打开会话保持各自钉住的模型。
+     *    广播不带来源，用前后对比判断：旧 main 已不在新列表说明是删模型引起的指针漂移，不同步，
+     *    避免把钉在其他模型上的活跃会话切走（core 已对受影响会话发会话级 model:update）。
+     * 2. 之后对所有打开会话重新拉取生效模型，覆盖 core 不发会话级事件的场景（未钉住会话跟随全局等）。
+     */
+    private handleGlobalModelUpdate(data: any): void {
+        this.postToApp({ type: 'modelUpdate', data });
+
+        const prev = this.lastGlobalModel;
+        const next = { main: data?.modelName || '', list: Array.isArray(data?.modelList) ? data.modelList as string[] : [] };
+        this.lastGlobalModel = next;
+        const mainChanged = !!prev && prev.main !== next.main;
+        const causedByDelete = !!prev && !!prev.main && !next.list.includes(prev.main);
+
+        const active = this.activeSessionId ? this.sessions.get(this.activeSessionId) : undefined;
+        const syncActive = mainChanged && !causedByDelete && active && next.main
+            ? active.wrapper.switchModel(next.main).catch(() => {})
+            : Promise.resolve();
+        void syncActive.then(() => {
+            for (const { wrapper } of this.sessions.values()) void wrapper.refreshModelInfo();
+        });
     }
 
     /** 所有会话共用一份回调（对齐 semaSidebarProvider.sessionCallbacks）。 */
@@ -133,9 +164,10 @@ export class Controller {
             case 'updateAgentMode': this.sessions.get(sid ?? '')?.wrapper.updateAgentMode(msg.mode); break;
             case 'updatePermissionLevel': this.sessions.get(sid ?? '')?.wrapper.updatePermissionLevel(msg.level); break;
 
-            case 'requestModelInfo': await this.sendModelInfo(); break;
+            // 模型显示是会话级的（对齐 chatWebview）；切换 = 本会话 + 全局默认，其他已打开会话不动
+            case 'requestModelInfo': await this.sessions.get(sid ?? '')?.wrapper.refreshModelInfo(true); break;
             case 'requestSystemConfig': void this.sendSystemConfig(); break;
-            case 'switchModel': await this.core.switchModel(msg.modelName).catch(() => {}); break;
+            case 'switchModel': await this.switchSessionModel(sid, msg.modelName); break;
             case 'requestCommands': void this.sendCommands(); break;
             case 'requestSkills': void this.sendSkills(); break;
             case 'requestAgents': void this.sendAgents(); break;
@@ -182,6 +214,11 @@ export class Controller {
         if (this.initialized) return;
         await this.core.init({});
         this.initialized = true;
+        // 记一份全局模型基线，供 handleGlobalModelUpdate 判断主模型指针是否变化；失败不影响初始化
+        try {
+            const d = await this.core.getModelData();
+            this.lastGlobalModel = { main: d?.modelName || '', list: Array.isArray(d?.modelList) ? d.modelList : [] };
+        } catch { /* ignore */ }
     }
 
     /**
@@ -405,12 +442,19 @@ export class Controller {
         this.reportState();
     }
 
-    private async sendModelInfo(): Promise<void> {
+    /**
+     * 输入框切换主模型（对齐 chatWebview.switchModel）= 改本会话 + 写全局默认，其他已打开会话各自钉住不受影响。
+     * 先会话级（显示由 core 会话级 model:update 驱动），再全局（落盘并由桥广播进程级 model:update，
+     * 配置页据此刷新；handleGlobalModelUpdate 同步活跃会话到同一模型，core 去重不重发）。
+     */
+    private async switchSessionModel(sid: string | undefined, modelName: string): Promise<void> {
+        const entry = sid ? this.sessions.get(sid) : undefined;
+        if (!entry) return;
         try {
-            const d = await this.core.getModelData();
-            this.postToApp({ type: 'updateModelInfo', modelName: d?.modelName || '', availableModels: d?.modelList || [] });
+            await entry.wrapper.switchModel(modelName);
+            await this.core.switchModel(modelName);
         } catch (e: any) {
-            this.postToApp({ type: 'error', message: `获取模型信息失败: ${e?.message || ''}` });
+            this.postToApp({ type: 'error', sessionId: sid, message: `切换模型失败: ${e?.message || ''}` });
         }
     }
 

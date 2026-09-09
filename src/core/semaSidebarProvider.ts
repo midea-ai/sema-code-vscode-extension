@@ -2,7 +2,7 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 import * as os from 'os';
 import type { SemaSession } from 'sema-core';
-import type { AgentMode } from 'sema-core/types';
+import type { AgentMode, ModelUpdateData } from 'sema-core/types';
 
 import { SessionHistoryManager } from '../managers/SessionHistoryManager';
 import { FileStateDiffManager } from '../managers/FileStateDiffManager';
@@ -11,7 +11,7 @@ import { SystemConfigManager } from '../managers/SystemConfigManager';
 import { ChatWebviewProvider } from '../webview/chat/chatWebview';
 import { ConfigWebviewProvider } from '../webview/config/configWebview';
 import { SessionHistoryWebviewProvider } from '../webview/sessionHistory/sessionHistoryWebview';
-import { SemaProcessWrapper, MAX_SESSIONS } from './semaProcessWrapper';
+import { SemaProcessWrapper, MAX_SESSIONS, ModelUpdateOrigin } from './semaProcessWrapper';
 import { SemaSessionWrapper, SessionWrapperCallbacks, Message, PermissionLevel } from './semaSessionWrapper';
 import { ClawCoordinator } from '../claw/coordinator';
 import { CLAW_SESSION_ID } from '../claw/paths';
@@ -483,9 +483,27 @@ export class SemaSidebarProvider implements vscode.WebviewViewProvider {
         this.chatWebviewProvider?.postMessage(msg);
     };
 
-    private handleModelUpdate = (data: any): void => {
+    /**
+     * 全局模型数据变化的回调（配置页增删模型/启用/任务配置，以及输入框切换写全局那一步）。
+     * 前端的 modelUpdate 只更新模型列表，各会话显示的模型名一律由会话级事件/拉取决定：
+     * 1. 全局主模型指针变化（switchModel / applyTaskModel）只同步到当前活跃会话，其他已打开会话保持各自钉住的模型
+     *    （输入框切换时本会话已先钉到同一模型，core 去重不重发事件）；
+     * 2. 之后对所有打开会话重新拉取生效模型，覆盖 core 不发会话级事件的场景（未钉住会话跟随全局、首个模型加入等）。
+     */
+    private handleModelUpdate = (data: ModelUpdateData, origin: ModelUpdateOrigin): void => {
         this.chatWebviewProvider.postMessage({ type: 'modelUpdate', data });
         this.configWebviewProvider.refreshConfigPage();
+
+        const active = this.activeSessionId ? this.sessions.get(this.activeSessionId) : undefined;
+        const globalMainChanged = origin === 'switchModel' || origin === 'applyTaskModel';
+        const syncActive = globalMainChanged && active && data.modelName
+            ? active.switchModel(data.modelName).catch(error => console.error('同步全局主模型到活跃会话失败:', error))
+            : Promise.resolve();
+        void syncActive.then(() => {
+            for (const wrapper of this.sessions.values()) {
+                void wrapper.refreshModelInfo();
+            }
+        });
     };
 
     private handleStateChange = (sessionId: string, state: 'idle' | 'processing'): void => {

@@ -49,6 +49,11 @@ export class RemoteSession {
     stopAllTasks(): Promise<number> { return this.t.call('stopAllTasks', undefined, this.sessionId); }
     // 子 agent 转后台（D4，会话级）。
     transferAgentToBackground(taskId: string): Promise<{ ok: boolean }> { return this.t.call('transferAgentToBackground', { taskId }, this.sessionId); }
+
+    // ── 会话级模型（桥按 session_id 路由到 SemaSession.switchModel / getModelData；空 sessionId 才是全局）──
+    // 切换只钉本会话主模型，成功后 core 在本会话发 model:update（SessionBinder 按 sessionId 帧下发到 emit）。
+    switchModel(modelName: string): Promise<any> { return this.t.call('switchModel', { modelName }, this.sessionId); }
+    getModelData(): Promise<any> { return this.t.call('getModelData', undefined, this.sessionId); }
 }
 
 /** 远程 SemaCore 代理。 */
@@ -56,7 +61,9 @@ export class RemoteCore {
     constructor(private t: Transport) {}
 
     init(config: any = {}): Promise<any> { return this.t.call('init', config, ''); }
+    /** 全局视角：modelName 为全局主模型指针（新会话默认值），会话实际生效模型用 RemoteSession.getModelData */
     getModelData(): Promise<any> { return this.t.call('getModelData', undefined, ''); }
+    /** 切换全局主模型指针，已打开会话各自钉住不受影响（配置页用；聊天页走 RemoteSession.switchModel） */
     switchModel(modelName: string): Promise<any> { return this.t.call('switchModel', { modelName }, ''); }
     closeSession(sessionId: string): void { void this.t.call('closeSession', undefined, sessionId); }
 

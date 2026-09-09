@@ -89,14 +89,15 @@ export class ChatWebviewProvider {
                 updateAgentMode: () => this.sessionController.getSessionWrapper(sid!)?.updateAgentMode(msg.mode),
                 updatePermissionLevel: () => this.sessionController.getSessionWrapper(sid!)?.updatePermissionLevel(msg.level),
                 transferAgentToBackground: () => { this.sessionController.getSessionWrapper(sid!)?.transferAgentToBackground(msg.taskId); },
+                // 模型显示是会话级的（来自 core 会话级事件/拉取）；切换 = 本会话 + 全局默认，其他已打开会话不动
+                requestModelInfo: () => this.sessionController.getSessionWrapper(sid!)?.refreshModelInfo(true),
+                switchModel: () => this.switchModel(sid, msg.modelName),
 
                 // ── 进程级 / 工具类 ──
                 openConfig: () => this.onOpenConfig(msg.page, msg.taskId),
                 openFile: () => this.fileOperationManager.openFileAtLine(msg.filePath, msg.line, msg.endLine),
                 requestWorkspaceFiles: () => this.sendWorkspaceFiles(msg.reqId),
                 searchWorkspaceFiles: () => this.searchWorkspaceFiles(msg.query || '', msg.reqId),
-                requestModelInfo: () => this.sendModelInfo(),
-                switchModel: () => this.switchModel(msg.modelName),
                 restoreFromSnapshots: () => this.restoreFromSnapshots(sid, msg.filePaths),
                 restoreFromSnapshot: () => this.restoreFromSnapshot(sid, msg.filePath),
                 getForkPreview: () => this.handleGetForkPreview(sid, msg.uuid, msg.reqId),
@@ -247,21 +248,16 @@ export class ChatWebviewProvider {
         }
     }
 
-    private async sendModelInfo(): Promise<void> {
+    /**
+     * 输入框切换主模型 = 改本会话 + 写全局默认（新建/加载会话取全局），其他已打开会话各自钉住不受影响。
+     * 先会话级（本会话立即生效，显示由 core 会话级 model:update 驱动），再全局
+     * （落 model.conf，经 onModelUpdate 回调刷新配置页与模型列表；活跃会话同步到同一模型，core 去重不重发）。
+     */
+    private async switchModel(sessionId: string | undefined, modelName: string): Promise<void> {
+        const wrapper = sessionId ? this.sessionController.getSessionWrapper(sessionId) : undefined;
+        if (!wrapper) return;
         try {
-            const modelData = await this.processWrapper.getModelData();
-            this.postMessage({
-                type: 'updateModelInfo',
-                modelName: modelData.modelName || '',
-                availableModels: modelData.modelList || []
-            });
-        } catch (error) {
-            this.postMessage({ type: 'error', message: `获取模型信息失败: ${error instanceof Error ? error.message : '未知错误'}` });
-        }
-    }
-
-    private async switchModel(modelName: string): Promise<void> {
-        try {
+            await wrapper.switchModel(modelName);
             await this.processWrapper.switchModel(modelName);
         } catch (error) {
             this.postMessage({ type: 'error', message: `切换模型失败: ${error instanceof Error ? error.message : '未知错误'}` });

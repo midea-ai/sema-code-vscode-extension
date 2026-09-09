@@ -4,7 +4,7 @@ import { VscodeApi } from '../../../types';
 export interface UseModelMenuReturn {
     showModelMenu: boolean;
     isModelLoading: boolean;
-    currentModel: string; // 返回当前模型（可能是临时的）
+    currentModel: string; // 本会话当前生效的模型（来自后端事件，不做本地乐观更新）
     setShowModelMenu: (show: boolean) => void;
     handleToggleModelMenu: () => void;
     handleModelSwitch: (model: string) => void;
@@ -13,6 +13,8 @@ export interface UseModelMenuReturn {
 
 /**
  * 模型菜单管理 Hook
+ * 切换只发 switchModel 命令（ChatSession 自动补 sessionId），后端改本会话并写全局默认，其他已打开会话不动；
+ * 显示值等后端按 core 会话级 model:update 推回的 updateModelInfo，切换失败时显示自然保持不变。
  */
 export const useModelMenu = (
     vscode: VscodeApi,
@@ -23,12 +25,6 @@ export const useModelMenu = (
 ): UseModelMenuReturn => {
     const [showModelMenu, setShowModelMenu] = useState<boolean>(false);
     const [isModelLoading, setIsModelLoading] = useState<boolean>(true);
-    const [localModel, setLocalModel] = useState<string>(modelName); // 本地状态
-
-    // 监听外部传入的模型名称变化
-    useEffect(() => {
-        setLocalModel(modelName);
-    }, [modelName]);
 
     // 监听模型名称变化，更新加载状态
     useEffect(() => {
@@ -68,21 +64,18 @@ export const useModelMenu = (
     };
 
     const handleModelSwitch = (model: string) => {
-        if (model === localModel) {
+        if (model === modelName) {
             // 点击当前模型，不做任何操作
             setShowModelMenu(false);
             return;
         }
 
-        // 立即更新本地显示的值
-        setLocalModel(model);
-        
-        // 发送消息给 VSCode 进行实际切换
+        // 只发命令：后端改本会话并写全局默认，显示由后端事件回推
         vscode.postMessage({
             type: 'switchModel',
             modelName: model
         });
-        
+
         setShowModelMenu(false);
     };
 
@@ -96,7 +89,7 @@ export const useModelMenu = (
     return {
         showModelMenu,
         isModelLoading,
-        currentModel: localModel, // 返回本地状态
+        currentModel: modelName,
         setShowModelMenu,
         handleToggleModelMenu,
         handleModelSwitch,
