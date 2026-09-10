@@ -10,6 +10,7 @@ import {
     ApiTestParams,
     ApiTestResult,
     ModelUpdateData,
+    ModelProfile,
     UpdatableCoreConfig,
     ToolInfo,
     MarketplacePluginsInfo,
@@ -165,6 +166,11 @@ export class SemaProcessWrapper {
 
     public getModelAdapter(provider: string, modelName: string, baseURL: string): string | undefined {
         return this.semaCore.getModelAdapter(provider, modelName, baseURL);
+    }
+
+    /** 按 (provider, modelName) 取单个模型的完整落盘配置（含明文 apiKey），配置页编辑模型时回填表单用 */
+    public getModelProfile(provider: string, modelName: string): ModelProfile | null {
+        return this.semaCore.getModelProfile(provider, modelName);
     }
 
     /** 删除单个会话在 ~/.sema/history 下的历史文件（会话从历史列表删除时同步清理） */

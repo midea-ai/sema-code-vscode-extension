@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { VscodeApi } from './types';
+import { ModelProfile, ThinkingHistoryPolicy, VscodeApi } from './types';
 import ProviderLogo from '../common/ProviderLogo';
 import IconSelect from './IconSelect';
 import { OpenIcon } from './utils/svgIcons';
@@ -26,6 +26,12 @@ const formatTokenCount = (val: number): string => {
 
 interface AddModelFormProps {
     onSuccess: () => void;
+    /** 编辑模式下点「取消」：由 App 清空编辑目标并回到列表 */
+    onCancelEdit: () => void;
+    /** 非空即编辑模式：按其回填并锁住 provider/模型名；变为空时表单重置为空白新增态 */
+    editModel: ModelProfile | null;
+    /** 每次进入编辑递增，保证连续编辑同一模型也能重新回填 */
+    editNonce: number;
     vscode: VscodeApi;
 }
 
@@ -58,12 +64,25 @@ const validateCustomProviderName = (name: string): string | null => {
     return null;
 };
 
-const AddModelForm: React.FC<AddModelFormProps> = ({ onSuccess, vscode }) => {
+/** 历史思考回传策略选项；core 旧配置缺省即 preserve */
+const DEFAULT_THINKING_HISTORY_POLICY: ThinkingHistoryPolicy = 'preserve';
+const THINKING_HISTORY_POLICY_OPTIONS: { value: ThinkingHistoryPolicy; label: string }[] = [
+    { value: 'preserve', label: '全部保留' },
+    { value: 'current_turn', label: '仅保留当前轮' },
+    { value: 'omit', label: '不保留' }
+];
+
+/** 预设服务商 key 是否可直接在下拉里选中（custom 走别名分支） */
+const isPresetProvider = (key: string) => key !== 'custom' && PROVIDER_ORDER.includes(key) && !!defaultModelProvider[key];
+
+const AddModelForm: React.FC<AddModelFormProps> = ({ onSuccess, onCancelEdit, editModel, editNonce, vscode }) => {
+    const isEditing = editModel !== null;
     const [provider, setProvider] = useState(DEFAULT_PROVIDER);
     const [customProviderName, setCustomProviderName] = useState(DEFAULT_PROVIDER === 'custom' ? 'custom' : '');
     const [baseURL, setBaseURL] = useState(defaultModelProvider[DEFAULT_PROVIDER].baseURL);
     const [apiKey, setApiKey] = useState('');
     const [adapt, setAdapt] = useState<AdapterType>(defaultModelProvider[DEFAULT_PROVIDER].defaultAdapt ?? 'openai');
+    const [thinkingHistoryPolicy, setThinkingHistoryPolicy] = useState<ThinkingHistoryPolicy>(DEFAULT_THINKING_HISTORY_POLICY);
     const [modelName, setModelName] = useState('');
     const [maxTokens, setMaxTokens] = useState(String(DEFAULT_MAX_TOKENS));
     const [selectedModelMaxTokens, setSelectedModelMaxTokens] = useState<number | null>(null);
@@ -198,7 +217,48 @@ const AddModelForm: React.FC<AddModelFormProps> = ({ onSuccess, vscode }) => {
         setSelectedModelMaxTokens(null);
         setContextLength(String(defaults.defaultContextLength ?? DEFAULT_CONTEXT_LENGTH));
         setAdapt(defaults.defaultAdapt ?? 'openai');
+        setThinkingHistoryPolicy(DEFAULT_THINKING_HISTORY_POLICY);
     };
+
+    /**
+     * 编辑目标变化：非空按落盘配置回填（模型名走手动输入分支，避免依赖「获取模型」），
+     * 变为空时整表重置为默认值——同页内点「新增模型」标签退出编辑后，不能把回填的 apiKey/baseURL
+     * 留在一个已解锁的表单里，否则用户以为在编辑，提交却新增了一条。
+     */
+    useEffect(() => {
+        if (!editModel) {
+            handleProviderChange(DEFAULT_PROVIDER);
+            return;
+        }
+        const preset = isPresetProvider(editModel.provider);
+        setProvider(preset ? editModel.provider : 'custom');
+        setCustomProviderName(preset ? '' : editModel.provider);
+        setBaseURL(editModel.baseURL ?? '');
+        setApiKey(editModel.apiKey ?? '');
+        setAdapt(editModel.adapt ?? 'openai');
+        setThinkingHistoryPolicy(editModel.thinkingHistoryPolicy ?? DEFAULT_THINKING_HISTORY_POLICY);
+        setIsManualInput(true);
+        setModelName(editModel.modelName);
+        setAvailableModels([]);
+        setSelectedModel('');
+        setModelDocUrls({});
+        setSelectedModelMaxTokens(null);
+        setMaxTokens(String(editModel.maxTokens));
+        setContextLength(String(editModel.contextLength));
+        setShowPassword(false);
+        setConnectionTested(false);
+        setConnectionSuccess(false);
+        setTestStatus({ message: '', type: '' });
+        setMessage({ text: '', type: '' });
+        setLastFetchedConfig({ baseURL: '', apiKey: '' });
+        setFetchModelsFailed(false);
+    }, [editModel, editNonce]);
+
+    /** 编辑模式下只有连接相关字段相对回填值有改动才要求重新测试连接；只改 token 数不用重测 */
+    const connectionFieldsChanged = !editModel
+        || baseURL !== (editModel.baseURL ?? '')
+        || apiKey !== (editModel.apiKey ?? '')
+        || adapt !== (editModel.adapt ?? 'openai');
 
     const handleFetchModels = () => {
         if (!baseURL) {
@@ -270,12 +330,12 @@ const AddModelForm: React.FC<AddModelFormProps> = ({ onSuccess, vscode }) => {
             return;
         }
 
-        if (!connectionTested) {
+        if (connectionFieldsChanged && !connectionTested) {
             setTestStatus({ message: '⚠ 请先点击"测试连接"按钮验证配置是否正确', type: 'error' });
             return;
         }
 
-        if (!connectionSuccess) {
+        if (connectionTested && !connectionSuccess) {
             setTestStatus({ message: '⚠ 连接测试未通过，请修正配置后重新测试', type: 'error' });
             return;
         }
@@ -296,7 +356,9 @@ const AddModelForm: React.FC<AddModelFormProps> = ({ onSuccess, vscode }) => {
                 modelName: currentModelName,
                 maxTokens: parseInt(maxTokens),
                 contextLength: parseInt(contextLength),
-                adapt
+                adapt,
+                thinkingHistoryPolicy,
+                isEdit: isEditing
             }
         });
     };
@@ -320,6 +382,7 @@ const AddModelForm: React.FC<AddModelFormProps> = ({ onSuccess, vscode }) => {
                         id="provider"
                         value={provider}
                         onChange={handleProviderChange}
+                        disabled={isEditing}
                         options={PROVIDER_ORDER.filter(key => defaultModelProvider[key]).map(key => ({
                             value: key,
                             label: defaultModelProvider[key].name,
@@ -336,6 +399,7 @@ const AddModelForm: React.FC<AddModelFormProps> = ({ onSuccess, vscode }) => {
                             id="customProviderName"
                             value={customProviderName}
                             onChange={(e) => setCustomProviderName(e.target.value.trim())}
+                            disabled={isEditing}
                             placeholder="为该服务命名以区分多个自定义服务，小写字母/数字/短横线，2~20 字符，留空默认为 custom"
                         />
                         {validateCustomProviderName(customProviderName) && (
@@ -401,12 +465,14 @@ const AddModelForm: React.FC<AddModelFormProps> = ({ onSuccess, vscode }) => {
                 <div className="form-group">
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
                         <label htmlFor="modelName">模型名称</label>
-                        <span
-                            className="label-action"
-                            onClick={() => setIsManualInput(!isManualInput)}
-                        >
-                            {isManualInput ? '从列表选择' : '手动输入'}
-                        </span>
+                        {!isEditing && (
+                            <span
+                                className="label-action"
+                                onClick={() => setIsManualInput(!isManualInput)}
+                            >
+                                {isManualInput ? '从列表选择' : '手动输入'}
+                            </span>
+                        )}
                     </div>
 
                     {!isManualInput ? (
@@ -469,6 +535,7 @@ const AddModelForm: React.FC<AddModelFormProps> = ({ onSuccess, vscode }) => {
                                 setConnectionSuccess(false);
                             }}
                             placeholder={defaults.defaultModel ? `输入模型名称，例如: ${defaults.defaultModel}` : '输入模型名称'}
+                            disabled={isEditing}
                         />
                     )}
 
@@ -484,6 +551,16 @@ const AddModelForm: React.FC<AddModelFormProps> = ({ onSuccess, vscode }) => {
                             { value: 'openai', label: 'OpenAI 格式' },
                             { value: 'anthropic', label: 'Anthropic 格式' }
                         ]}
+                    />
+                </div>
+
+                <div className="form-group">
+                    <label htmlFor="thinkingHistoryPolicy">思考历史</label>
+                    <IconSelect
+                        id="thinkingHistoryPolicy"
+                        value={thinkingHistoryPolicy}
+                        onChange={(value) => setThinkingHistoryPolicy(value as ThinkingHistoryPolicy)}
+                        options={THINKING_HISTORY_POLICY_OPTIONS}
                     />
                 </div>
 
@@ -532,8 +609,18 @@ const AddModelForm: React.FC<AddModelFormProps> = ({ onSuccess, vscode }) => {
                         disabled={isSaving}
                     >
                         {isSaving && <span className="spinner" />}
-                        {isSaving ? '添加中...' : '添加模型'}
+                        {isSaving ? (isEditing ? '保存中...' : '添加中...') : (isEditing ? '保存修改' : '添加模型')}
                     </button>
+                    {isEditing && (
+                        <button
+                            type="button"
+                            className="secondary"
+                            onClick={onCancelEdit}
+                            disabled={isSaving}
+                        >
+                            取消
+                        </button>
+                    )}
                 </div>
 
                 {testStatus.type && (

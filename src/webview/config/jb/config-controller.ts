@@ -77,8 +77,8 @@ export class ConfigController {
             case 'loadConfig': await this.loadConfig(); break;
             case 'saveConfig':
                 await this.respond('saveResult',
-                    () => this.core.addModel({ provider: m.data.provider, modelName: m.data.modelName, baseURL: m.data.baseURL, apiKey: m.data.apiKey, maxTokens: m.data.maxTokens, contextLength: m.data.contextLength, ...(m.data.adapt && { adapt: m.data.adapt }) }, true),
-                    () => ({ message: '模型配置已添加！' }), undefined);
+                    () => this.core.addModel({ provider: m.data.provider, modelName: m.data.modelName, baseURL: m.data.baseURL, apiKey: m.data.apiKey, maxTokens: m.data.maxTokens, contextLength: m.data.contextLength, ...(m.data.adapt && { adapt: m.data.adapt }), ...(m.data.thinkingHistoryPolicy && { thinkingHistoryPolicy: m.data.thinkingHistoryPolicy }) }, true),
+                    () => ({ message: m.data.isEdit ? '模型配置已保存！' : '模型配置已添加！' }), undefined);
                 await this.loadConfig();
                 break;
             case 'toggleModelActive':
@@ -108,6 +108,18 @@ export class ConfigController {
                 break;
             case 'getModelAdapter':
                 try { await this.ensureInit(); const adapter = await this.core.getModelAdapter(m.provider, m.modelName, m.baseURL); this.postToApp({ command: 'modelAdapterResult', adapter: adapter ?? null }); } catch { /* 静默 */ }
+                break;
+            case 'getModelProfile':
+                // 编辑模型：拿完整落盘配置回灌，App 据此切到新增页回填；失败只弹错，不进入编辑态
+                try {
+                    await this.ensureInit();
+                    const profile = await this.core.getModelProfile(m.provider, m.modelName);
+                    if (!profile) throw new Error(`模型不存在: ${m.modelName}[${m.provider}]`);
+                    this.postToApp({ command: 'modelProfileResult', profile });
+                } catch (e: any) {
+                    console.warn('[config] getModelProfile failed:', e?.message || e);
+                    this.postToApp({ command: 'modelProfileResult', success: false, profile: null, message: `读取模型配置失败：${e?.message || ''}` });
+                }
                 break;
             case 'testConnection':
                 try {

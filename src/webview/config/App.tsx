@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Config, VscodeApi } from './types';
+import { Config, ModelProfile, VscodeApi } from './types';
 import ModelList from './ModelList';
 import TaskConfig from './TaskConfig';
 import AddModelForm from './AddModelForm';
@@ -38,6 +38,12 @@ const App: React.FC<AppProps> = ({ vscode }) => {
     const [config, setConfig] = useState<Config | null>(null);
     const [initialTaskId, setInitialTaskId] = useState<string | undefined>(undefined);
     const [initialTaskNonce, setInitialTaskNonce] = useState(0);
+    /**
+     * 正在编辑的模型（唯一真源，表单不自己记编辑态）。非空时新增页锁住 provider/模型名并按其回填；
+     * 点「新增模型」标签、保存成功、离开模型页三种情况都清空，保证回到新增页时是可编辑的空白表单。
+     */
+    const [editModel, setEditModel] = useState<ModelProfile | null>(null);
+    const [editNonce, setEditNonce] = useState(0);
     const currentPageRef = useRef(currentPage);
     const taskTabRef = useRef(taskTab);
     currentPageRef.current = currentPage;
@@ -77,6 +83,15 @@ const App: React.FC<AppProps> = ({ vscode }) => {
                         setTaskRefreshTrigger(n => n + 1);
                     }
                     break;
+                case 'modelProfileResult':
+                    // 列表点「编辑」：切到新增页并回填；nonce 保证连续编辑同一模型也能重新回填
+                    if (message.profile) {
+                        setEditModel(message.profile);
+                        setEditNonce(n => n + 1);
+                        setCurrentPage('models');
+                        setModelTab('add');
+                    }
+                    break;
             }
         };
 
@@ -88,6 +103,16 @@ const App: React.FC<AppProps> = ({ vscode }) => {
             window.removeEventListener('message', handleMessage);
         };
     }, []);
+
+    // 离开模型页即退出编辑：模型页是条件渲染，回来时表单重新挂载，不能再带着编辑目标回填
+    useEffect(() => {
+        if (currentPage !== 'models') setEditModel(null);
+    }, [currentPage]);
+
+    const exitEditToList = () => {
+        setEditModel(null);
+        setModelTab('list');
+    };
 
     return (
         <div className="app-container">
@@ -195,7 +220,7 @@ const App: React.FC<AppProps> = ({ vscode }) => {
                             </div>
                             <div
                                 className={`tab-item ${modelTab === 'add' ? 'active' : ''}`}
-                                onClick={() => setModelTab('add')}
+                                onClick={() => { setEditModel(null); setModelTab('add'); }}
                             >
                                 新增模型
                             </div>
@@ -208,7 +233,13 @@ const App: React.FC<AppProps> = ({ vscode }) => {
                                 <TaskConfig config={config} vscode={vscode} />
                             </div>
                             <div style={{ display: modelTab === 'add' ? 'block' : 'none' }}>
-                                <AddModelForm onSuccess={() => setModelTab('list')} vscode={vscode} />
+                                <AddModelForm
+                                    onSuccess={exitEditToList}
+                                    onCancelEdit={exitEditToList}
+                                    editModel={editModel}
+                                    editNonce={editNonce}
+                                    vscode={vscode}
+                                />
                             </div>
                         </div>
                     </div>

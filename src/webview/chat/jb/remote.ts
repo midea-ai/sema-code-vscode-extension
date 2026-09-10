@@ -91,6 +91,8 @@ export class RemoteCore {
     fetchAvailableModels(params: any): Promise<any> { return this.t.call('fetchAvailableModels', params, ''); }
     testApiConnection(params: any): Promise<any> { return this.t.call('testApiConnection', params, ''); }
     getModelAdapter(provider: string, modelName: string, baseURL: string): Promise<any> { return this.t.call('getModelAdapter', { provider, modelName, baseURL }, ''); }
+    /** 单个模型完整落盘配置（含明文 apiKey），配置页编辑模型回填用；不存在回 null */
+    getModelProfile(provider: string, modelName: string): Promise<any> { return this.t.call('getModelProfile', { provider, modelName }, ''); }
 
     // 工具 / 系统配置推 core
     getToolInfos(): Promise<any> { return this.t.call('getToolInfos', undefined, ''); }

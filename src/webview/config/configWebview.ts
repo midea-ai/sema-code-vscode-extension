@@ -80,6 +80,7 @@ export class ConfigWebviewProvider {
                 loadSystemTools:            () => this.loadSystemTools(),
                 updateDisabledTools:        () => this.updateDisabledTools(m.disabledTools),
                 getModelAdapter:            () => Promise.resolve(this.getModelAdapter(m.provider, m.modelName, m.baseURL)),
+                getModelProfile:            () => this.getModelProfile(m.provider, m.modelName),
                 loadPluginConfig:           () => this.loadPluginConfig(),
                 refreshPluginConfig:        () => this.refreshPluginConfig(),
                 installPlugin:              () => this.installPlugin(m.pluginName, m.marketplaceName, m.scope, m.key),
@@ -320,10 +321,15 @@ export class ConfigWebviewProvider {
     }
 
     private async saveConfig(data: any) {
-        const { provider, modelName, baseURL, apiKey, maxTokens, contextLength, adapt } = data;
-        await this.execute('saveResult', '添加模型配置', async () => {
-            await this.coreManager.addModel({ provider, modelName, baseURL, apiKey, maxTokens, contextLength, ...(adapt && { adapt }) }, true);
-            this.postMessage({ command: 'saveResult', success: true, message: '模型配置已添加！' });
+        const { provider, modelName, baseURL, apiKey, maxTokens, contextLength, adapt, thinkingHistoryPolicy, isEdit } = data;
+        await this.execute('saveResult', isEdit ? '保存模型配置' : '添加模型配置', async () => {
+            // 编辑与新增走同一接口：core 对同名 (provider, modelName) 原地覆盖，指针与会话覆盖不受影响
+            await this.coreManager.addModel({
+                provider, modelName, baseURL, apiKey, maxTokens, contextLength,
+                ...(adapt && { adapt }),
+                ...(thinkingHistoryPolicy && { thinkingHistoryPolicy })
+            }, true);
+            this.postMessage({ command: 'saveResult', success: true, message: isEdit ? '模型配置已保存！' : '模型配置已添加！' });
             this.loadConfig();
         });
     }
@@ -376,6 +382,15 @@ export class ConfigWebviewProvider {
         try {
             this.postMessage({ command: 'modelAdapterResult', adapter: this.coreManager.getModelAdapter(provider, modelName, baseURL) ?? null });
         } catch { /* 静默失败 */ }
+    }
+
+    /** 编辑模型：取完整落盘配置回灌给配置页，由 App 切到新增页并回填表单 */
+    private async getModelProfile(provider: string, modelName: string) {
+        await this.execute('', '读取模型配置', async () => {
+            const profile = this.coreManager.getModelProfile(provider, modelName);
+            if (!profile) throw new Error(`模型不存在: ${modelName}[${provider}]`);
+            this.postMessage({ command: 'modelProfileResult', profile });
+        });
     }
 
     private async testConnection(data: any) {

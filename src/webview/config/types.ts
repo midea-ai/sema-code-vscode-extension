@@ -8,6 +8,22 @@ export interface ModelConfig {
     contextLength: number;
 }
 
+/** 历史思考回传策略（与 sema-core ThinkingHistoryPolicy 同形），旧配置缺省视为 preserve */
+export type ThinkingHistoryPolicy = 'preserve' | 'current_turn' | 'omit';
+
+/** core 落盘的单个模型完整配置（与 sema-core ModelProfile 同形），编辑模型时由 getModelProfile 回填表单 */
+export interface ModelProfile {
+    name: string;
+    provider: string;
+    modelName: string;
+    baseURL?: string;
+    apiKey: string;
+    maxTokens: number;
+    contextLength: number;
+    adapt: 'openai' | 'anthropic';
+    thinkingHistoryPolicy?: ThinkingHistoryPolicy;
+}
+
 export interface TaskConfig {
     main: string;
     quick: string;

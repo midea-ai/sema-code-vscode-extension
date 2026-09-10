@@ -1,7 +1,7 @@
 import React from 'react';
 import { Config, VscodeApi } from './types';
 import ProviderLogo from '../common/ProviderLogo';
-import { TrashIcon } from './utils/svgIcons';
+import { EditIcon, TrashIcon } from './utils/svgIcons';
 import './style/section.css';
 
 interface ModelListProps {
@@ -60,6 +60,16 @@ const ModelList: React.FC<ModelListProps> = ({ config, vscode }) => {
         });
     };
 
+    /** 编辑：向扩展端要完整落盘配置，回 modelProfileResult 后由 App 切到新增页回填 */
+    const handleEdit = (fullName: string) => {
+        const { provider, modelDisplayName } = parseModelName(fullName);
+        vscode.postMessage({
+            command: 'getModelProfile',
+            provider,
+            modelName: modelDisplayName
+        });
+    };
+
 
     const hasModels = config && config.modelList && config.modelList.length > 0;
     const sortedModelList = getSortedModelList();
@@ -75,7 +85,7 @@ const ModelList: React.FC<ModelListProps> = ({ config, vscode }) => {
                         <th>服务提供商</th>
                         <th>模型</th>
                         <th>任务</th>
-                        <th>删除</th>
+                        <th>操作</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -105,13 +115,22 @@ const ModelList: React.FC<ModelListProps> = ({ config, vscode }) => {
                                         )}
                                     </td>
                                     <td>
-                                        <button
-                                            className="section-icon-btn section-icon-btn-danger"
-                                            onClick={() => handleDelete(fullName)}
-                                            title="删除此模型"
-                                        >
-                                            <TrashIcon />
-                                        </button>
+                                        <div className="section-icon-btn-group">
+                                            <button
+                                                className="section-icon-btn"
+                                                onClick={() => handleEdit(fullName)}
+                                                title="编辑此模型"
+                                            >
+                                                <EditIcon />
+                                            </button>
+                                            <button
+                                                className="section-icon-btn section-icon-btn-danger"
+                                                onClick={() => handleDelete(fullName)}
+                                                title="删除此模型"
+                                            >
+                                                <TrashIcon />
+                                            </button>
+                                        </div>
                                     </td>
                                 </tr>
                             );

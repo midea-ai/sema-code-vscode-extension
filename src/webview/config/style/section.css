@@ -334,6 +334,14 @@
     background: var(--s-color-danger-bg);
 }
 
+/* 表格操作列：多个图标按钮横排居中 */
+.section-icon-btn-group {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+}
+
 /* ===== 开关样式 ===== */
 .section-switch {
     position: relative;
