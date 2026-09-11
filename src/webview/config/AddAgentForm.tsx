@@ -7,27 +7,28 @@ import {
     TOOL_NAME_RUN_SHELL, TOOL_NAME_CREATE_CRON, TOOL_NAME_DEL_CRON,
     TOOL_NAME_LIST_CRONS, TOOL_NAME_FETCH_URL, TOOL_NAME_SKILL
 } from '../../utils/tool';
+import { useT, I18nKey } from '../common/i18n/react';
 
-// 预设工具组合
-const TOOL_PRESETS = {
+// 预设工具组合（nameKey 为文案 key，渲染期经 t() 取值）
+const TOOL_PRESETS: Record<string, { nameKey: I18nKey; tools: string[] }> = {
     readonly: {
-        name: '只读工具',
+        nameKey: 'config.agent.preset.readonly',
         tools: [TOOL_NAME_SEARCH_FILES, TOOL_NAME_SEARCH_CONTENT, TOOL_NAME_VIEW_FILE]
     },
     edit: {
-        name: '编辑工具',
+        nameKey: 'config.agent.preset.edit',
         tools: [TOOL_NAME_PATCH_FILE, TOOL_NAME_WRITE_FILE, TOOL_NAME_EDIT_NOTEBOOK]
     },
     execute: {
-        name: '终端工具',
+        nameKey: 'config.agent.preset.execute',
         tools: [TOOL_NAME_RUN_SHELL]
     },
     cron: {
-        name: '定时任务工具',
+        nameKey: 'config.agent.preset.cron',
         tools: [TOOL_NAME_CREATE_CRON, TOOL_NAME_DEL_CRON, TOOL_NAME_LIST_CRONS]
     },
     other: {
-        name: '其他工具',
+        nameKey: 'config.agent.preset.other',
         tools: [TOOL_NAME_FETCH_URL, TOOL_NAME_SKILL]
     }
 };
@@ -64,6 +65,7 @@ interface AddAgentFormProps {
 }
 
 const AddAgentForm: React.FC<AddAgentFormProps> = ({ vscode, onSuccess, onClose }) => {
+    const t = useT();
     const [formData, setFormData] = useState(initialFormState);
     const [useAllTools, setUseAllTools] = useState(true);
     const [submitting, setSubmitting] = useState(false);
@@ -118,7 +120,7 @@ const AddAgentForm: React.FC<AddAgentFormProps> = ({ vscode, onSuccess, onClose 
     };
 
     const handlePresetSelection = (presetKey: string, checked: boolean) => {
-        const preset = TOOL_PRESETS[presetKey as keyof typeof TOOL_PRESETS];
+        const preset = TOOL_PRESETS[presetKey];
         if (!preset) return;
         setSelectedTools(prev => {
             const newSet = new Set(prev);
@@ -181,12 +183,12 @@ const AddAgentForm: React.FC<AddAgentFormProps> = ({ vscode, onSuccess, onClose 
     return (
         <div className="add-agent-form">
             <div className="agent-form-group">
-                <label>名称 <span className="required">*</span></label>
+                <label>{t('config.form.name')} <span className="required">*</span></label>
                 <input
                     type="text"
                     value={formData.name}
                     onChange={(e) => handleFormChange('name', e.target.value)}
-                    placeholder="Agent 名称，如：test_runner, code-checker 等"
+                    placeholder={t('config.agent.namePlaceholder')}
                     maxLength={NAME_MAX}
                     className={formData.name.trim() && !isNameValid() ? 'input-error' : ''}
                 />
@@ -195,20 +197,20 @@ const AddAgentForm: React.FC<AddAgentFormProps> = ({ vscode, onSuccess, onClose 
                         {formData.name.length}/{NAME_MAX}
                     </span>
                     {formData.name.trim().length > 0 && formData.name.trim().length < NAME_MIN && (
-                        <span className="error">（至少 {NAME_MIN} 字符）</span>
+                        <span className="error">{t('config.form.minChars', { n: NAME_MIN })}</span>
                     )}
                     {formData.name.trim().length >= NAME_MIN && formData.name.trim().length <= NAME_MAX && !isNameValid() && (
-                        <span className="error">（只允许英文字母、数字、连字符和下划线）</span>
+                        <span className="error">{t('config.form.nameCharset')}</span>
                     )}
                 </div>
             </div>
 
             <div className="agent-form-group">
-                <label>描述 <span className="required">*</span></label>
+                <label>{t('config.form.description')} <span className="required">*</span></label>
                 <textarea
                     value={formData.description}
                     onChange={(e) => handleFormChange('description', e.target.value)}
-                    placeholder="Agent 的使用时机"
+                    placeholder={t('config.agent.descPlaceholder')}
                     rows={3}
                     maxLength={DESCRIPTION_MAX}
                     className={formData.description.trim() && !isDescriptionValid() ? 'input-error' : ''}
@@ -218,7 +220,7 @@ const AddAgentForm: React.FC<AddAgentFormProps> = ({ vscode, onSuccess, onClose 
                         {formData.description.length}/{DESCRIPTION_MAX}
                     </span>
                     {formData.description.trim().length > 0 && formData.description.trim().length < DESCRIPTION_MIN && (
-                        <span className="error">（至少 {DESCRIPTION_MIN} 字符）</span>
+                        <span className="error">{t('config.form.minChars', { n: DESCRIPTION_MIN })}</span>
                     )}
                 </div>
             </div>
@@ -228,7 +230,7 @@ const AddAgentForm: React.FC<AddAgentFormProps> = ({ vscode, onSuccess, onClose 
                 <textarea
                     value={formData.prompt}
                     onChange={(e) => handleFormChange('prompt', e.target.value)}
-                    placeholder="Agent 的系统提示词"
+                    placeholder={t('config.agent.promptPlaceholder')}
                     rows={8}
                     maxLength={PROMPT_MAX}
                     className={formData.prompt.trim() && !isPromptValid() ? 'input-error' : ''}
@@ -238,13 +240,13 @@ const AddAgentForm: React.FC<AddAgentFormProps> = ({ vscode, onSuccess, onClose 
                         {formData.prompt.length}/{PROMPT_MAX}
                     </span>
                     {formData.prompt.trim().length > 0 && formData.prompt.trim().length < PROMPT_MIN && (
-                        <span className="error">（至少 {PROMPT_MIN} 字符）</span>
+                        <span className="error">{t('config.form.minChars', { n: PROMPT_MIN })}</span>
                     )}
                 </div>
             </div>
 
             <div className="agent-form-group">
-                <label>工具</label>
+                <label>{t('config.agent.tools')}</label>
                 <div className="tools-input-group">
                     <label className="checkbox-label">
                         <input
@@ -260,12 +262,12 @@ const AddAgentForm: React.FC<AddAgentFormProps> = ({ vscode, onSuccess, onClose 
                                 }
                             }}
                         />
-                        使用所有工具
+                        {t('config.agent.useAllTools')}
                     </label>
                     {!useAllTools && (
                         <div className="tools-selection">
                             <div className="tools-presets">
-                                <div className="presets-title">预设</div>
+                                <div className="presets-title">{t('config.agent.presets')}</div>
                                 <div className="presets-grid">
                                     {Object.entries(TOOL_PRESETS).map(([key, preset]) => (
                                         <label key={key} className="checkbox-label preset-item">
@@ -274,7 +276,7 @@ const AddAgentForm: React.FC<AddAgentFormProps> = ({ vscode, onSuccess, onClose 
                                                 checked={selectedPresets.has(key)}
                                                 onChange={(e) => handlePresetSelection(key, e.target.checked)}
                                             />
-                                            {preset.name} ({preset.tools.length})
+                                            {t(preset.nameKey)} ({preset.tools.length})
                                         </label>
                                     ))}
                                 </div>
@@ -282,7 +284,7 @@ const AddAgentForm: React.FC<AddAgentFormProps> = ({ vscode, onSuccess, onClose 
 
                             <div className="tools-header">
                                 <div className="select-all-indicator">
-                                    已选择 ({selectedTools.size}/{ALL_TOOLS.length})
+                                    {t('config.agent.selected')} ({selectedTools.size}/{ALL_TOOLS.length})
                                 </div>
                             </div>
                             <div className="tools-list-checkboxes">
@@ -304,38 +306,38 @@ const AddAgentForm: React.FC<AddAgentFormProps> = ({ vscode, onSuccess, onClose 
 
             <div className="form-row">
                 <div className="agent-form-group">
-                    <label>模型</label>
+                    <label>{t('config.agent.model')}</label>
                     <IconSelect
                         value={formData.model}
                         onChange={(value) => handleFormChange('model', value)}
                         options={[
-                            { value: 'main', label: 'Main (默认)' },
+                            { value: 'main', label: t('config.agent.mainDefault') },
                             { value: 'quick', label: 'Quick' }
                         ]}
                     />
                 </div>
 
                 <div className="agent-form-group">
-                    <label>位置</label>
+                    <label>{t('config.form.location')}</label>
                     <IconSelect
                         value={formData.locate}
                         onChange={(value) => handleFormChange('locate', value as 'project' | 'user')}
                         options={[
-                            { value: 'project', label: '项目级 (默认)' },
-                            { value: 'user', label: '用户级' }
+                            { value: 'project', label: t('common.projectDefault') },
+                            { value: 'user', label: t('common.userLevel') }
                         ]}
                     />
                 </div>
             </div>
 
             <div className="add-agent-form-footer">
-                <button className="btn-secondary" onClick={handleCancel}>取消</button>
+                <button className="btn-secondary" onClick={handleCancel}>{t('common.cancel')}</button>
                 <button
                     className="btn-primary"
                     onClick={handleSubmit}
                     disabled={submitting || !formData.name.trim() || !isNameValid() || !isDescriptionValid() || !isPromptValid()}
                 >
-                    {submitting ? '创建中...' : '创建'}
+                    {submitting ? t('common.creating') : t('common.create')}
                 </button>
             </div>
         </div>

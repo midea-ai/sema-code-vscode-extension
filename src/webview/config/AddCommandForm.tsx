@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { VscodeApi } from './types';
 import IconSelect from './IconSelect';
+import { useT } from '../common/i18n/react';
 
 const initialFormState = {
     name: '',
@@ -24,6 +25,7 @@ interface AddCommandFormProps {
 }
 
 const AddCommandForm: React.FC<AddCommandFormProps> = ({ vscode, onSuccess, onClose }) => {
+    const t = useT();
     const [formData, setFormData] = useState(initialFormState);
     const [submitting, setSubmitting] = useState(false);
 
@@ -95,12 +97,12 @@ const AddCommandForm: React.FC<AddCommandFormProps> = ({ vscode, onSuccess, onCl
     return (
         <div className="add-agent-form">
             <div className="agent-form-group">
-                <label>名称 <span className="required">*</span></label>
+                <label>{t('config.form.name')} <span className="required">*</span></label>
                 <input
                     type="text"
                     value={formData.name}
                     onChange={(e) => handleFormChange('name', e.target.value)}
-                    placeholder="Command 名称，如：fix-bug, review-code 等"
+                    placeholder={t('config.command.namePlaceholder')}
                     maxLength={NAME_MAX}
                     className={formData.name.trim() && !isNameValid() ? 'input-error' : ''}
                 />
@@ -109,20 +111,20 @@ const AddCommandForm: React.FC<AddCommandFormProps> = ({ vscode, onSuccess, onCl
                         {formData.name.length}/{NAME_MAX}
                     </span>
                     {formData.name.trim().length > 0 && formData.name.trim().length < NAME_MIN && (
-                        <span className="error">（至少 {NAME_MIN} 字符）</span>
+                        <span className="error">{t('config.form.minChars', { n: NAME_MIN })}</span>
                     )}
                     {formData.name.trim().length >= NAME_MIN && formData.name.trim().length <= NAME_MAX && !isNameValid() && (
-                        <span className="error">（只允许英文字母、数字、连字符和下划线）</span>
+                        <span className="error">{t('config.form.nameCharset')}</span>
                     )}
                 </div>
             </div>
 
             <div className="agent-form-group">
-                <label>描述 <span className="required">*</span></label>
+                <label>{t('config.form.description')} <span className="required">*</span></label>
                 <textarea
                     value={formData.description}
                     onChange={(e) => handleFormChange('description', e.target.value)}
-                    placeholder="Command 的功能描述"
+                    placeholder={t('config.command.descPlaceholder')}
                     rows={3}
                     maxLength={DESCRIPTION_MAX}
                     className={formData.description.trim() && !isDescriptionValid() ? 'input-error' : ''}
@@ -132,7 +134,7 @@ const AddCommandForm: React.FC<AddCommandFormProps> = ({ vscode, onSuccess, onCl
                         {formData.description.length}/{DESCRIPTION_MAX}
                     </span>
                     {formData.description.trim().length > 0 && formData.description.trim().length < DESCRIPTION_MIN && (
-                        <span className="error">（至少 {DESCRIPTION_MIN} 字符）</span>
+                        <span className="error">{t('config.form.minChars', { n: DESCRIPTION_MIN })}</span>
                     )}
                 </div>
             </div>
@@ -142,7 +144,7 @@ const AddCommandForm: React.FC<AddCommandFormProps> = ({ vscode, onSuccess, onCl
                 <textarea
                     value={formData.prompt}
                     onChange={(e) => handleFormChange('prompt', e.target.value)}
-                    placeholder="Command 的执行提示词，可使用 $ARGUMENTS 引用完整用户输入，或使用$0、$1、$2等捕获单个位置参数"
+                    placeholder={t('config.command.promptPlaceholder')}
                     rows={8}
                     maxLength={PROMPT_MAX}
                     className={formData.prompt.trim() && !isPromptValid() ? 'input-error' : ''}
@@ -152,41 +154,41 @@ const AddCommandForm: React.FC<AddCommandFormProps> = ({ vscode, onSuccess, onCl
                         {formData.prompt.length}/{PROMPT_MAX}
                     </span>
                     {formData.prompt.trim().length > 0 && formData.prompt.trim().length < PROMPT_MIN && (
-                        <span className="error">（至少 {PROMPT_MIN} 字符）</span>
+                        <span className="error">{t('config.form.minChars', { n: PROMPT_MIN })}</span>
                     )}
                 </div>
             </div>
 
             <div className="agent-form-group">
-                <label>参数提示</label>
+                <label>{t('config.command.argHint')}</label>
                 <input
                     type="text"
                     value={formData.argumentHint}
                     onChange={(e) => handleFormChange('argumentHint', e.target.value)}
-                    placeholder="可选，如：[参数名1] [参数名2] [参数名3]"
+                    placeholder={t('config.command.argHintPlaceholder')}
                 />
             </div>
 
             <div className="agent-form-group">
-                <label>位置</label>
+                <label>{t('config.form.location')}</label>
                 <IconSelect
                     value={formData.locate}
                     onChange={(value) => handleFormChange('locate', value as 'project' | 'user')}
                     options={[
-                        { value: 'project', label: '项目级 (默认)' },
-                        { value: 'user', label: '用户级' }
+                        { value: 'project', label: t('common.projectDefault') },
+                        { value: 'user', label: t('common.userLevel') }
                     ]}
                 />
             </div>
 
             <div className="add-agent-form-footer">
-                <button className="btn-secondary" onClick={handleCancel}>取消</button>
+                <button className="btn-secondary" onClick={handleCancel}>{t('common.cancel')}</button>
                 <button
                     className="btn-primary"
                     onClick={handleSubmit}
                     disabled={submitting || !formData.name.trim() || !isNameValid() || !isDescriptionValid() || !isPromptValid()}
                 >
-                    {submitting ? '创建中...' : '创建'}
+                    {submitting ? t('common.creating') : t('common.create')}
                 </button>
             </div>
         </div>

@@ -3,6 +3,7 @@ import { VscodeApi } from './types';
 import { getColorByName } from './utils/iconUtils';
 import { RefreshIcon, ExpandArrowIcon, OpenIcon } from './utils/svgIcons';
 import { DesignSkillInfo, DesignSystemInfo, DesignSystemColor } from './types/design';
+import { useT } from '../common/i18n/react';
 import './style/section.css';
 
 interface DesignConfigProps {
@@ -12,6 +13,7 @@ interface DesignConfigProps {
 type DesignTabType = 'skills' | 'systems';
 
 const DesignConfig: React.FC<DesignConfigProps> = ({ vscode }) => {
+    const t = useT();
     const [activeTab, setActiveTab] = useState<DesignTabType>('systems');
 
     const [skills, setSkills] = useState<DesignSkillInfo[]>([]);
@@ -119,7 +121,7 @@ const DesignConfig: React.FC<DesignConfigProps> = ({ vscode }) => {
         onToggle: () => void,
     ) => {
         const DESC_MAX = 150;
-        const text = description || '暂无描述';
+        const text = description || t('common.noDescription');
         const isLong = text.length > DESC_MAX;
         return (
             <div className={`section-card-desc ${isLong && !isExpanded ? 'collapsed' : ''}`}>
@@ -129,7 +131,7 @@ const DesignConfig: React.FC<DesignConfigProps> = ({ vscode }) => {
                         className="description-toggle"
                         onClick={(e) => { e.stopPropagation(); onToggle(); }}
                     >
-                        {isExpanded ? '收起' : '更多'}
+                        {isExpanded ? t('common.collapse') : t('common.more')}
                     </span>
                 )}
             </div>
@@ -154,7 +156,7 @@ const DesignConfig: React.FC<DesignConfigProps> = ({ vscode }) => {
             <div className="section-card-actions">
                 <button
                     className="section-icon-btn"
-                    title="打开 SKILL.md"
+                    title={t('config.design.openSkillMd')}
                     onClick={(e) => { e.stopPropagation(); handleOpen(openPath); }}
                 >
                     <OpenIcon />
@@ -251,15 +253,15 @@ const DesignConfig: React.FC<DesignConfigProps> = ({ vscode }) => {
     };
 
     const renderSkillsList = () => {
-        if (skillsLoading) return <div className="section-loading">加载中...</div>;
+        if (skillsLoading) return <div className="section-loading">{t('common.loading')}</div>;
         const isCollapsed = collapsedSections.has(SKILLS_SECTION_KEY);
         return (
             <div className="section-groups">
                 <div className="section-group section-user">
-                    {renderSectionHeader('用户级', SKILLS_SECTION_PATH, skills.length, SKILLS_SECTION_KEY)}
+                    {renderSectionHeader(t('common.userLevel'), SKILLS_SECTION_PATH, skills.length, SKILLS_SECTION_KEY)}
                     {!isCollapsed && (
                         skills.length === 0 ? (
-                            <div className="section-empty">暂无设计技能</div>
+                            <div className="section-empty">{t('config.design.noSkills')}</div>
                         ) : (
                             <div className="section-list">
                                 {skills.map((skill, index) => (
@@ -282,15 +284,15 @@ const DesignConfig: React.FC<DesignConfigProps> = ({ vscode }) => {
     };
 
     const renderSystemsList = () => {
-        if (systemsLoading) return <div className="section-loading">加载中...</div>;
+        if (systemsLoading) return <div className="section-loading">{t('common.loading')}</div>;
         const isCollapsed = collapsedSections.has(SYSTEMS_SECTION_KEY);
         return (
             <div className="section-groups">
                 <div className="section-group section-user">
-                    {renderSectionHeader('用户级', SYSTEMS_SECTION_PATH, systems.length, SYSTEMS_SECTION_KEY)}
+                    {renderSectionHeader(t('common.userLevel'), SYSTEMS_SECTION_PATH, systems.length, SYSTEMS_SECTION_KEY)}
                     {!isCollapsed && (
                         systems.length === 0 ? (
-                            <div className="section-empty">暂无设计系统</div>
+                            <div className="section-empty">{t('config.design.noSystems')}</div>
                         ) : (
                             <div className="section-list" style={{ gridTemplateColumns: '1fr' }}>
                                 {renderSystemsItems()}
@@ -331,7 +333,7 @@ const DesignConfig: React.FC<DesignConfigProps> = ({ vscode }) => {
                                 <div className="section-card-actions" onClick={(e) => e.stopPropagation()}>
                                     <button
                                         className="section-icon-btn"
-                                        title="打开 SKILL.md"
+                                        title={t('config.design.openSkillMd')}
                                         onClick={() => handleOpen(openPath)}
                                     >
                                         <OpenIcon />
@@ -363,7 +365,7 @@ const DesignConfig: React.FC<DesignConfigProps> = ({ vscode }) => {
                     className={`tab-item ${activeTab === 'systems' ? 'active' : ''}`}
                     onClick={() => setActiveTab('systems')}
                 >
-                    设计系统
+                    {t('config.design.tab.systems')}
                     {systems.length > 0 && (
                         <span className="section-tab-count">{systems.length}</span>
                     )}
@@ -372,7 +374,7 @@ const DesignConfig: React.FC<DesignConfigProps> = ({ vscode }) => {
                     className={`tab-item ${activeTab === 'skills' ? 'active' : ''}`}
                     onClick={() => setActiveTab('skills')}
                 >
-                    设计技能
+                    {t('config.design.tab.skills')}
                     {skills.length > 0 && (
                         <span className="section-tab-count">{skills.length}</span>
                     )}
@@ -381,7 +383,7 @@ const DesignConfig: React.FC<DesignConfigProps> = ({ vscode }) => {
                     <button
                         className={`section-icon-btn ${isRefreshing ? 'btn-loading' : ''}`}
                         onClick={handleRefresh}
-                        title="刷新"
+                        title={t('common.refresh')}
                         disabled={isRefreshing}
                     >
                         {isRefreshing ? (

@@ -4,6 +4,7 @@ import { getColorByName } from './utils/iconUtils';
 import { RefreshIcon, EditIcon, TrashIcon, OpenIcon } from './utils/svgIcons';
 import AddAgentForm from './AddAgentForm';
 import { AgentScope, AgentConfig as AgentConfigItem } from './types/agent';
+import { useT, I18nKey } from '../common/i18n/react';
 import './style/section.css';
 import './style/agent.css';
 
@@ -15,11 +16,12 @@ type AgentTabType = 'installed' | 'add';
 
 const LOCATE_ORDER: AgentScope[] = ['builtin', 'project', 'user', 'plugin'];
 
-const LOCATE_SECTION_TITLES: Record<AgentScope, string> = {
-    builtin: '内置 Agents',
-    plugin: '插件 Agents',
-    project: '项目级 Agents',
-    user: '用户级 Agents'
+// 分组标题文案 key，渲染期经 t() 取值
+const LOCATE_SECTION_TITLE_KEYS: Record<AgentScope, I18nKey> = {
+    builtin: 'config.agent.group.builtin',
+    plugin: 'config.agent.group.plugin',
+    project: 'config.agent.group.project',
+    user: 'config.agent.group.user'
 };
 
 const LOCATE_PATHS: Record<AgentScope, string> = {
@@ -30,6 +32,7 @@ const LOCATE_PATHS: Record<AgentScope, string> = {
 };
 
 const AgentConfig: React.FC<AgentConfigProps> = ({ vscode }) => {
+    const t = useT();
     const [activeTab, setActiveTab] = useState<AgentTabType>('installed');
     const [agents, setAgents] = useState<AgentConfigItem[]>([]);
     const [loading, setLoading] = useState(true);
@@ -123,13 +126,13 @@ const AgentConfig: React.FC<AgentConfigProps> = ({ vscode }) => {
     // 渲染工具列表
     const renderTools = (tools: string[] | '*' | undefined, agentIndex: number) => {
         if (!tools) {
-            return <span className="tools-none">无工具</span>;
+            return <span className="tools-none">{t('config.agent.noTools')}</span>;
         }
         if (tools === '*') {
-            return <span className="tools-all">所有工具</span>;
+            return <span className="tools-all">{t('config.agent.allTools')}</span>;
         }
         if (tools.length === 0) {
-            return <span className="tools-none">无工具</span>;
+            return <span className="tools-none">{t('config.agent.noTools')}</span>;
         }
 
         const isExpanded = expandedTools.has(agentIndex);
@@ -160,7 +163,7 @@ const AgentConfig: React.FC<AgentConfigProps> = ({ vscode }) => {
                             toggleToolsExpand(agentIndex);
                         }}
                     >
-                        收起
+                        {t('common.collapse')}
                     </span>
                 )}
             </div>
@@ -170,7 +173,7 @@ const AgentConfig: React.FC<AgentConfigProps> = ({ vscode }) => {
     if (loading) {
         return (
             <div className="agent-config">
-                <div className="section-loading">加载中...</div>
+                <div className="section-loading">{t('common.loading')}</div>
             </div>
         );
     }
@@ -202,7 +205,7 @@ const AgentConfig: React.FC<AgentConfigProps> = ({ vscode }) => {
     // 渲染单个 agent 卡片
     const renderAgentCard = (agent: AgentConfigItem, globalIndex: number) => {
         const LongDescValue = 150
-        const description = agent.description || '暂无描述';
+        const description = agent.description || t('common.noDescription');
         const isDescriptionExpanded = expandedDescriptions.has(globalIndex);
         const isLongDescription = description.length > LongDescValue;
         const isReadonly = agent.locate === 'builtin' || agent.locate === 'plugin';
@@ -216,21 +219,21 @@ const AgentConfig: React.FC<AgentConfigProps> = ({ vscode }) => {
                     <div className="section-card-name-group">
                         <span className="section-card-name">{agent.name}</span>
                         {isReadonly && (
-                            <span className="readonly-tab">只读</span>
+                            <span className="readonly-tab">{t('common.readonly')}</span>
                         )}
                     </div>
                     {!isReadonly && (
                         <div className="section-card-actions">
                             <button
                                 className="section-icon-btn"
-                                title="编辑"
+                                title={t('common.edit')}
                                 onClick={(e) => { e.stopPropagation(); handleEditAgent(agent); }}
                             >
                                 <EditIcon />
                             </button>
                             <button
                                 className="section-icon-btn section-icon-btn-danger"
-                                title="删除"
+                                title={t('common.delete')}
                                 onClick={(e) => { e.stopPropagation(); handleDeleteAgent(agent); }}
                             >
                                 <TrashIcon />
@@ -241,7 +244,7 @@ const AgentConfig: React.FC<AgentConfigProps> = ({ vscode }) => {
                         <div className="section-card-actions">
                             <button
                                 className="section-icon-btn"
-                                title="打开"
+                                title={t('common.open')}
                                 onClick={(e) => { e.stopPropagation(); handleEditAgent(agent); }}
                             >
                                 <OpenIcon />
@@ -259,20 +262,20 @@ const AgentConfig: React.FC<AgentConfigProps> = ({ vscode }) => {
                             className="description-toggle"
                             onClick={() => toggleDescriptionExpand(globalIndex)}
                         >
-                            {isDescriptionExpanded ? '收起' : '更多'}
+                            {isDescriptionExpanded ? t('common.collapse') : t('common.more')}
                         </span>
                     )}
                 </div>
                 {agent.model && (
                     <div className="agent-model-row">
-                        <span className="tools-label">模型:</span>
+                        <span className="tools-label">{t('config.agent.modelLabel')}</span>
                         <span className={getModelBadgeClass(agent.model)}>
                             {agent.model}
                         </span>
                     </div>
                 )}
                 <div className="agent-tools">
-                    <span className="tools-label">工具:</span>
+                    <span className="tools-label">{t('config.agent.toolsLabel')}</span>
                     {renderTools(agent.tools, globalIndex)}
                 </div>
             </div>
@@ -304,7 +307,7 @@ const AgentConfig: React.FC<AgentConfigProps> = ({ vscode }) => {
                     className={`tab-item ${activeTab === 'installed' ? 'active' : ''}`}
                     onClick={() => setActiveTab('installed')}
                 >
-                    已安装
+                    {t('common.installed')}
                     {agents.length > 0 && (
                         <span className="section-tab-count">{agents.length}</span>
                     )}
@@ -313,13 +316,13 @@ const AgentConfig: React.FC<AgentConfigProps> = ({ vscode }) => {
                     className={`tab-item ${activeTab === 'add' ? 'active' : ''}`}
                     onClick={() => setActiveTab('add')}
                 >
-                    创建 Agent
+                    {t('config.agent.create')}
                 </div>
                 <div className="section-tab-actions">
                     <button
                         className={`section-icon-btn ${isRefreshing ? 'btn-loading' : ''}`}
                         onClick={handleRefresh}
-                        title="刷新 Agents"
+                        title={t('config.agent.refresh')}
                         disabled={isRefreshing}
                     >
                         {isRefreshing ? (
@@ -357,14 +360,14 @@ const AgentConfig: React.FC<AgentConfigProps> = ({ vscode }) => {
                             return (
                                 <div key={scope} className={`section-group section-${scope}`}>
                                     <div className="section-group-title section-group-title-collapsible" style={{ cursor: 'pointer', userSelect: 'none' }} onClick={toggleCollapse}>
-                                        {LOCATE_SECTION_TITLES[scope]}
+                                        {t(LOCATE_SECTION_TITLE_KEYS[scope])}
                                         {LOCATE_PATHS[scope] && (
                                             <span className="section-group-count">({LOCATE_PATHS[scope]})</span>
                                         )}
                                         <span className={`section-collapse-arrow ${isCollapsed ? 'collapsed' : ''}`} />
                                     </div>
                                     {!isCollapsed && (sectionAgents.length === 0 ? (
-                                        <div className="section-empty">暂无 Agent</div>
+                                        <div className="section-empty">{t('config.agent.empty')}</div>
                                     ) : (
                                         <div className="section-list">
                                             {sectionAgents.map((agent, localIndex) =>

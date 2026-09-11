@@ -6,6 +6,8 @@ import { SemaProcessWrapper } from '../../core/semaProcessWrapper';
 import type { SessionController } from '../../core/semaSidebarProvider';
 import { transformCommandToPrompt } from '../../utils/prompt';
 import type { InputImageAttachment } from 'sema-core';
+import { DEFAULT_CUSTOM_RULES, isBuiltinCustomRules } from '../config/default/defaultConfig';
+import { t, getLang, normalizeLang, type Language } from '../common/i18n/core';
 
 const FILE_REFERENCE_QUOTE_REGEX = /[\s。，、；：！？""''「」『』（）《》〈〉【】,;!?]/;
 
@@ -53,7 +55,8 @@ export class ChatWebviewProvider {
         private readonly fileOperationManager: FileOperationManager,
         private readonly onOpenConfig: (page?: string, taskId?: string) => void,
         private readonly context: vscode.ExtensionContext,
-        private readonly sessionController: SessionController
+        private readonly sessionController: SessionController,
+        private readonly onLanguageChange?: (lang: Language) => void
     ) { }
 
     private static readonly INPUT_HISTORY_KEY = 'sema.inputHistory';
@@ -112,6 +115,7 @@ export class ChatWebviewProvider {
                 resolveImagePath: () => this.resolveImagePath(msg.filePath, msg.tempId),
                 openExternal: () => this.openExternal(msg.url),
                 requestSystemConfig: () => this.sendSystemConfig(),
+                updateLanguage: () => this.updateLanguage(msg.lang),
                 requestCommands: () => this.sendCommands(),
                 requestSkills: () => this.sendSkills(),
                 requestAgents: () => this.sendAgents(),
@@ -176,7 +180,7 @@ export class ChatWebviewProvider {
             this.postMessage({
                 type: 'error',
                 sessionId,
-                message: error instanceof Error ? error.message : '处理用户输入时发生错误'
+                message: error instanceof Error ? error.message : t('host.inputError')
             });
         }
     }
@@ -241,10 +245,40 @@ export class ChatWebviewProvider {
                 type: 'systemConfigUpdate',
                 skipFileEditPermission: config.skipFileEditPermission || false,
                 thinking: config.thinking !== false,
-                showThinkingText: (config as Record<string, any>).showThinkingText !== false
+                showThinkingText: (config as Record<string, any>).showThinkingText !== false,
+                lang: (config as Record<string, any>).lang
             });
         } catch (error) {
             console.error('Error sending system config:', error);
+        }
+    }
+
+    /**
+     * 首次配置提醒中的语言切换：行为与系统配置页保持一致。
+     * 除了持久化 lang，当前规则仍为内置默认值时，也切换成目标语言的默认规则。
+     */
+    private async updateLanguage(value: unknown): Promise<void> {
+        const lang = normalizeLang(value);
+        try {
+            const config = this.processWrapper.getSystemConfig() as Record<string, any>;
+            const isDefaultRules = isBuiltinCustomRules(config.customRules);
+
+            await this.processWrapper.updateSystemConfigByKey('lang', lang);
+            if (isDefaultRules) {
+                await this.processWrapper.updateSystemConfigByKey('customRules', DEFAULT_CUSTOM_RULES[lang]);
+            }
+
+            await this.sendSystemConfig();
+            this.onLanguageChange?.(lang);
+        } catch (error) {
+            // 前端采用即时切换；保存失败时用实际落盘配置回填，避免显示与配置不一致。
+            await this.sendSystemConfig();
+            this.postMessage({
+                type: 'error',
+                message: t('host.saveConfigFailed', {
+                    error: error instanceof Error ? error.message : t('common.unknownError')
+                })
+            });
         }
     }
 
@@ -260,7 +294,7 @@ export class ChatWebviewProvider {
             await wrapper.switchModel(modelName);
             await this.processWrapper.switchModel(modelName);
         } catch (error) {
-            this.postMessage({ type: 'error', message: `切换模型失败: ${error instanceof Error ? error.message : '未知错误'}` });
+            this.postMessage({ type: 'error', message: t('host.switchModelFailed', { error: error instanceof Error ? error.message : t('common.unknownError') }) });
         }
     }
 
@@ -279,7 +313,7 @@ export class ChatWebviewProvider {
     private handleGetForkPreview(sessionId: string | undefined, uuid: string, reqId: string): void {
         const wrapper = sessionId ? this.sessionController.getSessionWrapper(sessionId) : undefined;
         if (!wrapper || !uuid) {
-            this.postMessage({ type: 'forkPreviewResult', sessionId, reqId, error: '无法获取 fork 预览' });
+            this.postMessage({ type: 'forkPreviewResult', sessionId, reqId, error: t('host.forkPreviewFailed') });
             return;
         }
         try {
@@ -296,7 +330,7 @@ export class ChatWebviewProvider {
     private async handleForkSession(sessionId: string | undefined, uuid: string, restoreFiles: boolean, reqId: string): Promise<void> {
         const wrapper = sessionId ? this.sessionController.getSessionWrapper(sessionId) : undefined;
         if (!wrapper || !uuid) {
-            this.postMessage({ type: 'forkResult', sessionId, reqId, uuid, result: { ok: false, error: '会话不可用' } });
+            this.postMessage({ type: 'forkResult', sessionId, reqId, uuid, result: { ok: false, error: t('host.sessionUnavailable') } });
             return;
         }
         try {
@@ -450,8 +484,9 @@ export class ChatWebviewProvider {
             vscode.Uri.joinPath(this.extensionUri, 'dist', 'webview', 'chat.js')
         );
         const nonce = this.getNonce();
+        // <html lang> 由 i18n 模块在 webview 启动时读取作为初始语言，避免首屏闪中文
         return `<!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="${getLang()}">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">

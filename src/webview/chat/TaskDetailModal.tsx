@@ -4,6 +4,7 @@ import { Message, VscodeApi } from './types';
 import MessageItem from './MessageItem';
 import GroupedToolBlock from './blocks/tools/GroupedToolBlock';
 import { groupMessages } from './utils/groupMessages';
+import { useT } from '../common/i18n/react';
 
 interface TaskDetailModalProps {
     title: string;
@@ -20,6 +21,7 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
     vscode,
     onClose
 }) => {
+    const t = useT();
     const contentRef = useRef<HTMLDivElement>(null);
     const [userScrolled, setUserScrolled] = useState(false);
     const prevMessagesLengthRef = useRef(taskMessages.length);
@@ -99,11 +101,11 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
     const getStatusText = () => {
         switch (status) {
             case 'running':
-                return '运行中...';
+                return t('chat.task.running');
             case 'completed':
-                return '已完成';
+                return t('chat.task.done');
             case 'failed':
-                return '失败';
+                return t('chat.task.failed');
             default:
                 return '';
         }
@@ -114,7 +116,7 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
         if (!taskMessages || taskMessages.length === 0) {
             return (
                 <div className="task-modal-empty">
-                    暂无消息记录
+                    {t('chat.task.noMessages')}
                 </div>
             );
         }
@@ -153,7 +155,7 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                         </span>
                         <span className="task-modal-title-text">{title}</span>
                     </div>
-                    <button className="task-modal-close" onClick={onClose} title="关闭">
+                    <button className="task-modal-close" onClick={onClose} title={t('common.close')}>
                         ✕
                     </button>
                 </div>

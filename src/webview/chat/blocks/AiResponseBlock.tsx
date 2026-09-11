@@ -7,6 +7,7 @@ import { hasTextSelection } from '../utils/selection';
 import { SessionContext } from '../SessionContext';
 import { CopyIcon, CheckIcon, BranchIcon } from '../components/ui/IconButton';
 import { getFileIconHtml } from '../components/ui/FileIcon';
+import { useT } from '../../common/i18n/react';
 import '../style/markdown.css';
 
 interface AiResponseBlockProps {
@@ -27,6 +28,7 @@ const AiResponseBlock: React.FC<AiResponseBlockProps> = React.memo(({
     canBranch = false,
     onBranch
 }) => {
+    const t = useT();
     const sessionId = useContext(SessionContext);
     const contentRef = useRef<HTMLDivElement>(null);
     const actionsRef = useRef<HTMLDivElement>(null);
@@ -109,16 +111,16 @@ const AiResponseBlock: React.FC<AiResponseBlockProps> = React.memo(({
                 const action = codeBtn.getAttribute('data-action');
                 if (action === 'toggle-wrap') {
                     const nowrap = wrap.classList.toggle('is-nowrap');
-                    codeBtn.title = nowrap ? '开启自动换行' : '关闭自动换行';
+                    codeBtn.title = nowrap ? t('chat.code.wrapOn') : t('chat.code.wrapOff');
                 } else if (action === 'copy-code') {
                     const code = wrap.querySelector('code')?.textContent ?? '';
                     if (!code) return;
                     navigator.clipboard.writeText(code).then(() => {
                         codeBtn.classList.add('is-copied');
-                        codeBtn.title = '已复制';
+                        codeBtn.title = t('common.copied');
                         window.setTimeout(() => {
                             codeBtn.classList.remove('is-copied');
-                            codeBtn.title = '复制';
+                            codeBtn.title = t('common.copy');
                         }, 1000);
                     }).catch(() => { /* ignore */ });
                 }
@@ -282,20 +284,20 @@ const AiResponseBlock: React.FC<AiResponseBlockProps> = React.memo(({
                 <div className="ai-resp-actions" ref={actionsRef}>
                     <button
                         className="ai-resp-action-btn"
-                        title={copied ? '已复制' : '复制原始内容'}
+                        title={copied ? t('common.copied') : t('chat.copyRaw')}
                         onClick={handleCopy}
                     >
                         {copied ? <CheckIcon /> : <CopyIcon />}
-                        <span className="ai-resp-action-label">{copied ? '已复制' : '复制'}</span>
+                        <span className="ai-resp-action-label">{copied ? t('common.copied') : t('common.copy')}</span>
                     </button>
                     {canBranch && onBranch && (
                         <button
                             className="ai-resp-action-btn"
-                            title="以此处为终点开一个新聊天（不含后续轮次），原对话与文件不受影响"
+                            title={t('chat.forkHere.title')}
                             onClick={(e) => { e.stopPropagation(); onBranch(messageId); }}
                         >
                             <BranchIcon />
-                            <span className="ai-resp-action-label">分支到新聊天</span>
+                            <span className="ai-resp-action-label">{t('chat.forkHere.label')}</span>
                         </button>
                     )}
                 </div>

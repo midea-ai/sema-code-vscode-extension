@@ -1,5 +1,6 @@
 import DOMPurify from 'dompurify';
 import katex from 'katex';
+import { t } from '../../common/i18n/core';
 
 /**
  * 简化的Markdown渲染，只支持：
@@ -53,8 +54,8 @@ export function renderMarkdownToHtml(content: string, vscode?: any): string {
     codeBlockPlaceholders.push(
       `<div class="code-block-wrap">` +
       `<div class="code-block-toolbar">` +
-      `<span class="code-block-btn code-block-btn-wrap" data-action="toggle-wrap" title="关闭自动换行"></span>` +
-      `<span class="code-block-btn code-block-btn-copy" data-action="copy-code" title="复制"></span>` +
+      `<span class="code-block-btn code-block-btn-wrap" data-action="toggle-wrap" title="${escapeHtml(t('chat.code.wrapOff'))}"></span>` +
+      `<span class="code-block-btn code-block-btn-copy" data-action="copy-code" title="${escapeHtml(t('common.copy'))}"></span>` +
       `</div>` +
       `<pre class="code-block"><code${langClass}>${escapedCode}</code></pre>` +
       `</div>`

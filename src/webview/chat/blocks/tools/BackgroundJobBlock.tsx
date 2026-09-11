@@ -3,6 +3,7 @@ import { ToggleIcon } from '../../components/ui/IconButton';
 import { SessionContext } from '../../SessionContext';
 import { ToolContent } from '../../types';
 import { streamingStore } from '../../utils/StreamingStore';
+import { useT } from '../../../common/i18n/react';
 
 const MAX_VISIBLE_LINES = 2;
 
@@ -48,6 +49,7 @@ const processTerminalOutput = (text: string): string[] => {
 };
 
 const BackgroundJobBlock: React.FC<BackgroundJobBlockProps> = ({ content: toolContent, messageId, vscode }) => {
+    const t = useT();
     const sessionId = useContext(SessionContext);
     const [isExpanded, setIsExpanded] = useState(true);
     const streamContentRef = useRef('');
@@ -128,7 +130,7 @@ const BackgroundJobBlock: React.FC<BackgroundJobBlockProps> = ({ content: toolCo
                     {visibleLines.length > 0 && (
                         <>
                             {omittedCount > 0 && (
-                                <div className="bash-omitted-lines bash-omitted-lines-clickable" onClick={handleViewAll}>...省略了 {omittedCount} 行</div>
+                                <div className="bash-omitted-lines bash-omitted-lines-clickable" onClick={handleViewAll}>{t('chat.omittedLines', { count: omittedCount })}</div>
                             )}
                             <div className="bash-output pub-block-content">
                                 {visibleLines.map((line, i) => (

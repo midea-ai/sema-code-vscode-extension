@@ -21,7 +21,7 @@ class SemaHistoryFileEditor(project: Project, private val file: VirtualFile) : U
 
     override fun getComponent(): JComponent = panel.component
     override fun getPreferredFocusedComponent(): JComponent = panel.component
-    override fun getName(): String = "历史会话"
+    override fun getName(): String = SemaBundle.message("history.title")
     override fun getFile(): VirtualFile = file
 
     override fun setState(state: FileEditorState) {}

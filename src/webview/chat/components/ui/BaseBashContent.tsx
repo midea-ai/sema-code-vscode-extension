@@ -1,4 +1,5 @@
 import React, { useLayoutEffect, useRef, useState } from 'react';
+import { useT } from '../../../common/i18n/react';
 
 interface BaseBashContentProps {
     command: string;
@@ -17,6 +18,7 @@ const BaseBashContent: React.FC<BaseBashContentProps> = ({
     onOpenFull,
     maxHeightPx = DEFAULT_MAX_PX
 }) => {
+    const t = useT();
     const ref = useRef<HTMLDivElement>(null);
     const [overflowing, setOverflowing] = useState(false);
 
@@ -41,7 +43,7 @@ const BaseBashContent: React.FC<BaseBashContentProps> = ({
             className={`${className}${overflowing ? ' overflowing' : ''}${clickable ? ' clickable' : ''}`}
             style={style}
             onClick={clickable ? onOpenFull : undefined}
-            title={clickable ? '点击查看完整命令' : undefined}
+            title={clickable ? t('chat.bash.viewFull') : undefined}
         >
             <pre><code className="language-bash">{command}</code></pre>
         </div>

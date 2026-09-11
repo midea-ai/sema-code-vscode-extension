@@ -5,11 +5,12 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
 import AdmZip from 'adm-zip';
-import { defaultConfig } from './default/defaultConfig';
+import { defaultConfig, DEFAULT_CUSTOM_RULES } from './default/defaultConfig';
 import { skillHubConfig } from './default/defaultSkillHub';
 import { AgentConfig } from './types/agent';
 import { CommandConfig } from './types/command';
 import type { ClawCoordinator } from '../../claw/coordinator';
+import { t, getLang, normalizeLang } from '../common/i18n/core';
 
 export class ConfigWebviewProvider {
     private panel?: vscode.WebviewPanel;
@@ -33,6 +34,13 @@ export class ConfigWebviewProvider {
         this.onSystemConfigChanged = callback;
     }
 
+    /** 聊天页切换语言后，同步已打开的配置页及其原生面板标题。 */
+    public postLangUpdate(lang: string): void {
+        if (!this.panel) return;
+        this.panel.title = t('host.cfg.panelTitle');
+        this.postMessage({ command: 'langUpdate', lang });
+    }
+
     public show(extensionUri: vscode.Uri, page?: string, taskId?: string) {
         this.pendingPage = page;
         this.pendingTaskId = taskId;
@@ -43,7 +51,7 @@ export class ConfigWebviewProvider {
         }
 
         this.panel = vscode.window.createWebviewPanel(
-            'semaConfig', 'Code Agent 配置', vscode.ViewColumn.One,
+            'semaConfig', t('host.cfg.panelTitle'), vscode.ViewColumn.One,
             { enableScripts: true, retainContextWhenHidden: true, localResourceRoots: [vscode.Uri.joinPath(extensionUri, 'dist')] }
         );
 
@@ -167,8 +175,8 @@ export class ConfigWebviewProvider {
     // ─── Core helpers ────────────────────────────────────────────────────────
 
     private async ensureCoreReady() {
-        if (!this.coreManager) throw new Error('SemaCore 未初始化');
-        if (!await this.coreManager.waitForReady(5000)) throw new Error('SemaCore 初始化超时');
+        if (!this.coreManager) throw new Error(t('host.cfg.coreNotReady'));
+        if (!await this.coreManager.waitForReady(5000)) throw new Error(t('host.cfg.coreTimeout'));
     }
 
     private postMessage(message: any) {
@@ -213,7 +221,7 @@ export class ConfigWebviewProvider {
             void this.clawCoordinator.waitBind(sessionKey, {
                 onVerifyCodeNeeded: () => this.postMessage({ command: 'clawVerifyCodeNeeded' }),
                 onQrRefresh: (url: string) =>
-                    this.postMessage({ command: 'clawQrCode', data: { qrcodeDataUrl: url, message: '二维码已刷新，请重新扫描' } }),
+                    this.postMessage({ command: 'clawQrCode', data: { qrcodeDataUrl: url, message: t('host.cfg.qrRefreshed') } }),
                 onResult: (r) => {
                     this.postMessage({ command: 'clawBindResult', data: r });
                     if (this.clawCoordinator) {
@@ -230,20 +238,20 @@ export class ConfigWebviewProvider {
     private async clawBindFeishu(appId: string, appSecret: string): Promise<void> {
         if (!this.clawCoordinator) return;
         if (!appId?.trim() || !appSecret?.trim()) {
-            this.postMessage({ command: 'clawBindResult', data: { connected: false, message: 'App ID 和 App Secret 不能为空' } });
+            this.postMessage({ command: 'clawBindResult', data: { connected: false, message: t('host.cfg.feishuEmpty') } });
             return;
         }
         this.clawCoordinator.bindFeishu(appId.trim(), appSecret.trim());
         const res = await this.clawCoordinator.enable();
         const status = this.clawCoordinator.getStatus();
         if (res.ok) {
-            this.postMessage({ command: 'clawBindResult', data: { connected: true, message: '已连接飞书' } });
+            this.postMessage({ command: 'clawBindResult', data: { connected: true, message: t('host.cfg.feishuConnected') } });
             this.postMessage({ command: 'clawStatus', data: status });
         } else if (res.occupiedBy) {
-            this.postMessage({ command: 'clawBindResult', data: { connected: false, message: `claw 正在『${res.occupiedBy.projectPath}』使用中` } });
+            this.postMessage({ command: 'clawBindResult', data: { connected: false, message: t('host.cfg.clawOccupied', { path: res.occupiedBy.projectPath }) } });
             this.postMessage({ command: 'clawStatus', data: { ...status, occupancy: res.occupiedBy } });
         } else {
-            this.postMessage({ command: 'clawBindResult', data: { connected: false, message: res.error || '连接失败' } });
+            this.postMessage({ command: 'clawBindResult', data: { connected: false, message: res.error || t('host.cfg.connectFailed') } });
             this.postMessage({ command: 'clawStatus', data: { ...status, error: res.error } });
         }
     }
@@ -284,18 +292,19 @@ export class ConfigWebviewProvider {
             }
             return data;
         } catch (error) {
-            const message = error instanceof Error ? error.message : '未知错误';
+            const message = error instanceof Error ? error.message : t('common.unknownError');
             console.error(`Error ${errorMsg}:`, error);
+            const text = t('host.cfg.opFailed', { op: errorMsg, error: message });
             if (resultCommand) {
-                this.postMessage({ command: resultCommand, success: false, message: `${errorMsg}失败：${message}` });
+                this.postMessage({ command: resultCommand, success: false, message: text });
             }
             if (errorMsg) {
-                vscode.window.showErrorMessage(`${errorMsg}失败：${message}`);
+                vscode.window.showErrorMessage(text);
             }
         }
     }
 
-    private async confirm(msg: string, confirmLabel = '确定') {
+    private async confirm(msg: string, confirmLabel = t('common.ok')) {
         return await vscode.window.showWarningMessage(msg, { modal: true }, confirmLabel) === confirmLabel;
     }
 
@@ -322,20 +331,20 @@ export class ConfigWebviewProvider {
 
     private async saveConfig(data: any) {
         const { provider, modelName, baseURL, apiKey, maxTokens, contextLength, adapt, thinkingHistoryPolicy, isEdit } = data;
-        await this.execute('saveResult', isEdit ? '保存模型配置' : '添加模型配置', async () => {
+        await this.execute('saveResult', isEdit ? t('host.cfg.op.saveModel') : t('host.cfg.op.addModel'), async () => {
             // 编辑与新增走同一接口：core 对同名 (provider, modelName) 原地覆盖，指针与会话覆盖不受影响
             await this.coreManager.addModel({
                 provider, modelName, baseURL, apiKey, maxTokens, contextLength,
                 ...(adapt && { adapt }),
                 ...(thinkingHistoryPolicy && { thinkingHistoryPolicy })
             }, true);
-            this.postMessage({ command: 'saveResult', success: true, message: isEdit ? '模型配置已保存！' : '模型配置已添加！' });
+            this.postMessage({ command: 'saveResult', success: true, message: isEdit ? t('host.cfg.modelSaved') : t('host.cfg.modelAdded') });
             this.loadConfig();
         });
     }
 
     private async toggleModelActive(_provider: string, modelName: string) {
-        await this.execute('', '切换模型', async () => {
+        await this.execute('', t('host.cfg.op.switchModel'), async () => {
             await this.coreManager.switchModel(modelName);
             this.loadConfig();
         });
@@ -346,7 +355,7 @@ export class ConfigWebviewProvider {
     }
 
     private async confirmTaskConfig(data: { main: string; quick: string }) {
-        await this.execute('', '更新任务配置', async () => {
+        await this.execute('', t('host.cfg.op.updateTask'), async () => {
             await this.coreManager.applyTaskModel(data);
             this.postMessage({ command: 'taskConfigConfirmed' });
             this.loadConfig();
@@ -354,10 +363,10 @@ export class ConfigWebviewProvider {
     }
 
     private async deleteModel(_provider: string, modelName: string) {
-        if (!await this.confirm(`确定要删除模型 "${modelName}" 吗？\n\n注意：如果该模型正在被任务配置使用，将无法删除。`, '删除')) return;
-        await this.execute('deleteResult', '删除模型', async () => {
+        if (!await this.confirm(t('host.cfg.deleteModelConfirm', { name: modelName }), t('common.delete'))) return;
+        await this.execute('deleteResult', t('host.cfg.op.deleteModel'), async () => {
             await this.coreManager.deleteModel(modelName);
-            this.postMessage({ command: 'deleteResult', success: true, message: '模型已删除' });
+            this.postMessage({ command: 'deleteResult', success: true, message: t('host.cfg.modelDeleted') });
             this.loadConfig();
         });
     }
@@ -370,11 +379,11 @@ export class ConfigWebviewProvider {
                 command: 'modelsResult', success: result.success,
                 models: result.models || [],
                 message: result.success
-                    ? (result.message || '获取模型列表成功')
-                    : `${result.message || '获取模型列表失败'}${result.curlCommand ? '\n调试命令: ' + result.curlCommand : ''}`
+                    ? (result.message || t('host.cfg.fetchModelsOk'))
+                    : `${result.message || t('host.cfg.fetchModelsFailed')}${result.curlCommand ? '\n' + t('host.cfg.debugCommand') + result.curlCommand : ''}`
             });
         } catch (error) {
-            this.postMessage({ command: 'modelsResult', success: false, models: [], message: `获取模型列表失败: ${(error as Error).message}` });
+            this.postMessage({ command: 'modelsResult', success: false, models: [], message: `${t('host.cfg.fetchModelsFailed')}: ${(error as Error).message}` });
         }
     }
 
@@ -386,9 +395,9 @@ export class ConfigWebviewProvider {
 
     /** 编辑模型：取完整落盘配置回灌给配置页，由 App 切到新增页并回填表单 */
     private async getModelProfile(provider: string, modelName: string) {
-        await this.execute('', '读取模型配置', async () => {
+        await this.execute('', t('host.cfg.op.readModel'), async () => {
             const profile = this.coreManager.getModelProfile(provider, modelName);
-            if (!profile) throw new Error(`模型不存在: ${modelName}[${provider}]`);
+            if (!profile) throw new Error(t('host.cfg.modelNotExist', { name: `${modelName}[${provider}]` }));
             this.postMessage({ command: 'modelProfileResult', profile });
         });
     }
@@ -399,47 +408,51 @@ export class ConfigWebviewProvider {
             const result = await this.coreManager.testApiConnection(data);
             this.postMessage({
                 command: 'testResult', success: result.success,
-                message: result.success ? '✓ 连接测试成功！API 配置正确。' : `${result.message}\n调试命令: ${result.curlCommand}` || '连接测试失败'
+                message: result.success ? t('host.cfg.testOk') : `${result.message}\n${t('host.cfg.debugCommand')}${result.curlCommand}` || t('host.cfg.testFailed')
             });
         } catch (error) {
-            this.postMessage({ command: 'testResult', success: false, message: `✗ 测试失败: ${(error as Error).message}` });
+            this.postMessage({ command: 'testResult', success: false, message: t('host.cfg.testError', { error: (error as Error).message }) });
         }
     }
 
     // ─── System config ────────────────────────────────────────────────────────
 
     private async loadSystemConfig() {
-        await this.execute('loadSystemConfigResult', '加载系统配置', async () => {
+        await this.execute('loadSystemConfigResult', t('host.cfg.op.loadSystem'), async () => {
             const data = this.coreManager.getSystemConfig();
             this.postMessage({ command: 'loadSystemConfigResult', success: true, data, platform: process.platform });
         });
     }
 
     private async saveSystemConfig(data: any) {
-        await this.execute('saveSystemConfigResult', '保存系统配置', async () => {
+        await this.execute('saveSystemConfigResult', t('host.cfg.op.saveSystem'), async () => {
             await this.coreManager.updateSystemConfig(data);
-            this.postMessage({ command: 'saveSystemConfigResult', success: true, message: '系统配置已保存' });
+            this.postMessage({ command: 'saveSystemConfigResult', success: true, message: t('host.cfg.systemSaved') });
         });
     }
 
     private async saveSystemConfigByKey(key: string, value: any) {
-        await this.execute('saveSystemConfigByKeyResult', '保存系统配置', async () => {
+        await this.execute('saveSystemConfigByKeyResult', t('host.cfg.op.saveSystem'), async () => {
             // enablePet/showThinkingText/defaultPermissionLevel 是扩展端本地字段，不应推给 sema-core
             if (key === 'enablePet' || key === 'showThinkingText' || key === 'defaultPermissionLevel') {
                 await this.coreManager.saveLocalSystemConfigByKey(key, value);
             } else {
                 await this.coreManager.updateSystemConfigByKey(key, value);
             }
-            this.postMessage({ command: 'saveSystemConfigByKeyResult', success: true, key, value, message: '配置已保存' });
+            if (key === 'lang' && this.panel) this.panel.title = t('host.cfg.panelTitle');
+            this.postMessage({ command: 'saveSystemConfigByKeyResult', success: true, key, value, message: t('host.cfg.configSaved') });
             this.onSystemConfigChanged?.(key, value);
         });
     }
 
     private async resetSystemConfig() {
-        if (!await this.confirm('确定要重置为默认配置吗？此操作将恢复所有系统配置', '重置')) return;
-        await this.execute('resetSystemConfigResult', '重置系统配置', async () => {
-            await this.coreManager.updateSystemConfig(defaultConfig);
-            this.postMessage({ command: 'resetSystemConfigResult', success: true, message: '系统配置已重置' });
+        if (!await this.confirm(t('host.cfg.resetConfirm'), t('host.cfg.resetLabel'))) return;
+        await this.execute('resetSystemConfigResult', t('host.cfg.op.resetSystem'), async () => {
+            // 重置不改界面语言：lang 保留当前值，customRules 取当前语言对应的默认规则，其余字段回默认
+            const lang = normalizeLang((this.coreManager.getSystemConfig() as Record<string, any>).lang);
+            const resetConfig = { ...defaultConfig, lang, customRules: DEFAULT_CUSTOM_RULES[lang] };
+            await this.coreManager.updateSystemConfig(resetConfig);
+            this.postMessage({ command: 'resetSystemConfigResult', success: true, data: resetConfig, message: t('host.cfg.systemReset') });
             this.onSystemConfigChanged?.('skipFileEditPermission', defaultConfig.skipFileEditPermission);
             this.onSystemConfigChanged?.('thinking', defaultConfig.thinking);
             this.onSystemConfigChanged?.('showThinkingText', defaultConfig.showThinkingText);
@@ -459,9 +472,9 @@ export class ConfigWebviewProvider {
     }
 
     private async updateDisabledTools(disabledTools: string[] | null) {
-        await this.execute('updateDisabledToolsResult', '更新工具配置', async () => {
+        await this.execute('updateDisabledToolsResult', t('host.cfg.op.updateTools'), async () => {
             await this.coreManager.updateDisabledTools(disabledTools);
-            this.postMessage({ command: 'updateDisabledToolsResult', success: true, message: '工具配置已更新' });
+            this.postMessage({ command: 'updateDisabledToolsResult', success: true, message: t('host.cfg.toolsUpdated') });
         });
     }
 
@@ -479,64 +492,64 @@ export class ConfigWebviewProvider {
     }
 
     private async refreshPluginConfig() {
-        await this.execute('refreshPluginConfigResult', '刷新插件信息', async () => {
+        await this.execute('refreshPluginConfigResult', t('host.cfg.op.refreshPlugin'), async () => {
             const data = await this.coreManager.refreshMarketplacePluginsInfo();
             this.postMessage({ command: 'refreshPluginConfigResult', success: true, data });
         });
     }
 
     private async installPlugin(pluginName: string, marketplaceName: string, scope: string, key: string) {
-        await this.execute('installPluginResult', '安装插件', async () => {
+        await this.execute('installPluginResult', t('host.cfg.op.installPlugin'), async () => {
             const data = await this.coreManager.installPlugin(pluginName, marketplaceName, scope);
             this.postMessage({ command: 'installPluginResult', success: true, key, data });
         });
     }
 
     private async uninstallPlugin(pluginName: string, marketplaceName: string, scope: string, key: string) {
-        if (!await this.confirm(`确定要卸载插件 "${pluginName}" 吗？`, '卸载')) {
+        if (!await this.confirm(t('host.cfg.uninstallPluginConfirm', { name: pluginName }), t('host.cfg.uninstallLabel'))) {
             this.postMessage({ command: 'uninstallPluginResult', success: false, key, cancelled: true });
             return;
         }
-        await this.execute('uninstallPluginResult', '卸载插件', async () => {
+        await this.execute('uninstallPluginResult', t('host.cfg.op.uninstallPlugin'), async () => {
             const data = await this.coreManager.uninstallPlugin(pluginName, marketplaceName, scope);
             this.postMessage({ command: 'uninstallPluginResult', success: true, key, data });
         });
     }
 
     private async enablePlugin(pluginName: string, marketplaceName: string, scope: string) {
-        await this.execute('enablePluginResult', '启用插件', async () => {
+        await this.execute('enablePluginResult', t('host.cfg.op.enablePlugin'), async () => {
             const data = await this.coreManager.enablePlugin(pluginName, marketplaceName, scope);
             this.postMessage({ command: 'enablePluginResult', success: true, data });
         });
     }
 
     private async disablePlugin(pluginName: string, marketplaceName: string, scope: string) {
-        await this.execute('disablePluginResult', '禁用插件', async () => {
+        await this.execute('disablePluginResult', t('host.cfg.op.disablePlugin'), async () => {
             const data = await this.coreManager.disablePlugin(pluginName, marketplaceName, scope);
             this.postMessage({ command: 'disablePluginResult', success: true, data });
         });
     }
 
     private async updateMarketplace(marketplaceName: string) {
-        await this.execute('updateMarketplaceResult', '更新插件市场', async () => {
+        await this.execute('updateMarketplaceResult', t('host.cfg.op.updateMarket'), async () => {
             const data = await this.coreManager.updateMarketplace(marketplaceName);
             this.postMessage({ command: 'updateMarketplaceResult', success: true, name: marketplaceName, data });
         });
     }
 
     private async removeMarketplace(marketplaceName: string) {
-        if (!await this.confirm(`确定要移除插件市场 "${marketplaceName}" 吗？`, '移除')) {
+        if (!await this.confirm(t('host.cfg.removeMarketConfirm', { name: marketplaceName }), t('host.cfg.removeLabel'))) {
             this.postMessage({ command: 'removeMarketplaceResult', success: false, name: marketplaceName, cancelled: true });
             return;
         }
-        await this.execute('removeMarketplaceResult', '移除插件市场', async () => {
+        await this.execute('removeMarketplaceResult', t('host.cfg.op.removeMarket'), async () => {
             const data = await this.coreManager.removeMarketplace(marketplaceName);
             this.postMessage({ command: 'removeMarketplaceResult', success: true, name: marketplaceName, data });
         });
     }
 
     private async addMarketplace(type: 'github' | 'directory', value: string) {
-        await this.execute('addMarketplaceResult', '添加插件市场', async () => {
+        await this.execute('addMarketplaceResult', t('host.cfg.op.addMarket'), async () => {
             const data = type === 'github'
                 ? await this.coreManager.addMarketplaceFromGit(value)
                 : await this.coreManager.addMarketplaceFromDirectory(value);
@@ -567,17 +580,17 @@ export class ConfigWebviewProvider {
     }
 
     private async addAgent(data: Omit<AgentConfig, 'locate'> & { locate: 'project' | 'user' }) {
-        await this.execute('addAgentResult', '创建 Agent', async () => {
+        await this.execute('addAgentResult', t('host.cfg.op.createAgent'), async () => {
             const agents = await this.coreManager.addAgentConf(data);
-            this.postMessage({ command: 'addAgentResult', success: true, message: 'Agent 创建成功', data: agents });
+            this.postMessage({ command: 'addAgentResult', success: true, message: t('host.cfg.agentCreated'), data: agents });
         });
     }
 
     private async removeAgent(name: string) {
-        if (!await this.confirm(`确定要删除 Agent "${name}" 吗？`, '删除')) return;
-        await this.execute('removeAgentResult', '删除 Agent', async () => {
+        if (!await this.confirm(t('host.cfg.deleteAgentConfirm', { name }), t('common.delete'))) return;
+        await this.execute('removeAgentResult', t('host.cfg.op.deleteAgent'), async () => {
             const agents = await this.coreManager.removeAgentConf(name);
-            this.postMessage({ command: 'removeAgentResult', success: true, message: 'Agent 已删除', data: agents });
+            this.postMessage({ command: 'removeAgentResult', success: true, message: t('host.cfg.agentDeleted'), data: agents });
         });
     }
 
@@ -604,10 +617,10 @@ export class ConfigWebviewProvider {
     }
 
     private async removeSkill(name: string) {
-        if (!await this.confirm(`确定要删除 Skill "${name}" 吗？`, '删除')) return;
-        await this.execute('removeSkillResult', '删除 Skill', async () => {
+        if (!await this.confirm(t('host.cfg.deleteSkillConfirm', { name }), t('common.delete'))) return;
+        await this.execute('removeSkillResult', t('host.cfg.op.deleteSkill'), async () => {
             const skills = await this.coreManager.removeSkillConf(name);
-            this.postMessage({ command: 'removeSkillResult', success: true, message: 'Skill 已删除', data: skills });
+            this.postMessage({ command: 'removeSkillResult', success: true, message: t('host.cfg.skillDeleted'), data: skills });
         });
     }
 
@@ -616,7 +629,7 @@ export class ConfigWebviewProvider {
         // 成功消息由 execute 统一发送（successExtra 挂 data），fn 里不要再 postMessage，否则会多发一条无 data 的成功消息
         await this.execute(
             'toggleSkillResult',
-            enabled ? '启用 Skill' : '禁用 Skill',
+            enabled ? t('host.cfg.op.enableSkill') : t('host.cfg.op.disableSkill'),
             async () => (enabled ? await this.coreManager.enableSkill(name) : await this.coreManager.disableSkill(name)),
             (data) => ({ data }),
         );
@@ -638,7 +651,7 @@ export class ConfigWebviewProvider {
             let skillsDir: string;
             if (scope === 'project') {
                 const wsFolder = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-                if (!wsFolder) throw new Error('未打开项目，无法执行项目安装');
+                if (!wsFolder) throw new Error(t('host.cfg.noWorkspace'));
                 skillsDir = path.join(wsFolder, '.sema', 'skills');
             } else {
                 skillsDir = path.join(os.homedir(), '.sema', 'skills');
@@ -666,7 +679,7 @@ export class ConfigWebviewProvider {
             this.postMessage({ command: 'installSkillFromHubResult', success: true, slug, data: skills });
         } catch (error) {
             this.postMessage({ command: 'installSkillFromHubResult', success: false, slug, message: (error as Error).message });
-            vscode.window.showErrorMessage(`安装 Skill "${slug}" 失败: ${(error as Error).message}`);
+            vscode.window.showErrorMessage(t('host.cfg.installSkillFailed', { slug, error: (error as Error).message }));
         }
     }
 
@@ -723,7 +736,7 @@ export class ConfigWebviewProvider {
                         return;
                     }
                     if (res.statusCode !== 200) {
-                        reject(new Error(`下载失败，状态码: ${res.statusCode}`));
+                        reject(new Error(t('host.cfg.downloadFailed', { status: String(res.statusCode) })));
                         return;
                     }
                     const file = fs.createWriteStream(destPath);
@@ -759,17 +772,17 @@ export class ConfigWebviewProvider {
     }
 
     private async addCommand(data: Omit<CommandConfig, 'locate'> & { locate: 'project' | 'user' }) {
-        await this.execute('addCommandResult', '创建 Command', async () => {
+        await this.execute('addCommandResult', t('host.cfg.op.createCommand'), async () => {
             const commands = await this.coreManager.addCommandConf(data);
-            this.postMessage({ command: 'addCommandResult', success: true, message: 'Command 创建成功', data: commands });
+            this.postMessage({ command: 'addCommandResult', success: true, message: t('host.cfg.commandCreated'), data: commands });
         });
     }
 
     private async removeCommand(name: string) {
-        if (!await this.confirm(`确定要删除 Command "${name}" 吗？`, '删除')) return;
-        await this.execute('removeCommandResult', '删除 Command', async () => {
+        if (!await this.confirm(t('host.cfg.deleteCommandConfirm', { name }), t('common.delete'))) return;
+        await this.execute('removeCommandResult', t('host.cfg.op.deleteCommand'), async () => {
             const commands = await this.coreManager.removeCommandConf(name);
-            this.postMessage({ command: 'removeCommandResult', success: true, message: 'Command 已删除', data: commands });
+            this.postMessage({ command: 'removeCommandResult', success: true, message: t('host.cfg.commandDeleted'), data: commands });
         });
     }
 
@@ -797,45 +810,45 @@ export class ConfigWebviewProvider {
     }
 
     private async addMCPServer(data: any) {
-        await this.execute('addMCPServerResult', '添加 MCP Server', async () => {
+        await this.execute('addMCPServerResult', t('host.cfg.op.addMcp'), async () => {
             const servers = await this.coreManager.addMCPServer(data);
-            this.postMessage({ command: 'addMCPServerResult', success: true, message: 'MCP Server 添加成功', data: servers });
+            this.postMessage({ command: 'addMCPServerResult', success: true, message: t('host.cfg.mcpAdded'), data: servers });
         });
     }
 
     private async removeMCPServer(name: string) {
-        if (!await this.confirm(`确定要删除 MCP Server "${name}" 吗？`, '删除')) return;
-        await this.execute('removeMCPServerResult', '删除 MCP Server', async () => {
+        if (!await this.confirm(t('host.cfg.deleteMcpConfirm', { name }), t('common.delete'))) return;
+        await this.execute('removeMCPServerResult', t('host.cfg.op.deleteMcp'), async () => {
             const servers = await this.coreManager.removeMCPServer(name);
-            this.postMessage({ command: 'removeMCPServerResult', success: true, message: 'MCP Server 已删除', data: servers });
+            this.postMessage({ command: 'removeMCPServerResult', success: true, message: t('host.cfg.mcpDeleted'), data: servers });
         });
     }
 
     private async reconnectMCPServer(name: string) {
-        await this.execute('reconnectMCPServerResult', '重连 MCP Server', async () => {
+        await this.execute('reconnectMCPServerResult', t('host.cfg.op.reconnectMcp'), async () => {
             const servers = await this.coreManager.reconnectMCPServer(name);
-            this.postMessage({ command: 'reconnectMCPServerResult', success: true, message: 'MCP Server 重连成功', data: servers });
+            this.postMessage({ command: 'reconnectMCPServerResult', success: true, message: t('host.cfg.mcpReconnected'), data: servers });
         });
     }
 
     private async disableMCPServer(name: string) {
-        await this.execute('disableMCPServerResult', '禁用 MCP Server', async () => {
+        await this.execute('disableMCPServerResult', t('host.cfg.op.disableMcp'), async () => {
             const servers = await this.coreManager.disableMCPServer(name);
             this.postMessage({ command: 'disableMCPServerResult', success: true, data: servers });
         });
     }
 
     private async enableMCPServer(name: string) {
-        await this.execute('enableMCPServerResult', '启用 MCP Server', async () => {
+        await this.execute('enableMCPServerResult', t('host.cfg.op.enableMcp'), async () => {
             const servers = await this.coreManager.enableMCPServer(name);
             this.postMessage({ command: 'enableMCPServerResult', success: true, data: servers });
         });
     }
 
     private async updateMCPUseTools(name: string, toolNames: string[]) {
-        await this.execute('updateMCPUseToolsResult', '更新 MCP 工具配置', async () => {
+        await this.execute('updateMCPUseToolsResult', t('host.cfg.op.updateMcpTools'), async () => {
             const servers = await this.coreManager.updateMCPUseTools(name, toolNames);
-            this.postMessage({ command: 'updateMCPUseToolsResult', success: true, message: '工具配置已更新', data: servers });
+            this.postMessage({ command: 'updateMCPUseToolsResult', success: true, message: t('host.cfg.toolsUpdated'), data: servers });
         });
     }
 
@@ -932,7 +945,7 @@ export class ConfigWebviewProvider {
     }
 
     private async stopTask(taskId: string) {
-        await this.execute('stopTaskResult', '停止任务', async () => {
+        await this.execute('stopTaskResult', t('host.cfg.op.stopTask'), async () => {
             this.coreManager.stopTask(taskId);
             this.unwatchTask(taskId);
             this.postMessage({ command: 'stopTaskResult', success: true, taskId });
@@ -942,7 +955,7 @@ export class ConfigWebviewProvider {
     // ─── Cron Tasks ─────────────────────────────────────────────────────────
 
     private async loadCronTasks() {
-        await this.execute('', '加载定时任务', async () => {
+        await this.execute('', t('host.cfg.op.loadCron'), async () => {
             const data = await this.coreManager.getCronTasks();
             // console.log('[loadCronTasks] data:', data);
             this.postMessage({ command: 'loadCronTasksResult', success: true, data });
@@ -950,21 +963,21 @@ export class ConfigWebviewProvider {
     }
 
     private async deleteCronTask(id: string) {
-        await this.execute('', '删除定时任务', async () => {
+        await this.execute('', t('host.cfg.op.deleteCron'), async () => {
             const success = this.coreManager.deleteCronTask(id);
             this.postMessage({ command: 'deleteCronTaskResult', success, id });
         });
     }
 
     private async enableCronTask(id: string) {
-        await this.execute('', '启用定时任务', async () => {
+        await this.execute('', t('host.cfg.op.enableCron'), async () => {
             const success = this.coreManager.enableCronTask(id);
             this.postMessage({ command: 'enableCronTaskResult', success, id });
         });
     }
 
     private async disableCronTask(id: string) {
-        await this.execute('', '禁用定时任务', async () => {
+        await this.execute('', t('host.cfg.op.disableCron'), async () => {
             const success = this.coreManager.disableCronTask(id);
             this.postMessage({ command: 'disableCronTaskResult', success, id });
         });
@@ -1033,7 +1046,7 @@ export class ConfigWebviewProvider {
         } else {
             vscode.workspace.openTextDocument(filePath).then(
                 doc => vscode.window.showTextDocument(doc),
-                err => vscode.window.showErrorMessage(`打开文件失败：${(err as Error).message}`)
+                err => vscode.window.showErrorMessage(t('host.cfg.openFileFailed', { error: (err as Error).message }))
             );
         }
     }
@@ -1047,12 +1060,12 @@ export class ConfigWebviewProvider {
     private getHtmlContent(webview: vscode.Webview, extensionUri: vscode.Uri): string {
         const scriptUri = webview.asWebviewUri(vscode.Uri.joinPath(extensionUri, 'dist', 'webview', 'config.js'));
         return `<!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="${getLang()}">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline' ${webview.cspSource}; script-src ${webview.cspSource}; img-src data:;">
-    <title>Code Agent Model配置</title>
+    <title>${t('host.cfg.panelTitle')}</title>
 </head>
 <body>
     <div id="root"></div>

@@ -2,6 +2,7 @@ import React, { useState, useCallback, useEffect } from 'react';
 import ReactDOM from 'react-dom';
 import { ForkPreview, ForkFileChange, ForkFileEffect } from '../../types';
 import { getSelectionPointer } from '../../utils/symbols';
+import { useT, I18nKey } from '../../../common/i18n/react';
 
 interface ForkDialogProps {
     preview: ForkPreview;
@@ -9,10 +10,10 @@ interface ForkDialogProps {
     onCancel: () => void;
 }
 
-// 文件分两类展示：内容修改 / 存在性增删（recreate=恢复被删，delete=删掉新增）
-const GROUP_ORDER: { key: string; label: string; effects: ForkFileEffect[] }[] = [
-    { key: 'modify', label: '文件修改', effects: ['modify'] },
-    { key: 'addremove', label: '文件增删', effects: ['recreate', 'delete'] },
+// 文件分两类展示：内容修改 / 存在性增删（recreate=恢复被删，delete=删掉新增）；label 为文案 key，渲染期取值
+const GROUP_ORDER: { key: string; labelKey: I18nKey; effects: ForkFileEffect[] }[] = [
+    { key: 'modify', labelKey: 'chat.fork.filterModify', effects: ['modify'] },
+    { key: 'addremove', labelKey: 'chat.fork.filterAddRemove', effects: ['recreate', 'delete'] },
 ];
 
 const renderStats = (f: ForkFileChange) => {
@@ -33,6 +34,7 @@ const renderStats = (f: ForkFileChange) => {
  * 在某条用户消息处回退会话：可选仅撤销对话，或同时把文件回滚到该点。
  */
 const ForkDialog: React.FC<ForkDialogProps> = ({ preview, onConfirm, onCancel }) => {
+    const t = useT();
     const [submitting, setSubmitting] = useState<boolean>(false);
     const [selectedIndex, setSelectedIndex] = useState<number>(0);
     const { canRestoreFiles, files } = preview;
@@ -46,13 +48,13 @@ const ForkDialog: React.FC<ForkDialogProps> = ({ preview, onConfirm, onCancel })
     // 选项列表（顺序与渲染一致，最后一项恒为「取消」）
     const options: { label: string; title?: string }[] = hasRestorableFiles
         ? [
-            { label: '恢复文件并 Fork' },
-            { label: '仅 Fork 会话', title: '仅撤销对话，已修改的文件保持不变' },
-            { label: '取消' },
+            { label: t('chat.fork.restoreAndFork') },
+            { label: t('chat.fork.forkOnly'), title: t('chat.fork.forkOnlyTitle') },
+            { label: t('common.cancel') },
         ]
         : [
-            { label: 'Fork 会话' },
-            { label: '取消' },
+            { label: t('chat.fork.fork') },
+            { label: t('common.cancel') },
         ];
 
     // 触发某个选项：最后一项为取消，首项视有无可恢复文件决定是否回滚
@@ -107,15 +109,15 @@ const ForkDialog: React.FC<ForkDialogProps> = ({ preview, onConfirm, onCancel })
         <div className="fork-modal-overlay" onClick={handleBackdropClick}>
             <div className="fork-modal-container">
                 <div className="fork-dialog-header">
-                    <div className="fork-dialog-title">Fork / 撤销到此处</div>
-                    <div className="fork-dialog-subtitle">将删除此消息及之后的所有对话</div>
+                    <div className="fork-dialog-title">{t('chat.fork.title')}</div>
+                    <div className="fork-dialog-subtitle">{t('chat.fork.subtitle')}</div>
                 </div>
 
                 {hasRestorableFiles ? (
                     <div className="fork-dialog-files">
                         {groups.map(g => (
                             <div className="fork-file-group" key={g.key}>
-                                <div className="fork-file-group-title">{g.label}（{g.items.length}）</div>
+                                <div className="fork-file-group-title">{t(g.labelKey)}（{g.items.length}）</div>
                                 {g.items.map(f => (
                                     <div className="fork-file-row" key={f.filePath}>
                                         {/* 首尾包裹 LRM 锚定为 LTR，避免 direction:rtl 下路径首/尾的 "/" 被 bidi 移位 */}
@@ -129,8 +131,8 @@ const ForkDialog: React.FC<ForkDialogProps> = ({ preview, onConfirm, onCancel })
                 ) : (
                     <div className="fork-dialog-note">
                         {canRestoreFiles
-                            ? '此处之后无文件改动，将仅撤销对话'
-                            : '此消息无文件快照，将仅撤销对话'}
+                            ? t('chat.fork.noChangesAfter')
+                            : t('chat.fork.noSnapshot')}
                     </div>
                 )}
 

@@ -8,11 +8,16 @@ import com.intellij.testFramework.LightVirtualFile
  * 历史会话页的标记性虚拟文件——承载于编辑器主区域的 tab（对齐 VSCode createWebviewPanel(ViewColumn.One)）。
  * 每个 project 复用同一实例，保证 FileEditorManager.openFile 能聚焦已打开的 tab（= VSCode panel.reveal）。
  */
-class SemaHistoryVirtualFile private constructor() : LightVirtualFile("历史会话") {
+class SemaHistoryVirtualFile private constructor() : LightVirtualFile(title()) {
     override fun getPath(): String = "sema://history"
+
+    /** 编辑器 tab 标题取 presentableName：按当前语言动态返回（name 在构造时已定死）。 */
+    override fun getPresentableName(): String = title()
 
     companion object {
         private val KEY = Key.create<SemaHistoryVirtualFile>("sema.history.virtualFile")
+
+        private fun title(): String = SemaBundle.message("history.title")
 
         fun get(project: Project): SemaHistoryVirtualFile {
             project.getUserData(KEY)?.let { return it }

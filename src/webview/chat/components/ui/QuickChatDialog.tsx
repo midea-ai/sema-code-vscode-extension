@@ -1,6 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import { renderMarkdownToHtml } from '../../utils/markdown';
 import { getSelectionPointer } from '../../utils/symbols';
+import { useT } from '../../../common/i18n/react';
 import '../../style/markdown.css';
 
 interface QuickChatDialogProps {
@@ -9,6 +10,7 @@ interface QuickChatDialogProps {
 }
 
 const QuickChatDialog: React.FC<QuickChatDialogProps> = ({ data, onClose }) => {
+    const t = useT();
     const buttonRef = useRef<HTMLButtonElement>(null);
     const bodyRef = useRef<HTMLDivElement>(null);
 
@@ -32,7 +34,7 @@ const QuickChatDialog: React.FC<QuickChatDialogProps> = ({ data, onClose }) => {
                 <div className="quickchat-dialog-header">
                     <span className="quickchat-dialog-icon">💡</span>
                     <span className="quickchat-dialog-title">QuickChat</span>
-                    <button className="task-modal-close" onClick={onClose} title="关闭">✕</button>
+                    <button className="task-modal-close" onClick={onClose} title={t('common.close')}>✕</button>
                 </div>
                 <div className="quickchat-dialog-body" ref={bodyRef}>
                     <div className="quickchat-question">{data.question}</div>
@@ -49,7 +51,7 @@ const QuickChatDialog: React.FC<QuickChatDialogProps> = ({ data, onClose }) => {
                         className="bash-permission-btn bash-permission-btn-reject selected"
                         onClick={onClose}
                     >
-                        {getSelectionPointer()}关闭 (Enter)
+                        {getSelectionPointer()}{t('chat.quickchat.closeEnter')}
                     </button>
                 </div>
             </div>

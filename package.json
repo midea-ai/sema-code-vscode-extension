@@ -49,17 +49,17 @@
     "commands": [
       {
         "command": "sema-vscode-extension.newSession",
-        "title": "开始新对话",
+        "title": "%command.newSession.title%",
         "icon": "$(add)"
       },
       {
         "command": "sema-vscode-extension.openHistory",
-        "title": "历史会话",
+        "title": "%command.openHistory.title%",
         "icon": "$(history)"
       },
       {
         "command": "sema-vscode-extension.openConfig",
-        "title": "配置",
+        "title": "%command.openConfig.title%",
         "icon": "$(gear)"
       }
     ],

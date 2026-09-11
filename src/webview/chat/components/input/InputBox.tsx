@@ -46,6 +46,7 @@ import {
     insertNodeAtOffset
 } from './utils/editorDom';
 import { ShortcutCommand } from '../../../../utils/command';
+import { useT } from '../../../common/i18n/react';
 
 // ─── 组件 ───────────────────────────────────────────────────────────────────
 
@@ -90,6 +91,7 @@ const InputBox = forwardRef<InputBoxHandle, InputBoxProps>(({
     onPermissionLevelChange,
     prediction
 }, ref) => {
+    const t = useT();
     const [inputValue, setInputValue] = useState<string>('');
     const [mentions, setMentions] = useState<InputMention[]>([]);
     const [isExpanded, setIsExpanded] = useState<boolean>(false);
@@ -1080,7 +1082,7 @@ const InputBox = forwardRef<InputBoxHandle, InputBoxProps>(({
         <div className="input-box-container">
             <div className="input-box-wrapper">
                 <div className="input-header">
-                    <Tooltip content={disabled || fileSelection.showFilePicker ? '' : '添加文件'}>
+                    <Tooltip content={disabled || fileSelection.showFilePicker ? '' : t('chat.input.addFile')}>
                         <button
                             ref={addFileButtonRef}
                             className="add-file-btn"
@@ -1155,7 +1157,7 @@ const InputBox = forwardRef<InputBoxHandle, InputBoxProps>(({
 
                 <div className="bottom-left-container">
                     <div className="agent-mode-container">
-                        <Tooltip content={disabled || agentModeMenu.showAgentModeMenu ? '' : '切换 Agent 模式'}>
+                        <Tooltip content={disabled || agentModeMenu.showAgentModeMenu ? '' : t('chat.input.switchAgentMode')}>
                             <button
                                 ref={agentModeButtonRef}
                                 className={`agent-mode-btn mode-${agentMode.toLowerCase()}`}
@@ -1177,7 +1179,7 @@ const InputBox = forwardRef<InputBoxHandle, InputBoxProps>(({
                     <span className="bottom-separator separator-model">|</span>
 
                     <div className="model-info-container">
-                        <Tooltip content={disabled || modelMenu.showModelMenu ? '' : (modelMenu.isModelLoading ? '正在加载模型...' : (modelName || '未设置模型'))}>
+                        <Tooltip content={disabled || modelMenu.showModelMenu ? '' : (modelMenu.isModelLoading ? t('chat.input.loadingModels') : (modelName || t('chat.input.noModel')))}>
                             <button
                                 ref={modelButtonRef}
                                 className="model-info-btn"
@@ -1188,7 +1190,7 @@ const InputBox = forwardRef<InputBoxHandle, InputBoxProps>(({
                                     <ProviderLogo provider={parseProviderKey(modelMenu.currentModel)} className="model-btn-logo" />
                                 )}
                                 <span className="model-name-text">
-                                    {modelMenu.isModelLoading ? '加载中...' : (modelMenu.currentModel ? stripProviderSuffix(modelMenu.currentModel) : '未设置')}
+                                    {modelMenu.isModelLoading ? t('common.loading') : (modelMenu.currentModel ? stripProviderSuffix(modelMenu.currentModel) : t('chat.input.notSet'))}
                                 </span>
                                 <ChevronDownIcon />
                             </button>
@@ -1206,7 +1208,7 @@ const InputBox = forwardRef<InputBoxHandle, InputBoxProps>(({
 
                     <span className="bottom-separator separator-autoedit">|</span>
                     <div className="permission-level-container">
-                        <Tooltip content={disabled || permissionLevelMenu.showPermissionLevelMenu ? '' : '切换权限档位'}>
+                        <Tooltip content={disabled || permissionLevelMenu.showPermissionLevelMenu ? '' : t('chat.input.switchPermission')}>
                             <button
                                 ref={permissionLevelButtonRef}
                                 className={`permission-level-btn level-${permissionLevel.toLowerCase()}`}
@@ -1227,7 +1229,7 @@ const InputBox = forwardRef<InputBoxHandle, InputBoxProps>(({
                 </div>
 
                 <div className="input-actions">
-                    <Tooltip content={disabled ? '' : (isExpanded ? '缩小' : '扩大')}>
+                    <Tooltip content={disabled ? '' : (isExpanded ? t('chat.input.shrink') : t('chat.input.enlarge'))}>
                         <button
                             className="expand-btn"
                             onClick={handleToggleExpand}
@@ -1238,7 +1240,7 @@ const InputBox = forwardRef<InputBoxHandle, InputBoxProps>(({
                     </Tooltip>
 
                     <Tooltip content={(canSend || isGenerating) ?
-                        (canSend ? '发送 Enter' : '中断 Ctrl+C') : ''}>
+                        (canSend ? t('chat.input.send') : t('chat.input.interrupt')) : ''}>
                         <button
                             className={`send-btn ${canSend || isGenerating ? 'active' : ''}`}
                             onClick={handleButtonClick}

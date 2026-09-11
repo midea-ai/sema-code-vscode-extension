@@ -8,6 +8,7 @@ import { langMap } from '../../utils/fileLangTypeMap';
 import { countDiffChanges } from '../../utils/diffParser';
 import { TOOL_NAME_WRITE_FILE } from '../../../../utils/tool';
 import { hasTextSelection } from '../../utils/selection';
+import { useT } from '../../../common/i18n/react';
 
 interface EditBlockProps {
     content: ToolContent;
@@ -20,6 +21,7 @@ const EditBlock: React.FC<EditBlockProps> = React.memo(({
     vscode,
     onFileChange
 }) => {
+    const t = useT();
     const { toolName, title, content } = toolContent;
 
     const [isExpanded, setIsExpanded] = useState(true);
@@ -157,7 +159,7 @@ const EditBlock: React.FC<EditBlockProps> = React.memo(({
                 </div>
                 <div className="edit-spacer"></div>
                 <div className="edit-copy-btn" onClick={(e) => { e.stopPropagation(); handleCopy(); }}>
-                    复制
+                    {t('common.copy')}
                 </div>
             </div>
             {isExpanded && (

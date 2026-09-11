@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { VscodeApi } from './types';
-import { defaultConfig } from './default/defaultConfig.ts';
+import IconSelect from './IconSelect';
+import { defaultConfig, DEFAULT_CUSTOM_RULES, isBuiltinCustomRules } from './default/defaultConfig.ts';
+import { useT, setLang, getLang, normalizeLang, languageLabel, I18nKey, LANGS, LANGUAGES } from '../common/i18n/react';
 
 interface SystemConfigProps {
     vscode: VscodeApi;
@@ -8,6 +10,7 @@ interface SystemConfigProps {
 
 // 使用与 defaultConfig 相同的接口结构
 interface SystemConfigData {
+    lang?: string;
     stream?: boolean;
     thinking?: boolean;
     showThinkingText?: boolean;
@@ -27,20 +30,22 @@ interface SystemConfigData {
     defaultPermissionLevel?: string;
 }
 
-/** 可选的默认权限档位（与输入框权限菜单一致），desc 用于选中后旁侧提示 */
-const PERMISSION_LEVEL_OPTIONS: Array<{ value: string; desc: string }> = [
-    { value: 'Ask', desc: '每步操作前询问' },
-    { value: 'AutoEdit', desc: '自动批准文件编辑，其他询问' },
-    { value: 'AutoRun', desc: '自动批准，危险操作询问' },
-    { value: 'Bypass', desc: '跳过所有确认，危险' }
+/** 可选的默认权限档位（与输入框权限菜单一致），descKey 为说明文案 key，渲染期取值 */
+const PERMISSION_LEVEL_OPTIONS: Array<{ value: string; descKey: I18nKey }> = [
+    { value: 'Ask', descKey: 'config.system.perm.ask' },
+    { value: 'AutoEdit', descKey: 'config.system.perm.autoEdit' },
+    { value: 'AutoRun', descKey: 'config.system.perm.autoRun' },
+    { value: 'Bypass', descKey: 'config.system.perm.bypass' }
 ];
 
 const SystemConfig: React.FC<SystemConfigProps> = ({ vscode }) => {
     // JB 插件不支持桌宠，隐藏「启用桌宠」开关（VSCode 下 __SEMA_JB__ 为 undefined，行为不变）。
     // 必须在组件内读取：模块顶层求值早于 jb-index 设置该标记，会恒为 false。
     const IS_JB = !!(window as any).__SEMA_JB__;
-    const [config, setConfig] = useState<SystemConfigData>(defaultConfig);
-    const [savedConfig, setSavedConfig] = useState<SystemConfigData>(defaultConfig); // 已保存的配置
+    const t = useT();
+    // 初始值按当前语言取默认，避免英文用户在配置加载完成前闪一帧「- 中文回答」
+    const [config, setConfig] = useState<SystemConfigData>(() => ({ ...defaultConfig, lang: getLang(), customRules: DEFAULT_CUSTOM_RULES[getLang()] }));
+    const [savedConfig, setSavedConfig] = useState<SystemConfigData>(() => ({ ...defaultConfig, lang: getLang(), customRules: DEFAULT_CUSTOM_RULES[getLang()] })); // 已保存的配置
     const [message, setMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
     const [platform, setPlatform] = useState<string>('');
     const petSupported = platform === 'darwin' || platform === 'win32' || platform === 'linux';
@@ -68,10 +73,19 @@ const SystemConfig: React.FC<SystemConfigProps> = ({ vscode }) => {
             const msg = event.data;
 
             switch (msg.command) {
+                case 'langUpdate':
+                    if (typeof msg.lang === 'string') {
+                        const lang = normalizeLang(msg.lang);
+                        setLang(lang);
+                        setConfig(prev => ({ ...prev, lang }));
+                        setSavedConfig(prev => ({ ...prev, lang }));
+                    }
+                    break;
                 case 'loadSystemConfigResult':
                     if (msg.success && msg.data) {
                         setConfig(msg.data);
                         setSavedConfig(msg.data);
+                        if (msg.data.lang) setLang(msg.data.lang);
                     }
                     if (typeof msg.platform === 'string') {
                         setPlatform(msg.platform);
@@ -83,7 +97,7 @@ const SystemConfig: React.FC<SystemConfigProps> = ({ vscode }) => {
                         setSavedConfig(prev => ({ ...prev, [msg.key]: msg.value }));
                     } else {
                         setMessage({
-                            text: `✗ ${msg.message || '保存失败'}`,
+                            text: `✗ ${msg.message || t('config.system.saveFailed')}`,
                             type: 'error'
                         });
                         setTimeout(() => setMessage(null), 3000);
@@ -91,19 +105,22 @@ const SystemConfig: React.FC<SystemConfigProps> = ({ vscode }) => {
                     break;
                 case 'saveSystemConfigResult':
                     setMessage({
-                        text: msg.success ? '✓ 配置已保存' : `✗ ${msg.message || '保存失败'}`,
+                        text: msg.success ? t('config.system.saved') : `✗ ${msg.message || t('config.system.saveFailed')}`,
                         type: msg.success ? 'success' : 'error'
                     });
                     setTimeout(() => setMessage(null), 3000);
                     break;
                 case 'resetSystemConfigResult':
                     if (msg.success) {
-                        // 重置成功，更新前端状态
-                        setConfig(defaultConfig);
-                        setSavedConfig(defaultConfig);
+                        // 重置不改界面语言：优先使用宿主实际写入的配置回填；
+                        // 兜底按同样规则本地构造（保留当前 lang，customRules 取当前语言默认值）
+                        const lang = normalizeLang(msg.data?.lang ?? getLang());
+                        const resetConfig: SystemConfigData = msg.data ?? { ...defaultConfig, lang, customRules: DEFAULT_CUSTOM_RULES[lang] };
+                        setConfig(resetConfig);
+                        setSavedConfig(resetConfig);
                     }
                     setMessage({
-                        text: msg.success ? '✓ 已重置为默认配置' : `✗ ${msg.message || '重置失败'}`,
+                        text: msg.success ? t('config.system.resetDone') : `✗ ${msg.message || t('config.system.resetFailed')}`,
                         type: msg.success ? 'success' : 'error'
                     });
                     setTimeout(() => setMessage(null), 3000);
@@ -151,6 +168,26 @@ const SystemConfig: React.FC<SystemConfigProps> = ({ vscode }) => {
         saveConfigByKey(field, config[field]);
     };
 
+    /**
+     * 切换界面语言：页面立即切换并落盘 lang。
+     * customRules 仅当当前值仍是某个语言的默认值（整体比较，忽略首尾空白）时才替换为目标语言默认值；
+     * 用户改过的规则一律不动。
+     */
+    const handleLangChange = (value: string) => {
+        const lang = normalizeLang(value);
+        const isDefaultRules = isBuiltinCustomRules(config.customRules);
+        setConfig(prev => ({
+            ...prev,
+            lang,
+            ...(isDefaultRules ? { customRules: DEFAULT_CUSTOM_RULES[lang] } : {})
+        }));
+        setLang(lang);
+        saveConfigByKey('lang', lang);
+        if (isDefaultRules) {
+            saveConfigByKey('customRules', DEFAULT_CUSTOM_RULES[lang]);
+        }
+    };
+
     const handleReset = () => {
         // 发送重置请求到后端，由后端显示确认对话框
         vscode.postMessage({
@@ -160,44 +197,60 @@ const SystemConfig: React.FC<SystemConfigProps> = ({ vscode }) => {
 
     return (
         <div className="form-card">
-            <h2 className="section-title">系统配置</h2>
+            <h2 className="section-title">{t('config.system.title')}</h2>
 
             {/* 开关配置 */}
             <div className="config-section">
-                <h3 className="config-section-title">基础设置</h3>
+                <h3 className="config-section-title">{t('config.system.basic')}</h3>
+                {/* 界面语言：label 见 languageLabel()，保证任一语言下都能找到入口 */}
+                <div className="form-row">
+                    <div className="form-group">
+                        <div className="perm-level-field" title={t('config.system.languageTip')}>
+                            <label htmlFor="uiLang">{languageLabel()}</label>
+                            <div className="lang-select">
+                                <IconSelect
+                                    id="uiLang"
+                                    value={normalizeLang(config.lang)}
+                                    onChange={handleLangChange}
+                                    options={LANGUAGES.map(code => ({ value: code, label: LANGS[code].label }))}
+                                />
+                            </div>
+                        </div>
+                    </div>
+                </div>
                 {/* 流式和Thinking一行 */}
                 <div className="form-row">
                     <div className="form-group">
-                        <label className="checkbox-label" title="启用后AI回复将实时显示">
+                        <label className="checkbox-label" title={t('config.system.streamTip')}>
                             <input
                                 type="checkbox"
                                 checked={config.stream || false}
                                 onChange={(e) => handleChange('stream', e.target.checked)}
                             />
                             <span className="checkmark"></span>
-                            开启流式
+                            {t('config.system.stream')}
                         </label>
                     </div>
 
                     <div className="form-group thinking-form-group">
                         <div className="thinking-options">
-                            <label className="checkbox-label" title="开启AI的思考和推理过程">
+                            <label className="checkbox-label" title={t('config.system.thinkingTip')}>
                                 <input
                                     type="checkbox"
                                     checked={thinkingEnabled}
                                     onChange={(e) => handleChange('thinking', e.target.checked)}
                                 />
                                 <span className="checkmark"></span>
-                                开启Thinking
+                                {t('config.system.thinking')}
                             </label>
                             {thinkingEnabled && (
                                 <button
                                     type="button"
                                     className={`show-thinking-toggle ${showThinkingText ? 'hide' : 'show'}`}
-                                    title={showThinkingText ? '点击隐藏聊天区Thinking文本' : '点击显示聊天区Thinking文本'}
+                                    title={showThinkingText ? t('config.system.hideThinkingTip') : t('config.system.showThinkingTip')}
                                     onClick={() => handleChange('showThinkingText', !showThinkingText)}
                                 >
-                                    {showThinkingText ? '隐藏' : '显示'}
+                                    {showThinkingText ? t('config.system.hide') : t('config.system.show')}
                                 </button>
                             )}
                         </div>
@@ -207,14 +260,14 @@ const SystemConfig: React.FC<SystemConfigProps> = ({ vscode }) => {
                 {/* 输入预测 & 桌宠（JB 不支持桌宠，仅隐藏该项） */}
                 <div className="form-row">
                     <div className="form-group">
-                        <label className="checkbox-label" title="一轮回复结束后，用 quick 模型预测你可能的下一句输入，在输入框以灰色文本提示，按 Tab 采纳">
+                        <label className="checkbox-label" title={t('config.system.inputPredictionTip')}>
                             <input
                                 type="checkbox"
                                 checked={config.enableInputPrediction || false}
                                 onChange={(e) => handleChange('enableInputPrediction', e.target.checked)}
                             />
                             <span className="checkmark"></span>
-                            启用输入预测
+                            {t('config.system.inputPrediction')}
                         </label>
                     </div>
 
@@ -223,8 +276,8 @@ const SystemConfig: React.FC<SystemConfigProps> = ({ vscode }) => {
                             <label
                                 className="checkbox-label"
                                 title={petSupported
-                                    ? '启用后将下载并启动桌面 Pet（Sema Pet）。本地已有二进制时直接使用，否则从 GitHub releases 自动下载'
-                                    : '桌宠暂仅支持 macOS / Windows / Linux'}
+                                    ? t('config.system.petTip')
+                                    : t('config.system.petUnsupportedTip')}
                                 style={petSupported ? undefined : { opacity: 0.5, cursor: 'not-allowed' }}
                             >
                                 <input
@@ -234,7 +287,7 @@ const SystemConfig: React.FC<SystemConfigProps> = ({ vscode }) => {
                                     onChange={(e) => handleChange('enablePet', e.target.checked)}
                                 />
                                 <span className="checkmark"></span>
-                                启用桌宠{petSupported ? '' : '（暂仅支持 macOS / Windows / Linux）'}
+                                {t('config.system.pet')}{petSupported ? '' : t('config.system.petUnsupportedSuffix')}
                             </label>
                         </div>
                     )}
@@ -243,30 +296,30 @@ const SystemConfig: React.FC<SystemConfigProps> = ({ vscode }) => {
 
             {/* 工具设置 */}
             <div className="config-section">
-                <h3 className="config-section-title">工具设置</h3>
+                <h3 className="config-section-title">{t('config.system.tools')}</h3>
                 {/* 工具搜索 & 后台任务 */}
                 <div className="form-row">
                     <div className="form-group">
-                        <label className="checkbox-label" title="MCP 工具较多时建议开启：仅默认工具集进入模型上下文，其余工具由 AI 按需搜索加载，可明显减小请求体积。修改后下一次提问生效。">
+                        <label className="checkbox-label" title={t('config.system.toolSearchTip')}>
                             <input
                                 type="checkbox"
                                 checked={config.enableToolSearch || false}
                                 onChange={(e) => handleChange('enableToolSearch', e.target.checked)}
                             />
                             <span className="checkmark"></span>
-                            启用工具搜索
+                            {t('config.system.toolSearch')}
                         </label>
                     </div>
 
                     <div className="form-group">
-                        <label className="checkbox-label" title="启用后将禁止Bash后台运行、Agent后台执行、超时转后台等功能">
+                        <label className="checkbox-label" title={t('config.system.disableBackgroundTip')}>
                             <input
                                 type="checkbox"
                                 checked={config.disableBackgroundTasks || false}
                                 onChange={(e) => handleChange('disableBackgroundTasks', e.target.checked)}
                             />
                             <span className="checkmark"></span>
-                            禁止后台任务
+                            {t('config.system.disableBackground')}
                         </label>
                     </div>
                 </div>
@@ -274,14 +327,14 @@ const SystemConfig: React.FC<SystemConfigProps> = ({ vscode }) => {
                 {/* FetchUrl 浏览器标识 */}
                 <div className="form-row">
                     <div className="form-group">
-                        <label className="checkbox-label" title="FetchUrl 请求改用 Chrome 浏览器标识，可读取微信公众号等只放行浏览器的站点，需登录或验证码的页面不支持，请勿批量抓取">
+                        <label className="checkbox-label" title={t('config.system.fetchUrlUATip')}>
                             <input
                                 type="checkbox"
                                 checked={config.fetchUrlBrowserUserAgent || false}
                                 onChange={(e) => handleChange('fetchUrlBrowserUserAgent', e.target.checked)}
                             />
                             <span className="checkmark"></span>
-                            FetchUrl使用浏览器标识
+                            {t('config.system.fetchUrlUA')}
                         </label>
                     </div>
                 </div>
@@ -290,10 +343,10 @@ const SystemConfig: React.FC<SystemConfigProps> = ({ vscode }) => {
             {/* 开关配置 */}
             <div className="config-section">
                 <h3 className="config-section-title">
-                    权限设置
+                    {t('config.system.permissions')}
                     <span
                         className="section-hint-icon"
-                        title="以下「跳过…权限检查」开关优先级高于输入框的权限等级（Ask / AutoEdit / AutoRun）。勾选后对应操作将始终跳过确认，不受当前权限等级影响。"
+                        title={t('config.system.permissionsHint')}
                     >ⓘ</span>
                 </h3>
                 {/* 默认权限档位 */}
@@ -301,26 +354,21 @@ const SystemConfig: React.FC<SystemConfigProps> = ({ vscode }) => {
                     <div className="form-group">
                         <div
                             className="perm-level-field"
-                            title="新建会话的初始权限档位，会话内仍可通过输入框菜单随时切换"
+                            title={t('config.system.defaultPermTip')}
                         >
-                            <label htmlFor="defaultPermissionLevel">默认权限档位</label>
-                            {/* 展开的下拉列表显示「档位（说明）」，收起后框内只显示档位短名：
-                                select 文字设为透明，用覆盖在其上的 span 展示当前档位 */}
-                            <div className="perm-level-select-wrap">
-                                <select
+                            <label htmlFor="defaultPermissionLevel">{t('config.system.defaultPerm')}</label>
+                            {/* 展开的下拉列表显示「档位（说明）」，收起后框内只显示档位短名 */}
+                            <div className="perm-level-select">
+                                <IconSelect
                                     id="defaultPermissionLevel"
                                     value={config.defaultPermissionLevel || 'Ask'}
-                                    onChange={(e) => handleChange('defaultPermissionLevel', e.target.value)}
-                                >
-                                    {PERMISSION_LEVEL_OPTIONS.map(opt => (
-                                        <option key={opt.value} value={opt.value}>
-                                            {`${opt.value}（${opt.desc}）`}
-                                        </option>
-                                    ))}
-                                </select>
-                                <span className="perm-level-select-value">
-                                    {config.defaultPermissionLevel || 'Ask'}
-                                </span>
+                                    onChange={(value) => handleChange('defaultPermissionLevel', value)}
+                                    options={PERMISSION_LEVEL_OPTIONS.map(opt => ({
+                                        value: opt.value,
+                                        label: `${opt.value}（${t(opt.descKey)}）`,
+                                        selectedLabel: opt.value
+                                    }))}
+                                />
                             </div>
                         </div>
                     </div>
@@ -328,26 +376,26 @@ const SystemConfig: React.FC<SystemConfigProps> = ({ vscode }) => {
                 {/* 跳过权限第一行 */}
                 <div className="form-row">
                     <div className="form-group">
-                        <label className="checkbox-label" title="启用后读取项目外文件不需要确认">
+                        <label className="checkbox-label" title={t('config.system.skipReadTip')}>
                             <input
                                 type="checkbox"
                                 checked={config.skipExternalFileReadPermission || false}
                                 onChange={(e) => handleChange('skipExternalFileReadPermission', e.target.checked)}
                             />
                             <span className="checkmark"></span>
-                            跳过文件读取权限检查
+                            {t('config.system.skipRead')}
                         </label>
                     </div>
 
                     <div className="form-group">
-                        <label className="checkbox-label" title="启用后将直接编辑文件而不需要确认">
+                        <label className="checkbox-label" title={t('config.system.skipEditTip')}>
                             <input
                                 type="checkbox"
                                 checked={config.skipFileEditPermission || false}
                                 onChange={(e) => handleChange('skipFileEditPermission', e.target.checked)}
                             />
                             <span className="checkmark"></span>
-                            跳过文件编辑权限检查
+                            {t('config.system.skipEdit')}
                         </label>
                     </div>
                 </div>
@@ -355,26 +403,26 @@ const SystemConfig: React.FC<SystemConfigProps> = ({ vscode }) => {
                 {/* 跳过权限第二行 */}
                 <div className="form-row">
                     <div className="form-group">
-                        <label className="checkbox-label" title="启用后将直接执行Shell命令而不需要确认，慎重勾选">
+                        <label className="checkbox-label" title={t('config.system.skipShellTip')}>
                             <input
                                 type="checkbox"
                                 checked={config.skipShellExecPermission || false}
                                 onChange={(e) => handleChange('skipShellExecPermission', e.target.checked)}
                             />
                             <span className="checkmark"></span>
-                            跳过Shell执行权限检查
+                            {t('config.system.skipShell')}
                         </label>
                     </div>
 
                     <div className="form-group">
-                        <label className="checkbox-label" title="启用后将直接执行Skill而不需要确认">
+                        <label className="checkbox-label" title={t('config.system.skipSkillTip')}>
                             <input
                                 type="checkbox"
                                 checked={config.skipSkillPermission || false}
                                 onChange={(e) => handleChange('skipSkillPermission', e.target.checked)}
                             />
                             <span className="checkmark"></span>
-                            跳过Skill权限检查
+                            {t('config.system.skipSkill')}
                         </label>
                     </div>
                 </div>
@@ -382,26 +430,26 @@ const SystemConfig: React.FC<SystemConfigProps> = ({ vscode }) => {
                 {/* 跳过权限第三行 */}
                 <div className="form-row">
                     <div className="form-group">
-                        <label className="checkbox-label" title="启用后将直接执行MCP工具而不需要确认">
+                        <label className="checkbox-label" title={t('config.system.skipMcpTip')}>
                             <input
                                 type="checkbox"
                                 checked={config.skipMCPToolPermission || false}
                                 onChange={(e) => handleChange('skipMCPToolPermission', e.target.checked)}
                             />
                             <span className="checkmark"></span>
-                            跳过MCP工具权限检查
+                            {t('config.system.skipMcp')}
                         </label>
                     </div>
 
                     <div className="form-group">
-                        <label className="checkbox-label" title="启用后将直接执行FetchUrl而不需要确认">
+                        <label className="checkbox-label" title={t('config.system.skipFetchTip')}>
                             <input
                                 type="checkbox"
                                 checked={config.skipFetchUrlPermission || false}
                                 onChange={(e) => handleChange('skipFetchUrlPermission', e.target.checked)}
                             />
                             <span className="checkmark"></span>
-                            跳过FetchUrl权限检查
+                            {t('config.system.skipFetch')}
                         </label>
                     </div>
                 </div>
@@ -409,10 +457,10 @@ const SystemConfig: React.FC<SystemConfigProps> = ({ vscode }) => {
 
             {/* 提示词配置 */}
             <div className="config-section">
-                <h3 className="config-section-title">提示词设置</h3>
+                <h3 className="config-section-title">{t('config.system.prompts')}</h3>
 
                 <div className="form-group">
-                    <label htmlFor="systemPrompt">系统提示词</label>
+                    <label htmlFor="systemPrompt">{t('config.system.systemPrompt')}</label>
                     <textarea
                         id="systemPrompt"
                         rows={2}
@@ -422,7 +470,7 @@ const SystemConfig: React.FC<SystemConfigProps> = ({ vscode }) => {
                         maxLength={500}
                     />
                     <div className="description" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <span>定义AI助手的基本角色和行为</span>
+                        <span>{t('config.system.systemPromptDesc')}</span>
                         <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                             <span style={{ color: systemPromptCount > 450 ? '#f56565' : 'inherit' }}>
                                 {systemPromptCount}/500
@@ -433,24 +481,24 @@ const SystemConfig: React.FC<SystemConfigProps> = ({ vscode }) => {
                                 onClick={() => handleSaveTextField('systemPrompt')}
                                 disabled={!hasUnsavedChanges('systemPrompt')}
                             >
-                                保存
+                                {t('common.save')}
                             </button>
                         </span>
                     </div>
                 </div>
 
                 <div className="form-group">
-                    <label htmlFor="customRules">自定义规则</label>
+                    <label htmlFor="customRules">{t('config.system.customRules')}</label>
                     <textarea
                         id="customRules"
                         rows={6}
                         value={config.customRules || ''}
                         onChange={(e) => handleChange('customRules', e.target.value)}
-                        placeholder={defaultConfig.customRules}
+                        placeholder={DEFAULT_CUSTOM_RULES[normalizeLang(config.lang)]}
                         maxLength={1000}
                     />
                     <div className="description" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <span>定义AI助手应遵循的具体规则和约束</span>
+                        <span>{t('config.system.customRulesDesc')}</span>
                         <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                             <span style={{ color: customRulesCount > 900 ? '#f56565' : 'inherit' }}>
                                 {customRulesCount}/1000
@@ -461,7 +509,7 @@ const SystemConfig: React.FC<SystemConfigProps> = ({ vscode }) => {
                                 onClick={() => handleSaveTextField('customRules')}
                                 disabled={!hasUnsavedChanges('customRules')}
                             >
-                                保存
+                                {t('common.save')}
                             </button>
                         </span>
                     </div>
@@ -471,7 +519,7 @@ const SystemConfig: React.FC<SystemConfigProps> = ({ vscode }) => {
             {/* 按钮组 */}
             <div className="button-group">
                 <button type="button" className="reset-btn" onClick={handleReset}>
-                    重置为默认
+                    {t('config.system.reset')}
                 </button>
             </div>
 

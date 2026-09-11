@@ -2,6 +2,7 @@ import React from 'react';
 import { Config, VscodeApi } from './types';
 import ProviderLogo from '../common/ProviderLogo';
 import { EditIcon, TrashIcon } from './utils/svgIcons';
+import { useT } from '../common/i18n/react';
 import './style/section.css';
 
 interface ModelListProps {
@@ -10,6 +11,7 @@ interface ModelListProps {
 }
 
 const ModelList: React.FC<ModelListProps> = ({ config, vscode }) => {
+    const t = useT();
     // 解析模型名称以提取 provider 和 model 信息
     const parseModelName = (modelName: string) => {
         // 模型名称格式例如: "Claude-Sonnet-4-20250514-v1.0[custom]"
@@ -77,21 +79,21 @@ const ModelList: React.FC<ModelListProps> = ({ config, vscode }) => {
     return (
         <div className="model-list">
             <div className="section-header">
-                <h2 className="section-title" style={{ marginBottom: 0 }}>模型列表</h2>
+                <h2 className="section-title" style={{ marginBottom: 0 }}>{t('config.tab.modelList')}</h2>
             </div>
             <table className="model-table">
                 <thead>
                     <tr>
-                        <th>服务提供商</th>
-                        <th>模型</th>
-                        <th>任务</th>
-                        <th>操作</th>
+                        <th>{t('config.modelList.provider')}</th>
+                        <th>{t('config.modelList.model')}</th>
+                        <th>{t('config.modelList.task')}</th>
+                        <th>{t('config.modelList.actions')}</th>
                     </tr>
                 </thead>
                 <tbody>
                     {!hasModels ? (
                         <tr>
-                            <td colSpan={4} className="empty-state">暂无配置的模型</td>
+                            <td colSpan={4} className="empty-state">{t('config.modelList.empty')}</td>
                         </tr>
                     ) : (
                         sortedModelList.map((modelName, index) => {
@@ -119,14 +121,14 @@ const ModelList: React.FC<ModelListProps> = ({ config, vscode }) => {
                                             <button
                                                 className="section-icon-btn"
                                                 onClick={() => handleEdit(fullName)}
-                                                title="编辑此模型"
+                                                title={t('config.modelList.editTip')}
                                             >
                                                 <EditIcon />
                                             </button>
                                             <button
                                                 className="section-icon-btn section-icon-btn-danger"
                                                 onClick={() => handleDelete(fullName)}
-                                                title="删除此模型"
+                                                title={t('config.modelList.deleteTip')}
                                             >
                                                 <TrashIcon />
                                             </button>

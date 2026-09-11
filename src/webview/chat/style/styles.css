@@ -1196,6 +1196,26 @@ html.jb #output-container {
 .model-config-reminder-button.secondary:hover {
     background-color: var(--chat-bg-hover);
 }
+
+.model-config-reminder-language {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin: 2px 0 0 30px;
+    color: var(--chat-text-secondary);
+    font-size: var(--chat-font-sm);
+    line-height: 1.4;
+}
+
+.model-config-reminder-language-select {
+    padding: 1px 4px;
+    border: 1px solid var(--chat-border-input);
+    border-radius: 2px;
+    background: var(--chat-bg-primary);
+    color: var(--chat-text-primary);
+    font: inherit;
+    cursor: pointer;
+}
 /* ==================== 多会话 tab 栏 ==================== */
 .session-tabs {
     display: flex;

@@ -3,6 +3,8 @@
  * 用于 CronTaskConfig / BackgroundTaskConfig 等
  */
 
+import { t } from '../../common/i18n/core';
+
 const pad = (n: number) => String(n).padStart(2, '0');
 
 const isSameDay = (a: Date, b: Date) =>
@@ -30,13 +32,13 @@ export const formatDateTime = (ts: number): string => {
     tomorrow.setDate(now.getDate() + 1);
 
     if (isSameDay(d, now)) {
-        return `今日 ${time}`;
+        return t('config.time.today', { time });
     }
     if (isSameDay(d, yesterday)) {
-        return `昨日 ${time}`;
+        return t('config.time.yesterday', { time });
     }
     if (isSameDay(d, tomorrow)) {
-        return `明日 ${time}`;
+        return t('config.time.tomorrow', { time });
     }
 
     const date = `${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;

@@ -3,6 +3,7 @@ import { CopyIcon, CheckIcon, ForkIcon, ClockIcon } from '../components/ui/IconB
 import { ImageAttachment, InputSource } from '../types';
 import ImageThumbnail from '../components/ImageThumbnail';
 import ImagePreviewModal from '../components/ImagePreviewModal';
+import { useT, I18nKey } from '../../common/i18n/react';
 
 interface UserInputBlockProps {
     content: string;
@@ -13,14 +14,16 @@ interface UserInputBlockProps {
     onFork?: (uuid: string) => void;
 }
 
-// 非 user 来源的标签文案；未登记的来源不渲染
-const SOURCE_LABEL: Partial<Record<InputSource, string>> = {
-    cron: '由定时任务发送',
+// 非 user 来源的标签文案 key；未登记的来源不渲染
+const SOURCE_LABEL_KEY: Partial<Record<InputSource, I18nKey>> = {
+    cron: 'chat.source.cron',
 };
 
 // 气泡上方右对齐的来源小标签（pending 气泡和正式气泡共用）
 export const UserInputSourceTag: React.FC<{ source?: InputSource }> = ({ source }) => {
-    const label = source ? SOURCE_LABEL[source] : undefined;
+    const t = useT();
+    const labelKey = source ? SOURCE_LABEL_KEY[source] : undefined;
+    const label = labelKey ? t(labelKey) : undefined;
     if (!label) {
         return null;
     }
@@ -57,6 +60,7 @@ const BubbleImage: React.FC<{ attachment: ImageAttachment; onOpen: (src: string)
 const COLLAPSED_MAX_PX = 54;
 
 const UserInputBlock: React.FC<UserInputBlockProps> = React.memo(({ content, attachments, source, uuid, canFork, onFork }) => {
+    const t = useT();
 
     const [isExpanded, setIsExpanded] = useState<boolean>(false);
     const [isOverflowing, setIsOverflowing] = useState<boolean>(false);
@@ -120,13 +124,13 @@ const UserInputBlock: React.FC<UserInputBlockProps> = React.memo(({ content, att
             </div>
             {isOverflowing && (
                 <button type="button" className="user-input-toggle" onClick={handleToggle}>
-                    {isExpanded ? '收起' : '展开'}
+                    {isExpanded ? t('common.collapse') : t('common.expand')}
                 </button>
             )}
             <button
                 type="button"
                 className="user-input-copy"
-                title={copied ? '已复制' : '复制'}
+                title={copied ? t('common.copied') : t('common.copy')}
                 onClick={handleCopy}
             >
                 {copied ? <CheckIcon /> : <CopyIcon />}
@@ -135,7 +139,7 @@ const UserInputBlock: React.FC<UserInputBlockProps> = React.memo(({ content, att
                 <button
                     type="button"
                     className="user-input-fork"
-                    title={canFork ? '从此处 Fork / 撤销' : '生成中，暂不可 Fork'}
+                    title={canFork ? t('chat.forkFromHere') : t('chat.forkUnavailable')}
                     disabled={!canFork}
                     onClick={() => canFork && onFork?.(uuid)}
                 >
@@ -149,7 +153,7 @@ const UserInputBlock: React.FC<UserInputBlockProps> = React.memo(({ content, att
     );
 
     // 无来源标签时不额外包裹，保持原 DOM 结构
-    if (!source || !SOURCE_LABEL[source]) {
+    if (!source || !SOURCE_LABEL_KEY[source]) {
         return bubble;
     }
     return (

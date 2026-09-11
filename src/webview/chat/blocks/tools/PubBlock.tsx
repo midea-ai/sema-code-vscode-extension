@@ -5,6 +5,7 @@ import { ToolContent } from '../../types';
 import { CONTINUATION_SYMBOL } from '../../utils/symbols';
 import { streamingStore } from '../../utils/StreamingStore';
 import { TOOL_NAME_SEARCH_FILES, TOOL_NAME_SEARCH_CONTENT, TOOL_NAME_STOP_BG_JOB, TOOL_NAME_PICK_OPTION } from '../../../../utils/tool';
+import { useT } from '../../../common/i18n/react';
 
 const MAX_VISIBLE_LINES = 2;
 
@@ -15,6 +16,7 @@ interface PubBlockProps {
 }
 
 const PubBlock: React.FC<PubBlockProps> = React.memo(({ content, messageId, vscode }) => {
+    const t = useT();
     const sessionId = useContext(SessionContext);
     const streamContentRef = useRef('');
     const [streamContent, setStreamContent] = useState('');
@@ -121,7 +123,7 @@ const PubBlock: React.FC<PubBlockProps> = React.memo(({ content, messageId, vsco
                     {visibleLines.length > 0 && (
                         <>
                             {omittedCount > 0 && (
-                                <div className="bash-omitted-lines bash-omitted-lines-clickable" onClick={handleViewAll}>...省略了 {omittedCount} 行</div>
+                                <div className="bash-omitted-lines bash-omitted-lines-clickable" onClick={handleViewAll}>{t('chat.omittedLines', { count: omittedCount })}</div>
                             )}
                             {visibleLines.map((line, i) => (
                                 <div key={i} className="bash-output-line">{line}</div>

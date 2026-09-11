@@ -4,6 +4,7 @@ import { getColorByName } from './utils/iconUtils';
 import { RefreshIcon, OpenIcon } from './utils/svgIcons';
 import { HooksInfo, HookEntryInfo, HookSource, HOOK_EVENTS, TOOL_HOOK_EVENTS } from './types/hook';
 import { openFileWithRange } from './utils/fileUtils';
+import { useT, I18nKey } from '../common/i18n/react';
 import './style/section.css';
 import './style/agent.css';
 import './style/hook.css';
@@ -14,9 +15,10 @@ interface HooksConfigProps {
 
 const SOURCE_ORDER: HookSource[] = ['project', 'user'];
 
-const SOURCE_SECTION_TITLES: Record<HookSource, string> = {
-    project: '项目级 Hooks',
-    user: '用户级 Hooks'
+// 分组标题 / 状态文案 key，渲染期经 t() 取值
+const SOURCE_SECTION_TITLE_KEYS: Record<HookSource, I18nKey> = {
+    project: 'config.hooks.group.project',
+    user: 'config.hooks.group.user'
 };
 
 const SOURCE_PATHS: Record<HookSource, string> = {
@@ -24,12 +26,13 @@ const SOURCE_PATHS: Record<HookSource, string> = {
     user: '~/.sema/hooks/hooks.json'
 };
 
-const STATUS_LABELS: Record<string, string> = {
-    skipped: '已跳过',
-    invalid: '无效'
+const STATUS_LABEL_KEYS: Record<string, I18nKey> = {
+    skipped: 'config.hooks.status.skipped',
+    invalid: 'config.hooks.status.invalid'
 };
 
 const HooksConfig: React.FC<HooksConfigProps> = ({ vscode }) => {
+    const t = useT();
     const [hooksInfo, setHooksInfo] = useState<HooksInfo | null>(null);
     const [loading, setLoading] = useState(true);
     const [isRefreshing, setIsRefreshing] = useState(false);
@@ -111,7 +114,7 @@ const HooksConfig: React.FC<HooksConfigProps> = ({ vscode }) => {
     if (loading) {
         return (
             <div className="agent-config">
-                <div className="section-loading">加载中...</div>
+                <div className="section-loading">{t('common.loading')}</div>
             </div>
         );
     }
@@ -135,7 +138,7 @@ const HooksConfig: React.FC<HooksConfigProps> = ({ vscode }) => {
                     <div className="section-card-actions">
                         <button
                             className="section-icon-btn"
-                            title={`打开 ${SOURCE_PATHS[source]}`}
+                            title={t('config.hooks.openFile', { path: SOURCE_PATHS[source] })}
                             onClick={(e) => { e.stopPropagation(); handleOpenEntry(source, entries); }}
                         >
                             <OpenIcon />
@@ -145,11 +148,11 @@ const HooksConfig: React.FC<HooksConfigProps> = ({ vscode }) => {
                 {entries.map((entry, i) => (
                     <div key={i} className="hook-entry">
                         <div className="hook-command-row">
-                            <span className="tools-label">命令:</span>
-                            <code className="hook-command">{entry.command || '（空）'}</code>
+                            <span className="tools-label">{t('config.hooks.commandLabel')}</span>
+                            <code className="hook-command">{entry.command || t('config.hooks.emptyCommand')}</code>
                             {entry.status !== 'ok' && (
                                 <span className={`hook-status-tag hook-status-${entry.status}`} title={entry.statusReason || ''}>
-                                    {STATUS_LABELS[entry.status] || entry.status}
+                                    {STATUS_LABEL_KEYS[entry.status] ? t(STATUS_LABEL_KEYS[entry.status]) : entry.status}
                                 </span>
                             )}
                         </div>
@@ -157,13 +160,13 @@ const HooksConfig: React.FC<HooksConfigProps> = ({ vscode }) => {
                             <div className="agent-tools">
                                 {isToolEvent && (
                                     <>
-                                        <span className="tools-label">匹配:</span>
+                                        <span className="tools-label">{t('config.hooks.matcherLabel')}</span>
                                         <span className="tool-tag">{entry.matcher || '*'}</span>
                                     </>
                                 )}
                                 {!!entry.timeout && (
                                     <>
-                                        <span className="tools-label">超时:</span>
+                                        <span className="tools-label">{t('config.hooks.timeoutLabel')}</span>
                                         <span className="tool-tag">{entry.timeout}s</span>
                                     </>
                                 )}
@@ -183,7 +186,7 @@ const HooksConfig: React.FC<HooksConfigProps> = ({ vscode }) => {
             {/* Tab 导航 */}
             <div className="tab-navigation">
                 <div className="tab-item active">
-                    已安装
+                    {t('common.installed')}
                     {totalCount > 0 && (
                         <span className="section-tab-count">{totalCount}</span>
                     )}
@@ -192,7 +195,7 @@ const HooksConfig: React.FC<HooksConfigProps> = ({ vscode }) => {
                     <button
                         className={`section-icon-btn ${isRefreshing ? 'btn-loading' : ''}`}
                         onClick={handleRefresh}
-                        title="刷新 Hooks"
+                        title={t('config.hooks.refresh')}
                         disabled={isRefreshing}
                     >
                         {isRefreshing ? (
@@ -208,7 +211,7 @@ const HooksConfig: React.FC<HooksConfigProps> = ({ vscode }) => {
             <div className="tab-content">
                 {hooksInfo?.parseErrors?.map((err, i) => (
                     <div key={i} className="hook-banner hook-banner-error">
-                        {SOURCE_SECTION_TITLES[err.source]}配置解析失败：{err.message}
+                        {t('config.hooks.parseError', { source: t(SOURCE_SECTION_TITLE_KEYS[err.source]), message: err.message })}
                     </div>
                 ))}
                 <div className="section-groups">
@@ -226,12 +229,12 @@ const HooksConfig: React.FC<HooksConfigProps> = ({ vscode }) => {
                         return (
                             <div key={source} className={`section-group section-${source}`}>
                                 <div className="section-group-title section-group-title-collapsible" style={{ cursor: 'pointer', userSelect: 'none' }} onClick={toggleCollapse}>
-                                    {SOURCE_SECTION_TITLES[source]}
+                                    {t(SOURCE_SECTION_TITLE_KEYS[source])}
                                     <span className="section-group-count">({SOURCE_PATHS[source]})</span>
                                     {configExists && (
                                         <button
                                             className="section-icon-btn"
-                                            title={`打开 ${SOURCE_PATHS[source]}`}
+                                            title={t('config.hooks.openFile', { path: SOURCE_PATHS[source] })}
                                             onClick={(e) => { e.stopPropagation(); handleOpenConfig(source); }}
                                         >
                                             <OpenIcon />
@@ -240,7 +243,7 @@ const HooksConfig: React.FC<HooksConfigProps> = ({ vscode }) => {
                                     <span className={`section-collapse-arrow ${isCollapsed ? 'collapsed' : ''}`} />
                                 </div>
                                 {!isCollapsed && (sectionGroups.length === 0 ? (
-                                    <div className="section-empty">暂无 Hook</div>
+                                    <div className="section-empty">{t('config.hooks.empty')}</div>
                                 ) : (
                                     <div className="section-list">
                                         {sectionGroups.map(group =>

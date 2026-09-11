@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { VscodeApi } from './types';
+import { useT, I18nKey } from '../common/i18n/react';
 import './style/section.css';
 
 interface ClawConfigProps {
@@ -8,27 +9,27 @@ interface ClawConfigProps {
 
 interface IntegrationSource {
     id: string;
-    name: string;
-    initial: string;
+    nameKey: I18nKey;
+    initialKey: I18nKey;
     iconBg: string;
-    desc: string;
+    descKey: I18nKey;
     recommended?: boolean;
 }
 
-// 远程入口来源。
+// 远程入口来源（文案为 key，渲染期经 t() 取值）。
 const SOURCES: IntegrationSource[] = [
-    { id: 'wechat', name: '微信 ClawBot 集成', initial: '微', iconBg: '#07C160', desc: '通过微信扫码连接 ClawBot，接收并回复消息。', recommended: true },
-    { id: 'feishu', name: '飞书集成', initial: '飞', iconBg: '#3370FF', desc: '注册飞书应用以通过飞书接收和回复消息。' },
+    { id: 'wechat', nameKey: 'config.claw.wechat.name', initialKey: 'config.claw.wechat.initial', iconBg: '#07C160', descKey: 'config.claw.wechat.desc', recommended: true },
+    { id: 'feishu', nameKey: 'config.claw.feishu.name', initialKey: 'config.claw.feishu.initial', iconBg: '#3370FF', descKey: 'config.claw.feishu.desc' },
 ];
 
 type Verbosity = 'detailed' | 'medium' | 'simple' | 'minimal';
 
-// 信息显示详略：控制远程（微信）会话转发到手机的工具信息多少。
-const VERBOSITY_OPTIONS: { id: Verbosity; name: string; desc: string; badge?: string }[] = [
-    { id: 'detailed', name: '详细', desc: '展示完整工具调用、文件读取、编辑和终端信息。', badge: '默认' },
-    { id: 'medium', name: '中等', desc: '保留关键执行过程，仅展示文件编辑和终端工具。' },
-    { id: 'simple', name: '简单', desc: '隐藏工具过程，只同步对话文字内容。' },
-    { id: 'minimal', name: '极简', desc: '仅同步最终结论，适合减少手机端消息打扰。' },
+// 信息显示详略：控制远程（微信）会话转发到手机的工具信息多少（文案为 key，渲染期经 t() 取值）。
+const VERBOSITY_OPTIONS: { id: Verbosity; nameKey: I18nKey; descKey: I18nKey; badgeKey?: I18nKey }[] = [
+    { id: 'detailed', nameKey: 'config.claw.verbosity.detailed', descKey: 'config.claw.verbosity.detailedDesc', badgeKey: 'config.claw.default' },
+    { id: 'medium', nameKey: 'config.claw.verbosity.medium', descKey: 'config.claw.verbosity.mediumDesc' },
+    { id: 'simple', nameKey: 'config.claw.verbosity.simple', descKey: 'config.claw.verbosity.simpleDesc' },
+    { id: 'minimal', nameKey: 'config.claw.verbosity.minimal', descKey: 'config.claw.verbosity.minimalDesc' },
 ];
 
 /**
@@ -36,6 +37,7 @@ const VERBOSITY_OPTIONS: { id: Verbosity; name: string; desc: string; badge?: st
  * 所有重型逻辑都在扩展端按需懒载；这里只发消息、显示状态。
  */
 const ClawConfig: React.FC<ClawConfigProps> = ({ vscode }) => {
+    const t = useT();
     const [bound, setBound] = useState(false);
     const [enabled, setEnabled] = useState(false);
     const [occupancy, setOccupancy] = useState<string | null>(null);
@@ -97,8 +99,8 @@ const ClawConfig: React.FC<ClawConfigProps> = ({ vscode }) => {
                         setFeishuModalOpen(false);
                         setFeishuError(null);
                     } else {
-                        setHint(m.data.message || '绑定未完成');       // 微信扫码区提示
-                        setFeishuError(m.data.message || '连接失败');   // 飞书模态区提示
+                        setHint(m.data.message || t('config.claw.bindIncomplete'));       // 微信扫码区提示
+                        setFeishuError(m.data.message || t('config.claw.connectFailed'));   // 飞书模态区提示
                     }
                     break;
             }
@@ -115,7 +117,7 @@ const ClawConfig: React.FC<ClawConfigProps> = ({ vscode }) => {
         setQrcode(null);
         setExpired(false);
         setVerifyNeeded(false);
-        setHint('正在生成二维码…');
+        setHint(t('config.claw.generatingQr'));
         vscode.postMessage({ command: 'clawStartBind' });
     };
 
@@ -124,7 +126,7 @@ const ClawConfig: React.FC<ClawConfigProps> = ({ vscode }) => {
         vscode.postMessage({ command: 'clawSubmitVerifyCode', code: verifyCode.trim() });
         setVerifyNeeded(false);
         setVerifyCode('');
-        setHint('正在验证…');
+        setHint(t('config.claw.verifying'));
     };
 
     const unbind = () => {
@@ -150,7 +152,7 @@ const ClawConfig: React.FC<ClawConfigProps> = ({ vscode }) => {
 
     const connectFeishu = () => {
         if (!feishuAppId.trim() || !feishuAppSecret.trim()) {
-            setFeishuError('App ID 和 App Secret 不能为空');
+            setFeishuError(t('config.claw.feishuCredsRequired'));
             return;
         }
         setBusy(true);
@@ -184,33 +186,33 @@ const ClawConfig: React.FC<ClawConfigProps> = ({ vscode }) => {
         <div className="section-modal-overlay" onClick={() => setFeishuModalOpen(false)}>
             <div className="section-modal" onClick={(e) => e.stopPropagation()}>
                 <div className="section-modal-header">
-                    <span>连接飞书</span>
-                    <button className="section-modal-close" onClick={() => setFeishuModalOpen(false)} aria-label="关闭">
+                    <span>{t('config.claw.connectFeishu')}</span>
+                    <button className="section-modal-close" onClick={() => setFeishuModalOpen(false)} aria-label={t('common.close')}>
                         ×
                     </button>
                 </div>
                 <div className="section-modal-body">
                     <p style={{ margin: '0 0 16px', color: 'var(--vscode-descriptionForeground)', lineHeight: 1.6, fontSize: 13 }}>
-                        通过 WebSocket 长连接将此工作区绑定到飞书机器人。
+                        {t('config.claw.feishuModalDesc')}
                     </p>
                     <div className="form-group">
-                        <label htmlFor="feishu-app-id">飞书 App ID</label>
+                        <label htmlFor="feishu-app-id">{t('config.claw.feishuAppId')}</label>
                         <input
                             id="feishu-app-id"
                             type="text"
                             value={feishuAppId}
                             onChange={(e) => setFeishuAppId(e.target.value)}
-                            placeholder="如 cli_aa92b8926b2b9ba3"
+                            placeholder={t('config.claw.feishuAppIdPlaceholder')}
                         />
                     </div>
                     <div className="form-group" style={{ marginBottom: 0 }}>
-                        <label htmlFor="feishu-app-secret">飞书 App Secret</label>
+                        <label htmlFor="feishu-app-secret">{t('config.claw.feishuAppSecret')}</label>
                         <input
                             id="feishu-app-secret"
                             type="password"
                             value={feishuAppSecret}
                             onChange={(e) => setFeishuAppSecret(e.target.value)}
-                            placeholder="请输入飞书 App Secret"
+                            placeholder={t('config.claw.feishuAppSecretPlaceholder')}
                         />
                     </div>
                     {feishuError && (
@@ -218,9 +220,9 @@ const ClawConfig: React.FC<ClawConfigProps> = ({ vscode }) => {
                     )}
                 </div>
                 <div className="section-modal-footer">
-                    <button className="section-btn secondary" onClick={() => setFeishuModalOpen(false)} disabled={busy}>取消</button>
+                    <button className="section-btn secondary" onClick={() => setFeishuModalOpen(false)} disabled={busy}>{t('common.cancel')}</button>
                     <button className="section-btn primary" onClick={connectFeishu} disabled={busy}>
-                        {busy ? '连接中…' : '连接飞书'}
+                        {busy ? t('config.claw.connecting') : t('config.claw.connectFeishu')}
                     </button>
                 </div>
             </div>
@@ -231,17 +233,17 @@ const ClawConfig: React.FC<ClawConfigProps> = ({ vscode }) => {
     const renderBoundPanel = () => (
         <div style={{ padding: '12px 14px', borderTop: '1px solid var(--s-card-border)' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <button className="section-btn secondary small" onClick={unbind} disabled={enabled}>解绑</button>
+                <button className="section-btn secondary small" onClick={unbind} disabled={enabled}>{t('config.claw.unbind')}</button>
                 <button className="section-btn primary small" onClick={toggleEnable} disabled={busy}>
-                    {enabled ? '关闭' : '开启'}
+                    {enabled ? t('config.claw.turnOff') : t('config.claw.turnOn')}
                 </button>
                 <span style={{ fontSize: 12, color: 'var(--vscode-descriptionForeground)' }}>
-                    {enabled ? '运行中（本窗口独占）' : '已就绪，可开启'}
+                    {enabled ? t('config.claw.runningExclusive') : t('config.claw.ready')}
                 </span>
             </div>
             {occupancy && (
                 <div style={{ color: 'var(--s-color-danger, #e55)', fontSize: 12, marginTop: 8 }}>
-                    claw 正在『{occupancy}』使用中，请先在那里关闭。
+                    {t('config.claw.occupied', { path: occupancy })}
                 </div>
             )}
             {error && (
@@ -255,28 +257,28 @@ const ClawConfig: React.FC<ClawConfigProps> = ({ vscode }) => {
         <div style={{ padding: '16px 14px', borderTop: '1px solid var(--s-card-border)', textAlign: 'center' }}>
             {expired ? (
                 <>
-                    <div style={{ fontSize: 13, marginBottom: 10, opacity: 0.85 }}>二维码已过期</div>
-                    <button className="section-btn primary small" onClick={startBind}>刷新</button>
+                    <div style={{ fontSize: 13, marginBottom: 10, opacity: 0.85 }}>{t('config.claw.qrExpired')}</div>
+                    <button className="section-btn primary small" onClick={startBind}>{t('common.refresh')}</button>
                 </>
             ) : qrcode ? (
                 <>
-                    <div style={{ fontSize: 13, marginBottom: 10 }}>打开微信扫描二维码</div>
-                    <img src={qrcode} alt="微信二维码" style={{ width: 200, height: 200, background: '#fff', padding: 8, borderRadius: 6 }} />
+                    <div style={{ fontSize: 13, marginBottom: 10 }}>{t('config.claw.scanQr')}</div>
+                    <img src={qrcode} alt={t('config.claw.qrAlt')} style={{ width: 200, height: 200, background: '#fff', padding: 8, borderRadius: 6 }} />
                     {verifyNeeded && (
                         <div style={{ display: 'flex', gap: 8, marginTop: 12, justifyContent: 'center' }}>
                             <input
                                 type="text"
                                 value={verifyCode}
                                 onChange={(e) => setVerifyCode(e.target.value)}
-                                placeholder="请输入手机微信上的验证码"
+                                placeholder={t('config.claw.verifyCodePlaceholder')}
                                 style={{ flex: '0 0 200px' }}
                             />
-                            <button className="section-btn primary small" onClick={submitVerifyCode}>提交</button>
+                            <button className="section-btn primary small" onClick={submitVerifyCode}>{t('common.submit')}</button>
                         </div>
                     )}
                 </>
             ) : (
-                <div style={{ fontSize: 13, opacity: 0.85 }}>{hint || '正在生成二维码…'}</div>
+                <div style={{ fontSize: 13, opacity: 0.85 }}>{hint || t('config.claw.generatingQr')}</div>
             )}
         </div>
     );
@@ -286,10 +288,10 @@ const ClawConfig: React.FC<ClawConfigProps> = ({ vscode }) => {
           <div className="section-groups">
             <div className="config-section">
                 <h3 className="config-section-title">
-                    Claw配置（Beta）
+                    {t('config.claw.title')}
                     <span
                         className="section-hint-icon"
-                        title="远程同一时刻只能启用一个渠道，绑定其一后，另一个需先解绑才能配置。"
+                        title={t('config.claw.titleTip')}
                     >ⓘ</span>
                 </h3>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--s-gap-lg)' }}>
@@ -297,14 +299,14 @@ const ClawConfig: React.FC<ClawConfigProps> = ({ vscode }) => {
                         const open = openSource === src.id;
                         const isActive = platform === src.id && bound;              // 这张卡是当前绑定的平台
                         const lockedByOther = bound && platform !== null && platform !== src.id; // 已绑别的平台
-                        const statusLabel = isActive ? (enabled ? '运行中' : '已绑定') : null;
+                        const statusLabel = isActive ? (enabled ? t('config.claw.running') : t('config.claw.bound')) : null;
 
                         return (
                             <div className="section-card" key={src.id}>
                                 <div className="section-card-header">
-                                    <div className="section-card-icon" style={{ background: src.iconBg }}>{src.initial}</div>
-                                    <span className="section-card-name">{src.name}</span>
-                                    {src.recommended && <span className="section-installed-badge">推荐</span>}
+                                    <div className="section-card-icon" style={{ background: src.iconBg }}>{t(src.initialKey)}</div>
+                                    <span className="section-card-name">{t(src.nameKey)}</span>
+                                    {src.recommended && <span className="section-installed-badge">{t('config.claw.recommended')}</span>}
                                     {statusLabel && (
                                         <span style={{ fontSize: 12, fontWeight: 500, color: 'var(--s-color-success, #3a3)' }}>{statusLabel}</span>
                                     )}
@@ -313,13 +315,13 @@ const ClawConfig: React.FC<ClawConfigProps> = ({ vscode }) => {
                                             className="section-btn secondary small"
                                             onClick={() => handleConfigClick(src.id)}
                                             disabled={lockedByOther}
-                                            title={lockedByOther ? '已绑定其它渠道，请先解绑' : undefined}
+                                            title={lockedByOther ? t('config.claw.lockedByOther') : undefined}
                                         >
-                                            {open ? '收起' : '配置'}
+                                            {open ? t('common.collapse') : t('config.claw.configure')}
                                         </button>
                                     </div>
                                 </div>
-                                <div className="section-card-desc">{src.desc}</div>
+                                <div className="section-card-desc">{t(src.descKey)}</div>
                                 {open && (
                                     src.id === 'wechat'
                                         ? (isActive ? renderBoundPanel() : renderQrPanel())
@@ -335,10 +337,10 @@ const ClawConfig: React.FC<ClawConfigProps> = ({ vscode }) => {
 
             <div className="config-section claw-display-section">
                 <h3 className="config-section-title">
-                    显示设置
+                    {t('config.claw.displayTitle')}
                     <span
                         className="section-hint-icon"
-                        title="控制远程（微信）会话转发到手机的信息详略，仅影响手机端展示，不影响本地会话记录。"
+                        title={t('config.claw.displayTip')}
                     >ⓘ</span>
                 </h3>
                 <div className="form-row">
@@ -346,7 +348,7 @@ const ClawConfig: React.FC<ClawConfigProps> = ({ vscode }) => {
                         <div className="form-group claw-verbosity-group" key={opt.id}>
                             <label
                                 className={`checkbox-label claw-verbosity-option ${verbosity === opt.id ? 'active' : ''}`}
-                                title={opt.desc}
+                                title={t(opt.descKey)}
                             >
                                 <input
                                     type="radio"
@@ -358,10 +360,10 @@ const ClawConfig: React.FC<ClawConfigProps> = ({ vscode }) => {
                                 <span className="checkmark"></span>
                                 <span className="claw-verbosity-copy">
                                     <span className="claw-verbosity-name">
-                                        {opt.name}
-                                        {opt.badge && <span className="readonly-tab">{opt.badge}</span>}
+                                        {t(opt.nameKey)}
+                                        {opt.badgeKey && <span className="readonly-tab">{t(opt.badgeKey)}</span>}
                                     </span>
-                                    <span className="claw-verbosity-desc">{opt.desc}</span>
+                                    <span className="claw-verbosity-desc">{t(opt.descKey)}</span>
                                 </span>
                             </label>
                         </div>

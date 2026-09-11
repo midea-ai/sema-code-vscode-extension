@@ -1,5 +1,6 @@
 import React from 'react';
 import { SessionMeta } from '../types';
+import { useT } from '../../common/i18n/react';
 
 interface SessionTabsProps {
     sessions: SessionMeta[];
@@ -14,6 +15,7 @@ interface SessionTabsProps {
  * 新建会话入口统一放在 VSCode 视图标题栏的 $(add) 图标。
  */
 const SessionTabs: React.FC<SessionTabsProps> = ({ sessions, activeId, onSwitch, onClose }) => {
+    const t = useT();
     const [orderedIds, setOrderedIds] = React.useState<string[]>(() => sessions.map(s => s.id));
     const [draggingId, setDraggingId] = React.useState<string | null>(null);
     const [dragOver, setDragOver] = React.useState<{ id: string; position: 'before' | 'after' } | null>(null);
@@ -144,16 +146,16 @@ const SessionTabs: React.FC<SessionTabsProps> = ({ sessions, activeId, onSwitch,
                         onDrop={(e) => handleDrop(e, s.id)}
                         onDragEnd={handleDragEnd}
                         onDragLeave={() => setDragOver(prev => prev?.id === s.id ? null : prev)}
-                        title={s.title || '新会话'}
+                        title={s.title || t('common.newSession')}
                     >
                         {(s.processing || s.waiting) && (
                             <span className={`session-tab-dot${s.waiting ? ' waiting' : ''}`} />
                         )}
-                        <span className="session-tab-title">{s.title || '新会话'}</span>
+                        <span className="session-tab-title">{s.title || t('common.newSession')}</span>
                         {s.id === activeId && (
                             <span
                                 className="session-tab-close"
-                                title="关闭会话"
+                                title={t('chat.session.close')}
                                 onClick={(e) => { e.stopPropagation(); onClose(s.id); }}
                             >×</span>
                         )}

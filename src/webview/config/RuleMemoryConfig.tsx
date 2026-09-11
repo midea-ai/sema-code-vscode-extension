@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { VscodeApi } from './types';
 import { RefreshIcon, LinkIcon } from './utils/svgIcons';
+import { useT, I18nKey } from '../common/i18n/react';
 import './style/section.css';
 import './style/agent.css';
 
@@ -13,9 +14,10 @@ interface MemoryConfigItem {
 
 type MemoryScope = 'project' | 'other';
 
-const MEMORY_SECTION_TITLES: Record<MemoryScope, string> = {
-    project: '项目级 Memory',
-    other: '外部 Memory',
+// 分组标题文案 key，渲染期经 t() 取值
+const MEMORY_SECTION_TITLE_KEYS: Record<MemoryScope, I18nKey> = {
+    project: 'config.memory.group.project',
+    other: 'config.memory.group.other',
 };
 
 const MEMORY_PATHS: Record<MemoryScope, string> = {
@@ -32,10 +34,10 @@ interface RuleConfig {
     filePath?: string;
 }
 
-const RULE_SECTION_TITLES: Record<RuleScope, string> = {
-    project: '项目级 Rule',
-    user: '用户级 Rule',
-    other: '外部 Rule',
+const RULE_SECTION_TITLE_KEYS: Record<RuleScope, I18nKey> = {
+    project: 'config.rule.group.project',
+    user: 'config.rule.group.user',
+    other: 'config.rule.group.other',
 };
 
 const RULE_PATHS: Record<RuleScope, string> = {
@@ -51,6 +53,7 @@ interface RuleMemoryConfigProps {
 type ActiveTab = 'rule' | 'memory';
 
 const RuleMemoryConfig: React.FC<RuleMemoryConfigProps> = ({ vscode }) => {
+    const t = useT();
     const [activeTab, setActiveTab] = useState<ActiveTab>('rule');
 
     // Memory state
@@ -167,7 +170,7 @@ const RuleMemoryConfig: React.FC<RuleMemoryConfigProps> = ({ vscode }) => {
                         >
                             {item.FilePath ? getFileName(item.FilePath) : 'MEMORY.md'}
                         </span>
-                        {readonly && <span className="readonly-tab">只读</span>}
+                        {readonly && <span className="readonly-tab">{t('common.readonly')}</span>}
                         {readonly && item.from && <span className="readonly-tab">{item.from}</span>}
                     </div>
                 </div>
@@ -190,7 +193,7 @@ const RuleMemoryConfig: React.FC<RuleMemoryConfigProps> = ({ vscode }) => {
                 {item.refFilePath && item.refFilePath.length > 0 && (
                     <div style={{ marginTop: '14px', padding: '0 14px 14px' }}>
                         <div style={{ fontSize: '12px', color: 'var(--vscode-foreground)', marginBottom: '4px' }}>
-                            关联文件（{item.refFilePath.length}）
+                            {t('config.memory.refFiles', { count: item.refFilePath.length })}
                         </div>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
                             {item.refFilePath.map((fp, fi) => (
@@ -250,7 +253,7 @@ const RuleMemoryConfig: React.FC<RuleMemoryConfigProps> = ({ vscode }) => {
                         >
                             {item.filePath ? getFileName(item.filePath) : 'Rule'}
                         </span>
-                        {readonly && <span className="readonly-tab">只读</span>}
+                        {readonly && <span className="readonly-tab">{t('common.readonly')}</span>}
                         {readonly && item.from && <span className="readonly-tab">{item.from}</span>}
                     </div>
                 </div>
@@ -297,7 +300,7 @@ const RuleMemoryConfig: React.FC<RuleMemoryConfigProps> = ({ vscode }) => {
                         <button
                             className={`section-icon-btn ${isRuleRefreshing ? 'btn-loading' : ''}`}
                             onClick={handleRuleRefresh}
-                            title="刷新 Rule"
+                            title={t('config.rule.refresh')}
                             disabled={isRuleRefreshing}
                         >
                             {isRuleRefreshing ? <span className="spinner" /> : <RefreshIcon size={14} />}
@@ -306,7 +309,7 @@ const RuleMemoryConfig: React.FC<RuleMemoryConfigProps> = ({ vscode }) => {
                         <button
                             className={`section-icon-btn ${isMemoryRefreshing ? 'btn-loading' : ''}`}
                             onClick={handleMemoryRefresh}
-                            title="刷新 Memory"
+                            title={t('config.memory.refresh')}
                             disabled={isMemoryRefreshing}
                         >
                             {isMemoryRefreshing ? <span className="spinner" /> : <RefreshIcon size={14} />}
@@ -320,7 +323,7 @@ const RuleMemoryConfig: React.FC<RuleMemoryConfigProps> = ({ vscode }) => {
                 {/* Rule 内容 */}
                 {activeTab === 'rule' && (
                     ruleLoading ? (
-                        <div className="section-loading">加载中...</div>
+                        <div className="section-loading">{t('common.loading')}</div>
                     ) : (
                         <div className="section-groups">
                             {(['project', 'user', 'other'] as RuleScope[]).map(scope => {
@@ -334,7 +337,7 @@ const RuleMemoryConfig: React.FC<RuleMemoryConfigProps> = ({ vscode }) => {
                                             style={{ cursor: 'pointer', userSelect: 'none' }}
                                             onClick={() => toggleRuleCollapse(scope)}
                                         >
-                                            {RULE_SECTION_TITLES[scope]}
+                                            {t(RULE_SECTION_TITLE_KEYS[scope])}
                                             {RULE_PATHS[scope] && (
                                                 <span className="section-group-count">({RULE_PATHS[scope]})</span>
                                             )}
@@ -342,7 +345,7 @@ const RuleMemoryConfig: React.FC<RuleMemoryConfigProps> = ({ vscode }) => {
                                         </div>
                                         {!isCollapsed && (
                                             items.length === 0 ? (
-                                                <div className="section-empty">暂无 Rule 配置</div>
+                                                <div className="section-empty">{t('config.rule.empty')}</div>
                                             ) : (
                                                 <div className="section-list memory-list">
                                                     {items.map((item, index) => renderRuleCard(item, index))}
@@ -359,7 +362,7 @@ const RuleMemoryConfig: React.FC<RuleMemoryConfigProps> = ({ vscode }) => {
                 {/* Memory 内容 */}
                 {activeTab === 'memory' && (
                     memoryLoading ? (
-                        <div className="section-loading">加载中...</div>
+                        <div className="section-loading">{t('common.loading')}</div>
                     ) : (
                         <div className="section-groups">
                             {(['project', 'other'] as MemoryScope[]).map(scope => {
@@ -373,7 +376,7 @@ const RuleMemoryConfig: React.FC<RuleMemoryConfigProps> = ({ vscode }) => {
                                             style={{ cursor: 'pointer', userSelect: 'none' }}
                                             onClick={() => toggleMemoryCollapse(scope)}
                                         >
-                                            {MEMORY_SECTION_TITLES[scope]}
+                                            {t(MEMORY_SECTION_TITLE_KEYS[scope])}
                                             {MEMORY_PATHS[scope] && (
                                                 <span className="section-group-count">({MEMORY_PATHS[scope]})</span>
                                             )}
@@ -381,7 +384,7 @@ const RuleMemoryConfig: React.FC<RuleMemoryConfigProps> = ({ vscode }) => {
                                         </div>
                                         {!isCollapsed && (
                                             items.length === 0 ? (
-                                                <div className="section-empty">暂无 Memory 配置</div>
+                                                <div className="section-empty">{t('config.memory.empty')}</div>
                                             ) : (
                                                 <div className="section-list memory-list">
                                                     {items.map((item, index) => renderMemoryCard(item, index))}

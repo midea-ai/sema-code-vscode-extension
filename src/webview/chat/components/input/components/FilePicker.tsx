@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
 import FileIcon from '../../ui/FileIcon';
 import { FileItem } from '../../../types';
+import { useT } from '../../../../common/i18n/react';
 
 interface FilePickerProps {
     show: boolean;
@@ -19,6 +20,7 @@ const FilePicker: React.FC<FilePickerProps> = ({
     filePickerRef,
     showDividers = false
 }) => {
+    const t = useT();
     useEffect(() => {
         if (!show || !filePickerRef.current) return;
         const selectedEl = filePickerRef.current.querySelector<HTMLElement>('.shortcut-panel-item.selected');
@@ -87,7 +89,7 @@ const FilePicker: React.FC<FilePickerProps> = ({
                 })
             ) : (
                 <div className="file-picker-empty">
-                    工作区中没有文件
+                    {t('chat.filePicker.empty')}
                 </div>
             )}
         </div>

@@ -1,6 +1,7 @@
 import React from 'react';
 import Tooltip from '../../ui/Tooltip';
 import { TokenInfo } from '../../../types';
+import { useT } from '../../../../common/i18n/react';
 
 // interface TokenInfo {
 //     useTokens: number;          // 当前会话已使用的token数
@@ -14,6 +15,7 @@ interface TokenProgressProps {
 }
 
 const TokenProgress: React.FC<TokenProgressProps> = React.memo(({ tokenInfo }) => {
+    const t = useT();
     // console.log('tokenInfo: ', tokenInfo)
     // 计算使用百分比
     const percentage = tokenInfo.maxTokens > 0
@@ -28,7 +30,7 @@ const TokenProgress: React.FC<TokenProgressProps> = React.memo(({ tokenInfo }) =
         return tokens.toString();
     };
 
-    const tooltip = `已使用: ${formatTokens(tokenInfo.useTokens)} / ${formatTokens(tokenInfo.maxTokens)} tokens`;
+    const tooltip = t('chat.tokens.used', { used: formatTokens(tokenInfo.useTokens), max: formatTokens(tokenInfo.maxTokens) });
 
     return (
         <Tooltip content={tooltip}>

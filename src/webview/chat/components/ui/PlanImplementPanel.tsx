@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { renderMarkdownToHtml, hasMarkdownFormatting } from '../../utils/markdown';
 import { ToggleIcon } from './IconButton';
 import CollapsibleContent from './CollapsibleContent';
+import { useT } from '../../../common/i18n/react';
 import '../../style/markdown.css';
 
 interface PlanImplementPanelProps {
@@ -15,6 +16,7 @@ const PlanImplementPanel: React.FC<PlanImplementPanelProps> = ({
     planContent,
     vscode
 }) => {
+    const t = useT();
     const [isExpanded, setIsExpanded] = useState<boolean>(true);
 
     const handleFileNameClick = () => {
@@ -38,18 +40,18 @@ const PlanImplementPanel: React.FC<PlanImplementPanelProps> = ({
                 {/* 标题区域 */}
                 <div className="plan-implement-header">
                     <span className="plan-implement-header-tag">Plan</span>
-                    <span className="plan-implement-title">规划文档</span>
+                    <span className="plan-implement-title">{t('chat.plan.doc')}</span>
                     <span
                         className="plan-implement-file-name"
                         onClick={handleFileNameClick}
-                        title={`点击打开: ${planFilePath}`}
+                        title={t('chat.plan.openFile', { path: planFilePath })}
                     >
                         {fileName}
                     </span>
                     <button
                         className="plan-implement-toggle-btn"
                         onClick={toggleExpanded}
-                        title={isExpanded ? '收起' : '展开'}
+                        title={isExpanded ? t('common.collapse') : t('common.expand')}
                     >
                         <ToggleIcon isExpanded={isExpanded} />
                     </button>

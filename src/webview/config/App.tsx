@@ -16,6 +16,7 @@ import CronTaskConfig from './CronTaskConfig';
 import DesignConfig from './DesignConfig';
 import ClawConfig from './ClawConfig';
 import { RefreshIcon } from './utils/svgIcons';
+import { setLang, useT } from '../common/i18n/react';
 
 type PageType = 'models' | 'system' | 'memory' | 'mcp' | 'skill' | 'agent' | 'hooks' | 'command' | 'plugin' | 'task' | 'design' | 'claw';
 type ModelTabType = 'list' | 'add';
@@ -29,6 +30,7 @@ const App: React.FC<AppProps> = ({ vscode }) => {
     // JB 插件不支持 Claw 远程，隐藏其入口（VSCode 下 __SEMA_JB__ 为 undefined，行为不变）。
     // 必须在组件内读取：模块顶层求值早于 jb-index 设置该标记，会恒为 false。
     const IS_JB = !!(window as any).__SEMA_JB__;
+    const t = useT();
     const [currentPage, setCurrentPage] = useState<PageType>('models');
     const [modelTab, setModelTab] = useState<ModelTabType>('list');
     const [taskTab, setTaskTab] = useState<TaskTabType>('background');
@@ -54,6 +56,9 @@ const App: React.FC<AppProps> = ({ vscode }) => {
             const message = event.data;
 
             switch (message.command) {
+                case 'langUpdate':
+                    if (typeof message.lang === 'string') setLang(message.lang);
+                    break;
                 case 'loadConfig':
                     // 直接设置 ModelUpdateData 格式的数据
                     setConfig(message.data);
@@ -122,21 +127,21 @@ const App: React.FC<AppProps> = ({ vscode }) => {
                     className={`nav-item nav-main ${currentPage === 'models' ? 'active' : ''}`}
                     onClick={() => setCurrentPage('models')}
                 >
-                    模型配置
+                    {t('config.nav.models')}
                 </div>
 
                 <div
                     className={`nav-item nav-main ${currentPage === 'system' ? 'active' : ''}`}
                     onClick={() => setCurrentPage('system')}
                 >
-                    系统配置
+                    {t('config.nav.system')}
                 </div>
 
                 <div
                     className={`nav-item nav-main ${currentPage === 'task' ? 'active' : ''}`}
                     onClick={() => setCurrentPage('task')}
                 >
-                    任务管理
+                    {t('config.nav.task')}
                 </div>
 
                 <div
@@ -200,7 +205,7 @@ const App: React.FC<AppProps> = ({ vscode }) => {
                         className={`nav-item nav-main ${currentPage === 'claw' ? 'active' : ''}`}
                         onClick={() => setCurrentPage('claw')}
                     >
-                        Claw 远程
+                        {t('config.nav.claw')}
                     </div>
                 )}
             </div>
@@ -216,13 +221,13 @@ const App: React.FC<AppProps> = ({ vscode }) => {
                                 className={`tab-item ${modelTab === 'list' ? 'active' : ''}`}
                                 onClick={() => setModelTab('list')}
                             >
-                                模型列表
+                                {t('config.tab.modelList')}
                             </div>
                             <div
                                 className={`tab-item ${modelTab === 'add' ? 'active' : ''}`}
                                 onClick={() => { setEditModel(null); setModelTab('add'); }}
                             >
-                                新增模型
+                                {t('config.tab.addModel')}
                             </div>
                         </div>
 
@@ -323,7 +328,7 @@ const App: React.FC<AppProps> = ({ vscode }) => {
                                 className={`tab-item ${taskTab === 'background' ? 'active' : ''}`}
                                 onClick={() => setTaskTab('background')}
                             >
-                                后台任务
+                                {t('config.tab.backgroundTasks')}
                                 {backgroundTaskCount > 0 && (
                                     <span className="section-tab-count">{backgroundTaskCount}</span>
                                 )}
@@ -332,7 +337,7 @@ const App: React.FC<AppProps> = ({ vscode }) => {
                                 className={`tab-item ${taskTab === 'cron' ? 'active' : ''}`}
                                 onClick={() => setTaskTab('cron')}
                             >
-                                定时任务
+                                {t('config.tab.cronTasks')}
                                 {cronTaskCount > 0 && (
                                     <span className="section-tab-count">{cronTaskCount}</span>
                                 )}
@@ -340,7 +345,7 @@ const App: React.FC<AppProps> = ({ vscode }) => {
                             <div style={{ marginLeft: 'auto' }}>
                                 <button
                                     className="section-icon-btn"
-                                    title="刷新"
+                                    title={t('common.refresh')}
                                     onClick={() => setTaskRefreshTrigger(n => n + 1)}
                                 >
                                     <RefreshIcon size={14} />
@@ -363,4 +368,3 @@ const App: React.FC<AppProps> = ({ vscode }) => {
 };
 
 export default App;
-

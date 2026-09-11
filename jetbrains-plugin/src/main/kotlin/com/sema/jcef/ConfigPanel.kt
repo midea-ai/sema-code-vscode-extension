@@ -81,7 +81,7 @@ class ConfigPanel(project: Project) : Disposable {
         val js = File(dir, "jb-config.js")
         stream.use { input -> js.outputStream().use { input.copyTo(it) } }
         val html = File(dir, "index.html")
-        html.writeText(HtmlShell.page(buildInjection(), Theme.cssVariables(), "jb-config.js", extraCss = Theme.configPageOverrideCss()))
+        html.writeText(HtmlShell.page(buildInjection(), Theme.cssVariables(), "jb-config.js", extraCss = Theme.configPageOverrideCss(), lang = HtmlShell.currentLang()))
         log.warn("[sema] config bundle=${js.length()} bytes 载入 ${html.toURI()}")
         browser.loadURL(html.toURI().toString())
     }

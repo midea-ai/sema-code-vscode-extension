@@ -6,6 +6,7 @@ import { defaultMCPMarketInfos, MCPMarketInfo } from './default/defaultMCPMarket
 import { inlineSvgIcons } from './utils/mcpIcon';
 import { initialBgColors, hashString } from './utils/iconUtils';
 import { openFileWithRange } from './utils/fileUtils';
+import { useT, I18nKey } from '../common/i18n/react';
 import './style/section.css';
 import './style/mcp.css';
 
@@ -15,10 +16,11 @@ type MCPGroupScope = 'project' | 'user' | 'plugin';
 
 const GROUP_ORDER: MCPGroupScope[] = ['project', 'user', 'plugin'];
 
-const GROUP_TITLES: Record<MCPGroupScope, string> = {
-    project: '项目级 MCP',
-    user: '用户级 MCP',
-    plugin: '插件 MCP',
+// 分组标题文案 key，渲染期经 t() 取值
+const GROUP_TITLE_KEYS: Record<MCPGroupScope, I18nKey> = {
+    project: 'config.mcp.group.project',
+    user: 'config.mcp.group.user',
+    plugin: 'config.mcp.group.plugin',
 };
 
 const GROUP_PATHS: Record<MCPGroupScope, string> = {
@@ -44,11 +46,11 @@ const statusColors: Record<string, string> = {
     error: '#ef4444',
 };
 
-const statusText: Record<string, string> = {
-    disconnected: '未连接',
-    connecting: '连接中',
-    connected: '已连接',
-    error: '错误',
+const STATUS_TEXT_KEYS: Record<string, I18nKey> = {
+    disconnected: 'config.mcp.status.disconnected',
+    connecting: 'config.mcp.status.connecting',
+    connected: 'config.mcp.status.connected',
+    error: 'config.mcp.status.error',
 };
 
 // 将后端返回的分组/数组数据展开为平铺列表
@@ -88,9 +90,10 @@ const ToolsPanel: React.FC<{
     canToggle: boolean;
     onToolToggle: (toolName: string, enabled: boolean) => void;
 }> = ({ tools, canToggle, onToolToggle }) => {
+    const t = useT();
     const [toolPage, setToolPage] = useState(1);
     const toolCount = tools.length;
-    const enabledCount = tools.filter(t => t.enabled).length;
+    const enabledCount = tools.filter(tool => tool.enabled).length;
     const toolTotalPages = Math.ceil(toolCount / TOOLS_PAGE_SIZE);
     const pagedTools = tools.slice((toolPage - 1) * TOOLS_PAGE_SIZE, toolPage * TOOLS_PAGE_SIZE);
 
@@ -130,7 +133,7 @@ const ToolsPanel: React.FC<{
                     )}
                 </>
             ) : (
-                <div className="mcp-tools-empty">暂无工具</div>
+                <div className="mcp-tools-empty">{t('config.mcp.noTools')}</div>
             )}
         </div>
     );
@@ -147,6 +150,7 @@ const MCPServerCard: React.FC<{
     onToggle: (server: MCPServerInfo, scope: MCPGroupScope, enabled: boolean) => void;
     onToolToggle: (mcpName: string, toolName: string, enabled: boolean) => void;
 }> = ({ server, scope, onReconnect, onEdit, onDelete, onToggle, onToolToggle }) => {
+    const t = useT();
     const [expanded, setExpanded] = useState(false);
     const tools = server.capabilities?.tools || [];
 
@@ -180,17 +184,17 @@ const MCPServerCard: React.FC<{
                 <span
                     className="mcp-status-dot"
                     style={{ backgroundColor: statusColors[statusKey] || statusColors.disconnected }}
-                    title={statusText[statusKey] || statusKey}
+                    title={STATUS_TEXT_KEYS[statusKey] ? t(STATUS_TEXT_KEYS[statusKey]) : statusKey}
                 />
                 {statusKey === 'error' && (server as any).error && (
                     <span className="mcp-error-hint" title={(server as any).error}>!</span>
                 )}
-                {!canEdit && <span className="readonly-tab">只读</span>}
+                {!canEdit && <span className="readonly-tab">{t('common.readonly')}</span>}
                 <div className="section-card-actions" onClick={(e) => e.stopPropagation()}>
                     <button
                         className="section-icon-btn"
                         onClick={() => onReconnect(server.config.name)}
-                        title={server.status !== true ? '服务未生效，无法重连' : '重新连接'}
+                        title={server.status !== true ? t('config.mcp.reconnectDisabled') : t('config.mcp.reconnect')}
                         disabled={server.status !== true}
                     >
                         <RefreshIcon />
@@ -199,7 +203,7 @@ const MCPServerCard: React.FC<{
                         <button
                             className="section-icon-btn"
                             onClick={() => onEdit(server, scope)}
-                            title="编辑配置"
+                            title={t('config.mcp.editConfig')}
                         >
                             <EditIcon />
                         </button>
@@ -208,7 +212,7 @@ const MCPServerCard: React.FC<{
                         <button
                             className="section-icon-btn section-icon-btn-danger"
                             onClick={() => onDelete(server, scope)}
-                            title="删除"
+                            title={t('common.delete')}
                         >
                             <TrashIcon />
                         </button>
@@ -242,6 +246,7 @@ const SystemToolsCard: React.FC<{
     tools: SystemToolInfo[];
     onToolToggle: (toolName: string, enabled: boolean) => void;
 }> = ({ tools, onToolToggle }) => {
+    const t = useT();
     const [expanded, setExpanded] = useState(true);
 
     const toolsPanelItems: ToolsPanelItem[] = tools.map(tool => ({
@@ -262,12 +267,12 @@ const SystemToolsCard: React.FC<{
                 <div className="section-card-icon mcp-builtin-icon">
                     <GearIcon />
                 </div>
-                <span className="section-card-name">内置工具</span>
-                <span className="readonly-tab">只读</span>
+                <span className="section-card-name">{t('config.mcp.builtinTools')}</span>
+                <span className="readonly-tab">{t('common.readonly')}</span>
                 <span
                     className="mcp-status-dot"
                     style={{ backgroundColor: '#10b981' }}
-                    title="已连接"
+                    title={t('config.mcp.status.connected')}
                 />
             </div>
             {expanded && (
@@ -292,6 +297,7 @@ const MCPEditModal: React.FC<{
     vscode: VscodeApi;
     isSaving?: boolean;
 }> = ({ server, scope, require, onClose, onSave, vscode, isSaving }) => {
+    const t = useT();
     const [jsonText, setJsonText] = useState('');
     const [error, setError] = useState<string | null>(null);
 
@@ -330,24 +336,26 @@ const MCPEditModal: React.FC<{
         try {
             const parsed = JSON.parse(jsonText);
             if (!parsed.mcpServers || typeof parsed.mcpServers !== 'object') {
-                setError('格式错误：需要 mcpServers 对象'); return;
+                setError(t('config.mcp.err.needMcpServers')); return;
             }
             const serverNames = Object.keys(parsed.mcpServers);
             if (serverNames.length !== 1) {
-                setError('格式错误：mcpServers 中只能有一个服务配置'); return;
+                setError(t('config.mcp.err.singleServer')); return;
             }
             const name = serverNames[0];
             const config: MCPServerConfig = { name, ...parsed.mcpServers[name] };
-            if (!config.transport) { setError('transport 字段是必需的'); return; }
+            if (!config.transport) { setError(t('config.mcp.err.transportRequired')); return; }
             if (require) {
                 const unreplacedKeys = checkRequirePlaceholders(config, Object.keys(require));
                 if (unreplacedKeys.length > 0) {
-                    setError(`请将 ${unreplacedKeys.map(k => `'${k}'`).join('、')} 替换为实际值`); return;
+                    setError(t('config.mcp.err.replacePlaceholders', {
+                        keys: unreplacedKeys.map(k => `'${k}'`).join(t('config.mcp.requireSeparator'))
+                    })); return;
                 }
             }
             onSave(config, scope);
         } catch {
-            setError('JSON 格式错误');
+            setError(t('config.mcp.err.invalidJson'));
         }
     };
 
@@ -357,15 +365,15 @@ const MCPEditModal: React.FC<{
         if (!require || Object.keys(require).length === 0) return null;
         return (
             <div className="mcp-require-hint">
-                <span className="mcp-require-hint-prefix">请将 </span>
+                <span className="mcp-require-hint-prefix">{t('config.mcp.requirePrefix')}</span>
                 {Object.entries(require).map(([key, desc], index, arr) => (
                     <span key={key}>
                         '<span className="mcp-require-key">{key}</span>'
-                        <span className="mcp-require-desc">（{desc}）</span>
-                        {index < arr.length - 1 && '、'}
+                        <span className="mcp-require-desc">{t('config.mcp.requireDesc', { desc })}</span>
+                        {index < arr.length - 1 && t('config.mcp.requireSeparator')}
                     </span>
                 ))}
-                <span className="mcp-require-hint-suffix"> 替换为自己的值</span>
+                <span className="mcp-require-hint-suffix">{t('config.mcp.requireSuffix')}</span>
             </div>
         );
     };
@@ -374,20 +382,20 @@ const MCPEditModal: React.FC<{
         <div className="section-modal-overlay" onClick={onClose}>
             <div className="section-modal" onClick={(e) => e.stopPropagation()}>
                 <div className="section-modal-header">
-                    <span>编辑 MCP 配置 - {server.config.name}</span>
+                    <span>{t('config.mcp.editTitle', { name: server.config.name })}</span>
                     <button className="section-modal-close" onClick={onClose}><CloseIcon /></button>
                 </div>
                 <div className="section-modal-body">
                     {showNpxHint && (
                         <div className="mcp-npx-hint">
-                            <span className="mcp-npx-hint-text">本地需要 npx 环境</span>
-                            <a href="#" className="mcp-npx-hint-link" onClick={(e) => { e.preventDefault(); vscode.postMessage({ command: 'openExternal', url: 'https://nodejs.org/' }); }}>如何安装？</a>
+                            <span className="mcp-npx-hint-text">{t('config.mcp.needNpx')}</span>
+                            <a href="#" className="mcp-npx-hint-link" onClick={(e) => { e.preventDefault(); vscode.postMessage({ command: 'openExternal', url: 'https://nodejs.org/' }); }}>{t('config.mcp.howToInstall')}</a>
                         </div>
                     )}
                     {showUvxHint && (
                         <div className="mcp-npx-hint">
-                            <span className="mcp-npx-hint-text">本地需要 uvx 环境</span>
-                            <a href="#" className="mcp-npx-hint-link" onClick={(e) => { e.preventDefault(); vscode.postMessage({ command: 'openExternal', url: 'https://docs.astral.sh/uv/getting-started/installation/' }); }}>如何安装？</a>
+                            <span className="mcp-npx-hint-text">{t('config.mcp.needUvx')}</span>
+                            <a href="#" className="mcp-npx-hint-link" onClick={(e) => { e.preventDefault(); vscode.postMessage({ command: 'openExternal', url: 'https://docs.astral.sh/uv/getting-started/installation/' }); }}>{t('config.mcp.howToInstall')}</a>
                         </div>
                     )}
                     {renderRequireHints()}
@@ -400,10 +408,10 @@ const MCPEditModal: React.FC<{
                     {error && <div className="section-edit-error">{error}</div>}
                 </div>
                 <div className="section-modal-footer">
-                    <button className="section-btn secondary" onClick={onClose} disabled={isSaving}>取消</button>
+                    <button className="section-btn secondary" onClick={onClose} disabled={isSaving}>{t('common.cancel')}</button>
                     <button className={`section-btn primary ${isSaving ? 'btn-loading' : ''}`} onClick={handleSave} disabled={isSaving}>
                         {isSaving && <span className="spinner" />}
-                        {isSaving ? '保存中...' : '确定'}
+                        {isSaving ? t('common.saving') : t('common.ok')}
                     </button>
                 </div>
             </div>
@@ -451,6 +459,7 @@ const MCPMarketCard: React.FC<{
     onInstall: (item: MCPMarketInfo, scope: MCPGroupScope) => void;
     vscode: VscodeApi;
 }> = ({ item, isInstalled, onInstall, vscode }) => {
+    const t = useT();
     const [expanded, setExpanded] = useState(false);
     const commandType = getCommandType(item.config.command);
     const author = getGitHubAuthor(item.github);
@@ -470,11 +479,11 @@ const MCPMarketCard: React.FC<{
                 </div>
                 <div className="mcp-market-card-right">
                     {isInstalled ? (
-                        <span className="section-installed-badge">已安装</span>
+                        <span className="section-installed-badge">{t('common.installed')}</span>
                     ) : (
                         <div className="section-install-btns">
-                            <button className="section-btn secondary small" onClick={() => onInstall(item, 'project')} title="安装到当前项目">项目添加</button>
-                            <button className="section-btn primary small" onClick={() => onInstall(item, 'user')} title="安装到用户全局">全局添加</button>
+                            <button className="section-btn secondary small" onClick={() => onInstall(item, 'project')} title={t('common.installToProjectTip')}>{t('config.mcp.addProject')}</button>
+                            <button className="section-btn primary small" onClick={() => onInstall(item, 'user')} title={t('common.installToUserTip')}>{t('config.mcp.addUser')}</button>
                         </div>
                     )}
                 </div>
@@ -490,7 +499,7 @@ const MCPMarketCard: React.FC<{
                     <span>{item.tools.length} Tools</span>
                 </button>
                 {item.github && (
-                    <a href="#" className="mcp-github-link" onClick={(e) => { e.preventDefault(); vscode.postMessage({ command: 'openExternal', url: item.github }); }} title="查看源码">
+                    <a href="#" className="mcp-github-link" onClick={(e) => { e.preventDefault(); vscode.postMessage({ command: 'openExternal', url: item.github }); }} title={t('config.mcp.viewSource')}>
                         <GitHubIcon />
                         {author && <span className="mcp-author">{author}</span>}
                     </a>
@@ -517,6 +526,7 @@ interface MCPConfigProps {
 }
 
 const MCPConfig: React.FC<MCPConfigProps> = ({ vscode, onOpenSystemConfig }) => {
+    const t = useT();
     const [activeTab, setActiveTab] = useState<MCPTabType>('installed');
     const [servers, setServers] = useState<MCPServerInfo[]>([]);
     const [systemTools, setSystemTools] = useState<SystemToolInfo[]>([]);
@@ -553,7 +563,7 @@ const MCPConfig: React.FC<MCPConfigProps> = ({ vscode, onOpenSystemConfig }) => 
     }, [servers]);
 
     const totalToolCount = useMemo(() => {
-        const systemCount = systemTools.filter(t => t.enabled).length;
+        const systemCount = systemTools.filter(tool => tool.enabled).length;
         const mcpCount = [...groupedServers.project, ...groupedServers.user, ...groupedServers.plugin]
             .filter(s => s.config.enabled !== false)
             .reduce((sum, s) => {
@@ -699,7 +709,7 @@ const MCPConfig: React.FC<MCPConfigProps> = ({ vscode, onOpenSystemConfig }) => 
         const server = [...groupedServers.project, ...groupedServers.user, ...groupedServers.plugin].find(s => s.config.name === mcpName);
         if (!server) return;
 
-        const allToolNames = (server.capabilities?.tools || []).map(t => t.name);
+        const allToolNames = (server.capabilities?.tools || []).map(tool => tool.name);
         let currentEnabled = server.config.useTools === null || server.config.useTools === undefined
             ? [...allToolNames]
             : [...server.config.useTools];
@@ -707,7 +717,7 @@ const MCPConfig: React.FC<MCPConfigProps> = ({ vscode, onOpenSystemConfig }) => 
         if (enabled) {
             if (!currentEnabled.includes(toolName)) currentEnabled.push(toolName);
         } else {
-            currentEnabled = currentEnabled.filter(t => t !== toolName);
+            currentEnabled = currentEnabled.filter(name => name !== toolName);
         }
         const toolsToSend = currentEnabled.length === allToolNames.length ? null : currentEnabled;
 
@@ -720,11 +730,11 @@ const MCPConfig: React.FC<MCPConfigProps> = ({ vscode, onOpenSystemConfig }) => 
     };
 
     const handleSystemToolToggle = (toolName: string, enabled: boolean) => {
-        const newTools = systemTools.map(t =>
-            t.name === toolName ? { ...t, enabled, status: (enabled ? 'enable' : 'disable') as 'enable' | 'disable' } : t
+        const newTools = systemTools.map(tool =>
+            tool.name === toolName ? { ...tool, enabled, status: (enabled ? 'enable' : 'disable') as 'enable' | 'disable' } : tool
         );
         setSystemTools(newTools);
-        const disabledTools = newTools.filter(t => !t.enabled).map(t => t.name);
+        const disabledTools = newTools.filter(tool => !tool.enabled).map(tool => tool.name);
         vscode.postMessage({ command: 'updateDisabledTools', disabledTools: disabledTools.length === 0 ? null : disabledTools });
     };
 
@@ -749,21 +759,21 @@ const MCPConfig: React.FC<MCPConfigProps> = ({ vscode, onOpenSystemConfig }) => 
                     className={`tab-item ${activeTab === 'installed' ? 'active' : ''}`}
                     onClick={() => setActiveTab('installed')}
                 >
-                    已安装
+                    {t('common.installed')}
                     {totalToolCount > 0 && <span className="section-tab-count">{totalToolCount}</span>}
                 </div>
                 <div
                     className={`tab-item ${activeTab === 'market' ? 'active' : ''}`}
                     onClick={() => setActiveTab('market')}
                 >
-                    MCP 市场
+                    {t('config.mcp.tab.market')}
                 </div>
                 <div className="section-tab-actions">
                     {activeTab === 'installed' && (
                         <button
                             className={`section-icon-btn ${isRefreshing ? 'btn-loading' : ''}`}
                             onClick={handleRefresh}
-                            title="刷新 MCP"
+                            title={t('config.mcp.refresh')}
                             disabled={isRefreshing}
                         >
                             {isRefreshing ? <span className="spinner" /> : <RefreshIcon size={14} />}
@@ -776,22 +786,22 @@ const MCPConfig: React.FC<MCPConfigProps> = ({ vscode, onOpenSystemConfig }) => 
             <div className="tab-content">
                 {activeTab === 'installed' ? (
                     loading ? (
-                        <div className="section-loading">加载中...</div>
+                        <div className="section-loading">{t('common.loading')}</div>
                     ) : (
                         <div className="section-groups">
                             {totalToolCount > MAX_TOOL_COUNT && toolSearchEnabled === false && (
                                 <div className="mcp-tool-warning">
                                     <div className="mcp-tool-warning-icon"><WarningCircleIcon /></div>
                                     <div className="mcp-tool-warning-content">
-                                        <div className="mcp-tool-warning-title">工具数量过多（当前 {totalToolCount} 个）</div>
+                                        <div className="mcp-tool-warning-title">{t('config.mcp.tooManyTitle', { count: totalToolCount })}</div>
                                         <div className="mcp-tool-warning-desc">
-                                            建议启用的工具总数不超过 {MAX_TOOL_COUNT} 个，过多的工具可能会影响 AI 的选择准确性。
-                                            开启<a
+                                            {t('config.mcp.tooManyDesc', { max: MAX_TOOL_COUNT })}
+                                            {t('config.mcp.tooManyHintBefore')}<a
                                                 href="#"
                                                 className="mcp-tool-warning-link"
                                                 onClick={(e) => { e.preventDefault(); onOpenSystemConfig?.(); }}
-                                                title="前往系统配置查看"
-                                            >「工具搜索」</a>后仅默认工具集进入模型上下文，其余工具由 AI 按需搜索加载。
+                                                title={t('config.mcp.goSystemConfig')}
+                                            >{t('config.mcp.tooManyHintLink')}</a>{t('config.mcp.tooManyHintAfter')}
                                         </div>
                                         <div className="mcp-tool-warning-actions">
                                             <button
@@ -799,7 +809,7 @@ const MCPConfig: React.FC<MCPConfigProps> = ({ vscode, onOpenSystemConfig }) => 
                                                 onClick={handleEnableToolSearch}
                                                 disabled={enablingToolSearch}
                                             >
-                                                {enablingToolSearch ? '开启中...' : '开启工具搜索'}
+                                                {enablingToolSearch ? t('config.mcp.enabling') : t('config.mcp.enableToolSearch')}
                                             </button>
                                         </div>
                                     </div>
@@ -816,7 +826,7 @@ const MCPConfig: React.FC<MCPConfigProps> = ({ vscode, onOpenSystemConfig }) => 
                                             style={{ cursor: 'pointer', userSelect: 'none' }}
                                             onClick={() => toggleSection('system')}
                                         >
-                                            系统工具
+                                            {t('config.mcp.systemTools')}
                                             <span className={`section-collapse-arrow ${isCollapsed ? 'collapsed' : ''}`} />
                                         </div>
                                         {!isCollapsed && (
@@ -843,14 +853,14 @@ const MCPConfig: React.FC<MCPConfigProps> = ({ vscode, onOpenSystemConfig }) => 
                                             style={{ cursor: 'pointer', userSelect: 'none' }}
                                             onClick={() => toggleSection(scope)}
                                         >
-                                            {GROUP_TITLES[scope]}
+                                            {t(GROUP_TITLE_KEYS[scope])}
                                             {pathHint && <span className="section-group-count">({pathHint})</span>}
                                             <span className={`section-collapse-arrow ${isCollapsed ? 'collapsed' : ''}`} />
                                         </div>
                                         {!isCollapsed && (
                                             <div className="section-list mcp-server-list">
                                                 {scopeServers.length === 0 ? (
-                                                    <div className="section-empty">暂无 MCP 服务</div>
+                                                    <div className="section-empty">{t('config.mcp.empty')}</div>
                                                 ) : (
                                                     scopeServers.map((server, index) => (
                                                         <MCPServerCard
@@ -872,7 +882,7 @@ const MCPConfig: React.FC<MCPConfigProps> = ({ vscode, onOpenSystemConfig }) => 
                             })}
 
                             {systemTools.length === 0 && GROUP_ORDER.every(s => (groupedServers[s] || []).length === 0) && (
-                                <div className="section-empty">暂无 MCP 服务</div>
+                                <div className="section-empty">{t('config.mcp.empty')}</div>
                             )}
                         </div>
                     )
@@ -882,7 +892,7 @@ const MCPConfig: React.FC<MCPConfigProps> = ({ vscode, onOpenSystemConfig }) => 
                             <input
                                 type="text"
                                 className="section-search-input"
-                                placeholder="搜索 MCP 服务..."
+                                placeholder={t('config.mcp.searchPlaceholder')}
                                 value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}
                             />

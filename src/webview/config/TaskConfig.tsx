@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { Config, VscodeApi } from './types';
-import { RECOMMENDED_MAIN_MODEL, RECOMMENDED_QUICK_MODEL } from './default/defaultModelProvider';
+import { RECOMMENDED_MAIN_MODEL_KEY, RECOMMENDED_QUICK_MODEL_KEY } from './default/defaultModelProvider';
 import ProviderLogo, { parseProviderKey, stripProviderSuffix } from '../common/ProviderLogo';
 import IconSelect from './IconSelect';
+import { useT } from '../common/i18n/react';
 
 interface TaskConfigProps {
     config: Config | null;
@@ -10,6 +11,7 @@ interface TaskConfigProps {
 }
 
 const TaskConfig: React.FC<TaskConfigProps> = ({ config, vscode }) => {
+    const t = useT();
     const [taskConfig, setTaskConfig] = useState({
         main: '',
         quick: ''
@@ -48,7 +50,7 @@ const TaskConfig: React.FC<TaskConfigProps> = ({ config, vscode }) => {
             if (msg.command === 'taskConfigConfirmed') {
                 setSavedConfig({ ...taskConfig });
                 setHasChanges(false);
-                setMessage({ text: '✓ 任务配置已更新', type: 'success' });
+                setMessage({ text: t('config.task.updated'), type: 'success' });
                 setTimeout(() => setMessage(null), 3000);
             }
         };
@@ -86,7 +88,7 @@ const TaskConfig: React.FC<TaskConfigProps> = ({ config, vscode }) => {
 
     return (
         <div className="task-config">
-            <h2 className="section-title">任务配置</h2>
+            <h2 className="section-title">{t('config.task.title')}</h2>
 
             <div className="task-row">
                 <label className="task-label" htmlFor="mainModel">Main</label>
@@ -97,9 +99,9 @@ const TaskConfig: React.FC<TaskConfigProps> = ({ config, vscode }) => {
                         onChange={(value) => handleChange('main', value)}
                         options={modelOptions}
                         disabled={availableModels.length === 0}
-                        placeholder="无可用模型"
+                        placeholder={t('config.task.noModel')}
                     />
-                    {RECOMMENDED_MAIN_MODEL && <span className="task-recommend">{RECOMMENDED_MAIN_MODEL}</span>}
+                    {RECOMMENDED_MAIN_MODEL_KEY && <span className="task-recommend">{t(RECOMMENDED_MAIN_MODEL_KEY)}</span>}
                 </div>
             </div>
 
@@ -112,9 +114,9 @@ const TaskConfig: React.FC<TaskConfigProps> = ({ config, vscode }) => {
                         onChange={(value) => handleChange('quick', value)}
                         options={modelOptions}
                         disabled={availableModels.length === 0}
-                        placeholder="无可用模型"
+                        placeholder={t('config.task.noModel')}
                     />
-                    {RECOMMENDED_QUICK_MODEL && <span className="task-recommend">{RECOMMENDED_QUICK_MODEL}</span>}
+                    {RECOMMENDED_QUICK_MODEL_KEY && <span className="task-recommend">{t(RECOMMENDED_QUICK_MODEL_KEY)}</span>}
                 </div>
             </div>
 
@@ -126,7 +128,7 @@ const TaskConfig: React.FC<TaskConfigProps> = ({ config, vscode }) => {
                     disabled={!hasChanges}
                     onClick={handleConfirm}
                 >
-                    确认提交
+                    {t('config.task.confirm')}
                 </button>
             </div>
 

@@ -1,6 +1,7 @@
 import type { Transport } from '../../chat/jb/transport';
 import { RemoteCore } from '../../chat/jb/remote';
-import { defaultConfig } from '../default/defaultConfig';
+import { defaultConfig, DEFAULT_CUSTOM_RULES } from '../default/defaultConfig';
+import { t, normalizeLang } from '../../common/i18n/core';
 
 /**
  * 配置页控制器（JB 版）—— 1:1 复刻 VSCode 端 ConfigWebviewProvider 的 handler → 出站 command 映射，
@@ -54,7 +55,7 @@ export class ConfigController {
     }
 
     /** 破坏性操作二次确认：走 Kotlin 模态弹窗（对齐 VSCode configWebview 的 showWarningMessage modal）。取消/失败均视为不确认。 */
-    private async confirm(message: string, confirmLabel = '确定'): Promise<boolean> {
+    private async confirm(message: string, confirmLabel = t('common.ok')): Promise<boolean> {
         try { const r = await this.t.callEditor('confirm', { message, confirmLabel }); return !!r?.confirmed; }
         catch { return false; }
     }
@@ -66,7 +67,7 @@ export class ConfigController {
             const data = await fn();
             this.postToApp({ command, success: true, ...shape(data) });
         } catch (e: any) {
-            this.postToApp({ command, success: false, data: failData, message: e?.message || '操作失败' });
+            this.postToApp({ command, success: false, data: failData, message: e?.message || t('host.cfg.failed') });
         }
     }
 
@@ -78,7 +79,7 @@ export class ConfigController {
             case 'saveConfig':
                 await this.respond('saveResult',
                     () => this.core.addModel({ provider: m.data.provider, modelName: m.data.modelName, baseURL: m.data.baseURL, apiKey: m.data.apiKey, maxTokens: m.data.maxTokens, contextLength: m.data.contextLength, ...(m.data.adapt && { adapt: m.data.adapt }), ...(m.data.thinkingHistoryPolicy && { thinkingHistoryPolicy: m.data.thinkingHistoryPolicy }) }, true),
-                    () => ({ message: m.data.isEdit ? '模型配置已保存！' : '模型配置已添加！' }), undefined);
+                    () => ({ message: m.data.isEdit ? t('host.cfg.modelSaved') : t('host.cfg.modelAdded') }), undefined);
                 await this.loadConfig();
                 break;
             case 'toggleModelActive':
@@ -93,17 +94,17 @@ export class ConfigController {
                 await this.loadConfig();
                 break;
             case 'deleteModel':
-                if (!await this.confirm(`确定要删除模型 "${m.modelName}" 吗？\n\n注意：如果该模型正在被任务配置使用，将无法删除。`, '删除')) break;
-                await this.respond('deleteResult', () => this.core.delModel(m.modelName), () => ({ message: '模型已删除' }), undefined);
+                if (!await this.confirm(t('host.cfg.deleteModelConfirm', { name: m.modelName }), t('common.delete'))) break;
+                await this.respond('deleteResult', () => this.core.delModel(m.modelName), () => ({ message: t('host.cfg.modelDeleted') }), undefined);
                 await this.loadConfig();
                 break;
             case 'fetchModels':
                 try {
                     await this.ensureInit();
                     const r = await this.core.fetchAvailableModels(m.data);
-                    this.postToApp({ command: 'modelsResult', success: r.success, models: r.models || [], message: r.success ? (r.message || '获取模型列表成功') : `${r.message || '获取模型列表失败'}${r.curlCommand ? '\n调试命令: ' + r.curlCommand : ''}` });
+                    this.postToApp({ command: 'modelsResult', success: r.success, models: r.models || [], message: r.success ? (r.message || t('host.cfg.fetchModelsOk')) : `${r.message || t('host.cfg.fetchModelsFailed')}${r.curlCommand ? '\n' + t('host.cfg.debugCommand') + r.curlCommand : ''}` });
                 } catch (e: any) {
-                    this.postToApp({ command: 'modelsResult', success: false, models: [], message: `获取模型列表失败: ${e?.message || ''}` });
+                    this.postToApp({ command: 'modelsResult', success: false, models: [], message: `${t('host.cfg.fetchModelsFailed')}: ${e?.message || ''}` });
                 }
                 break;
             case 'getModelAdapter':
@@ -114,20 +115,20 @@ export class ConfigController {
                 try {
                     await this.ensureInit();
                     const profile = await this.core.getModelProfile(m.provider, m.modelName);
-                    if (!profile) throw new Error(`模型不存在: ${m.modelName}[${m.provider}]`);
+                    if (!profile) throw new Error(t('host.cfg.modelNotExist', { name: `${m.modelName}[${m.provider}]` }));
                     this.postToApp({ command: 'modelProfileResult', profile });
                 } catch (e: any) {
                     console.warn('[config] getModelProfile failed:', e?.message || e);
-                    this.postToApp({ command: 'modelProfileResult', success: false, profile: null, message: `读取模型配置失败：${e?.message || ''}` });
+                    this.postToApp({ command: 'modelProfileResult', success: false, profile: null, message: t('host.cfg.readModelFailed', { error: e?.message || '' }) });
                 }
                 break;
             case 'testConnection':
                 try {
                     await this.ensureInit();
                     const r = await this.core.testApiConnection(m.data);
-                    this.postToApp({ command: 'testResult', success: r.success, message: r.success ? '✓ 连接测试成功！API 配置正确。' : `${r.message}\n调试命令: ${r.curlCommand}` || '连接测试失败' });
+                    this.postToApp({ command: 'testResult', success: r.success, message: r.success ? t('host.cfg.testOk') : `${r.message}\n${t('host.cfg.debugCommand')}${r.curlCommand}` || t('host.cfg.testFailed') });
                 } catch (e: any) {
-                    this.postToApp({ command: 'testResult', success: false, message: `✗ 测试失败: ${e?.message || ''}` });
+                    this.postToApp({ command: 'testResult', success: false, message: t('host.cfg.testError', { error: e?.message || '' }) });
                 }
                 break;
 
@@ -138,9 +139,9 @@ export class ConfigController {
                     await this.ensureInit();
                     await this.t.callEditor('systemConfig', { op: 'save', config: m.data });
                     await this.core.updateCoreConfig(this.toCoreSystemConfig(m.data));
-                    this.postToApp({ command: 'saveSystemConfigResult', success: true, message: '系统配置已保存' });
+                    this.postToApp({ command: 'saveSystemConfigResult', success: true, message: t('host.cfg.systemSaved') });
                 } catch (e: any) {
-                    this.postToApp({ command: 'saveSystemConfigResult', success: false, message: e?.message || '保存失败' });
+                    this.postToApp({ command: 'saveSystemConfigResult', success: false, message: e?.message || t('host.cfg.saveFailed') });
                 }
                 break;
             case 'saveSystemConfigByKey':
@@ -148,20 +149,25 @@ export class ConfigController {
                     await this.ensureInit();
                     await this.t.callEditor('systemConfig', { op: 'saveByKey', key: m.key, value: m.value });
                     if (!LOCAL_SYSTEM_CONFIG_KEYS.includes(m.key)) await this.core.updateCoreConfByKey(m.key, m.value);
-                    this.postToApp({ command: 'saveSystemConfigByKeyResult', success: true, key: m.key, value: m.value, message: '配置已保存' });
+                    this.postToApp({ command: 'saveSystemConfigByKeyResult', success: true, key: m.key, value: m.value, message: t('host.cfg.configSaved') });
                 } catch (e: any) {
-                    this.postToApp({ command: 'saveSystemConfigByKeyResult', success: false, key: m.key, value: m.value, message: e?.message || '保存失败' });
+                    this.postToApp({ command: 'saveSystemConfigByKeyResult', success: false, key: m.key, value: m.value, message: e?.message || t('host.cfg.saveFailed') });
                 }
                 break;
             case 'resetSystemConfig':
-                if (!await this.confirm('确定要重置为默认配置吗？此操作将恢复所有系统配置', '重置')) break;
+                if (!await this.confirm(t('host.cfg.resetConfirm'), t('host.cfg.resetLabel'))) break;
                 try {
                     await this.ensureInit();
-                    await this.t.callEditor('systemConfig', { op: 'save', config: defaultConfig });
-                    await this.core.updateCoreConfig(this.toCoreSystemConfig(defaultConfig));
-                    this.postToApp({ command: 'resetSystemConfigResult', success: true, message: '系统配置已重置' });
+                    // 重置不改界面语言（对齐 VSCode configWebview.resetSystemConfig）：
+                    // lang 保留当前持久化值，customRules 取当前语言对应的默认规则，其余字段回默认。
+                    const current = await this.t.callEditor('systemConfig', { op: 'get' });
+                    const lang = normalizeLang(current?.config?.lang);
+                    const resetConfig = { ...defaultConfig, lang, customRules: DEFAULT_CUSTOM_RULES[lang] };
+                    await this.t.callEditor('systemConfig', { op: 'save', config: resetConfig });
+                    await this.core.updateCoreConfig(this.toCoreSystemConfig(resetConfig));
+                    this.postToApp({ command: 'resetSystemConfigResult', success: true, data: resetConfig, message: t('host.cfg.systemReset') });
                 } catch (e: any) {
-                    this.postToApp({ command: 'resetSystemConfigResult', success: false, message: e?.message || '重置失败' });
+                    this.postToApp({ command: 'resetSystemConfigResult', success: false, message: e?.message || t('host.cfg.resetFailed') });
                 }
                 break;
 
@@ -174,9 +180,9 @@ export class ConfigController {
                     await this.ensureInit();
                     await this.t.callEditor('systemConfig', { op: 'saveDisabledTools', disabledTools: m.disabledTools });
                     await this.core.updateDisabledTools(m.disabledTools);
-                    this.postToApp({ command: 'updateDisabledToolsResult', success: true, message: '工具配置已更新' });
+                    this.postToApp({ command: 'updateDisabledToolsResult', success: true, message: t('host.cfg.toolsUpdated') });
                 } catch (e: any) {
-                    this.postToApp({ command: 'updateDisabledToolsResult', success: false, message: e?.message || '更新失败' });
+                    this.postToApp({ command: 'updateDisabledToolsResult', success: false, message: e?.message || t('host.cfg.updateFailed') });
                 }
                 break;
 
@@ -191,7 +197,7 @@ export class ConfigController {
                 await this.respond('installPluginResult', () => this.core.installPlugin(m.pluginName, m.marketplaceName, m.scope), (data) => ({ key: m.key, data }), undefined);
                 break;
             case 'uninstallPlugin':
-                if (!await this.confirm(`确定要卸载插件 "${m.pluginName}" 吗？`, '卸载')) break;
+                if (!await this.confirm(t('host.cfg.uninstallPluginConfirm', { name: m.pluginName }), t('host.cfg.uninstallLabel'))) break;
                 await this.respond('uninstallPluginResult', () => this.core.uninstallPlugin(m.pluginName, m.marketplaceName, m.scope), (data) => ({ key: m.key, data }), undefined);
                 break;
             case 'enablePlugin':
@@ -204,7 +210,7 @@ export class ConfigController {
                 await this.respond('updateMarketplaceResult', () => this.core.updateMarketplace(m.marketplaceName), (data) => ({ name: m.marketplaceName, data }), undefined);
                 break;
             case 'removeMarketplace':
-                if (!await this.confirm(`确定要移除插件市场 "${m.marketplaceName}" 吗？`, '移除')) break;
+                if (!await this.confirm(t('host.cfg.removeMarketConfirm', { name: m.marketplaceName }), t('host.cfg.removeLabel'))) break;
                 await this.respond('removeMarketplaceResult', () => this.core.removeMarketplace(m.marketplaceName), (data) => ({ name: m.marketplaceName, data }), undefined);
                 break;
             case 'addMarketplaceFromGit':
@@ -222,11 +228,11 @@ export class ConfigController {
                 await this.respond('refreshAgentsInfoResult', () => this.core.getAgentsInfo(true), (data) => ({ data }));
                 break;
             case 'addAgent':
-                await this.respond('addAgentResult', () => this.core.addAgentConf(m.data), (data) => ({ message: 'Agent 创建成功', data }));
+                await this.respond('addAgentResult', () => this.core.addAgentConf(m.data), (data) => ({ message: t('host.cfg.agentCreated'), data }));
                 break;
             case 'removeAgent':
-                if (!await this.confirm(`确定要删除 Agent "${m.name}" 吗？`, '删除')) break;
-                await this.respond('removeAgentResult', () => this.core.removeAgentConf(m.name), (data) => ({ message: 'Agent 已删除', data }));
+                if (!await this.confirm(t('host.cfg.deleteAgentConfirm', { name: m.name }), t('common.delete'))) break;
+                await this.respond('removeAgentResult', () => this.core.removeAgentConf(m.name), (data) => ({ message: t('host.cfg.agentDeleted'), data }));
                 break;
 
             // ─── Skills（读/删走 core；Hub 后置）──────────────────────────
@@ -237,18 +243,18 @@ export class ConfigController {
                 await this.respond('refreshSkillsInfoResult', () => this.core.getSkillsInfo(true), (data) => ({ data }));
                 break;
             case 'removeSkill':
-                if (!await this.confirm(`确定要删除 Skill "${m.name}" 吗？`, '删除')) break;
-                await this.respond('removeSkillResult', () => this.core.removeSkillConf(m.name), (data) => ({ message: 'Skill 已删除', data }));
+                if (!await this.confirm(t('host.cfg.deleteSkillConfirm', { name: m.name }), t('common.delete'))) break;
+                await this.respond('removeSkillResult', () => this.core.removeSkillConf(m.name), (data) => ({ message: t('host.cfg.skillDeleted'), data }));
                 break;
             case 'toggleSkill':
                 // 写入哪层 settings 由 core 按技能所在层决定；失败时 UI 收到 success:false 会重拉恢复真实状态
                 await this.respond('toggleSkillResult', () => (m.enabled ? this.core.enableSkill(m.name) : this.core.disableSkill(m.name)), (data) => ({ data }));
                 break;
             case 'searchSkillHub':
-                this.postToApp({ command: 'searchSkillHubResult', success: false, data: [], message: 'JetBrains 版暂不支持 Skill Hub 在线搜索' });
+                this.postToApp({ command: 'searchSkillHubResult', success: false, data: [], message: t('host.cfg.jbNoSkillHubSearch') });
                 break;
             case 'installSkillFromHub':
-                this.postToApp({ command: 'installSkillFromHubResult', success: false, slug: m.slug, message: 'JetBrains 版暂不支持 Skill Hub 在线安装' });
+                this.postToApp({ command: 'installSkillFromHubResult', success: false, slug: m.slug, message: t('host.cfg.jbNoSkillHubInstall') });
                 break;
 
             // ─── Commands ──────────────────────────────────────────────
@@ -259,11 +265,11 @@ export class ConfigController {
                 await this.respond('refreshCommandsInfoResult', () => this.core.getCommandsInfo(true), (data) => ({ data }));
                 break;
             case 'addCommand':
-                await this.respond('addCommandResult', () => this.core.addCommandConf(m.data), (data) => ({ message: 'Command 创建成功', data }));
+                await this.respond('addCommandResult', () => this.core.addCommandConf(m.data), (data) => ({ message: t('host.cfg.commandCreated'), data }));
                 break;
             case 'removeCommand':
-                if (!await this.confirm(`确定要删除 Command "${m.name}" 吗？`, '删除')) break;
-                await this.respond('removeCommandResult', () => this.core.removeCommandConf(m.name), (data) => ({ message: 'Command 已删除', data }));
+                if (!await this.confirm(t('host.cfg.deleteCommandConfirm', { name: m.name }), t('common.delete'))) break;
+                await this.respond('removeCommandResult', () => this.core.removeCommandConf(m.name), (data) => ({ message: t('host.cfg.commandDeleted'), data }));
                 break;
 
             // ─── MCP ───────────────────────────────────────────────────
@@ -274,14 +280,14 @@ export class ConfigController {
                 await this.respond('refreshMCPServerInfoResult', () => this.core.refreshMCPServerInfo(), (data) => ({ data }));
                 break;
             case 'addMCPServer':
-                await this.respond('addMCPServerResult', () => this.core.addMCPServer(m.data), (data) => ({ message: 'MCP Server 添加成功', data }));
+                await this.respond('addMCPServerResult', () => this.core.addMCPServer(m.data), (data) => ({ message: t('host.cfg.mcpAdded'), data }));
                 break;
             case 'removeMCPServer':
-                if (!await this.confirm(`确定要删除 MCP Server "${m.name}" 吗？`, '删除')) break;
-                await this.respond('removeMCPServerResult', () => this.core.removeMCPServer(m.name), (data) => ({ message: 'MCP Server 已删除', data }));
+                if (!await this.confirm(t('host.cfg.deleteMcpConfirm', { name: m.name }), t('common.delete'))) break;
+                await this.respond('removeMCPServerResult', () => this.core.removeMCPServer(m.name), (data) => ({ message: t('host.cfg.mcpDeleted'), data }));
                 break;
             case 'reconnectMCPServer':
-                await this.respond('reconnectMCPServerResult', () => this.core.reconnectMCPServer(m.name), (data) => ({ message: 'MCP Server 重连成功', data }));
+                await this.respond('reconnectMCPServerResult', () => this.core.reconnectMCPServer(m.name), (data) => ({ message: t('host.cfg.mcpReconnected'), data }));
                 break;
             case 'disableMCPServer':
                 await this.respond('disableMCPServerResult', () => this.core.disableMCPServer(m.name), (data) => ({ data }));
@@ -290,7 +296,7 @@ export class ConfigController {
                 await this.respond('enableMCPServerResult', () => this.core.enableMCPServer(m.name), (data) => ({ data }));
                 break;
             case 'updateMCPUseTools':
-                await this.respond('updateMCPUseToolsResult', () => this.core.updateMCPUseTools(m.name, m.toolNames), (data) => ({ message: '工具配置已更新', data }));
+                await this.respond('updateMCPUseToolsResult', () => this.core.updateMCPUseTools(m.name, m.toolNames), (data) => ({ message: t('host.cfg.toolsUpdated'), data }));
                 break;
 
             // ─── Memory / Rule ─────────────────────────────────────────
@@ -363,7 +369,7 @@ export class ConfigController {
                     await this.core.stopTask(m.taskId);
                     this.postToApp({ command: 'stopTaskResult', success: true, taskId: m.taskId });
                 } catch (e: any) {
-                    this.postToApp({ command: 'stopTaskResult', success: false, taskId: m.taskId, message: e?.message || '停止任务失败' });
+                    this.postToApp({ command: 'stopTaskResult', success: false, taskId: m.taskId, message: e?.message || t('host.cfg.stopTaskFailed') });
                 }
                 break;
 
@@ -391,7 +397,7 @@ export class ConfigController {
             const res = await this.t.callEditor('systemConfig', { op: 'get' });
             this.postToApp({ command: 'loadSystemConfigResult', success: true, data: res?.config ?? defaultConfig, platform: res?.platform ?? 'darwin' });
         } catch (e: any) {
-            this.postToApp({ command: 'loadSystemConfigResult', success: false, data: defaultConfig, message: e?.message || '加载失败' });
+            this.postToApp({ command: 'loadSystemConfigResult', success: false, data: defaultConfig, message: e?.message || t('host.cfg.loadFailed') });
         }
     }
 }

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { renderMarkdownToHtml } from '../../utils/markdown';
 import { getSelectionPointer } from '../../utils/symbols';
 import CollapsibleContent from './CollapsibleContent';
+import { useT } from '../../../common/i18n/react';
 
 import '../../style/markdown.css';
 
@@ -28,6 +29,7 @@ const PlanExitDialog: React.FC<PlanExitDialogProps> = ({
     onCancel,
     vscode
 }) => {
+    const t = useT();
     const [selectedIndex, setSelectedIndex] = useState<number>(0);
     const containerRef = useRef<HTMLDivElement>(null);
 
@@ -131,7 +133,7 @@ const PlanExitDialog: React.FC<PlanExitDialogProps> = ({
                         {/* 标题区域 */}
                         <div className="plan-implement-header">
                             <span className="plan-implement-header-tag">Plan</span>
-                            <span className="plan-implement-title">规划文档</span>
+                            <span className="plan-implement-title">{t('chat.plan.doc')}</span>
                             <span
                                 className="plan-implement-file-name"
                                 onClick={handleFileClick}
@@ -172,7 +174,7 @@ const PlanExitDialog: React.FC<PlanExitDialogProps> = ({
                                 }
                             }}
                         >
-                            {selectedIndex === index && getSelectionPointer()}{key === 'cancel' ? '拒绝' : data.options[key]}
+                            {selectedIndex === index && getSelectionPointer()}{key === 'cancel' ? t('chat.plan.reject') : data.options[key]}
                         </button>
                     ))}
                 </div>

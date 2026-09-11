@@ -4,6 +4,7 @@ import TaskDetailModal from '../../TaskDetailModal';
 import { SessionActiveContext, SessionContext } from '../../SessionContext';
 import { countDiffChanges } from '../../utils/diffParser';
 import { TOOL_NAME_EDIT_NOTEBOOK, TOOL_NAME_PATCH_FILE, TOOL_NAME_WRITE_FILE } from '../../../../utils/tool';
+import { useT } from '../../../common/i18n/react';
 
 // Task 消息内容类型
 export interface TaskMessageContent {
@@ -97,6 +98,7 @@ const extractFileChange = (message: Message): FileChange | null => {
 };
 
 const AgentBlock: React.FC<AgentBlockProps> = React.memo(({ content, vscode, forceClose, externalOpen, onExternalClose, onFileChange }) => {
+    const t = useT();
     const [isModalOpen, setIsModalOpen] = useState(false);
     const reportedChangeKeysRef = useRef<Set<string>>(new Set());
     const sessionId = useContext(SessionContext);
@@ -174,7 +176,7 @@ const AgentBlock: React.FC<AgentBlockProps> = React.memo(({ content, vscode, for
                 <div className="chat-block-header task-block-header">
                     <div className="chat-block-title task-block-title">
                         {getStatusIcon()}
-                        {background && <span className="task-background-tag">后台</span>}
+                        {background && <span className="task-background-tag">{t('chat.agent.background')}</span>}
                         <span className="task-title-text">{title}</span>
                     </div>
                     {status === 'running' && !background && (
@@ -184,14 +186,14 @@ const AgentBlock: React.FC<AgentBlockProps> = React.memo(({ content, vscode, for
                                 vscode.postMessage({ type: 'transferAgentToBackground', sessionId, taskId: content.taskId });
                             }}
                         >
-                            转后台
+                            {t('chat.agent.toBackground')}
                         </button>
                     )}
                     <button
                         className="task-detail-btn"
                         onClick={handleOpenModal}
                     >
-                        查看详情
+                        {t('chat.agent.viewDetail')}
                     </button>
                 </div>
                 {summary && (

@@ -1,3 +1,5 @@
+import { t } from '../webview/common/i18n/core';
+
 // 快捷命令配置类型
 export interface ShortcutCommand {
     text: string;
@@ -8,20 +10,20 @@ export interface ShortcutCommand {
     category?: 'command' | 'skill' | 'agent';  // 分类：命令 / 技能 / 子代理
 }
 
-// 内置快捷命令配置
-export const BUILTIN_SHORTCUT_COMMANDS: ShortcutCommand[] = [
+// 内置快捷命令配置（desc 随当前界面语言取值，故做成函数而非顶层常量）
+export const getBuiltinShortcutCommands = (): ShortcutCommand[] => [
     {
         text: "clear",
-        desc: "清除对话历史和上下文",
+        desc: t('chat.cmd.clear'),
         send: true  // 设置为true 点击后直接发送不给输入
     },
     {
         text: "compact",
-        desc: "压缩会话历史",
+        desc: t('chat.cmd.compact'),
         send: true  // 设置为true 点击后直接发送不给输入
     },
     {
         text: "quickchat",
-        desc: "顺便问一下"
+        desc: t('chat.cmd.quickchat')
     }
 ];

@@ -787,32 +787,26 @@ button.small {
     white-space: nowrap;
 }
 
-/* 展开的下拉列表显示「档位（说明）」，收起后框内只显示档位短名：
-   select 文字透明，由覆盖其上的 .perm-level-select-value 展示当前档位 */
-.perm-level-select-wrap {
-    position: relative;
-    display: inline-block;
+/* 界面语言 / 默认权限档位下拉（IconSelect）：与标签同行，宽度按内容而非撑满 */
+.perm-level-field .lang-select {
+    width: 130px;
 }
 
-.perm-level-select-wrap select {
+.perm-level-field .perm-level-select {
     width: 110px;
-    color: transparent;
+}
+
+.perm-level-field button[type="button"].icon-select {
     padding-top: 4px;
     padding-bottom: 4px;
 }
 
-.perm-level-select-wrap option {
-    color: var(--vscode-input-foreground);
-}
-
-.perm-level-select-value {
-    position: absolute;
-    left: 14px;
-    top: 50%;
-    transform: translateY(-50%);
-    pointer-events: none;
-    color: var(--vscode-input-foreground);
-    font-size: var(--s-font-md);
+/* 选项带说明文字，弹层按内容撑开，不受按钮宽度限制 */
+.perm-level-field .icon-select-menu {
+    right: auto;
+    min-width: 100%;
+    width: max-content;
+    max-width: min(420px, calc(100vw - 48px));
 }
 
 /* 窄面板时标签与选择框折成两行（断点与 .form-row 折单列一致） */

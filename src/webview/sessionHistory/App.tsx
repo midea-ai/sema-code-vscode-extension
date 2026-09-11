@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useT, useLang, setLang, LANGS } from '../common/i18n/react';
 
 interface Session {
     id: string;
@@ -21,6 +22,8 @@ interface AppProps {
 }
 
 const App: React.FC<AppProps> = ({ vscode }) => {
+    const t = useT();
+    const lang = useLang();
     const [sessions, setSessions] = useState<Session[]>([]);
     const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
     const [openSessionIds, setOpenSessionIds] = useState<string[]>([]);
@@ -36,6 +39,9 @@ const App: React.FC<AppProps> = ({ vscode }) => {
                         setCurrentSessionId(message.currentSessionId);
                     }
                     setOpenSessionIds(message.openSessionIds || []);
+                    break;
+                case 'langUpdate':
+                    setLang(message.lang);
                     break;
             }
         };
@@ -75,19 +81,20 @@ const App: React.FC<AppProps> = ({ vscode }) => {
         const diffTime = Math.abs(now.getTime() - timestamp);
         const diffDays = Math.floor((today.getTime() - targetDay.getTime()) / (24 * 60 * 60 * 1000));
 
-        const timeStr = date.toLocaleTimeString('zh-CN', {
+        const locale = LANGS[lang].dateLocale;
+        const timeStr = date.toLocaleTimeString(locale, {
             hour: '2-digit',
             minute: '2-digit'
         });
 
         // 1分钟内：刚刚
         if (diffTime < 60 * 1000) {
-            return '刚刚';
+            return t('history.justNow');
         }
         // 1小时内：X分钟前
         else if (diffTime < 60 * 60 * 1000) {
             const minutes = Math.floor(diffTime / (60 * 1000));
-            return `${minutes}分钟前`;
+            return t('history.minutesAgo', { n: minutes });
         }
         // 今天
         else if (diffDays === 0) {
@@ -95,15 +102,15 @@ const App: React.FC<AppProps> = ({ vscode }) => {
         }
         // 昨天
         else if (diffDays === 1) {
-            return `昨天 ${timeStr}`;
+            return t('history.yesterday', { time: timeStr });
         }
         // 7天内
         else if (diffDays < 7) {
-            return `${diffDays}天前`;
+            return t('history.daysAgo', { n: diffDays });
         }
         // 今年内
         else if (date.getFullYear() === now.getFullYear()) {
-            return date.toLocaleDateString('zh-CN', {
+            return date.toLocaleDateString(locale, {
                 month: '2-digit',
                 day: '2-digit',
                 hour: '2-digit',
@@ -112,7 +119,7 @@ const App: React.FC<AppProps> = ({ vscode }) => {
         }
         // 跨年
         else {
-            return date.toLocaleDateString('zh-CN', {
+            return date.toLocaleDateString(locale, {
                 year: 'numeric',
                 month: '2-digit',
                 day: '2-digit',
@@ -125,15 +132,15 @@ const App: React.FC<AppProps> = ({ vscode }) => {
     return (
         <div className="container">
             <div className="header">
-                <div className="title">历史会话</div>
-                <div className="subtitle">点击会话可加载对话记录</div>
+                <div className="title">{t('history.title')}</div>
+                <div className="subtitle">{t('history.subtitle')}</div>
             </div>
 
             <div className="sessions-container">
                 {sessions.length === 0 ? (
                     <div className="empty-state">
                         <div className="empty-icon">📝</div>
-                        <div className="empty-text">暂无历史会话</div>
+                        <div className="empty-text">{t('history.empty')}</div>
                     </div>
                 ) : (
                     sessions.map(session => {
@@ -162,17 +169,17 @@ const App: React.FC<AppProps> = ({ vscode }) => {
                                             <span className="session-mode-design">Design</span>
                                         )}
                                         {isActive && (
-                                            <span className="session-current">活跃</span>
+                                            <span className="session-current">{t('history.active')}</span>
                                         )}
                                         {!isActive && isOpen && (
-                                            <span className="session-open">打开</span>
+                                            <span className="session-open">{t('history.open')}</span>
                                         )}
                                         {!isOpen && (
                                             <button
                                                 className="session-delete"
                                                 onClick={(e) => deleteSession(e, session.id)}
                                             >
-                                                删除
+                                                {t('common.delete')}
                                             </button>
                                         )}
                                     </div>

@@ -1,4 +1,5 @@
 import type { Transport } from './transport';
+import { t } from '../../common/i18n/core';
 
 type Handler = (data: any) => void;
 
@@ -77,7 +78,7 @@ export class RemoteCore {
             const data = await this.t.call('createSession', payload, '');
             return { ok: true, sessionId: data?.sessionId };
         } catch (e: any) {
-            return { ok: false, error: e?.message || '创建会话失败' };
+            return { ok: false, error: e?.message || t('chat.createSessionFailed') };
         }
     }
 
@@ -173,7 +174,7 @@ export class RemoteCore {
     /** taskId 全局唯一，stop/watch 借任一会话转发即可（对齐 VSCode wrapper anySession）。 */
     private async anySessionId(): Promise<string> {
         const sessions = await this.listSessions();
-        if (!sessions.length) throw new Error('无可用会话');
+        if (!sessions.length) throw new Error(t('host.noSession'));
         return sessions[0];
     }
     async stopTask(taskId: string): Promise<any> { return this.t.call('stopTask', { taskId }, await this.anySessionId()); }

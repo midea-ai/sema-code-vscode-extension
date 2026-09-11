@@ -1,10 +1,18 @@
+import type { I18nKey } from '../../common/i18n/react';
+
 export type AdapterType = 'openai' | 'anthropic';
 
 export interface ProviderDefaults {
+    /** 显示名（英文品牌名，不进字典）；含中文的服务商另给 nameKey，渲染期有 nameKey 则 t(nameKey) */
     name: string;
+    nameKey?: I18nKey;
     baseURL: string;
     baseURLPlaceholder?: string;
-    apiKeyPlaceholder?: string;
+    /**
+     * API Key 输入框 placeholder 里的品牌名，渲染期拼进 'config.modelForm.apiKeyPlaceholder' 模板；
+     * 为空（如自定义接口）则用 'config.modelForm.apiKeyPlaceholderGeneric'。
+     */
+    apiKeyProviderLabel?: string;
     defaultModel?: string;
     modelsUrl?: string;  // 获取模型列表的 URL，默认用baseURL
     apikeyUrl?: string;
@@ -31,11 +39,11 @@ export const DEFAULT_CONTEXT_LENGTH_OPTIONS = [128000, 256000, 512000, 1000000];
 /** 全局默认最大生成token数 */
 export const DEFAULT_MAX_TOKENS = 64000;
 
-/** Main 任务推荐模型，为空则不显示推荐提示 */
-export const RECOMMENDED_MAIN_MODEL = '主对话使用的模型';
+/** Main 任务推荐提示的字典 key，为空则不显示推荐提示（渲染期 t() 取值） */
+export const RECOMMENDED_MAIN_MODEL_KEY: I18nKey | '' = 'config.task.recommendMain';
 
-/** Quick 任务推荐模型，为空则不显示推荐提示 */
-export const RECOMMENDED_QUICK_MODEL = '话题识别、命令前缀提取等轻量任务使用的模型';
+/** Quick 任务推荐提示的字典 key，为空则不显示推荐提示（渲染期 t() 取值） */
+export const RECOMMENDED_QUICK_MODEL_KEY: I18nKey | '' = 'config.task.recommendQuick';
 
 /** 全局默认上下文窗口大小 */
 export const DEFAULT_CONTEXT_LENGTH = 512000;
@@ -62,21 +70,21 @@ export const defaultModelProvider: Record<string, ProviderDefaults> = {
         name: 'Anthropic',
         baseURL: 'https://api.anthropic.com',
         baseURLPlaceholder: 'https://api.anthropic.com',
-        apiKeyPlaceholder: '输入您的 Anthropic API Key',
+        apiKeyProviderLabel: 'Anthropic',
         defaultAdapt: 'anthropic',
     },
     'openai': {
         name: 'OpenAI',
         baseURL: 'https://api.openai.com/v1',
         baseURLPlaceholder: 'https://api.openai.com/v1',
-        apiKeyPlaceholder: '输入您的 OpenAI API Key',
+        apiKeyProviderLabel: 'OpenAI',
         defaultAdapt: 'openai',
     },
     'kimi': {
         name: 'Kimi (Moonshot)',
         baseURL: 'https://api.moonshot.cn/v1',
         baseURLPlaceholder: 'https://api.moonshot.cn/v1',
-        apiKeyPlaceholder: '输入您的 Moonshot API Key',
+        apiKeyProviderLabel: 'Moonshot',
         defaultModel: 'kimi-k3',
         apikeyUrl: 'https://platform.moonshot.cn/console/api-keys',
         defaultAdapt: 'openai',
@@ -85,7 +93,7 @@ export const defaultModelProvider: Record<string, ProviderDefaults> = {
         name: 'MiniMax',
         baseURL: 'https://api.minimaxi.com/anthropic',
         baseURLPlaceholder: 'https://api.minimaxi.com/anthropic',
-        apiKeyPlaceholder: '输入您的 MiniMax API Key',
+        apiKeyProviderLabel: 'MiniMax',
         defaultModel: 'MiniMax-M3',
         apikeyUrl: 'https://platform.minimaxi.com/user-center/basic-information/interface-key',
         defaultAdapt: 'anthropic',
@@ -95,16 +103,17 @@ export const defaultModelProvider: Record<string, ProviderDefaults> = {
         baseURL: 'https://api.deepseek.com/anthropic',
         modelsUrl: 'https://api.deepseek.com/v1/models',
         baseURLPlaceholder: 'https://api.deepseek.com/anthropic',
-        apiKeyPlaceholder: '输入您的 DeepSeek API Key',
+        apiKeyProviderLabel: 'DeepSeek',
         defaultModel: 'deepseek-v4-pro',
         apikeyUrl: 'https://platform.deepseek.com/api_keys',
         defaultAdapt: 'anthropic',
     },
     'glm': {
-        name: 'GLM (智谱)',
+        name: 'GLM (Zhipu)',
+        nameKey: 'config.modelForm.provider.glm',
         baseURL: 'https://open.bigmodel.cn/api/paas/v4',
         baseURLPlaceholder: 'https://open.bigmodel.cn/api/paas/v4',
-        apiKeyPlaceholder: '输入您的智谱 API Key',
+        apiKeyProviderLabel: 'Zhipu',
         defaultModel: 'glm-5.2',
         apikeyUrl: 'https://bigmodel.cn/usercenter/proj-mgmt/apikeys',
         defaultAdapt: 'openai',
@@ -114,7 +123,7 @@ export const defaultModelProvider: Record<string, ProviderDefaults> = {
         baseURL: 'https://openrouter.ai/api',
         modelsUrl: 'https://openrouter.ai/api/v1/models',
         baseURLPlaceholder: 'https://openrouter.ai/api/v1',
-        apiKeyPlaceholder: '输入您的 OpenRouter API Key',
+        apiKeyProviderLabel: 'OpenRouter',
         defaultModel: 'anthropic/claude-opus-4.6',
         apikeyUrl: 'https://openrouter.ai/settings/keys',
         defaultAdapt: 'anthropic',
@@ -123,7 +132,7 @@ export const defaultModelProvider: Record<string, ProviderDefaults> = {
         name: 'Qwen (Alibaba)',
         baseURL: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
         baseURLPlaceholder: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
-        apiKeyPlaceholder: '输入您的阿里云 API Key',
+        apiKeyProviderLabel: 'Alibaba Cloud',
         defaultModel: 'qwen3.7-max',
         apikeyUrl: 'https://bailian.console.aliyun.com/cn-beijing?api-key',
         defaultAdapt: 'openai',
@@ -133,16 +142,17 @@ export const defaultModelProvider: Record<string, ProviderDefaults> = {
         baseURL: 'https://api.xiaomimimo.com/anthropic',
         modelsUrl: 'https://api.xiaomimimo.com/v1/models',
         baseURLPlaceholder: 'https://api.xiaomimimo.com/anthropic',
-        apiKeyPlaceholder: '输入您的 Xiaomi MiMo API Key',
+        apiKeyProviderLabel: 'Xiaomi MiMo',
         defaultModel: 'mimo-v2.5-pro',
         apikeyUrl: 'https://platform.xiaomimimo.com/console/api-keys',
         defaultAdapt: 'anthropic',
     },
     'custom': {
-        name: '自定义LLM接口',
+        name: 'Custom LLM API',
+        nameKey: 'config.modelForm.provider.custom',
         baseURL: '',
         baseURLPlaceholder: 'https://your-api.com/v1',
-        apiKeyPlaceholder: '输入您的 API Key',
+        // 无品牌名 → 渲染期用 'config.modelForm.apiKeyPlaceholderGeneric'
         defaultAdapt: 'openai',
     },
 };

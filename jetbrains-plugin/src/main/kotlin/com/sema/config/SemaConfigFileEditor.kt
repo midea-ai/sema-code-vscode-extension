@@ -21,7 +21,7 @@ class SemaConfigFileEditor(project: Project, private val file: VirtualFile) : Us
 
     override fun getComponent(): JComponent = panel.component
     override fun getPreferredFocusedComponent(): JComponent = panel.component
-    override fun getName(): String = "Code Agent 配置"
+    override fun getName(): String = SemaBundle.message("config.title")
     override fun getFile(): VirtualFile = file
 
     override fun setState(state: FileEditorState) {}

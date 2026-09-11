@@ -28,6 +28,7 @@ import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.Pair
 import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.openapi.vfs.VfsUtil
+import com.sema.config.SemaBundle
 import java.io.File
 import java.security.MessageDigest
 
@@ -276,7 +277,7 @@ class EditorOps(
             return
         }
         // diff tab 复用 key 带 sessionId，避免多会话对同一文件的 diff 互相覆盖。
-        openDiff("$sessionId:$full", fileName, original, current, "快照", "当前", maxOf(0, (minLine ?: 1) - 1))
+        openDiff("$sessionId:$full", fileName, original, current, SemaBundle.message("diff.snapshot"), SemaBundle.message("diff.current"), maxOf(0, (minLine ?: 1) - 1))
     }
 
     private fun showPermissionDiff(sessionId: String, filePath: String?, diffContent: JsonObject?) {
@@ -298,7 +299,7 @@ class EditorOps(
         }
         // VSCode 顺序：左=当前，右=proposed；滚动到首个 hunk 的 newStart（1-based，对齐 VSCode）。
         val minLine = patch?.firstOrNull()?.asJsonObject?.get("newStart")?.asInt ?: 1
-        openDiff("permission:$sessionId:$full", fileName, current, proposed, "当前", "提议修改", maxOf(0, minLine - 1))
+        openDiff("permission:$sessionId:$full", fileName, current, proposed, SemaBundle.message("diff.current"), SemaBundle.message("diff.proposed"), maxOf(0, minLine - 1))
     }
 
     /**

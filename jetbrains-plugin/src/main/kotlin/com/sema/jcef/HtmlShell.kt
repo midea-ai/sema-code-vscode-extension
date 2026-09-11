@@ -5,14 +5,21 @@ package com.sema.jcef
  * 关键：桥函数 __semaHostQuery 内联在 bundle **之前**定义，否则 App 初始发出的命令会丢失。
  */
 object HtmlShell {
+    /** 当前持久化的界面语言对应的 <html lang> 值（"zh-CN" / "en"），三个面板构建页面时统一从这里取。 */
+    fun currentLang(): String =
+        com.intellij.openapi.application.ApplicationManager.getApplication()
+            .getService(com.sema.config.SystemConfigManager::class.java).htmlLang()
+
     /**
      * @param injection 定义 window.__semaHostQuery 的 JS（由 JBCefJSQuery.inject 生成）
      * @param theme     :root{ --vscode-* } 主题变量（Theme.cssVariables()）
      * @param extraCss  页面专属覆盖 CSS（如 chat 的背景对齐 Project），仅对应面板传入；默认空。
+     * @param lang      写入 <html lang> 的界面语言（SystemConfigManager.htmlLang()）：i18n 模块启动时据此取初始语言，
+     *                  避免英文用户首屏闪中文（对齐 VSCode 各 webview 用 getLang() 写入 html lang）。
      */
-    fun page(injection: String, theme: String, bundle: String = "jb-chat.js", extraCss: String = ""): String = """
+    fun page(injection: String, theme: String, bundle: String = "jb-chat.js", extraCss: String = "", lang: String = "zh-CN"): String = """
         <!DOCTYPE html>
-        <html lang="zh-CN">
+        <html lang="$lang">
         <head><meta charset="UTF-8"><title>Sema Code</title>
         <!-- 主题变量单独成标签：供 Theme.installLiveUpdate 在 IDE 换肤时整体替换 textContent 实时热更新 -->
         <style id="sema-theme">$theme</style>

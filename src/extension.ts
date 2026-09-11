@@ -4,6 +4,8 @@ import * as path from 'path';
 import * as os from 'os';
 import { SemaSidebarProvider } from './core/semaSidebarProvider';
 import { pet } from './pet/pet-client';
+import { SystemConfigManager } from './managers/SystemConfigManager';
+import { t } from './webview/common/i18n/core';
 
 // 保存 sidebarProvider 实例以便在 deactivate 时使用
 let sidebarProvider: SemaSidebarProvider;
@@ -11,7 +13,8 @@ let sidebarProvider: SemaSidebarProvider;
 let currentWorkspacePath: string | undefined;
 
 export function activate(context: vscode.ExtensionContext) {
-    // console.log('Sema VSCode Extension is now active!');
+    // 先按落盘配置确定界面语言，后续宿主文案（含默认工作区 README）都据此取值
+    SystemConfigManager.initLang(context);
 
     // 检查并设置默认工作区
     checkAndSetDefaultWorkspace();
@@ -33,7 +36,7 @@ export function activate(context: vscode.ExtensionContext) {
     // 注册开始新对话命令
     const newSessionCommand = vscode.commands.registerCommand('sema-vscode-extension.newSession', () => {
         sidebarProvider.newSession();
-        vscode.window.setStatusBarMessage('✓ 已开始新对话', 3000);
+        vscode.window.setStatusBarMessage(t('host.newSessionStarted'), 3000);
     });
 
     // 注册历史会话命令
@@ -112,7 +115,7 @@ function reloadExtension(context: vscode.ExtensionContext) {
         )
     );
 
-    vscode.window.setStatusBarMessage('✓ Sema 插件已重新加载', 3000);
+    vscode.window.setStatusBarMessage(t('host.reloaded'), 3000);
 
     // 工作区切换后 sema-core 实例已重建，桌宠订阅需重新挂载
     sidebarProvider.rewirePetEventsIfEnabled();
@@ -139,26 +142,12 @@ function checkAndSetDefaultWorkspace() {
                // console.log(`已创建默认工作区目录: ${semaDemo}`);
 
                 // 创建一个简单的README文件
-                const readmeContent = `# Sema Demo 工作区
-
-这是 Sema VSCode Extension 的默认工作区。
-
-## 使用说明
-
-1. 在这个目录下创建你的项目文件
-2. 使用 Sema 插件进行代码助手功能
-3. 如需切换到其他工作区，请使用 VSCode 的 "文件 -> 打开文件夹" 功能
-
-## 开始使用
-
-你可以在这里创建任何类型的项目文件，Sema 插件会自动适配当前工作区环境。
-`;
-                fs.writeFileSync(path.join(semaDemo, 'README.md'), readmeContent, 'utf8');
+                fs.writeFileSync(path.join(semaDemo, 'README.md'), t('host.demoReadme'), 'utf8');
                // console.log('已创建 README.md 文件');
 
             } catch (error) {
                 console.error('创建默认工作区失败:', error);
-                vscode.window.showErrorMessage(`创建默认工作区失败: ${error}`);
+                vscode.window.showErrorMessage(t('host.createDemoFailed', { error: String(error) }));
                 return;
             }
         }
@@ -167,10 +156,10 @@ function checkAndSetDefaultWorkspace() {
         const uri = vscode.Uri.file(semaDemo);
         vscode.commands.executeCommand('vscode.openFolder', uri, false).then(() => {
            // console.log(`已打开默认工作区: ${semaDemo}`);
-            vscode.window.setStatusBarMessage('✓ 已打开默认工作区 sema-demo', 3000);
+            vscode.window.setStatusBarMessage(t('host.openDemoDone'), 3000);
         }, (error) => {
             console.error('打开默认工作区失败:', error);
-            vscode.window.showErrorMessage(`打开默认工作区失败: ${error}`);
+            vscode.window.showErrorMessage(t('host.openDemoFailed', { error: String(error) }));
         });
     }
 }

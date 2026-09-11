@@ -5,6 +5,7 @@ import FileIcon from '../../components/ui/FileIcon';
 import { ToolContent } from '../../types';
 import UpdateCodeDiff from '../../components/ui/UpdateCodeDiff';
 import { hasTextSelection } from '../../utils/selection';
+import { useT } from '../../../common/i18n/react';
 
 interface NotebookEditBlockProps {
     content: ToolContent;
@@ -19,6 +20,7 @@ const NotebookEditBlock: React.FC<NotebookEditBlockProps> = React.memo(({
     onFileChange,
     language = 'python'
 }) => {
+    const t = useT();
     const { title, summary, content } = toolContent;
 
     const [isExpanded, setIsExpanded] = useState(true);
@@ -160,7 +162,7 @@ const NotebookEditBlock: React.FC<NotebookEditBlockProps> = React.memo(({
                 </div>
                 <div className="edit-spacer"></div>
                 <div className="edit-copy-btn" onClick={(e) => { e.stopPropagation(); handleCopy(); }}>
-                    复制
+                    {t('common.copy')}
                 </div>
             </div>
             {isExpanded && (

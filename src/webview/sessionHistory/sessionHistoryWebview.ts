@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import { SessionHistoryManager } from '../../managers/SessionHistoryManager';
+import { t, getLang } from '../common/i18n/core';
 
 // 定义回调函数类型
 export interface SessionHistoryCallbacks {
@@ -39,7 +40,7 @@ export class SessionHistoryWebviewProvider {
         // 创建新面板
         this.panel = vscode.window.createWebviewPanel(
             'semaHistoryWebview',
-            '历史会话',
+            t('history.title'),
             vscode.ViewColumn.One,
             {
                 enableScripts: true,
@@ -72,7 +73,7 @@ export class SessionHistoryWebviewProvider {
                             await this.callbacks.loadSession(message.sessionId);
                         } catch (error) {
                             console.error('Failed to load session:', error);
-                            vscode.window.showErrorMessage(`加载会话失败：${error instanceof Error ? error.message : '未知错误'}`);
+                            vscode.window.showErrorMessage(t('host.loadSessionFailed', { error: error instanceof Error ? error.message : t('common.unknownError') }));
                         }
                     }
                     await this.refreshSessionList();
@@ -80,7 +81,7 @@ export class SessionHistoryWebviewProvider {
                 case 'deleteSession':
                     // 禁止删除已在 chat 中打开的会话（含活跃会话）
                     if (this.sessionHistoryManager.getOpenSessionIds().includes(message.sessionId)) {
-                        vscode.window.showWarningMessage('无法删除已打开的会话');
+                        vscode.window.showWarningMessage(t('host.cannotDeleteOpen'));
                         return;
                     }
 
@@ -99,6 +100,13 @@ export class SessionHistoryWebviewProvider {
         this.panel.onDidDispose(() => {
             this.panel = undefined;
         });
+    }
+
+    /** 语言切换：面板已打开时同步刷新页内文案与面板标题 */
+    public postLangUpdate(lang: string): void {
+        if (!this.panel) { return; }
+        this.panel.title = t('history.title');
+        this.panel.webview.postMessage({ type: 'langUpdate', lang });
     }
 
     /**
@@ -124,12 +132,12 @@ export class SessionHistoryWebviewProvider {
         );
 
         return `<!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="${getLang()}">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline' ${webview.cspSource}; script-src ${webview.cspSource};">
-    <title>历史会话</title>
+    <title>${t('history.title')}</title>
 </head>
 <body>
     <div id="root"></div>

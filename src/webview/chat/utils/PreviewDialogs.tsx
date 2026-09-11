@@ -35,6 +35,7 @@ const PreviewDialogs: React.FC<{ vscode: any }> = ({ vscode }) => {
                     {...item}
                     onClose={() => dismiss('ModelConfigReminder', 'onClose')}
                     onOpenConfig={() => dismiss('ModelConfigReminder', 'onOpenConfig')}
+                    onLanguageChange={(lang) => log('ModelConfigReminder', 'onLanguageChange', lang)}
                 />
             ))}
             {show('QuickChatDialog') && mockDialogMap.QuickChatDialog.map((item, i) => (

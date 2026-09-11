@@ -80,7 +80,7 @@ class HistoryPanel(project: Project) : Disposable {
         val js = File(dir, "jb-sessionHistory.js")
         stream.use { input -> js.outputStream().use { input.copyTo(it) } }
         val html = File(dir, "index.html")
-        html.writeText(HtmlShell.page(buildInjection(), Theme.cssVariables(), "jb-sessionHistory.js"))
+        html.writeText(HtmlShell.page(buildInjection(), Theme.cssVariables(), "jb-sessionHistory.js", lang = HtmlShell.currentLang()))
         log.warn("[sema] history bundle=${js.length()} bytes 载入 ${html.toURI()}")
         browser.loadURL(html.toURI().toString())
     }

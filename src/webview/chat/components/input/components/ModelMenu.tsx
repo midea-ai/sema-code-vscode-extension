@@ -1,6 +1,7 @@
 import React from 'react';
 import { CheckIcon } from '../../ui/IconButton';
 import ProviderLogo, { parseProviderKey, stripProviderSuffix } from '../../../../common/ProviderLogo';
+import { useT } from '../../../../common/i18n/react';
 
 interface ModelMenuProps {
     show: boolean;
@@ -21,6 +22,7 @@ const ModelMenu: React.FC<ModelMenuProps> = ({
     onOpenConfig,
     modelMenuRef
 }) => {
+    const t = useT();
     if (!show) return null;
 
     return (
@@ -28,7 +30,7 @@ const ModelMenu: React.FC<ModelMenuProps> = ({
             {/* 可用模型列表 */}
             {isModelLoading ? (
                 <div className="model-menu-item model-current">
-                    <span className="model-menu-text">正在加载模型...</span>
+                    <span className="model-menu-text">{t('chat.input.loadingModels')}</span>
                 </div>
             ) : availableModels.length > 0 ? (
                 availableModels.map(model => (
@@ -48,7 +50,7 @@ const ModelMenu: React.FC<ModelMenuProps> = ({
             ) : (
                 <div className="model-menu-item model-current" title={currentModel || undefined}>
                     {currentModel && <ProviderLogo provider={parseProviderKey(currentModel)} className="model-menu-logo" />}
-                    <span className="model-menu-text">{currentModel ? stripProviderSuffix(currentModel) : '未设置模型'}</span>
+                    <span className="model-menu-text">{currentModel ? stripProviderSuffix(currentModel) : t('chat.input.noModel')}</span>
                 </div>
             )}
 
@@ -60,7 +62,7 @@ const ModelMenu: React.FC<ModelMenuProps> = ({
                 className="model-menu-item model-config"
                 onClick={onOpenConfig}
             >
-                <span className="model-menu-text">模型管理</span>
+                <span className="model-menu-text">{t('chat.modelMenu.manage')}</span>
             </div>
         </div>
     );

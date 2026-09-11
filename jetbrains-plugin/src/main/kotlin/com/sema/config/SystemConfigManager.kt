@@ -24,8 +24,13 @@ class SystemConfigManager {
         private const val CONFIG_KEY = "sema.systemConfig"
         private const val DISABLED_TOOLS_KEY = "sema.disabledTools"
 
+        /** APP 级单例，供 Action / VirtualFile 等拿不到注入的原生 UI 处按当前语言取文案。 */
+        fun instance(): SystemConfigManager =
+            com.intellij.openapi.application.ApplicationManager.getApplication().getService(SystemConfigManager::class.java)
+
         // 对齐 src/webview/config/default/defaultConfig.ts
         private val DEFAULT_CONFIG: Map<String, Any?> = linkedMapOf(
+            "lang" to "zh",
             "stream" to true,
             "thinking" to true,
             "showThinkingText" to false,
@@ -47,6 +52,15 @@ class SystemConfigManager {
 
         // 仅落本地、不推 sema-core 的键（对齐 semaProcessWrapper.LOCAL_SYSTEM_CONFIG_KEYS）
         private val LOCAL_KEYS = setOf("enablePet", "showThinkingText", "defaultPermissionLevel")
+
+        /** 受支持的界面语言 → <html lang> 值；需与 src/webview/common/i18n/core.ts 的 LANGS 同步维护。 */
+        private val HTML_LANGS: Map<String, String> = linkedMapOf(
+            "zh" to "zh-CN",
+            "en" to "en",
+            "de" to "de",
+            "fr" to "fr",
+            "it" to "it",
+        )
     }
 
     /** 读取完整系统配置（缺省合并默认值，保证新增字段有值）。 */
@@ -63,6 +77,17 @@ class SystemConfigManager {
 
     fun saveConfig(config: Map<String, Any?>) {
         props.setValue(CONFIG_KEY, gson.toJson(config))
+    }
+
+    /** 当前界面语言，归一为 HTML_LANGS 中的语言码（口径对齐 i18n/core.ts normalizeLang：取主语言码匹配，匹配不到 zh）。 */
+    fun lang(): String = normalizeLang(getConfig()["lang"])
+
+    /** 写入 <html lang> 的值：i18n 模块启动时据此取初始语言，避免非中文用户首屏闪中文。 */
+    fun htmlLang(): String = HTML_LANGS.getValue(lang())
+
+    private fun normalizeLang(value: Any?): String {
+        val code = (value as? String)?.lowercase()?.split('-', '_')?.first().orEmpty()
+        return if (code in HTML_LANGS) code else "zh"
     }
 
     fun saveByKey(key: String, value: Any?) {

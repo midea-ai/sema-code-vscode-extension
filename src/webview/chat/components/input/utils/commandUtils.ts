@@ -1,4 +1,4 @@
-import { BUILTIN_SHORTCUT_COMMANDS, ShortcutCommand } from '../../../../../utils/command';
+import { getBuiltinShortcutCommands, ShortcutCommand } from '../../../../../utils/command';
 import { CommandConfig } from '../../../../config/types/command';
 import { SkillConfig } from '../../../../config/types/skill';
 import { AgentConfig } from '../../../../config/types/agent';
@@ -53,7 +53,7 @@ export const setAgents = (agentList: AgentConfig[]) => {
  */
 const getAllCommands = (): ShortcutCommand[] => {
     return [
-        ...BUILTIN_SHORTCUT_COMMANDS.map(cmd => ({ send: false, category: 'command' as const, ...cmd })),
+        ...getBuiltinShortcutCommands().map(cmd => ({ send: false, category: 'command' as const, ...cmd })),
         ...customCommands,
         ...skills,
         ...agents

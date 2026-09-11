@@ -1,6 +1,7 @@
 import React from 'react';
 import { RemoveIcon } from './ui/IconButton';
 import { ImageAttachment } from '../types';
+import { useT } from '../../common/i18n/react';
 
 interface ImageThumbnailProps {
     src: string;                              // 输入框用 objectURL，气泡用 data:base64
@@ -25,6 +26,7 @@ const EXT: Record<string, string> = {
 const ImageThumbnail: React.FC<ImageThumbnailProps> = ({
     src, mediaType, name, width, height, onOpen, deletable, onDelete
 }) => {
+    const t = useT();
     const displayName = name && name.trim() ? name : `image.${EXT[mediaType] || 'png'}`;
     const sizeText = width && height ? `${width}×${height}` : '';
     return (
@@ -42,7 +44,7 @@ const ImageThumbnail: React.FC<ImageThumbnailProps> = ({
                 <button
                     type="button"
                     className="image-chip-remove"
-                    title="移除"
+                    title={t('common.remove')}
                     onClick={(e) => { e.stopPropagation(); onDelete?.(); }}
                 >
                     <RemoveIcon />

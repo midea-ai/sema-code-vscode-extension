@@ -1,8 +1,10 @@
 import { SemaSessionWrapper, SessionWrapperCallbacks, PermissionLevel } from '../../../core/semaSessionWrapper';
 import { transformCommandToPrompt } from '../../../utils/prompt';
 import { TOOL_NAME_VIEW_FILE, TOOL_NAME_WRITE_FILE, TOOL_NAME_PATCH_FILE } from '../../../utils/tool';
+import { DEFAULT_CUSTOM_RULES, isBuiltinCustomRules } from '../../config/default/defaultConfig';
 import { Transport } from './transport';
 import { RemoteCore, RemoteSession } from './remote';
+import { normalizeLang, t } from '../../common/i18n/core';
 
 /** 同时打开的会话上限（对齐 semaProcessWrapper.MAX_SESSIONS = 5，本地常量避免拽入 node 依赖）。 */
 const MAX_SESSIONS = 5;
@@ -167,6 +169,7 @@ export class Controller {
             // 模型显示是会话级的（对齐 chatWebview）；切换 = 本会话 + 全局默认，其他已打开会话不动
             case 'requestModelInfo': await this.sessions.get(sid ?? '')?.wrapper.refreshModelInfo(true); break;
             case 'requestSystemConfig': void this.sendSystemConfig(); break;
+            case 'updateLanguage': await this.updateLanguage(msg.lang); break;
             case 'switchModel': await this.switchSessionModel(sid, msg.modelName); break;
             case 'requestCommands': void this.sendCommands(); break;
             case 'requestSkills': void this.sendSkills(); break;
@@ -228,7 +231,7 @@ export class Controller {
     private async createSession(opts: { agentMode?: any; permissionLevel?: any; sessionId?: string; historyContent?: any[]; title?: string } = {}): Promise<{ ok: boolean; error?: string }> {
         // 会话数上限（对齐 VSCode createNewSession）。已打开的历史会话走切 tab 不到这里。
         if (this.sessions.size >= MAX_SESSIONS) {
-            const error = `最多同时打开 ${MAX_SESSIONS} 个会话，请先关闭已有会话`;
+            const error = t('host.maxSessions', { max: MAX_SESSIONS });
             this.postToApp({ type: 'sessionCreateFailed', error });
             return { ok: false, error };
         }
@@ -255,7 +258,7 @@ export class Controller {
         }
 
         // 先建 tab（sessionOpened），再重放历史消息，保证 React 按 sessionId 能收到内容更新。
-        this.postToApp({ type: 'sessionOpened', sessionId: res.sessionId, title: opts.title || '新会话' });
+        this.postToApp({ type: 'sessionOpened', sessionId: res.sessionId, title: opts.title || t('common.newSession') });
         if (opts.historyContent && opts.historyContent.length > 0) {
             if (opts.title) wrapper.updateTitle(opts.title);
             wrapper.updateMessageHistory(opts.historyContent);
@@ -328,14 +331,14 @@ export class Controller {
     private async handleGetForkPreview(sid: string | undefined, uuid: string, reqId: any): Promise<void> {
         const entry = sid ? this.sessions.get(sid) : undefined;
         if (!entry || !uuid) {
-            this.postToApp({ type: 'forkPreviewResult', sessionId: sid, reqId, error: '会话不可用' });
+            this.postToApp({ type: 'forkPreviewResult', sessionId: sid, reqId, error: t('host.sessionUnavailable') });
             return;
         }
         try {
             const preview = await entry.remote.getForkPreview(uuid);
             this.postToApp({ type: 'forkPreviewResult', sessionId: sid, reqId, preview });
         } catch (e: any) {
-            this.postToApp({ type: 'forkPreviewResult', sessionId: sid, reqId, error: e?.message || '预览失败' });
+            this.postToApp({ type: 'forkPreviewResult', sessionId: sid, reqId, error: e?.message || t('host.forkPreviewFailed') });
         }
     }
 
@@ -343,7 +346,7 @@ export class Controller {
     private async handleForkSession(sid: string | undefined, uuid: string, restoreFiles: any, reqId: any): Promise<void> {
         const entry = sid ? this.sessions.get(sid) : undefined;
         if (!entry || !uuid) {
-            this.postToApp({ type: 'forkResult', sessionId: sid, reqId, uuid, result: { ok: false, error: '会话不可用' } });
+            this.postToApp({ type: 'forkResult', sessionId: sid, reqId, uuid, result: { ok: false, error: t('host.sessionUnavailable') } });
             return;
         }
         try {
@@ -354,7 +357,7 @@ export class Controller {
             if (restored.length > 0) this.t.editor('refreshFiles', { filePaths: restored });
             this.postToApp({ type: 'forkResult', sessionId: sid, reqId, uuid, result });
         } catch (e: any) {
-            this.postToApp({ type: 'forkResult', sessionId: sid, reqId, uuid, result: { ok: false, error: e?.message || 'fork 失败' } });
+            this.postToApp({ type: 'forkResult', sessionId: sid, reqId, uuid, result: { ok: false, error: e?.message || t('host.forkFailed', { error: t('common.unknownError') }) } });
         }
     }
 
@@ -371,18 +374,18 @@ export class Controller {
             this.postToApp({ type: 'branchResult', sessionId: sid, reqId, ok: false, error });
         };
         const entry = sid ? this.sessions.get(sid) : undefined;
-        if (!entry) { fail('会话不可用'); return; }
+        if (!entry) { fail(t('host.sessionUnavailable')); return; }
         // 先于 core 检查会话数上限：core branch 会落盘新历史文件，开不出 tab 会留下孤儿会话
         if (this.sessions.size >= MAX_SESSIONS) {
-            fail(`最多同时打开 ${MAX_SESSIONS} 个会话，请先关闭已有会话`);
+            fail(t('host.maxSessions', { max: MAX_SESSIONS }));
             return;
         }
-        if (entry.wrapper.getCurrentState() !== 'idle') { fail('会话处理中，请等待空闲后再分支'); return; }
+        if (entry.wrapper.getCurrentState() !== 'idle') { fail(t('host.sessionBusy')); return; }
 
         try {
             const result = await entry.remote.branch(beforeMessageUuid);
             if (!result || result.ok === false || !result.sessionId) {
-                fail(`分支失败：${result?.error || '未知错误'}`);
+                fail(t('host.forkFailed', { error: result?.error || t('common.unknownError') }));
                 return;
             }
 
@@ -395,7 +398,7 @@ export class Controller {
                 if (cutIndex >= 0) historyContent = historyContent.slice(0, cutIndex);
             }
 
-            const title = entry.wrapper.title ? `${entry.wrapper.title} (分支)` : '分支会话';
+            const title = entry.wrapper.title ? t('host.forkTitle', { title: entry.wrapper.title }) : t('host.forkSession');
             const created = await this.createSession({
                 sessionId: result.sessionId,
                 agentMode: entry.wrapper.getAgentMode(),
@@ -412,7 +415,7 @@ export class Controller {
             this.saveSession(result.sessionId);
             this.postToApp({ type: 'branchResult', sessionId: sid, reqId, ok: true });
         } catch (e: any) {
-            fail(`分支失败：${e?.message || '未知错误'}`);
+            fail(t('host.forkFailed', { error: e?.message || t('common.unknownError') }));
         }
     }
 
@@ -454,7 +457,7 @@ export class Controller {
             await entry.wrapper.switchModel(modelName);
             await this.core.switchModel(modelName);
         } catch (e: any) {
-            this.postToApp({ type: 'error', sessionId: sid, message: `切换模型失败: ${e?.message || ''}` });
+            this.postToApp({ type: 'error', sessionId: sid, message: t('host.switchModelFailed', { error: e?.message || '' }) });
         }
     }
 
@@ -471,7 +474,7 @@ export class Controller {
 
     /**
      * 系统配置：改读 Kotlin 本地持久化（systemConfig channel，与配置页同源），
-     * 抽取聊天页需要的三个开关（抽取逻辑对齐 VSCode chatWebview.sendSystemConfig）。
+     * 抽取聊天页需要的三个开关 + 界面语言 lang（抽取逻辑对齐 VSCode chatWebview.sendSystemConfig）。
      */
     private async sendSystemConfig(): Promise<void> {
         try {
@@ -482,9 +485,36 @@ export class Controller {
                 skipFileEditPermission: config.skipFileEditPermission || false,
                 thinking: config.thinking !== false,
                 showThinkingText: config.showThinkingText !== false,
+                lang: config.lang,
             });
         } catch {
             this.postToApp({ type: 'systemConfigUpdate', skipFileEditPermission: false, thinking: true, showThinkingText: false });
+        }
+    }
+
+    /** 首次配置提醒中的语言切换；持久化与默认规则联动逻辑对齐配置页。 */
+    private async updateLanguage(value: unknown): Promise<void> {
+        const lang = normalizeLang(value);
+        try {
+            await this.ensureInit();
+            const res = await this.t.callEditor('systemConfig', { op: 'get' });
+            const config = res?.config ?? {};
+            const isDefaultRules = isBuiltinCustomRules(config.customRules);
+
+            await this.t.callEditor('systemConfig', { op: 'saveByKey', key: 'lang', value: lang });
+            await this.core.updateCoreConfByKey('lang', lang);
+            if (isDefaultRules) {
+                await this.t.callEditor('systemConfig', {
+                    op: 'saveByKey',
+                    key: 'customRules',
+                    value: DEFAULT_CUSTOM_RULES[lang],
+                });
+                await this.core.updateCoreConfByKey('customRules', DEFAULT_CUSTOM_RULES[lang]);
+            }
+        } catch (e: any) {
+            // React 端先乐观切换；失败时重新读取宿主持久化值回填。
+            await this.sendSystemConfig();
+            this.postToApp({ type: 'error', message: e?.message || 'Failed to save language setting' });
         }
     }
 

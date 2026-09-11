@@ -19,6 +19,7 @@ import { TOOL_NAME_VIEW_FILE, TOOL_NAME_WRITE_FILE, TOOL_NAME_PATCH_FILE } from 
 import { pet } from '../pet/pet-client';
 import { ensurePetRunning, killPet } from '../pet/pet-launcher';
 import { wirePetEvents, setPetSessionState } from '../pet/pet-events';
+import { t } from '../webview/common/i18n/core';
 
 /** chatWebview 用于驱动会话生命周期的控制接口 */
 export interface SessionController {
@@ -101,7 +102,11 @@ export class SemaSidebarProvider implements vscode.WebviewViewProvider {
             this.fileOperationManager,
             (page?: string, taskId?: string) => this.openConfigPanel(page, taskId),
             this.context,
-            sessionController
+            sessionController,
+            (lang) => {
+                this.configWebviewProvider?.postLangUpdate(lang);
+                this.sessionHistoryWebviewProvider?.postLangUpdate(lang);
+            }
         );
 
         this.sessionHistoryManager = new SessionHistoryManager(
@@ -124,14 +129,19 @@ export class SemaSidebarProvider implements vscode.WebviewViewProvider {
         );
         this.configWebviewProvider = new ConfigWebviewProvider(this.processWrapper, this.fileOperationManager, this.clawCoordinator);
         this.configWebviewProvider.setOnSystemConfigChanged((key, value) => {
-            if (key === 'skipFileEditPermission' || key === 'thinking' || key === 'showThinkingText') {
+            if (key === 'skipFileEditPermission' || key === 'thinking' || key === 'showThinkingText' || key === 'lang') {
                 const cfg = this.processWrapper.getSystemConfig() as Record<string, any>;
                 this.chatWebviewProvider.postMessage({
                     type: 'systemConfigUpdate',
                     skipFileEditPermission: !!cfg.skipFileEditPermission,
                     thinking: cfg.thinking !== false,
-                    showThinkingText: cfg.showThinkingText !== false
+                    showThinkingText: cfg.showThinkingText !== false,
+                    lang: cfg.lang
                 });
+            }
+            if (key === 'lang') {
+                // 历史面板若已打开，同步切换语言；面板标题也一并刷新
+                this.sessionHistoryWebviewProvider?.postLangUpdate(value);
             }
             if (key === 'enablePet') {
                 if (value) void this.startPet();
@@ -201,7 +211,7 @@ export class SemaSidebarProvider implements vscode.WebviewViewProvider {
         title?: string;
     } = {}): Promise<{ ok: boolean; error?: string }> {
         if (this.sessions.size >= MAX_SESSIONS) {
-            const error = `最多同时打开 ${MAX_SESSIONS} 个会话，请先关闭已有会话`;
+            const error = t('host.maxSessions', { max: MAX_SESSIONS });
             this.chatWebviewProvider.postMessage({ type: 'sessionCreateFailed', error });
             return { ok: false, error };
         }
@@ -240,14 +250,14 @@ export class SemaSidebarProvider implements vscode.WebviewViewProvider {
             this.chatWebviewProvider.postMessage({
                 type: 'sessionOpened',
                 sessionId: wrapper.sessionId,
-                title: wrapper.title || '新会话',
+                title: wrapper.title || t('common.newSession'),
             });
 
             this.wirePetForSession(wrapper.sessionId);
             this.sessionHistoryWebviewProvider?.refreshSessionList();
             return { ok: true };
         } catch (error) {
-            const msg = error instanceof Error ? error.message : '创建会话失败';
+            const msg = error instanceof Error ? error.message : t('chat.createSessionFailed');
             console.error('Error creating session:', error);
             this.chatWebviewProvider.postMessage({ type: 'sessionCreateFailed', error: msg });
             return { ok: false, error: msg };
@@ -332,7 +342,7 @@ export class SemaSidebarProvider implements vscode.WebviewViewProvider {
         this.chatWebviewProvider.postMessage({
             type: 'sessionOpened',
             sessionId: wrapper.sessionId,
-            title: wrapper.title || '微信远程',
+            title: wrapper.title || t('host.wechatRemote'),
             isClaw: true,
         });
         this.wirePetForSession(wrapper.sessionId);
@@ -384,7 +394,7 @@ export class SemaSidebarProvider implements vscode.WebviewViewProvider {
             await this.sessionHistoryWebviewProvider.show(this.context.extensionUri);
         } catch (error) {
             console.error('Error opening history panel:', error);
-            vscode.window.showErrorMessage(`打开历史会话面板失败：${error instanceof Error ? error.message : '未知错误'}`);
+            vscode.window.showErrorMessage(t('host.openHistoryFailed', { error: error instanceof Error ? error.message : t('common.unknownError') }));
         }
     }
 
@@ -432,20 +442,20 @@ export class SemaSidebarProvider implements vscode.WebviewViewProvider {
         try {
             const ok = await ensurePetRunning(this.context.extensionPath);
             if (!ok) {
-                vscode.window.setStatusBarMessage('Sema Pet: 启动失败（解压失败 / 端口被占？）', 5000);
+                vscode.window.setStatusBarMessage(t('host.pet.startFailed'), 5000);
                 return;
             }
             this.rewireAllPetEvents();
             const registered = await pet.register(this.workingDir);
             if (!registered) {
-                vscode.window.setStatusBarMessage('Sema Pet: 注册会话失败，桌宠不会显示当前项目', 5000);
+                vscode.window.setStatusBarMessage(t('host.pet.registerFailed'), 5000);
                 console.warn('[pet] register failed for cwd=', this.workingDir);
                 return;
             }
-            vscode.window.setStatusBarMessage('✓ Sema Pet 已启动', 3000);
+            vscode.window.setStatusBarMessage(t('host.pet.started'), 3000);
         } catch (e) {
             console.error('[pet] start failed:', e);
-            vscode.window.setStatusBarMessage(`Sema Pet: 启动异常 ${(e as Error).message}`, 5000);
+            vscode.window.setStatusBarMessage(t('host.pet.startError', { error: (e as Error).message }), 5000);
         }
     }
 
@@ -455,7 +465,7 @@ export class SemaSidebarProvider implements vscode.WebviewViewProvider {
             this.petUnwires.clear();
             await pet.dispose();
             killPet();
-            vscode.window.setStatusBarMessage('Sema Pet 已关闭', 3000);
+            vscode.window.setStatusBarMessage(t('host.pet.stopped'), 3000);
         } catch (e) {
             console.error('[pet] stop failed:', e);
         }
@@ -570,11 +580,11 @@ export class SemaSidebarProvider implements vscode.WebviewViewProvider {
 
             const session = await this.sessionHistoryManager.getSession(sessionId);
             if (!session) {
-                vscode.window.showErrorMessage('会话不存在或已被删除');
+                vscode.window.showErrorMessage(t('host.sessionNotFound'));
                 return;
             }
             if (!session.content || session.content.length === 0) {
-                vscode.window.showErrorMessage('无法加载会话：会话数据为空');
+                vscode.window.showErrorMessage(t('host.sessionEmpty'));
                 return;
             }
 
@@ -588,7 +598,7 @@ export class SemaSidebarProvider implements vscode.WebviewViewProvider {
             });
         } catch (error) {
             console.error('Error loading history session:', error);
-            vscode.window.showErrorMessage(`加载会话失败：${error instanceof Error ? error.message : '未知错误'}`);
+            vscode.window.showErrorMessage(t('host.loadSessionFailed', { error: error instanceof Error ? error.message : t('common.unknownError') }));
         }
     }
 
@@ -604,16 +614,16 @@ export class SemaSidebarProvider implements vscode.WebviewViewProvider {
             return { ok: false, error };
         };
         const source = this.sessions.get(sourceId);
-        if (!source) return fail('会话不可用');
+        if (!source) return fail(t('host.sessionUnavailable'));
         // 先于 core 检查会话数上限：core branch 会落盘新历史文件，开不出 tab 会留下孤儿会话
         if (this.sessions.size >= MAX_SESSIONS) {
-            return fail(`最多同时打开 ${MAX_SESSIONS} 个会话，请先关闭已有会话`);
+            return fail(t('host.maxSessions', { max: MAX_SESSIONS }));
         }
-        if (source.getCurrentState() !== 'idle') return fail('会话处理中，请等待空闲后再分支');
+        if (source.getCurrentState() !== 'idle') return fail(t('host.sessionBusy'));
 
         try {
             const result = await source.branch(beforeMessageUuid);
-            if (result.ok === false) return fail(`分支失败：${result.error}`);
+            if (result.ok === false) return fail(t('host.forkFailed', { error: result.error ?? '' }));
 
             // 新 tab 的消息列表与 core 落盘历史保持一致：有锚点时截到该用户输入之前
             // （锚点是用户输入的 uuid，即 core inputId）。锚点在列表里找不到时回退全量
@@ -624,7 +634,7 @@ export class SemaSidebarProvider implements vscode.WebviewViewProvider {
                 if (cutIndex >= 0) historyContent = historyContent.slice(0, cutIndex);
             }
 
-            const title = source.title ? `${source.title} (分支)` : '分支会话';
+            const title = source.title ? t('host.forkTitle', { title: source.title }) : t('host.forkSession');
             const created = await this.createNewSession({
                 sessionId: result.sessionId,
                 agentMode: source.getAgentMode(),
@@ -642,7 +652,7 @@ export class SemaSidebarProvider implements vscode.WebviewViewProvider {
             return { ok: true };
         } catch (error) {
             console.error('Error branching session:', error);
-            return fail(`分支失败：${error instanceof Error ? error.message : '未知错误'}`);
+            return fail(t('host.forkFailed', { error: error instanceof Error ? error.message : t('common.unknownError') }));
         }
     }
 

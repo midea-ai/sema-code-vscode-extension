@@ -6,6 +6,7 @@ import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.diagnostic.logger
 import com.intellij.openapi.fileEditor.FileEditorManager
 import com.intellij.openapi.project.Project
+import com.sema.config.SemaBundle
 import com.sema.config.SemaConfigVirtualFile
 import com.sema.config.SessionHistoryManager
 import com.sema.config.SystemConfigManager
@@ -97,17 +98,23 @@ class MessageBridge(
                 else -> emptyMap<String, Any?>()
             }
         } catch (e: Exception) {
-            replyEditorError(reqId, e.message ?: "systemConfig 操作失败")
+            replyEditorError(reqId, e.message ?: SemaBundle.message("error.systemConfig"))
             return
         }
-        // 配置页改系统配置后，主动把聊天页关心的三个开关推给聊天 webview
-        // （对齐 VSCode setOnSystemConfigChanged → chat.postMessage systemConfigUpdate；
+        // 配置页改系统配置后，主动把聊天页关心的开关 + 界面语言推给聊天 webview，并把语言推给历史面板
+        // （对齐 VSCode setOnSystemConfigChanged → chat.postMessage systemConfigUpdate / history.postLangUpdate；
         //  跨 JCEF 面板只能经总线，配置页那条 gRPC 连接推不到聊天页）。
-        if (op == "save" || op == "saveByKey") pushSystemConfigToChat()
+        if (op == "save" || op == "saveByKey") {
+            pushSystemConfigToChat()
+        }
+        if (op == "save" || (op == "saveByKey" && payload.str("key") == "lang")) {
+            pushLangToHistory()
+            pushLangToConfig()
+        }
         replyEditor(reqId, data)
     }
 
-    /** 把聊天页关心的三个系统配置开关推给聊天 webview（systemConfigUpdate，走 editor message 帧）。
+    /** 把聊天页关心的三个系统配置开关 + 界面语言推给聊天 webview（systemConfigUpdate，走 editor message 帧）。
      *  取值口径与聊天 controller.sendSystemConfig 一致，避免两端漂移。 */
     private fun pushSystemConfigToChat() {
         val c = sysConfig.getConfig()
@@ -116,6 +123,7 @@ class MessageBridge(
             "skipFileEditPermission" to (c["skipFileEditPermission"] == true),
             "thinking" to (c["thinking"] != false),
             "showThinkingText" to (c["showThinkingText"] != false),
+            "lang" to sysConfig.lang(),
         )
         val frame = JsonObject().apply {
             addProperty("channel", "editor")
@@ -124,15 +132,34 @@ class MessageBridge(
         bus.pushToChat(gson.toJson(frame))
     }
 
+    /** 界面语言推给已打开的历史面板（langUpdate，走 editor message 帧；对齐 VSCode sessionHistoryWebview.postLangUpdate）。 */
+    private fun pushLangToHistory() {
+        if (!bus.hasHistory()) return
+        val uiMsg = linkedMapOf<String, Any?>("type" to "langUpdate", "lang" to sysConfig.lang())
+        val frame = JsonObject().apply {
+            addProperty("channel", "editor")
+            addProperty("message", gson.toJson(uiMsg))
+        }
+        bus.pushToHistory(gson.toJson(frame))
+    }
+
+    /** 聊天页切换语言后，同步已打开（或正在初始化）的配置 webview。 */
+    private fun pushLangToConfig() {
+        val uiMsg = linkedMapOf<String, Any?>("command" to "langUpdate", "lang" to sysConfig.lang())
+        bus.pushToConfig(editorFrame(uiMsg))
+    }
+
     /** 破坏性操作确认弹窗（channel=editor, type=confirm；带 reqId 回帧供 callEditor resolve）。对齐 VSCode configWebview.confirm 的 modal 警告。 */
     private fun handleConfirm(obj: JsonObject) {
         val reqId = obj.str("reqId")
         val payload = runCatching { gson.fromJson(obj.str("payload"), JsonObject::class.java) }.getOrNull() ?: JsonObject()
         val message = payload.str("message")
-        val confirmLabel = payload.str("confirmLabel").ifEmpty { "确定" }
+        // 按钮文案按当前界面语言取值（webview 未传 confirmLabel 时的缺省，以及取消按钮）
+        val confirmLabel = payload.str("confirmLabel").ifEmpty { SemaBundle.message("dialog.ok") }
+        val cancelLabel = SemaBundle.message("dialog.cancel")
         ApplicationManager.getApplication().invokeLater {
             val ok = com.intellij.openapi.ui.Messages.showYesNoDialog(
-                project, message, "Sema Code", confirmLabel, "取消",
+                project, message, "Sema Code", confirmLabel, cancelLabel,
                 com.intellij.openapi.ui.Messages.getWarningIcon(),
             ) == com.intellij.openapi.ui.Messages.YES
             replyEditor(reqId, mapOf("confirmed" to ok))
@@ -213,10 +240,11 @@ class MessageBridge(
                     val id = payload.str("sessionId")
                     if (bus.openIds.contains(id)) {
                         // 对齐 VSCode：拒删已打开会话并提示（VSCode 为 showWarningMessage 提示条，JB 用模态提示替代）
+                        val msg = SemaBundle.message("history.cannotDeleteOpen")
                         ApplicationManager.getApplication().invokeLater {
-                            com.intellij.openapi.ui.Messages.showWarningDialog(project, "无法删除已打开的会话", "Sema Code")
+                            com.intellij.openapi.ui.Messages.showWarningDialog(project, msg, "Sema Code")
                         }
-                        throw IllegalStateException("无法删除已打开的会话")
+                        throw IllegalStateException(msg)
                     }
                     history.delete(id); emptyMap<String, Any?>()
                 }
@@ -224,7 +252,7 @@ class MessageBridge(
                 else -> emptyMap<String, Any?>()
             }
         } catch (e: Exception) {
-            if (reqId.isNotEmpty()) replyEditorError(reqId, e.message ?: "history 操作失败")
+            if (reqId.isNotEmpty()) replyEditorError(reqId, e.message ?: SemaBundle.message("error.history"))
             return
         }
         // 增删后主动刷新已打开的历史面板
@@ -336,4 +364,3 @@ class MessageBridge(
 
     private fun JsonObject.str(key: String): String = get(key)?.takeIf { !it.isJsonNull }?.asString ?: ""
 }
-

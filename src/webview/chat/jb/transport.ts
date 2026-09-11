@@ -1,5 +1,6 @@
 // 低层传输：对接 Kotlin 注入的 window.__semaHostQuery / __semaHostToWeb。
 // 帧与 sema-grpc 的 BridgeCommand/BridgeEvent 对应（sema-core 透明镜像，此处不做协议翻译）。
+import { t } from '../../common/i18n/core';
 
 type GrpcEventHandler = (event: string, data: any, sessionId: string) => void;
 type AppMessageHandler = (msg: any) => void;
@@ -98,7 +99,7 @@ export class Transport {
                 if (p) {
                     this.pending.delete(frame.reqId);
                     const data = frame.data ? safeParse(frame.data) : undefined;
-                    if (frame.error) p.reject(new Error(typeof frame.error === 'string' ? frame.error : '编辑器操作失败'));
+                    if (frame.error) p.reject(new Error(typeof frame.error === 'string' ? frame.error : t('host.editorOpFailed')));
                     else p.resolve(data);
                     return;
                 }
@@ -120,7 +121,7 @@ export class Transport {
             if (p) {
                 this.pending.delete(cmdId);
                 if (event === 'ack') p.resolve(data);
-                else p.reject(new Error(data?.message || '命令失败'));
+                else p.reject(new Error(data?.message || t('host.commandFailed')));
             }
             return;
         }

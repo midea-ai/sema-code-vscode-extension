@@ -13,6 +13,7 @@ import {
     DEFAULT_CONTEXT_LENGTH_OPTIONS,
     AdapterType
 } from './default/defaultModelProvider';
+import { useT, t, I18nKey } from '../common/i18n/react';
 
 
 /** 将 token 数格式化为易读形式：1000000 -> 1M，128000 -> 128k */
@@ -47,35 +48,36 @@ interface Model {
 /** 预设服务商名称，自定义别名不允许与之重名（custom 本身除外，等价于不填） */
 const RESERVED_PROVIDERS = PROVIDER_ORDER.filter(key => key !== 'custom');
 
-/** 校验自定义服务商别名：留空合法（回退 custom），否则 2~20 位小写字母/数字/短横线，字母开头、不以短横线结尾 */
+/** 校验自定义服务商别名：留空合法（回退 custom），否则 2~20 位小写字母/数字/短横线，字母开头、不以短横线结尾（渲染期调用，可直接用 t） */
 const validateCustomProviderName = (name: string): string | null => {
     if (!name) {
         return null;
     }
     if (name.length < 2 || name.length > 20) {
-        return '长度需为 2~20 个字符';
+        return t('config.modelForm.aliasLength');
     }
     if (!/^[a-z][a-z0-9-]*[a-z0-9]$/.test(name)) {
-        return '仅支持小写字母、数字和短横线(-)，需以字母开头且不能以短横线结尾';
+        return t('config.modelForm.aliasCharset');
     }
     if (RESERVED_PROVIDERS.includes(name)) {
-        return `"${name}" 是预设服务商名称，请换一个`;
+        return t('config.modelForm.aliasReserved', { name });
     }
     return null;
 };
 
-/** 历史思考回传策略选项；core 旧配置缺省即 preserve */
+/** 历史思考回传策略选项；core 旧配置缺省即 preserve（labelKey 渲染期经 t() 取值） */
 const DEFAULT_THINKING_HISTORY_POLICY: ThinkingHistoryPolicy = 'preserve';
-const THINKING_HISTORY_POLICY_OPTIONS: { value: ThinkingHistoryPolicy; label: string }[] = [
-    { value: 'preserve', label: '全部保留' },
-    { value: 'current_turn', label: '仅保留当前轮' },
-    { value: 'omit', label: '不保留' }
+const THINKING_HISTORY_POLICY_OPTIONS: { value: ThinkingHistoryPolicy; labelKey: I18nKey }[] = [
+    { value: 'preserve', labelKey: 'config.modelForm.thinking.preserve' },
+    { value: 'current_turn', labelKey: 'config.modelForm.thinking.currentTurn' },
+    { value: 'omit', labelKey: 'config.modelForm.thinking.omit' }
 ];
 
 /** 预设服务商 key 是否可直接在下拉里选中（custom 走别名分支） */
 const isPresetProvider = (key: string) => key !== 'custom' && PROVIDER_ORDER.includes(key) && !!defaultModelProvider[key];
 
 const AddModelForm: React.FC<AddModelFormProps> = ({ onSuccess, onCancelEdit, editModel, editNonce, vscode }) => {
+    const t = useT();
     const isEditing = editModel !== null;
     const [provider, setProvider] = useState(DEFAULT_PROVIDER);
     const [customProviderName, setCustomProviderName] = useState(DEFAULT_PROVIDER === 'custom' ? 'custom' : '');
@@ -169,7 +171,7 @@ const AddModelForm: React.FC<AddModelFormProps> = ({ onSuccess, onCancelEdit, ed
                             vscode.postMessage({ command: 'getModelAdapter', provider, modelName: autoSelectedModel, baseURL });
 
                             setTestStatus({
-                                message: `✓ 成功获取 ${msg.models.length} 个模型`,
+                                message: t('config.modelForm.fetchedModels', { count: msg.models.length }),
                                 type: 'success'
                             });
                             setTimeout(() => setTestStatus({ message: '', type: '' }), 3000);
@@ -177,7 +179,7 @@ const AddModelForm: React.FC<AddModelFormProps> = ({ onSuccess, onCancelEdit, ed
                             // 请求成功但没有模型
                             setFetchModelsFailed(true);
                             setTestStatus({
-                                message: '✗ 请求成功，但没有返回可用模型',
+                                message: t('config.modelForm.noModelsReturned'),
                                 type: 'error'
                             });
                         }
@@ -185,7 +187,7 @@ const AddModelForm: React.FC<AddModelFormProps> = ({ onSuccess, onCancelEdit, ed
                         // 请求失败
                         setFetchModelsFailed(true);
                         setTestStatus({
-                            message: `✗ ${msg.message || '获取模型列表失败'}`,
+                            message: `✗ ${msg.message || t('config.modelForm.fetchFailed')}`,
                             type: 'error'
                         });
                     }
@@ -262,7 +264,7 @@ const AddModelForm: React.FC<AddModelFormProps> = ({ onSuccess, onCancelEdit, ed
 
     const handleFetchModels = () => {
         if (!baseURL) {
-            setTestStatus({ message: '请输入模型地址', type: 'error' });
+            setTestStatus({ message: t('config.modelForm.needBaseUrl'), type: 'error' });
             return;
         }
 
@@ -270,11 +272,11 @@ const AddModelForm: React.FC<AddModelFormProps> = ({ onSuccess, onCancelEdit, ed
         const providerConfig = defaultModelProvider[provider];
         const requiresApiKey = providerConfig?.requiresApiKeyForModelList !== false;
         if (requiresApiKey && !apiKey) {
-            setTestStatus({ message: '请输入 API Key', type: 'error' });
+            setTestStatus({ message: t('config.modelForm.needApiKey'), type: 'error' });
             return;
         }
 
-        setTestStatus({ message: '正在获取模型列表...', type: 'testing' });
+        setTestStatus({ message: t('config.modelForm.fetching'), type: 'testing' });
         setIsFetchingModels(true);
         vscode.postMessage({
             command: 'fetchModels',
@@ -286,19 +288,19 @@ const AddModelForm: React.FC<AddModelFormProps> = ({ onSuccess, onCancelEdit, ed
         const currentModelName = getCurrentModelName();
 
         if (!baseURL) {
-            setTestStatus({ message: '请输入模型地址', type: 'error' });
+            setTestStatus({ message: t('config.modelForm.needBaseUrl'), type: 'error' });
             return;
         }
         if (!apiKey) {
-            setTestStatus({ message: '请输入 API Key', type: 'error' });
+            setTestStatus({ message: t('config.modelForm.needApiKey'), type: 'error' });
             return;
         }
         if (!currentModelName) {
-            setTestStatus({ message: '请先获取模型', type: 'error' });
+            setTestStatus({ message: t('config.modelForm.needModel'), type: 'error' });
             return;
         }
 
-        setTestStatus({ message: '正在测试连接...', type: 'testing' });
+        setTestStatus({ message: t('config.modelForm.testing'), type: 'testing' });
 
         vscode.postMessage({
             command: 'testConnection',
@@ -318,31 +320,31 @@ const AddModelForm: React.FC<AddModelFormProps> = ({ onSuccess, onCancelEdit, ed
         const currentModelName = getCurrentModelName();
 
         if (!apiKey) {
-            setMessage({ text: '请输入 API Key', type: 'error' });
+            setMessage({ text: t('config.modelForm.needApiKey'), type: 'error' });
             return;
         }
         if (!currentModelName) {
-            setMessage({ text: '请先获取模型', type: 'error' });
+            setMessage({ text: t('config.modelForm.needModel'), type: 'error' });
             return;
         }
         if (!baseURL) {
-            setMessage({ text: '请输入模型地址', type: 'error' });
+            setMessage({ text: t('config.modelForm.needBaseUrl'), type: 'error' });
             return;
         }
 
         if (connectionFieldsChanged && !connectionTested) {
-            setTestStatus({ message: '⚠ 请先点击"测试连接"按钮验证配置是否正确', type: 'error' });
+            setTestStatus({ message: t('config.modelForm.testFirst'), type: 'error' });
             return;
         }
 
         if (connectionTested && !connectionSuccess) {
-            setTestStatus({ message: '⚠ 连接测试未通过，请修正配置后重新测试', type: 'error' });
+            setTestStatus({ message: t('config.modelForm.testNotPassed'), type: 'error' });
             return;
         }
 
         const aliasError = provider === 'custom' ? validateCustomProviderName(customProviderName) : null;
         if (aliasError) {
-            setMessage({ text: `服务商名称不合法: ${aliasError}`, type: 'error' });
+            setMessage({ text: t('config.modelForm.aliasInvalid', { error: aliasError }), type: 'error' });
             return;
         }
 
@@ -377,7 +379,7 @@ const AddModelForm: React.FC<AddModelFormProps> = ({ onSuccess, onCancelEdit, ed
         <div className="form-card">
             <form onSubmit={handleSubmit}>
                 <div className="form-group">
-                    <label htmlFor="provider">服务提供商</label>
+                    <label htmlFor="provider">{t('config.modelForm.provider')}</label>
                     <IconSelect
                         id="provider"
                         value={provider}
@@ -385,7 +387,7 @@ const AddModelForm: React.FC<AddModelFormProps> = ({ onSuccess, onCancelEdit, ed
                         disabled={isEditing}
                         options={PROVIDER_ORDER.filter(key => defaultModelProvider[key]).map(key => ({
                             value: key,
-                            label: defaultModelProvider[key].name,
+                            label: defaultModelProvider[key].nameKey ? t(defaultModelProvider[key].nameKey!) : defaultModelProvider[key].name,
                             icon: <ProviderLogo provider={key} className="icon-select-logo" />
                         }))}
                     />
@@ -393,14 +395,14 @@ const AddModelForm: React.FC<AddModelFormProps> = ({ onSuccess, onCancelEdit, ed
 
                 {provider === 'custom' && (
                     <div className="form-group">
-                        <label htmlFor="customProviderName">服务商名称</label>
+                        <label htmlFor="customProviderName">{t('config.modelForm.providerName')}</label>
                         <input
                             type="text"
                             id="customProviderName"
                             value={customProviderName}
                             onChange={(e) => setCustomProviderName(e.target.value.trim())}
                             disabled={isEditing}
-                            placeholder="为该服务命名以区分多个自定义服务，小写字母/数字/短横线，2~20 字符，留空默认为 custom"
+                            placeholder={t('config.modelForm.providerNamePlaceholder')}
                         />
                         {validateCustomProviderName(customProviderName) && (
                             <div className="description" style={{ color: 'var(--vscode-errorForeground)' }}>
@@ -411,7 +413,7 @@ const AddModelForm: React.FC<AddModelFormProps> = ({ onSuccess, onCancelEdit, ed
                 )}
 
                 <div className="form-group">
-                    <label htmlFor="baseURL">模型地址</label>
+                    <label htmlFor="baseURL">{t('config.modelForm.baseUrl')}</label>
                     <input
                         type="text"
                         id="baseURL"
@@ -437,7 +439,7 @@ const AddModelForm: React.FC<AddModelFormProps> = ({ onSuccess, onCancelEdit, ed
                                 rel="noopener noreferrer"
                                 title={currentModelDocUrl}
                             >
-                                获取 API Key
+                                {t('config.modelForm.getApiKey')}
                                 <OpenIcon size={11} />
                             </a>
                         )}
@@ -452,7 +454,9 @@ const AddModelForm: React.FC<AddModelFormProps> = ({ onSuccess, onCancelEdit, ed
                                 setConnectionTested(false);
                                 setConnectionSuccess(false);
                             }}
-                            placeholder={defaults.apiKeyPlaceholder}
+                            placeholder={defaults.apiKeyProviderLabel
+                                ? t('config.modelForm.apiKeyPlaceholder', { provider: defaults.apiKeyProviderLabel })
+                                : t('config.modelForm.apiKeyPlaceholderGeneric')}
                         />
                         <span
                             className={`input-icon ${showPassword ? 'hide-password' : 'show-password'}`}
@@ -464,13 +468,13 @@ const AddModelForm: React.FC<AddModelFormProps> = ({ onSuccess, onCancelEdit, ed
 
                 <div className="form-group">
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-                        <label htmlFor="modelName">模型名称</label>
+                        <label htmlFor="modelName">{t('config.modelForm.modelName')}</label>
                         {!isEditing && (
                             <span
                                 className="label-action"
                                 onClick={() => setIsManualInput(!isManualInput)}
                             >
-                                {isManualInput ? '从列表选择' : '手动输入'}
+                                {isManualInput ? t('config.modelForm.pickFromList') : t('config.modelForm.manualInput')}
                             </span>
                         )}
                     </div>
@@ -498,7 +502,7 @@ const AddModelForm: React.FC<AddModelFormProps> = ({ onSuccess, onCancelEdit, ed
                                             label: model.name || model.id
                                         }))}
                                         disabled={availableModels.length === 0}
-                                        placeholder="-- 请先获取模型列表 --"
+                                        placeholder={t('config.modelForm.fetchFirstPlaceholder')}
                                     />
                                 </div>
                                 <button
@@ -509,17 +513,17 @@ const AddModelForm: React.FC<AddModelFormProps> = ({ onSuccess, onCancelEdit, ed
                                     style={{ whiteSpace: 'nowrap', padding: '10px 16px' }}
                                 >
                                     {isFetchingModels && <span className="spinner" />}
-                                    {isFetchingModels ? '获取中...' : '获取模型'}
+                                    {isFetchingModels ? t('config.modelForm.fetchingShort') : t('config.modelForm.fetchModels')}
                                 </button>
                             </div>
                             {fetchModelsFailed && availableModels.length === 0 && (
                                 <div className="description" style={{ marginTop: 0 }}>
-                                    获取不到模型列表？该服务商可能不支持列出模型，可以
+                                    {t('config.modelForm.fetchHelpBefore')}
                                     <span
                                         style={{ color: 'var(--vscode-textLink-foreground)', cursor: 'pointer', textDecoration: 'underline' }}
                                         onClick={() => setIsManualInput(true)}
                                     >
-                                        手动输入模型名称
+                                        {t('config.modelForm.fetchHelpLink')}
                                     </span>
                                 </div>
                             )}
@@ -534,7 +538,7 @@ const AddModelForm: React.FC<AddModelFormProps> = ({ onSuccess, onCancelEdit, ed
                                 setConnectionTested(false);
                                 setConnectionSuccess(false);
                             }}
-                            placeholder={defaults.defaultModel ? `输入模型名称，例如: ${defaults.defaultModel}` : '输入模型名称'}
+                            placeholder={defaults.defaultModel ? t('config.modelForm.modelNamePlaceholderExample', { model: defaults.defaultModel }) : t('config.modelForm.modelNamePlaceholder')}
                             disabled={isEditing}
                         />
                     )}
@@ -542,31 +546,31 @@ const AddModelForm: React.FC<AddModelFormProps> = ({ onSuccess, onCancelEdit, ed
                 </div>
 
                 <div className="form-group">
-                    <label htmlFor="adapt">API 类型</label>
+                    <label htmlFor="adapt">{t('config.modelForm.apiType')}</label>
                     <IconSelect
                         id="adapt"
                         value={adapt}
                         onChange={(value) => setAdapt(value as AdapterType)}
                         options={[
-                            { value: 'openai', label: 'OpenAI 格式' },
-                            { value: 'anthropic', label: 'Anthropic 格式' }
+                            { value: 'openai', label: t('config.modelForm.openaiFormat') },
+                            { value: 'anthropic', label: t('config.modelForm.anthropicFormat') }
                         ]}
                     />
                 </div>
 
                 <div className="form-group">
-                    <label htmlFor="thinkingHistoryPolicy">思考历史</label>
+                    <label htmlFor="thinkingHistoryPolicy">{t('config.modelForm.thinkingHistory')}</label>
                     <IconSelect
                         id="thinkingHistoryPolicy"
                         value={thinkingHistoryPolicy}
                         onChange={(value) => setThinkingHistoryPolicy(value as ThinkingHistoryPolicy)}
-                        options={THINKING_HISTORY_POLICY_OPTIONS}
+                        options={THINKING_HISTORY_POLICY_OPTIONS.map(opt => ({ value: opt.value, label: t(opt.labelKey) }))}
                     />
                 </div>
 
                 <div className="form-row">
                     <div className="form-group">
-                        <label htmlFor="maxTokens">最大生成token数</label>
+                        <label htmlFor="maxTokens">{t('config.modelForm.maxTokens')}</label>
                         <IconSelect
                             id="maxTokens"
                             value={maxTokens}
@@ -580,7 +584,7 @@ const AddModelForm: React.FC<AddModelFormProps> = ({ onSuccess, onCancelEdit, ed
                     </div>
 
                     <div className="form-group">
-                        <label htmlFor="contextLength">上下文窗口大小</label>
+                        <label htmlFor="contextLength">{t('config.modelForm.contextLength')}</label>
                         <IconSelect
                             id="contextLength"
                             value={contextLength}
@@ -601,7 +605,7 @@ const AddModelForm: React.FC<AddModelFormProps> = ({ onSuccess, onCancelEdit, ed
                         disabled={testStatus.type === 'testing'}
                     >
                         {testStatus.type === 'testing' && <span className="spinner" />}
-                        {testStatus.type === 'testing' ? '测试中...' : '测试连接'}
+                        {testStatus.type === 'testing' ? t('config.modelForm.testingShort') : t('config.modelForm.testConnection')}
                     </button>
                     <button
                         type="submit"
@@ -609,7 +613,7 @@ const AddModelForm: React.FC<AddModelFormProps> = ({ onSuccess, onCancelEdit, ed
                         disabled={isSaving}
                     >
                         {isSaving && <span className="spinner" />}
-                        {isSaving ? (isEditing ? '保存中...' : '添加中...') : (isEditing ? '保存修改' : '添加模型')}
+                        {isSaving ? (isEditing ? t('common.saving') : t('common.adding')) : (isEditing ? t('config.modelForm.saveChanges') : t('config.modelForm.addModel'))}
                     </button>
                     {isEditing && (
                         <button
@@ -618,7 +622,7 @@ const AddModelForm: React.FC<AddModelFormProps> = ({ onSuccess, onCancelEdit, ed
                             onClick={onCancelEdit}
                             disabled={isSaving}
                         >
-                            取消
+                            {t('common.cancel')}
                         </button>
                     )}
                 </div>

@@ -1,4 +1,5 @@
 import React, { useState, useRef, useLayoutEffect, useCallback } from 'react';
+import { useT } from '../../../common/i18n/react';
 
 // 折叠态最大高度（px），需与 code.css 中 .collapsible-diff.collapsed 的 max-height 同步
 const COLLAPSED_MAX_PX = 140;
@@ -13,6 +14,7 @@ interface CollapsibleContentProps {
  * 区别仅在于这里包裹任意 children（如 markdown），而非写死的 UpdateCodeDiff。
  */
 const CollapsibleContent: React.FC<CollapsibleContentProps> = React.memo(({ children }) => {
+    const t = useT();
     const [isExpanded, setIsExpanded] = useState(false);
     const [isOverflowing, setIsOverflowing] = useState(false);
     const ref = useRef<HTMLDivElement>(null);
@@ -46,7 +48,7 @@ const CollapsibleContent: React.FC<CollapsibleContentProps> = React.memo(({ chil
             </div>
             {isOverflowing && (
                 <button type="button" className="collapsible-diff-toggle" onClick={handleToggle}>
-                    {isExpanded ? '收起' : '展开'}
+                    {isExpanded ? t('common.collapse') : t('common.expand')}
                 </button>
             )}
         </>

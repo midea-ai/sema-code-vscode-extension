@@ -18,6 +18,7 @@ import PlanExitDialog from './components/ui/PlanExitDialog';
 import QuickChatDialog from './components/ui/QuickChatDialog';
 import ForkDialog from './components/ui/ForkDialog';
 import ProcessingSpinner from './components/ui/ProcessingSpinner';
+import { useT, setLang, type Language } from '../common/i18n/react';
 import ModelConfigReminder from './components/ui/ModelConfigReminder';
 import { PREVIEW_MODE, getPreviewMessages, mockDialogMap, isPreviewActive } from './utils/mockMessages';
 import { groupMessages } from './utils/groupMessages';
@@ -38,6 +39,7 @@ interface ChatSessionProps {
  * 后台事件持续更新其内存状态。
  */
 const ChatSession: React.FC<ChatSessionProps> = ({ vscode: rawVscode, sessionId, active, onWaitingChange }) => {
+    const t = useT();
     // 包一层：给本会话子树发出的所有消息自动补 sessionId（未显式设置时），
     // 避免 FileChangesPanel/EditBlock 等子组件发的 showFileDiff/restore 因缺 sessionId
     // 落到后端后取不到本会话快照（diff 左侧空、恢复失败）。
@@ -62,7 +64,8 @@ const ChatSession: React.FC<ChatSessionProps> = ({ vscode: rawVscode, sessionId,
     const [progressMessage, setProgressMessage] = useState<string>('');
     const [tokenInfo, setTokenInfo] = useState<TokenInfo>({ useTokens: 0, maxTokens: 0, promptTokens: 0 });
     const [inputDisabled, setInputDisabled] = useState<boolean>(true);
-    const [inputPlaceholder, setInputPlaceholder] = useState<string>('正在初始化 CLI，请稍候...');
+    // null 表示用默认文案（按禁用态取「初始化中」/「请输入需求」，随语言切换），非空为宿主指定的提示
+    const [inputPlaceholderMsg, setInputPlaceholderMsg] = useState<string | null>(null);
     const [processingState, setProcessingState] = useState<'idle' | 'processing'>('idle');
     const [fileChanges, setFileChanges] = useState<FileChange[]>(isPreviewActive('FileChangesPanel') ? (mockDialogMap.FileChangesPanel?.[0]?.changes || []) : []);
     const [todos, setTodos] = useState<TodoItem[]>(isPreviewActive('TodosPanel') ? (mockDialogMap.TodosPanel?.[0]?.todos || []) : []);
@@ -260,12 +263,12 @@ const ChatSession: React.FC<ChatSessionProps> = ({ vscode: rawVscode, sessionId,
                     break;
                 case 'enableInput':
                     setInputDisabled(false);
-                    setInputPlaceholder('请输入需求...(/指令 @文件)');
+                    setInputPlaceholderMsg(null);
                     vscode.postMessage({ type: 'requestSystemConfig' });
                     break;
                 case 'disableInput':
                     setInputDisabled(true);
-                    setInputPlaceholder(message.message || '正在初始化 CLI，请稍候...');
+                    setInputPlaceholderMsg(message.message || null);
                     break;
                 case 'fileChange':
                     handleFileChange(message.change);
@@ -349,6 +352,9 @@ const ChatSession: React.FC<ChatSessionProps> = ({ vscode: rawVscode, sessionId,
                     }
                     break;
                 case 'systemConfigUpdate':
+                    if (typeof message.lang === 'string') {
+                        setLang(message.lang);
+                    }
                     if (typeof message.skipFileEditPermission === 'boolean') {
                         setSkipFileEditPermission(message.skipFileEditPermission);
                     }
@@ -691,10 +697,17 @@ const ChatSession: React.FC<ChatSessionProps> = ({ vscode: rawVscode, sessionId,
         setModelReminderDismissed(true);
     };
 
+    const handleLanguageChange = (lang: Language) => {
+        // 与配置页一致：先即时刷新当前 webview，再交给宿主持久化并同步其他面板。
+        setLang(lang);
+        vscode.postMessage({ type: 'updateLanguage', lang });
+    };
+
     /** 横幅文案：模型列表为空且未被用户关闭时显示 */
     const modelReminderText = modelInfoLoaded && availableModels.length === 0 && !modelReminderDismissed
-        ? 'Code Agent Model 尚未配置，请先配置模型信息'
+        ? t('chat.modelNotConfigured')
         : '';
+    const inputPlaceholder = inputPlaceholderMsg ?? (inputDisabled ? t('chat.initializing') : t('chat.inputPlaceholder'));
 
     const handleAgentModeChange = (mode: AgentMode) => {
         setAgentMode(mode);
@@ -1016,6 +1029,7 @@ const ChatSession: React.FC<ChatSessionProps> = ({ vscode: rawVscode, sessionId,
                             message={modelReminderText}
                             onClose={handleCloseModelConfigReminder}
                             onOpenConfig={handleOpenConfig}
+                            onLanguageChange={handleLanguageChange}
                         />
                     )}
                     {PREVIEW_MODE && <PreviewDialogs vscode={vscode} />}
@@ -1051,6 +1065,7 @@ const ChatSession: React.FC<ChatSessionProps> = ({ vscode: rawVscode, sessionId,
  * 每个会话渲染一个常驻挂载的 ChatSession，非 active 时隐藏。
  */
 const App: React.FC<AppProps> = ({ vscode }) => {
+    const t = useT();
     const [sessions, setSessions] = useState<SessionMeta[]>([]);
     const [activeId, setActiveId] = useState<string | null>(null);
     const [errorBanner, setErrorBanner] = useState<string>('');
@@ -1073,7 +1088,7 @@ const App: React.FC<AppProps> = ({ vscode }) => {
                                 ? { ...s, title: message.title || s.title }
                                 : s);
                         }
-                        return [...prev, { id: message.sessionId, title: message.title || '新会话', processing: false, waiting: false, isClaw: !!message.isClaw }];
+                        return [...prev, { id: message.sessionId, title: message.title || t('common.newSession'), processing: false, waiting: false, isClaw: !!message.isClaw }];
                     });
                     setActiveId(message.sessionId);
                     break;
@@ -1083,7 +1098,7 @@ const App: React.FC<AppProps> = ({ vscode }) => {
                     setActiveId(prev => (prev === message.sessionId ? (message.nextActiveId ?? null) : prev));
                     break;
                 case 'sessionCreateFailed':
-                    showError(message.error || '创建会话失败');
+                    showError(message.error || t('chat.createSessionFailed'));
                     break;
                 case 'sessionTitleUpdate':
                     setSessions(prev => prev.map(s => s.id === message.sessionId

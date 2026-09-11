@@ -4,6 +4,7 @@ import { execFile } from 'child_process';
 import { promisify } from 'util';
 import { EXCLUDED_NAMES, EXCLUDE_GLOB, NON_TEXT_EXTENSIONS } from '../utils/fileExcludePatterns';
 import { scoreItem, compareScored } from '../utils/fileScoring';
+import { t } from '../webview/common/i18n/core';
 
 const execFileAsync = promisify(execFile);
 
@@ -111,7 +112,7 @@ export class FileOperationManager {
             editor.revealRange(revealRange, vscode.TextEditorRevealType.InCenter);
         } catch (error) {
             console.error('Failed to open file:', error);
-            vscode.window.showErrorMessage(`无法打开文件: ${filePath}`);
+            vscode.window.showErrorMessage(t('host.cannotOpenFile', { path: filePath }));
         }
     }
 

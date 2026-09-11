@@ -4,6 +4,7 @@ import { getColorByName } from './utils/iconUtils';
 import { RefreshIcon, EditIcon, TrashIcon, OpenIcon } from './utils/svgIcons';
 import { SkillScope, SkillConfig as SkillConfigItem } from './types/skill';
 import { skillHubConfig } from './default/defaultSkillHub';
+import { useT, I18nKey } from '../common/i18n/react';
 import './style/section.css';
 
 interface SkillConfigProps {
@@ -21,10 +22,11 @@ interface HubSkillResult {
 
 const LOCATE_ORDER: SkillScope[] = ['project', 'user', 'plugin'];
 
-const LOCATE_SECTION_TITLES: Record<SkillScope, string> = {
-    plugin: '插件 Skills',
-    project: '项目级 Skills',
-    user: '用户级 Skills',
+// 分组标题文案 key，渲染期经 t() 取值
+const LOCATE_SECTION_TITLE_KEYS: Record<SkillScope, I18nKey> = {
+    plugin: 'config.skill.group.plugin',
+    project: 'config.skill.group.project',
+    user: 'config.skill.group.user',
 };
 
 const LOCATE_PATHS: Record<SkillScope, string> = {
@@ -39,6 +41,7 @@ const SkillConfig: React.FC<SkillConfigProps> = ({ vscode }) => {
     // JB 插件不支持 SkillHub 在线搜索/安装，隐藏其标签页（VSCode 下 __SEMA_JB__ 为 undefined，行为不变）。
     // 必须在组件内读取：模块顶层求值早于 jb-index 设置该标记，会恒为 false。
     const IS_JB = !!(window as any).__SEMA_JB__;
+    const t = useT();
     const [activeTab, setActiveTab] = useState<SkillTabType>('installed');
     const [skills, setSkills] = useState<SkillConfigItem[]>([]);
     const [loading, setLoading] = useState(true);
@@ -208,13 +211,13 @@ const SkillConfig: React.FC<SkillConfigProps> = ({ vscode }) => {
 
     const renderSkillCard = (skill: SkillConfigItem, globalIndex: number) => {
         const DESC_MAX = 150;
-        const description = skill.description || '暂无描述';
+        const description = skill.description || t('common.noDescription');
         const isDescExpanded = expandedDescriptions.has(globalIndex);
         const isLongDesc = description.length > DESC_MAX;
         const isReadonly = skill.locate === 'plugin';
         const isDisabled = skill.status === false;
         const skillSwitch = (
-            <label className="section-switch" title={isDisabled ? (skill.locate === 'project' ? '已禁用（当前项目）' : '已禁用（全局）') : '已启用'}>
+            <label className="section-switch" title={isDisabled ? (skill.locate === 'project' ? t('config.skill.disabledProject') : t('config.skill.disabledGlobal')) : t('config.skill.enabled')}>
                 <input
                     type="checkbox"
                     checked={!isDisabled}
@@ -233,21 +236,21 @@ const SkillConfig: React.FC<SkillConfigProps> = ({ vscode }) => {
                     <div className="section-card-name-group" style={{ opacity: isDisabled ? 0.5 : 1 }}>
                         <span className="section-card-name">{skill.name}</span>
                         {isReadonly && (
-                            <span className="readonly-tab">只读</span>
+                            <span className="readonly-tab">{t('common.readonly')}</span>
                         )}
                     </div>
                     {!isReadonly && (
                         <div className="section-card-actions">
                             <button
                                 className="section-icon-btn"
-                                title="编辑"
+                                title={t('common.edit')}
                                 onClick={(e) => { e.stopPropagation(); handleEditSkill(skill); }}
                             >
                                 <EditIcon />
                             </button>
                             <button
                                 className="section-icon-btn section-icon-btn-danger"
-                                title="删除"
+                                title={t('common.delete')}
                                 onClick={(e) => { e.stopPropagation(); handleDeleteSkill(skill); }}
                             >
                                 <TrashIcon />
@@ -260,7 +263,7 @@ const SkillConfig: React.FC<SkillConfigProps> = ({ vscode }) => {
                             {skill.filePath && (
                                 <button
                                     className="section-icon-btn"
-                                    title="打开"
+                                    title={t('common.open')}
                                     onClick={(e) => { e.stopPropagation(); handleEditSkill(skill); }}
                                 >
                                     <OpenIcon />
@@ -280,7 +283,7 @@ const SkillConfig: React.FC<SkillConfigProps> = ({ vscode }) => {
                             className="description-toggle"
                             onClick={() => toggleDescriptionExpand(globalIndex)}
                         >
-                            {isDescExpanded ? '收起' : '更多'}
+                            {isDescExpanded ? t('common.collapse') : t('common.more')}
                         </span>
                     )}
                 </div>
@@ -305,7 +308,7 @@ const SkillConfig: React.FC<SkillConfigProps> = ({ vscode }) => {
                     className={`tab-item ${activeTab === 'installed' ? 'active' : ''}`}
                     onClick={() => setActiveTab('installed')}
                 >
-                    已安装
+                    {t('common.installed')}
                     {skills.length > 0 && (
                         <span className="section-tab-count">{skills.length}</span>
                     )}
@@ -323,7 +326,7 @@ const SkillConfig: React.FC<SkillConfigProps> = ({ vscode }) => {
                         <button
                             className={`section-icon-btn ${isRefreshing ? 'btn-loading' : ''}`}
                             onClick={handleRefresh}
-                            title="刷新 Skills"
+                            title={t('config.skill.refresh')}
                             disabled={isRefreshing}
                         >
                             {isRefreshing ? (
@@ -343,7 +346,7 @@ const SkillConfig: React.FC<SkillConfigProps> = ({ vscode }) => {
                         <input
                             type="text"
                             className="section-search-input"
-                            placeholder="搜索 Skill 名称或描述..."
+                            placeholder={t('config.skill.hubSearchPlaceholder')}
                             value={hubSearch}
                             onChange={(e) => handleHubSearchChange(e.target.value)}
                             onKeyDown={(e) => { if (e.key === 'Enter') handleHubSearchSubmit(); }}
@@ -355,19 +358,19 @@ const SkillConfig: React.FC<SkillConfigProps> = ({ vscode }) => {
                             disabled={hubLoading}
                         >
                             {hubLoading && <span className="spinner" />}
-                            {hubLoading ? '搜索中' : '搜索'}
+                            {hubLoading ? t('config.skill.searching') : t('common.search')}
                         </button>
                     </div>
                     {hubLoading ? (
-                        <div className="section-loading">搜索中...</div>
+                        <div className="section-loading">{t('config.skill.searchingDots')}</div>
                     ) : !hubSearched ? (
                         <div className="section-empty" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', padding: '24px 16px' }}>
-                            <div>{skillHubConfig.defaultHint}</div>
+                            <div>{t('config.skill.hubHint')}</div>
                             <div style={{ fontSize: '12px', color: 'var(--vscode-descriptionForeground)', lineHeight: '1.6', textAlign: 'center', maxWidth: '360px' }}>
-                                {skillHubConfig.defaultDescription}
+                                {t('config.skill.hubDescription')}
                             </div>
                             <div style={{ fontSize: '12px', color: 'var(--vscode-descriptionForeground)', marginTop: '4px' }}>
-                                {skillHubConfig.sourceLabel}{' '}
+                                {t('config.skill.hubSourceLabel')}{' '}
                                 <a
                                     href="#"
                                     className="skillhub-source-link"
@@ -378,7 +381,7 @@ const SkillConfig: React.FC<SkillConfigProps> = ({ vscode }) => {
                             </div>
                         </div>
                     ) : hubResults.length === 0 ? (
-                        <div className="section-empty">没有匹配的 Skill</div>
+                        <div className="section-empty">{t('config.skill.noMatch')}</div>
                     ) : (
                         <div className="plugin-available-list" style={{ borderRadius: '8px', border: '1px solid var(--vscode-panel-border)' }}>
                             {[...hubResults]
@@ -413,26 +416,26 @@ const SkillConfig: React.FC<SkillConfigProps> = ({ vscode }) => {
                                         </div>
                                         <div className="plugin-available-right">
                                             {isInstalled ? (
-                                                <span className="section-installed-badge">已安装</span>
+                                                <span className="section-installed-badge">{t('common.installed')}</span>
                                             ) : (
                                                 <div className="section-install-btns">
                                                     <button
                                                         className={`section-btn secondary small ${isInstallingProject ? 'btn-loading' : ''}`}
                                                         onClick={() => handleInstallFromHub(item.slug, 'project')}
-                                                        title="安装到当前项目"
+                                                        title={t('common.installToProjectTip')}
                                                         disabled={isInstallingProject || isInstallingUser}
                                                     >
                                                         {isInstallingProject && <span className="spinner" />}
-                                                        项目安装
+                                                        {t('common.installProject')}
                                                     </button>
                                                     <button
                                                         className={`section-btn primary small ${isInstallingUser ? 'btn-loading' : ''}`}
                                                         onClick={() => handleInstallFromHub(item.slug, 'user')}
-                                                        title="安装到用户全局"
+                                                        title={t('common.installToUserTip')}
                                                         disabled={isInstallingProject || isInstallingUser}
                                                     >
                                                         {isInstallingUser && <span className="spinner" />}
-                                                        全局安装
+                                                        {t('common.installUser')}
                                                     </button>
                                                 </div>
                                             )}
@@ -444,7 +447,7 @@ const SkillConfig: React.FC<SkillConfigProps> = ({ vscode }) => {
                     )}
                     {hubSearched && hubResults.length > 0 && !hubLoading && (
                         <div style={{ textAlign: 'center', fontSize: '12px', color: 'var(--vscode-descriptionForeground)', marginTop: '4px' }}>
-                            {skillHubConfig.sourceLabel}{' '}
+                            {t('config.skill.hubSourceLabel')}{' '}
                             <a
                                 href="#"
                                 className="skillhub-source-link"
@@ -456,7 +459,7 @@ const SkillConfig: React.FC<SkillConfigProps> = ({ vscode }) => {
                     )}
                 </div>
                 {activeTab !== 'hub' && loading ? (
-                    <div className="section-loading">加载中...</div>
+                    <div className="section-loading">{t('common.loading')}</div>
                 ) : activeTab !== 'hub' ? (
                     <div className="section-groups">
                         {LOCATE_ORDER.map(scope => {
@@ -478,7 +481,7 @@ const SkillConfig: React.FC<SkillConfigProps> = ({ vscode }) => {
                                         style={{ cursor: 'pointer', userSelect: 'none' }}
                                         onClick={toggleCollapse}
                                     >
-                                        {LOCATE_SECTION_TITLES[scope]}
+                                        {t(LOCATE_SECTION_TITLE_KEYS[scope])}
                                         {LOCATE_PATHS[scope] && (
                                             <span className="section-group-count">({LOCATE_PATHS[scope]})</span>
                                         )}
@@ -486,7 +489,7 @@ const SkillConfig: React.FC<SkillConfigProps> = ({ vscode }) => {
                                     </div>
                                     {!isCollapsed && (
                                         sectionSkills.length === 0 ? (
-                                            <div className="section-empty">暂无 Skill</div>
+                                            <div className="section-empty">{t('config.skill.empty')}</div>
                                         ) : (
                                             <div className="section-list">
                                                 {sectionSkills.map((skill, localIndex) =>

@@ -4,6 +4,7 @@ import { getColorByName } from './utils/iconUtils';
 import { RefreshIcon, EditIcon, TrashIcon, OpenIcon } from './utils/svgIcons';
 import AddCommandForm from './AddCommandForm';
 import { CommandScope, CommandConfig as CommandConfigItem } from './types/command';
+import { useT, I18nKey } from '../common/i18n/react';
 import './style/section.css';
 import './style/agent.css';
 
@@ -15,10 +16,11 @@ type CommandTabType = 'installed' | 'add';
 
 const LOCATE_ORDER: CommandScope[] = ['project', 'user', 'plugin'];
 
-const LOCATE_SECTION_TITLES: Record<CommandScope, string> = {
-    plugin: '插件 Commands',
-    project: '项目级 Commands',
-    user: '用户级 Commands',
+// 分组标题文案 key，渲染期经 t() 取值
+const LOCATE_SECTION_TITLE_KEYS: Record<CommandScope, I18nKey> = {
+    plugin: 'config.command.group.plugin',
+    project: 'config.command.group.project',
+    user: 'config.command.group.user',
 };
 
 const LOCATE_PATHS: Record<CommandScope, string> = {
@@ -28,6 +30,7 @@ const LOCATE_PATHS: Record<CommandScope, string> = {
 };
 
 const CommandConfig: React.FC<CommandConfigProps> = ({ vscode }) => {
+    const t = useT();
     const [activeTab, setActiveTab] = useState<CommandTabType>('installed');
     const [commands, setCommands] = useState<CommandConfigItem[]>([]);
     const [loading, setLoading] = useState(true);
@@ -111,7 +114,7 @@ const CommandConfig: React.FC<CommandConfigProps> = ({ vscode }) => {
 
     const renderCommandCard = (cmd: CommandConfigItem, globalIndex: number) => {
         const DESC_MAX = 150;
-        const description = cmd.description || '暂无描述';
+        const description = cmd.description || t('common.noDescription');
         const isDescExpanded = expandedDescriptions.has(globalIndex);
         const isLongDesc = description.length > DESC_MAX;
         const isReadonly = cmd.locate === 'plugin';
@@ -125,7 +128,7 @@ const CommandConfig: React.FC<CommandConfigProps> = ({ vscode }) => {
                     <div className="section-card-name-group">
                         <span className="section-card-name">/{cmd.name}</span>
                         {isReadonly && (
-                            <span className="readonly-tab">只读</span>
+                            <span className="readonly-tab">{t('common.readonly')}</span>
                         )}
                     </div>
                     {!isReadonly && (
@@ -133,7 +136,7 @@ const CommandConfig: React.FC<CommandConfigProps> = ({ vscode }) => {
                             {cmd.filePath && (
                                 <button
                                     className="section-icon-btn"
-                                    title="编辑"
+                                    title={t('common.edit')}
                                     onClick={(e) => { e.stopPropagation(); handleEditCommand(cmd); }}
                                 >
                                     <EditIcon />
@@ -141,7 +144,7 @@ const CommandConfig: React.FC<CommandConfigProps> = ({ vscode }) => {
                             )}
                             <button
                                 className="section-icon-btn section-icon-btn-danger"
-                                title="删除"
+                                title={t('common.delete')}
                                 onClick={(e) => { e.stopPropagation(); handleDeleteCommand(cmd); }}
                             >
                                 <TrashIcon />
@@ -152,7 +155,7 @@ const CommandConfig: React.FC<CommandConfigProps> = ({ vscode }) => {
                         <div className="section-card-actions">
                             <button
                                 className="section-icon-btn"
-                                title="打开"
+                                title={t('common.open')}
                                 onClick={(e) => { e.stopPropagation(); handleEditCommand(cmd); }}
                             >
                                 <OpenIcon />
@@ -170,13 +173,13 @@ const CommandConfig: React.FC<CommandConfigProps> = ({ vscode }) => {
                             className="description-toggle"
                             onClick={() => toggleDescriptionExpand(globalIndex)}
                         >
-                            {isDescExpanded ? '收起' : '更多'}
+                            {isDescExpanded ? t('common.collapse') : t('common.more')}
                         </span>
                     )}
                 </div>
                 {cmd.argumentHint && (
                     <div className="section-card-desc">
-                        <span className="tools-label">参数提示:</span>{' '}
+                        <span className="tools-label">{t('config.command.argHintLabel')}</span>{' '}
                         {Array.isArray(cmd.argumentHint)
                             ? cmd.argumentHint.map((hint, i) => (
                                 <span key={i} className="model-badge model-default" style={{ marginRight: 4 }}>{hint}</span>
@@ -213,7 +216,7 @@ const CommandConfig: React.FC<CommandConfigProps> = ({ vscode }) => {
                     className={`tab-item ${activeTab === 'installed' ? 'active' : ''}`}
                     onClick={() => setActiveTab('installed')}
                 >
-                    已安装
+                    {t('common.installed')}
                     {commands.length > 0 && (
                         <span className="section-tab-count">{commands.length}</span>
                     )}
@@ -222,14 +225,14 @@ const CommandConfig: React.FC<CommandConfigProps> = ({ vscode }) => {
                     className={`tab-item ${activeTab === 'add' ? 'active' : ''}`}
                     onClick={() => setActiveTab('add')}
                 >
-                    创建 Command
+                    {t('config.command.create')}
                 </div>
                 <div className="section-tab-actions">
                     {activeTab === 'installed' && (
                         <button
                             className={`section-icon-btn ${isRefreshing ? 'btn-loading' : ''}`}
                             onClick={handleRefresh}
-                            title="刷新 Commands"
+                            title={t('config.command.refresh')}
                             disabled={isRefreshing}
                         >
                             {isRefreshing ? (
@@ -252,7 +255,7 @@ const CommandConfig: React.FC<CommandConfigProps> = ({ vscode }) => {
                     />
                 </div>
                 {activeTab !== 'add' && loading ? (
-                    <div className="section-loading">加载中...</div>
+                    <div className="section-loading">{t('common.loading')}</div>
                 ) : activeTab !== 'add' ? (
                     <div className="section-groups">
                         {ALL_SECTIONS.map(scope => {
@@ -274,7 +277,7 @@ const CommandConfig: React.FC<CommandConfigProps> = ({ vscode }) => {
                                         style={{ cursor: 'pointer', userSelect: 'none' }}
                                         onClick={toggleCollapse}
                                     >
-                                        {LOCATE_SECTION_TITLES[scope]}
+                                        {t(LOCATE_SECTION_TITLE_KEYS[scope])}
                                         {LOCATE_PATHS[scope] && (
                                             <span className="section-group-count">({LOCATE_PATHS[scope]})</span>
                                         )}
@@ -282,7 +285,7 @@ const CommandConfig: React.FC<CommandConfigProps> = ({ vscode }) => {
                                     </div>
                                     {!isCollapsed && (
                                         sectionCommands.length === 0 ? (
-                                            <div className="section-empty">暂无 Command</div>
+                                            <div className="section-empty">{t('config.command.empty')}</div>
                                         ) : (
                                             <div className="section-list">
                                                 {sectionCommands.map((cmd, localIndex) =>

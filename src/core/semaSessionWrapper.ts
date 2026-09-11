@@ -1,5 +1,6 @@
 import { SemaSession } from 'sema-core';
 import type { ForkOptions, ForkPreview, ForkResult, BranchResult } from 'sema-core';
+import { t } from '../webview/common/i18n/core';
 import {
     MessageCompleteData,
     StateUpdateData,
@@ -274,7 +275,7 @@ export class SemaSessionWrapper {
         this.sendContentUpdate();
         this.post(this.sessionReady
             ? { type: 'enableInput' }
-            : { type: 'disableInput', message: '正在初始化 CLI，请稍候...' });
+            : { type: 'disableInput', message: t('chat.initializing') });
         this.post({ type: 'agentModeUpdate', mode: this._agentMode });
         this.post({ type: 'permissionLevelUpdate', level: this._permissionLevel });
         this.post({ type: 'stateUpdate', state: this.currentState });
@@ -464,8 +465,8 @@ export class SemaSessionWrapper {
         // hook:notice 只在三种情况发出：脚本输出 systemMessage、hook 超时等告警、输入被 UserPromptSubmit 拦截
         this.session.on<HookNoticeData>('hook:notice', (data) => {
             if (!data?.message) return;
-            const label = data.kind === 'warning' ? 'Hook 警告'
-                : data.kind === 'blocked' ? 'Hook 拦截'
+            const label = data.kind === 'warning' ? t('host.hookWarning')
+                : data.kind === 'blocked' ? t('host.hookBlocked')
                 : 'Hook';
             const event = data.hookEvent ? `[${data.hookEvent}]` : '';
             const noticeMsg: Message = {
@@ -479,7 +480,7 @@ export class SemaSessionWrapper {
 
         this.session.on<{ sessionId: string | null }>('session:cleared', (_data) => {
             this.clearMessageHistory();
-            this.setTitle('新会话');
+            this.setTitle(t('common.newSession'));
             this.messageHistory.push({
                 id: this.generateId(),
                 type: 'user',
@@ -507,7 +508,7 @@ export class SemaSessionWrapper {
                 if (title.length > 50) {
                     title = title.substring(0, 50) + '...';
                 }
-                this.setTitle(title || '新对话');
+                this.setTitle(title || t('common.newSession'));
             }
 
             const userMsg: Message = {

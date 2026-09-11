@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { VscodeApi } from './types';
 import { ExpandArrowIcon, EditIcon, TrashIcon } from './utils/svgIcons';
 import { formatDateTime } from './utils/timeUtils';
+import { useT } from '../common/i18n/react';
 import './style/task.css';
 import './style/section.css';
 
@@ -35,6 +36,7 @@ const CronTaskCard: React.FC<{
     onDelete: (id: string) => void;
     onToggle: (id: string, enabled: boolean) => void;
 }> = ({ task, vscode, onDelete, onToggle }) => {
+    const t = useT();
     const [expanded, setExpanded] = useState(false);
 
     return (
@@ -54,7 +56,7 @@ const CronTaskCard: React.FC<{
                     {task.filePath && (
                         <button
                             className="section-icon-btn"
-                            title="编辑"
+                            title={t('common.edit')}
                             onClick={() => {
                                 const match = task.filePath!.match(/^(.+?)(?::(\d+)(?:-(\d+))?)?$/);
                                 if (match) {
@@ -72,7 +74,7 @@ const CronTaskCard: React.FC<{
                     )}
                     <button
                         className="section-icon-btn section-icon-btn-danger"
-                        title="删除"
+                        title={t('common.delete')}
                         onClick={() => onDelete(task.id)}
                     >
                         <TrashIcon />
@@ -90,7 +92,7 @@ const CronTaskCard: React.FC<{
             {expanded && (
                 <>
                     <div className="task-detail-info">
-                        <div><strong>Cron:</strong> <span className="cron-expression-tag">{task.schedule.split('').map((ch, i) => ch === '*' ? ch : <span key={i} className="cron-highlight">{ch}</span>)}</span> <span className="readonly-tab">{task.repeat ? '周期' : '一次性'}</span>{task.persist && <> <span className="readonly-tab">持久化</span></>}</div>
+                        <div><strong>Cron:</strong> <span className="cron-expression-tag">{task.schedule.split('').map((ch, i) => ch === '*' ? ch : <span key={i} className="cron-highlight">{ch}</span>)}</span> <span className="readonly-tab">{task.repeat ? t('config.cron.repeat') : t('config.cron.once')}</span>{task.persist && <> <span className="readonly-tab">{t('config.cron.persist')}</span></>}</div>
                         <div style={{ color: 'var(--vscode-descriptionForeground)', opacity: 0.8 }}>{task.id} · {formatDateTime(task.createdAt)}</div>
                     </div>
                     <div className="cron-card-body">
@@ -112,14 +114,14 @@ const CronTaskCard: React.FC<{
                                             title: `${task.title || task.id} (${task.describeCronExpression})`,
                                             toolId: task.id,
                                         })}
-                                    >...省略了 {omitted} 行</div>
+                                    >{t('chat.omittedLines', { count: omitted })}</div>
                                 </>);
                             })()}
                         </pre>
                         {task.nextFireAt.length > 0 && (
                             <div className="cron-next-fire-section">
-                                <div className="task-detail-output-label">预计触发时间:</div>
-                                <pre className="task-detail-output">{task.nextFireAt.map(t => formatDateTime(t)).join('\n')}</pre>
+                                <div className="task-detail-output-label">{t('config.cron.nextFire')}</div>
+                                <pre className="task-detail-output">{task.nextFireAt.map(ts => formatDateTime(ts)).join('\n')}</pre>
                             </div>
                         )}
                     </div>
@@ -130,6 +132,7 @@ const CronTaskCard: React.FC<{
 };
 
 const CronTaskConfig: React.FC<CronTaskConfigProps> = ({ vscode, refreshTrigger, onCountChange }) => {
+    const t = useT();
     const [tasks, setTasks] = useState<CronTask[]>([]);
     const [loading, setLoading] = useState(false);
     const [refreshing, setRefreshing] = useState(false);
@@ -157,12 +160,12 @@ const CronTaskConfig: React.FC<CronTaskConfigProps> = ({ vscode, refreshTrigger,
                     break;
                 case 'enableCronTaskResult':
                     if (msg.success) {
-                        setTasks(prev => prev.map(t => t.id === msg.id ? { ...t, status: true } : t));
+                        setTasks(prev => prev.map(task => task.id === msg.id ? { ...task, status: true } : task));
                     }
                     break;
                 case 'disableCronTaskResult':
                     if (msg.success) {
-                        setTasks(prev => prev.map(t => t.id === msg.id ? { ...t, status: false } : t));
+                        setTasks(prev => prev.map(task => task.id === msg.id ? { ...task, status: false } : task));
                     }
                     break;
             }
@@ -198,7 +201,7 @@ const CronTaskConfig: React.FC<CronTaskConfigProps> = ({ vscode, refreshTrigger,
     };
 
     if (loading) {
-        return <div className="section-loading">加载中...</div>;
+        return <div className="section-loading">{t('common.loading')}</div>;
     }
 
     const renderTaskCard = (task: CronTask) => <CronTaskCard key={task.id} task={task} vscode={vscode} onDelete={handleDelete} onToggle={handleToggle} />;
@@ -208,7 +211,7 @@ const CronTaskConfig: React.FC<CronTaskConfigProps> = ({ vscode, refreshTrigger,
             <div className="section-groups">
                 <div className="section-group">
                     <div className="section-group-title">
-                        项目级 Crons
+                        {t('config.cron.group.project')}
                         <span className="section-group-count">(.sema/scheduled_tasks.json)</span>
                     </div>
                     {filteredTasks.length > 0 ? (
@@ -216,7 +219,7 @@ const CronTaskConfig: React.FC<CronTaskConfigProps> = ({ vscode, refreshTrigger,
                             {filteredTasks.map(task => renderTaskCard(task))}
                         </div>
                     ) : (
-                        <div className="section-empty">暂无定时任务</div>
+                        <div className="section-empty">{t('config.cron.empty')}</div>
                     )}
                 </div>
             </div>

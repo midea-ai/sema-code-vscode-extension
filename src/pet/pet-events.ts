@@ -1,5 +1,6 @@
 import { pet } from './pet-client';
 import { PetState } from './pet-types';
+import { t } from '../webview/common/i18n/core';
 
 /** 桌宠订阅的事件源（SemaSession 满足该接口） */
 interface PetEventSource {
@@ -7,11 +8,12 @@ interface PetEventSource {
   off(event: string, listener: (data: any) => void): unknown;
 }
 
+// 气泡文案按触发时的语言取值（不能做模块顶层常量，否则切换语言不生效）
 const ATTENTION_BUBBLES = {
-  permission: '需要权限确认，点我查看',
-  pick:       '我有点疑问，点我聊聊',
-  plan:       '计划写好啦，点我开干',
-} as const;
+  get permission() { return t('pet.permission'); },
+  get pick()       { return t('pet.pick'); },
+  get plan()       { return t('pet.plan'); },
+};
 
 /**
  * 状态优先级：桌宠只有一个，多会话并发时展示优先级最高的状态。

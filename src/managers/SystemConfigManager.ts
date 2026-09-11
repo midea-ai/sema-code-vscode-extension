@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import { UpdatableCoreConfig } from 'sema-core/types';
 import { defaultConfig } from '../webview/config/default/defaultConfig';
+import { setLang, t } from '../webview/common/i18n/core';
 
 /**
  * SystemConfigManager 类 - 管理系统配置的持久化存储
@@ -11,6 +12,15 @@ export class SystemConfigManager {
     private static readonly LEGACY_USE_TOOLS_KEY = 'sema.useTools';
     private context: vscode.ExtensionContext;
 
+    /**
+     * 按落盘配置初始化宿主侧界面语言。activate 早期（SystemConfigManager 尚未构造）也可调用，
+     * 保证宿主的通知 / 状态栏文案从一开始就是用户选定的语言。
+     */
+    public static initLang(context: vscode.ExtensionContext): void {
+        const stored = context.globalState.get<Record<string, any>>(SystemConfigManager.CONFIG_KEY);
+        setLang(stored?.lang ?? defaultConfig.lang);
+    }
+
     constructor(context: vscode.ExtensionContext) {
         this.context = context;
         // 一次性迁移：旧版本以白名单形式存储工具配置（key 不一致 + 升级后会导致全部禁用），
@@ -18,6 +28,12 @@ export class SystemConfigManager {
         if (this.context.globalState.get(SystemConfigManager.LEGACY_USE_TOOLS_KEY) !== undefined) {
             this.context.globalState.update(SystemConfigManager.LEGACY_USE_TOOLS_KEY, undefined);
         }
+        SystemConfigManager.initLang(context);
+    }
+
+    /** 当前界面语言（zh / en），供生成 webview HTML 时写入 <html lang> */
+    public getLang(): string {
+        return (this.getSystemConfig() as Record<string, any>).lang ?? defaultConfig.lang;
     }
 
     /**
@@ -64,10 +80,10 @@ export class SystemConfigManager {
     public async saveSystemConfig(config: UpdatableCoreConfig): Promise<void> {
         try {
             await this.context.globalState.update(SystemConfigManager.CONFIG_KEY, config);
-           // console.log('System config updated:', config);
+            setLang((config as Record<string, any>).lang ?? defaultConfig.lang);
         } catch (error) {
             console.error('Error saving system config:', error);
-            throw new Error(`保存系统配置失败: ${error instanceof Error ? error.message : '未知错误'}`);
+            throw new Error(t('host.saveConfigFailed', { error: error instanceof Error ? error.message : t('common.unknownError') }));
         }
     }
 
@@ -82,11 +98,10 @@ export class SystemConfigManager {
             const currentConfig = this.getSystemConfig();
             const newConfig = { ...currentConfig, [key]: value };
             await this.context.globalState.update(SystemConfigManager.CONFIG_KEY, newConfig);
-           // console.log(`System config updated: ${String(key)} =`, value);
-
+            if ((key as string) === 'lang') setLang(value);
         } catch (error) {
             console.error('Error saving system config by key:', error);
-            throw new Error(`保存系统配置失败: ${error instanceof Error ? error.message : '未知错误'}`);
+            throw new Error(t('host.saveConfigFailed', { error: error instanceof Error ? error.message : t('common.unknownError') }));
         }
     }
 
@@ -99,9 +114,10 @@ export class SystemConfigManager {
             const currentConfig = this.getSystemConfig() as Record<string, any>;
             const newConfig = { ...currentConfig, [key]: value };
             await this.context.globalState.update(SystemConfigManager.CONFIG_KEY, newConfig);
+            if (key === 'lang') setLang(value);
         } catch (error) {
             console.error('Error saving system config by key (raw):', error);
-            throw new Error(`保存系统配置失败: ${error instanceof Error ? error.message : '未知错误'}`);
+            throw new Error(t('host.saveConfigFailed', { error: error instanceof Error ? error.message : t('common.unknownError') }));
         }
     }
 
@@ -127,7 +143,7 @@ export class SystemConfigManager {
             await this.context.globalState.update(SystemConfigManager.DISABLED_TOOLS_KEY, disabledTools);
         } catch (error) {
             console.error('Error saving disabledTools config:', error);
-            throw new Error(`保存 disabledTools 配置失败: ${error instanceof Error ? error.message : '未知错误'}`);
+            throw new Error(t('host.saveDisabledToolsFailed', { error: error instanceof Error ? error.message : t('common.unknownError') }));
         }
     }
 

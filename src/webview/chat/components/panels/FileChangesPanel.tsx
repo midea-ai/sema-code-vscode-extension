@@ -3,7 +3,7 @@ import { VscodeApi, FileChange } from '../../types';
 import { CheckIcon, ToggleIcon, CancelCircleIcon } from '../ui/IconButton';
 import FileIcon from '../ui/FileIcon';
 import { hasTextSelection } from '../../utils/selection';
-
+import { useT } from '../../../common/i18n/react';
 
 interface FileChangesPanelProps {
     changes: FileChange[];
@@ -15,6 +15,7 @@ interface FileChangesPanelProps {
 }
 
 const FileChangesPanel: React.FC<FileChangesPanelProps> = ({ changes, vscode, onDiscardAll, onMarkAdopted, fileStateManager, onScrollToBottom }) => {
+    const t = useT();
     const [isExpanded, setIsExpanded] = useState(true);
 
     // 按完整路径对文件进行去重，保留最新的文件变更
@@ -88,10 +89,10 @@ const FileChangesPanel: React.FC<FileChangesPanelProps> = ({ changes, vscode, on
                             e.stopPropagation();
                             handleDiscardAll();
                         }}
-                        title="全部放弃"
+                        title={t('chat.fileChanges.discardAll')}
                     >
                         <CancelCircleIcon />
-                        全部放弃
+                        {t('chat.fileChanges.discardAll')}
                     </button>
                     <button
                         className="file-changes-action-btn adopted-btn"
@@ -99,10 +100,10 @@ const FileChangesPanel: React.FC<FileChangesPanelProps> = ({ changes, vscode, on
                             e.stopPropagation();
                             onMarkAdopted?.();
                         }}
-                        title="已采纳"
+                        title={t('chat.fileChanges.markAdopted')}
                     >
                         <CheckIcon />
-                        已采纳
+                        {t('chat.fileChanges.markAdopted')}
                     </button>
                 </div>
             </div>
@@ -152,7 +153,7 @@ const FileChangesPanel: React.FC<FileChangesPanelProps> = ({ changes, vscode, on
                                 )}
                                 <span
                                     className="file-change-discard-btn"
-                                    title="放弃此文件修改"
+                                    title={t('chat.fileChanges.discardFile')}
                                     onClick={(e) => {
                                         e.stopPropagation();
                                         vscode.postMessage({
@@ -162,7 +163,7 @@ const FileChangesPanel: React.FC<FileChangesPanelProps> = ({ changes, vscode, on
                                     }}
                                 >
                                     <CancelCircleIcon />
-                                    放弃
+                                    {t('chat.fileChanges.discard')}
                                 </span>
                             </div>
                         </div>

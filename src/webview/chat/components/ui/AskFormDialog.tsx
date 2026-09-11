@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { ToggleIcon } from './IconButton';
+import { useT } from '../../../common/i18n/react';
 
 export type PickOptionQuestion =
     | { type: 'radio'; id: string; label: string; required?: boolean; options: string[] }
@@ -129,6 +130,7 @@ const AskFormDialog: React.FC<AskFormDialogProps> = ({
     initialValues,
     status,
 }) => {
+    const t = useT();
     const [{ values: initValues, otherActive: initActive, otherText: initText }] = useState<AskFormState>(() =>
         buildInitialState(data.questions, initialValues)
     );
@@ -207,8 +209,8 @@ const AskFormDialog: React.FC<AskFormDialogProps> = ({
         for (const q of data.questions) {
             if (q.required && !isAnswered(q, finalValues[q.id])) {
                 newErrors[q.id] = isChoiceQuestion(q) && otherActive[q.id]
-                    ? '请填写 Other 内容'
-                    : '此项为必填';
+                    ? t('chat.askForm.otherRequired')
+                    : t('chat.askForm.required');
             }
         }
         if (Object.keys(newErrors).length > 0) {
@@ -229,7 +231,7 @@ const AskFormDialog: React.FC<AskFormDialogProps> = ({
                 type="text"
                 className="ask-form-text"
                 value={otherText[q.id] || ''}
-                placeholder="请输入其他内容..."
+                placeholder={t('chat.askForm.otherPlaceholder')}
                 disabled={readonly}
                 maxLength={OTHER_INPUT_MAX_LENGTH}
                 onChange={(e) => setOtherTextFor(q.id, e.target.value.slice(0, OTHER_INPUT_MAX_LENGTH))}
@@ -325,7 +327,7 @@ const AskFormDialog: React.FC<AskFormDialogProps> = ({
                             </button>
                             {max ? (
                                 <div className="ask-form-hint ask-form-hint-row">
-                                    最多选择 {max} 项（已选 {count}/{max}）
+                                    {t('chat.askForm.maxSelect', { max, count })}
                                 </div>
                             ) : null}
                         </div>
@@ -352,7 +354,7 @@ const AskFormDialog: React.FC<AskFormDialogProps> = ({
                                 }
                             }}
                         >
-                            <option value="">请选择...</option>
+                            <option value="">{t('chat.askForm.selectPlaceholder')}</option>
                             {q.options.map((opt, i) => (
                                 <option key={i} value={opt}>{opt}</option>
                             ))}
@@ -417,7 +419,7 @@ const AskFormDialog: React.FC<AskFormDialogProps> = ({
     };
 
     const answered = !!status;
-    const mainTitle = data.estimatedTime ? `快速确认（${data.estimatedTime}）` : '快速确认';
+    const mainTitle = data.estimatedTime ? t('chat.askForm.titleWithTime', { time: data.estimatedTime }) : t('chat.askForm.title');
 
     return (
         <div
@@ -428,7 +430,7 @@ const AskFormDialog: React.FC<AskFormDialogProps> = ({
             <div
                 className="ask-form-header"
                 onClick={() => setIsExpanded(prev => !prev)}
-                title={isExpanded ? '收起' : '展开'}
+                title={isExpanded ? t('common.collapse') : t('common.expand')}
             >
                 <span className="ask-form-toggle-icon">
                     <ToggleIcon isExpanded={isExpanded} />

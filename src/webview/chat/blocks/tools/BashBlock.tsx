@@ -5,6 +5,7 @@ import BaseBashContent from '../../components/ui/BaseBashContent';
 import { ToolContent } from '../../types';
 import { CONTINUATION_SYMBOL } from '../../utils/symbols';
 import { streamingStore } from '../../utils/StreamingStore';
+import { useT } from '../../../common/i18n/react';
 
 const MAX_VISIBLE_LINES = 2;
 
@@ -53,6 +54,7 @@ const processTerminalOutput = (text: string): string[] => {
 };
 
 const BashBlock: React.FC<BashBlockProps> = ({ content: toolContent, messageId, vscode, isLast = false }) => {
+    const t = useT();
     // console.log('BashBlock:', JSON.stringify(toolContent));
     const sessionId = useContext(SessionContext);
     // null = 用户未手动操作过，展开状态跟随「是否为最后一个块」；手动操作后钉住用户设的状态
@@ -156,7 +158,7 @@ const BashBlock: React.FC<BashBlockProps> = ({ content: toolContent, messageId, 
                     </div>
                 </div>
                 {command && (
-                    <div className="bash-copy-btn" onClick={handleCopy}>复制</div>
+                    <div className="bash-copy-btn" onClick={handleCopy}>{t('common.copy')}</div>
                 )}
             </div>
             {isExpanded && (
@@ -167,7 +169,7 @@ const BashBlock: React.FC<BashBlockProps> = ({ content: toolContent, messageId, 
                     {visibleLines.length > 0 && (
                         <>
                             {omittedCount > 0 && (
-                                <div className="bash-omitted-lines bash-omitted-lines-clickable" onClick={handleViewAll}>...省略了 {omittedCount} 行</div>
+                                <div className="bash-omitted-lines bash-omitted-lines-clickable" onClick={handleViewAll}>{t('chat.omittedLines', { count: omittedCount })}</div>
                             )}
                             <div className="bash-output">
                                 {visibleLines.map((line, i) => (

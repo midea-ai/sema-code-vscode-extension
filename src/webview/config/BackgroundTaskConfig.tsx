@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { CloseIcon } from './utils/svgIcons';
 import { formatDateTime } from './utils/timeUtils';
 import { VscodeApi } from './types';
+import { useT, t } from '../common/i18n/react';
 import './style/task.css';
 
 interface BackgroundTaskConfigProps {
@@ -54,7 +55,7 @@ const formatStartTime = (start: number) => {
     const DAY = 24 * 60 * 60 * 1000;
     if (diff >= DAY) {
         const days = Math.floor(diff / DAY);
-        return `${days}天前`;
+        return t('history.daysAgo', { n: days });
     }
     const d = new Date(start);
     const hh = String(d.getHours()).padStart(2, '0');
@@ -75,6 +76,7 @@ const RuntimeText: React.FC<{ start: number; end?: number; status: TaskStatus }>
 const MAX_LINES = 2;
 
 const BashOutputPanel: React.FC<{ taskId: string; command?: string; status: TaskStatus; vscode: VscodeApi }> = ({ taskId, command, status, vscode }) => {
+    const t = useT();
     const [output, setOutput] = useState('');
 
     useEffect(() => {
@@ -125,7 +127,7 @@ const BashOutputPanel: React.FC<{ taskId: string; command?: string; status: Task
             <div className="task-detail-output-label">Output:</div>
             <pre className="task-detail-output">
                 {omittedCount > 0 && (
-                    <div className="bash-omitted-lines bash-omitted-lines-clickable" onClick={handleViewAll}>...省略了 {omittedCount} 行</div>
+                    <div className="bash-omitted-lines bash-omitted-lines-clickable" onClick={handleViewAll}>{t('chat.omittedLines', { count: omittedCount })}</div>
                 )}
                 {visibleLines.join('\n')}
             </pre>
@@ -134,6 +136,7 @@ const BashOutputPanel: React.FC<{ taskId: string; command?: string; status: Task
 };
 
 const CommandPanel: React.FC<{ command: string; taskId: string; vscode: VscodeApi }> = ({ command, taskId, vscode }) => {
+    const t = useT();
     const handleViewAll = () => {
         vscode.postMessage({
             command: 'openBashOutput',
@@ -154,7 +157,7 @@ const CommandPanel: React.FC<{ command: string; taskId: string; vscode: VscodeAp
             <pre className="task-detail-output">
                 {visibleLines.join('\n')}
                 {omittedCount > 0 && (
-                    <div className="bash-omitted-lines bash-omitted-lines-clickable" onClick={handleViewAll}>...省略了 {omittedCount} 行</div>
+                    <div className="bash-omitted-lines bash-omitted-lines-clickable" onClick={handleViewAll}>{t('chat.omittedLines', { count: omittedCount })}</div>
                 )}
             </pre>
         </div>
@@ -162,6 +165,7 @@ const CommandPanel: React.FC<{ command: string; taskId: string; vscode: VscodeAp
 };
 
 const BackgroundTaskConfig: React.FC<BackgroundTaskConfigProps> = ({ vscode, refreshTrigger, onCountChange, initialTaskId, initialTaskNonce }) => {
+    const t = useT();
     const [tasks, setTasks] = useState<Map<string, TaskItem>>(new Map());
     const [selectedTaskId, setSelectedTaskId] = useState<string | null>(initialTaskId ?? null);
     const autoOpenAppliedRef = useRef<Set<string>>(new Set());
@@ -270,7 +274,7 @@ const BackgroundTaskConfig: React.FC<BackgroundTaskConfigProps> = ({ vscode, ref
     }, [refreshTrigger]);
 
     useEffect(() => {
-        onCountChange?.(Array.from(tasks.values()).filter(t => t.status === 'running').length);
+        onCountChange?.(Array.from(tasks.values()).filter(task => task.status === 'running').length);
     }, [tasks]);
 
     // Auto-open detail when only 1 task total
@@ -294,8 +298,8 @@ const BackgroundTaskConfig: React.FC<BackgroundTaskConfigProps> = ({ vscode, ref
         if (a.status !== 'running' && b.status === 'running') return 1;
         return b.startTime - a.startTime;
     });
-    const bashTasks = allTasks.filter(t => t.type === TASK_TYPE_SHELL);
-    const agentTasks = allTasks.filter(t => t.type === TASK_TYPE_AGENT);
+    const bashTasks = allTasks.filter(task => task.type === TASK_TYPE_SHELL);
+    const agentTasks = allTasks.filter(task => task.type === TASK_TYPE_AGENT);
     const selectedTask = selectedTaskId ? tasks.get(selectedTaskId) : null;
 
     const getTaskDisplayName = (task: TaskItem) => {
@@ -333,21 +337,21 @@ const BackgroundTaskConfig: React.FC<BackgroundTaskConfigProps> = ({ vscode, ref
     const renderBashDetail = (task: TaskItem) => (
         <div>
             <div className="task-detail-header">
-                <span className="task-detail-title">Shell 详情</span>
+                <span className="task-detail-title">{t('config.bgTask.shellDetail')}</span>
                 <button
                     className="section-icon-btn"
-                    title="Close"
+                    title={t('common.close')}
                     onClick={() => setSelectedTaskId(null)}
                 >
                     <CloseIcon />
                 </button>
             </div>
             <div className="task-detail-info">
-                <div><strong>任务:</strong> {task.taskId}</div>
-                <div><strong>状态:</strong> <span className={`task-status-text ${task.status}`}>{STATUS_LABELS[task.status]}</span></div>
-                <div><strong>已运行:</strong> <RuntimeText start={task.startTime} end={task.endTime} status={task.status} /></div>
+                <div><strong>{t('config.bgTask.task')}</strong> {task.taskId}</div>
+                <div><strong>{t('config.bgTask.status')}</strong> <span className={`task-status-text ${task.status}`}>{STATUS_LABELS[task.status]}</span></div>
+                <div><strong>{t('config.bgTask.elapsed')}</strong> <RuntimeText start={task.startTime} end={task.endTime} status={task.status} /></div>
                 {task.status !== 'running' && task.endTime && (
-                    <div style={{ color: 'var(--vscode-descriptionForeground)', fontSize: '11px', opacity: 0.8 }}>结束: {formatDateTime(task.endTime)}</div>
+                    <div style={{ color: 'var(--vscode-descriptionForeground)', fontSize: '11px', opacity: 0.8 }}>{t('config.bgTask.ended', { time: formatDateTime(task.endTime) })}</div>
                 )}
                 </div>
             <CommandPanel command={task.command || task.filepath} taskId={task.taskId} vscode={vscode} />
@@ -361,18 +365,18 @@ const BackgroundTaskConfig: React.FC<BackgroundTaskConfigProps> = ({ vscode, ref
                 <span className="task-detail-title">{getTaskDisplayName(task)}</span>
                 <button
                     className="section-icon-btn"
-                    title="Close"
+                    title={t('common.close')}
                     onClick={() => setSelectedTaskId(null)}
                 >
                     <CloseIcon />
                 </button>
             </div>
             <div className="task-detail-info">
-                <div><strong>任务:</strong> {task.taskId}</div>
-                <div><strong>状态:</strong> <span className={`task-status-text ${task.status}`}>{STATUS_LABELS[task.status]}</span></div>
-                <div><strong>已运行:</strong> <RuntimeText start={task.startTime} end={task.endTime} status={task.status} /></div>
+                <div><strong>{t('config.bgTask.task')}</strong> {task.taskId}</div>
+                <div><strong>{t('config.bgTask.status')}</strong> <span className={`task-status-text ${task.status}`}>{STATUS_LABELS[task.status]}</span></div>
+                <div><strong>{t('config.bgTask.elapsed')}</strong> <RuntimeText start={task.startTime} end={task.endTime} status={task.status} /></div>
                 {task.status !== 'running' && task.endTime && (
-                    <div style={{ color: 'var(--vscode-descriptionForeground)', opacity: 0.8 }}>结束: {formatDateTime(task.endTime)}</div>
+                    <div style={{ color: 'var(--vscode-descriptionForeground)', opacity: 0.8 }}>{t('config.bgTask.ended', { time: formatDateTime(task.endTime) })}</div>
                 )}
             </div>
             <div style={{ marginTop: 16, padding: '0 14px 14px' }}>
@@ -380,7 +384,7 @@ const BackgroundTaskConfig: React.FC<BackgroundTaskConfigProps> = ({ vscode, ref
                     className="task-view-detail-btn"
                     onClick={() => vscode.postMessage({ command: 'openAgentDetail', taskId: task.taskId })}
                 >
-                    任务详情
+                    {t('config.bgTask.viewDetail')}
                 </button>
             </div>
         </div>
@@ -410,7 +414,7 @@ const BackgroundTaskConfig: React.FC<BackgroundTaskConfigProps> = ({ vscode, ref
                     </div>
                     {bashTasks.length > 0
                         ? <div>{bashTasks.map(renderTaskRow)}</div>
-                        : <div className="section-empty">暂无 Shell 任务</div>
+                        : <div className="section-empty">{t('config.bgTask.noShell')}</div>
                     }
                 </div>
 
@@ -422,7 +426,7 @@ const BackgroundTaskConfig: React.FC<BackgroundTaskConfigProps> = ({ vscode, ref
                     </div>
                     {agentTasks.length > 0
                         ? <div>{agentTasks.map(renderTaskRow)}</div>
-                        : <div className="section-empty">暂无 Agent 任务</div>
+                        : <div className="section-empty">{t('config.bgTask.noAgent')}</div>
                     }
                 </div>
             </div>

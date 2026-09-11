@@ -6,7 +6,8 @@ import { Transport } from '../../chat/jb/transport';
  * - webviewReady → 拉列表并回 updateSessions
  * - loadSession  → 转 Kotlin（Kotlin 经 bus 推给聊天 webview 重放，即发即忘）
  * - deleteSession→ 转 Kotlin 删除，成功后经 gRPC 通知 core 清理历史文件，再刷新列表
- * Kotlin 主动推的 updateSessions（会话变化时）经 transport.appMessageHandler 灌回 App。
+ * Kotlin 主动推的 updateSessions（会话变化时）与 langUpdate（配置页改界面语言时，字段 lang）
+ * 均为 channel=editor 的 message 帧，经 transport.appMessageHandler 原样灌回 App（App 自己 setLang）。
  */
 export class HistoryController {
     constructor(private t: Transport, private postToApp: (msg: any) => void) {

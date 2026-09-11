@@ -1,8 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useT } from '../common/i18n/react';
 
 export interface IconSelectOption {
     value: string;
     label: string;
+    /** 收起后按钮上显示的文案，缺省用 label（用于列表带说明、收起只显示短名的场景） */
+    selectedLabel?: string;
     /** 选项前的图标，如 <ProviderLogo provider={key} className="icon-select-logo" /> */
     icon?: React.ReactNode;
     /** 禁用该选项（可见但不可选） */
@@ -28,6 +31,7 @@ const SEARCH_THRESHOLD = 10;
  * 外观对齐全局 select 样式，见 styles.css 中 .icon-select 相关规则
  */
 const IconSelect: React.FC<IconSelectProps> = ({ id, value, options, onChange, disabled, placeholder }) => {
+    const t = useT();
     const [open, setOpen] = useState(false);
     const [filter, setFilter] = useState('');
     const wrapperRef = useRef<HTMLDivElement>(null);
@@ -77,7 +81,7 @@ const IconSelect: React.FC<IconSelectProps> = ({ id, value, options, onChange, d
                 onClick={toggleOpen}
             >
                 {current?.icon}
-                <span className="icon-select-name">{current?.label ?? (value || placeholder || '')}</span>
+                <span className="icon-select-name">{current ? (current.selectedLabel ?? current.label) : (value || placeholder || '')}</span>
             </button>
             {open && (
                 <div className="icon-select-menu">
@@ -87,7 +91,7 @@ const IconSelect: React.FC<IconSelectProps> = ({ id, value, options, onChange, d
                                 type="text"
                                 autoFocus
                                 value={filter}
-                                placeholder="搜索..."
+                                placeholder={t('config.iconSelect.searchPlaceholder')}
                                 onChange={(e) => setFilter(e.target.value)}
                                 onKeyDown={(e) => {
                                     if (e.key === 'Escape') {
@@ -102,7 +106,7 @@ const IconSelect: React.FC<IconSelectProps> = ({ id, value, options, onChange, d
                         </div>
                     )}
                     {visibleOptions.length === 0 && (
-                        <div className="icon-select-empty">无匹配选项</div>
+                        <div className="icon-select-empty">{t('config.iconSelect.noMatch')}</div>
                     )}
                     {visibleOptions.map(opt => (
                         <div

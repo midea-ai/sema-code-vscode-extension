@@ -12,6 +12,7 @@ import { getMcpServerName, getToolName, getToolTitle, isExploratoryShellCommand,
 import { formatSearchTitle } from './utils';
 import { hasTextSelection } from '../../utils/selection';
 import PubBlock from './PubBlock';
+import { useT } from '../../../common/i18n/react';
 
 interface GroupedToolBlockProps {
     messages: Message[];
@@ -255,6 +256,7 @@ const CollapsibleResultRow: React.FC<{
     toolId?: string;
     vscode?: any;
 }> = ({ label, title, tooltip, content, summary, toolId = '', vscode }) => {
+    const t = useT();
     const [isExpanded, setIsExpanded] = useState(false);
     const command = title ? `${label} ${title}` : label;
     const formattedContent = [
@@ -289,7 +291,7 @@ const CollapsibleResultRow: React.FC<{
             {isExpanded && (
                 <div className="chat-block-content grouped-result-content">
                     {omittedCount > 0 && (
-                        <div className="bash-omitted-lines bash-omitted-lines-clickable" onClick={handleViewAll}>{`...\u7701\u7565\u4e86 ${omittedCount} \u884c`}</div>
+                        <div className="bash-omitted-lines bash-omitted-lines-clickable" onClick={handleViewAll}>{t('chat.omittedLines', { count: omittedCount })}</div>
                     )}
                     {visibleLines.join('\n')}
                 </div>
