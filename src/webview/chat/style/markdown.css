@@ -31,9 +31,9 @@
   vertical-align: baseline;
 }
 
-/* 内联代码样式 - `代码` 变色 + 淡背景 */
+/* 内联代码样式 - `代码` 正文色 + 淡背景；高亮色只留给可点的文件路径 / 链接，避免三者混淆 */
 .markdown-content .inline-code {
-  color: var(--chat-text-symbol);
+  color: inherit;
   background: var(--chat-bg-hover);
   padding: 0.1em 0.35em;
   border-radius: var(--chat-radius-sm);
