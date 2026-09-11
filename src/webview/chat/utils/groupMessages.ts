@@ -14,6 +14,8 @@ export type RenderItem =
 interface GroupMessagesOptions {
     streamingToolId?: string | null;
     showThinkingText?: boolean;
+    /** 列表末尾之后是否已有其它渲染内容（如下一轮用户输入），为 true 时末尾的终端命令也可折叠 */
+    tailClosed?: boolean;
 }
 
 interface RunItem {
@@ -123,9 +125,18 @@ export const getMcpServerName = (message: Message): string | null => {
     return parseMcpToolName(toolName).mcpName || null;
 };
 
+/** 非探索类的终端命令（ls/find/pwd 等归探索组，不算在内） */
+export const isShellRunMessage = (message: Message): boolean => {
+    return message.type === 'tool'
+        && getToolName(message) === TOOL_NAME_RUN_SHELL
+        && getGroupableToolKind(message) === null;
+};
+
+const SHELL_RUN_KEY = 'shell';
+
 /**
  * 可分组消息的 run key：相邻消息 key 相同才会合并进同一组。
- * 探索类工具统一为 'explore'，MCP 工具按服务名区分为 'mcp:<服务名>'。
+ * 探索类工具统一为 'explore'，MCP 工具按服务名区分为 'mcp:<服务名>'，其余终端命令为 'shell'。
  */
 const getRunKey = (message: Message): string | null => {
     if (message.type !== 'tool') {
@@ -142,11 +153,23 @@ const getRunKey = (message: Message): string | null => {
         return 'explore';
     }
 
+    if (isShellRunMessage(message)) {
+        return SHELL_RUN_KEY;
+    }
+
     return null;
 };
 
 const isStreamingToolMessage = (message: Message, streamingToolId?: string | null): boolean => {
     return message.content?.completed === false || (!!streamingToolId && message.id === streamingToolId);
+};
+
+const hasVisibleAssistantBody = (message: Message, showThinkingText: boolean): boolean => {
+    const content = message.content?.content;
+    const reasoning = message.reasoning;
+    const hasContent = !!(content && content.trim().length > 0);
+    const hasVisibleReasoning = showThinkingText && !!(reasoning && reasoning.trim().length > 0);
+    return hasContent || hasVisibleReasoning;
 };
 
 const isInvisibleCompletedAssistantMessage = (
@@ -157,11 +180,22 @@ const isInvisibleCompletedAssistantMessage = (
         return false;
     }
 
-    const content = message.content?.content;
-    const reasoning = message.reasoning;
-    const hasContent = !!(content && content.trim().length > 0);
-    const hasVisibleReasoning = showThinkingText && !!(reasoning && reasoning.trim().length > 0);
-    return !hasContent && !hasVisibleReasoning;
+    return !hasVisibleAssistantBody(message, showThinkingText);
+};
+
+/**
+ * 流式中、尚无可见正文/思考的 assistant 消息：还不算「后面已有渲染内容」。
+ * 若它最终无正文结束并接着新的终端命令，终端组应继续累积，避免先折叠再展开的闪动。
+ */
+const isPendingEmptyAssistantMessage = (
+    message: Message,
+    showThinkingText = true,
+): boolean => {
+    if (message.type !== 'assistant' || message.content?.completed !== false) {
+        return false;
+    }
+
+    return !hasVisibleAssistantBody(message, showThinkingText);
 };
 
 const toMessageItems = (run: RunItem[]): RenderItem[] => {
@@ -172,9 +206,15 @@ const toMessageItems = (run: RunItem[]): RenderItem[] => {
     }));
 };
 
+/**
+ * @param closed run 之后是否已有其它渲染内容。终端组只在 closed 时折叠：
+ * 末尾还可能继续追加的终端命令逐条展示，数量不再变化后才收成 Ran N commands
+ */
 const flushRun = (
     items: RenderItem[],
     run: RunItem[],
+    runKey: string | null,
+    closed: boolean,
     streamingToolId?: string | null,
 ): void => {
     if (run.length === 0) {
@@ -182,7 +222,7 @@ const flushRun = (
     }
 
     const hasStreamingTool = run.some(({ message }) => isStreamingToolMessage(message, streamingToolId));
-    if (run.length < 2 || hasStreamingTool) {
+    if (run.length < 2 || hasStreamingTool || (runKey === SHELL_RUN_KEY && !closed)) {
         items.push(...toMessageItems(run));
         return;
     }
@@ -210,7 +250,7 @@ export const groupMessages = (
         if (key !== null) {
             // 相邻但 key 不同（如 explore → mcp:xxx，或不同 MCP 服务）时先切段
             if (runKey !== null && runKey !== key) {
-                flushRun(items, run, options.streamingToolId);
+                flushRun(items, run, runKey, true, options.streamingToolId);
                 run = [];
             }
             runKey = key;
@@ -222,13 +262,14 @@ export const groupMessages = (
             return;
         }
 
-        flushRun(items, run, options.streamingToolId);
+        const closed = !isPendingEmptyAssistantMessage(message, options.showThinkingText);
+        flushRun(items, run, runKey, closed, options.streamingToolId);
         run = [];
         runKey = null;
         items.push({ kind: 'message', message, originalIndex: index });
     });
 
-    flushRun(items, run, options.streamingToolId);
+    flushRun(items, run, runKey, !!options.tailClosed, options.streamingToolId);
 
     return items;
 };

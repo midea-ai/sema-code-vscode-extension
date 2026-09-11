@@ -8,10 +8,11 @@ import {
     TOOL_NAME_SEARCH_FILES,
     TOOL_NAME_VIEW_FILE,
 } from '../../../../utils/tool';
-import { getMcpServerName, getToolName, getToolTitle, isExploratoryShellCommand, isFindShellCommand, isLsShellCommand, isPwdShellCommand } from '../../utils/groupMessages';
+import { getMcpServerName, getToolName, getToolTitle, isExploratoryShellCommand, isFindShellCommand, isLsShellCommand, isPwdShellCommand, isShellRunMessage } from '../../utils/groupMessages';
 import { formatSearchTitle } from './utils';
 import { hasTextSelection } from '../../utils/selection';
 import PubBlock from './PubBlock';
+import BashBlock from './BashBlock';
 import { useT } from '../../../common/i18n/react';
 
 interface GroupedToolBlockProps {
@@ -82,6 +83,9 @@ export const getGroupTitle = (messages: Message[]): string => {
     const mcpServerName = messages.length > 0 ? getMcpServerName(messages[0]) : null;
     if (mcpServerName) {
         return `Called ${mcpServerName} ${formatCount(messages.length, 'time', 'times')}`;
+    }
+    if (messages.length > 0 && isShellRunMessage(messages[0])) {
+        return `Ran ${formatCount(messages.length, 'command', 'commands')}`;
     }
     return `Explored ${formatCount(messages.length, 'tool', 'tools')}`;
 };
@@ -407,6 +411,33 @@ const GroupedMcpToolBlock: React.FC<GroupedToolBlockProps & { serverName: string
     );
 };
 
+/** 连续终端命令组：标题为 Ran N commands，展开后逐条复用 BashBlock */
+const GroupedShellToolBlock: React.FC<GroupedToolBlockProps> = ({ messages, vscode }) => {
+    const [isExpanded, setIsExpanded] = useState(false);
+
+    const count = useMemo(() => formatCount(messages.length, 'command', 'commands'), [messages]);
+
+    return (
+        <div className="chat-block chat-block--borderless grouped-tool-block">
+            <div className="chat-block-header grouped-tool-header" onClick={() => setIsExpanded(prev => !prev)}>
+                <div className="chat-block-title">
+                    <span className="chat-block-title-label"><strong>Ran</strong> <span className="grouped-tool-muted-text">{count}</span></span>
+                    <div className="grouped-tool-toggle-btn">
+                        <ToggleIcon isExpanded={isExpanded} />
+                    </div>
+                </div>
+            </div>
+            {isExpanded && (
+                <div className="chat-block-content grouped-tool-content">
+                    {messages.map(message => (
+                        <BashBlock key={message.id} content={message.content} messageId={message.id} vscode={vscode} />
+                    ))}
+                </div>
+            )}
+        </div>
+    );
+};
+
 const GroupedExploreToolBlock: React.FC<GroupedToolBlockProps> = ({ messages, vscode }) => {
     const [isExpanded, setIsExpanded] = useState(false);
 
@@ -451,11 +482,14 @@ const GroupedExploreToolBlock: React.FC<GroupedToolBlockProps> = ({ messages, vs
     );
 };
 
-/** 按组内首条消息判定分组类型：同一 MCP 服务的连续调用走 MCP 组，其余走探索组 */
+/** 按组内首条消息判定分组类型：同一 MCP 服务的连续调用走 MCP 组，连续终端命令走终端组，其余走探索组 */
 const GroupedToolBlock: React.FC<GroupedToolBlockProps> = ({ messages, vscode }) => {
     const mcpServerName = messages.length > 0 ? getMcpServerName(messages[0]) : null;
     if (mcpServerName) {
         return <GroupedMcpToolBlock messages={messages} serverName={mcpServerName} vscode={vscode} />;
+    }
+    if (messages.length > 0 && isShellRunMessage(messages[0])) {
+        return <GroupedShellToolBlock messages={messages} vscode={vscode} />;
     }
     return <GroupedExploreToolBlock messages={messages} vscode={vscode} />;
 };

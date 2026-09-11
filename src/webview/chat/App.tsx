@@ -877,9 +877,10 @@ const ChatSession: React.FC<ChatSessionProps> = ({ vscode: rawVscode, sessionId,
             }
         }
 
-        return groups.map(group => (
+        // 非最后一轮后面已有下一轮的用户输入，轮末的终端命令数量不会再变，可以折叠成组
+        return groups.map((group, gi) => (
             <div key={group.key} className="turn-group">
-                {groupMessages(group.items.map(item => item.message), { streamingToolId, showThinkingText: shouldShowThinkingText }).map((item) => {
+                {groupMessages(group.items.map(item => item.message), { streamingToolId, showThinkingText: shouldShowThinkingText, tailClosed: gi < groups.length - 1 }).map((item) => {
                     if (item.kind === 'group') {
                         return (
                             <div key={item.id} className="msg-wrap">
