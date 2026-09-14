@@ -11,12 +11,17 @@ import { AgentConfig } from './types/agent';
 import { CommandConfig } from './types/command';
 import type { ClawCoordinator } from '../../claw/coordinator';
 import { t, getLang, normalizeLang } from '../common/i18n/core';
+import { BrowserControlManager } from '../../managers/BrowserControlManager';
+
+/** 仅落宿主本地、不推 sema-core 的系统配置键（对齐 semaProcessWrapper.LOCAL_SYSTEM_CONFIG_KEYS） */
+const LOCAL_SYSTEM_CONFIG_KEYS = new Set(['enablePet', 'showThinkingText', 'defaultPermissionLevel', 'enableBrowserControl']);
 
 export class ConfigWebviewProvider {
     private panel?: vscode.WebviewPanel;
     private coreManager: any;
     private fileOperationManager: any;
     private clawCoordinator?: ClawCoordinator;
+    private browserControl?: BrowserControlManager;
     private mcpStatusHandler?: (data: any) => void;
     private cronUpdateHandler?: () => void;
     private taskWatcherMap: Map<string, () => void> = new Map();
@@ -45,6 +50,8 @@ export class ConfigWebviewProvider {
     public show(extensionUri: vscode.Uri, page?: string, taskId?: string) {
         this.pendingPage = page;
         this.pendingTaskId = taskId;
+        // 需要扩展根路径定位 assets/chrome/，构造时拿不到，首次 show 时创建
+        this.browserControl ??= new BrowserControlManager(this.coreManager, extensionUri.fsPath);
         if (this.panel) {
             this.panel.reveal(vscode.ViewColumn.One);
             this.navigateTo(page || 'models', taskId);
@@ -85,6 +92,7 @@ export class ConfigWebviewProvider {
                 saveSystemConfig:           () => this.saveSystemConfig(m.data),
                 saveSystemConfigByKey:      () => this.saveSystemConfigByKey(m.key, m.value),
                 resetSystemConfig:          () => this.resetSystemConfig(),
+                setBrowserControl:          () => this.setBrowserControl(!!m.enabled),
                 openExternal:               () => Promise.resolve(this.openExternalUrl(m.url)),
                 loadSystemTools:            () => this.loadSystemTools(),
                 updateDisabledTools:        () => this.updateDisabledTools(m.disabledTools),
@@ -434,8 +442,8 @@ export class ConfigWebviewProvider {
 
     private async saveSystemConfigByKey(key: string, value: any) {
         await this.execute('saveSystemConfigByKeyResult', t('host.cfg.op.saveSystem'), async () => {
-            // enablePet/showThinkingText/defaultPermissionLevel 是扩展端本地字段，不应推给 sema-core
-            if (key === 'enablePet' || key === 'showThinkingText' || key === 'defaultPermissionLevel') {
+            // 扩展端本地字段（见 LOCAL_SYSTEM_CONFIG_KEYS）不应推给 sema-core
+            if (LOCAL_SYSTEM_CONFIG_KEYS.has(key)) {
                 await this.coreManager.saveLocalSystemConfigByKey(key, value);
             } else {
                 await this.coreManager.updateSystemConfigByKey(key, value);
@@ -449,9 +457,14 @@ export class ConfigWebviewProvider {
     private async resetSystemConfig() {
         if (!await this.confirm(t('host.cfg.resetConfirm'), t('host.cfg.resetLabel'))) return;
         await this.execute('resetSystemConfigResult', t('host.cfg.op.resetSystem'), async () => {
-            // 重置不改界面语言：lang 保留当前值，customRules 取当前语言对应的默认规则，其余字段回默认
-            const lang = normalizeLang((this.coreManager.getSystemConfig() as Record<string, any>).lang);
-            const resetConfig = { ...defaultConfig, lang, customRules: DEFAULT_CUSTOM_RULES[lang] };
+            // 重置不改界面语言：lang 保留当前值，customRules 取当前语言对应的默认规则，其余字段回默认。
+            // enableBrowserControl 只允许由 BrowserControlManager 在动作成功后写入，重置时保留当前值，避免键与实际 skill/MCP 状态脱节
+            const current = this.coreManager.getSystemConfig() as Record<string, any>;
+            const lang = normalizeLang(current.lang);
+            const resetConfig = {
+                ...defaultConfig, lang, customRules: DEFAULT_CUSTOM_RULES[lang],
+                enableBrowserControl: !!current.enableBrowserControl
+            };
             await this.coreManager.updateSystemConfig(resetConfig);
             this.postMessage({ command: 'resetSystemConfigResult', success: true, data: resetConfig, message: t('host.cfg.systemReset') });
             this.onSystemConfigChanged?.('skipFileEditPermission', defaultConfig.skipFileEditPermission);
@@ -459,6 +472,28 @@ export class ConfigWebviewProvider {
             this.onSystemConfigChanged?.('showThinkingText', defaultConfig.showThinkingText);
             this.onSystemConfigChanged?.('enablePet', defaultConfig.enablePet);
         });
+    }
+
+    // ─── Browser control ─────────────────────────────────────────────────────
+
+    /**
+     * 浏览器控制开关：由 BrowserControlManager 串行执行补齐/删除 skill 与 MCP，成功后才落 enableBrowserControl。
+     * 回传 enabled：成功为目标值，失败为原值（页面据此回弹）。
+     */
+    private async setBrowserControl(enabled: boolean) {
+        const previous = !!(this.coreManager.getSystemConfig() as Record<string, any>)?.enableBrowserControl;
+        try {
+            await this.ensureCoreReady();
+            if (!this.browserControl) throw new Error(t('host.cfg.coreNotReady'));
+            const result = await this.browserControl.setEnabled(enabled);
+            this.postMessage({ command: 'setBrowserControlResult', success: true, enabled: result });
+        } catch (error) {
+            const message = error instanceof Error ? error.message : t('common.unknownError');
+            console.error('Error setBrowserControl:', error);
+            const text = t('host.cfg.opFailed', { op: t('host.cfg.op.browserControl'), error: message });
+            this.postMessage({ command: 'setBrowserControlResult', success: false, enabled: previous, message: text });
+            vscode.window.showErrorMessage(text);
+        }
     }
 
     // ─── Tools ────────────────────────────────────────────────────────────────

@@ -855,6 +855,24 @@ button.small {
     cursor: not-allowed;
 }
 
+/* 浏览器控制：开关下方一行状态 / 安装入口（正在启用… / 需安装 [Chrome 扩展]，链接挂在扩展名上） */
+.browser-control-hint {
+    margin-top: 6px;
+    font-size: 12px;
+    line-height: 1.4;
+    color: var(--vscode-descriptionForeground);
+}
+
+.browser-control-hint-link {
+    color: var(--vscode-textLink-foreground);
+    text-decoration: none;
+    cursor: pointer;
+}
+
+.browser-control-hint-link:hover {
+    text-decoration: underline;
+}
+
 .claw-display-section {
     margin-bottom: 0;
 }

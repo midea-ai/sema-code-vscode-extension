@@ -40,5 +40,6 @@ export const defaultConfig = {
     enableToolSearch: true,
     enableInputPrediction: true,
     enablePet: false,
+    enableBrowserControl: false,
     defaultPermissionLevel: 'Ask'
 };

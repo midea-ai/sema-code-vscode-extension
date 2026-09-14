@@ -27,8 +27,12 @@ interface SystemConfigData {
     enableToolSearch?: boolean;
     enableInputPrediction?: boolean;
     enablePet?: boolean;
+    enableBrowserControl?: boolean;
     defaultPermissionLevel?: string;
 }
+
+/** Chrome 扩展商店页（Sema Browser Control） */
+const CHROME_EXTENSION_STORE_URL = 'https://chromewebstore.google.com/detail/pjofgjgagohldpbcnkgnfjeehealejie';
 
 /** 可选的默认权限档位（与输入框权限菜单一致），descKey 为说明文案 key，渲染期取值 */
 const PERMISSION_LEVEL_OPTIONS: Array<{ value: string; descKey: I18nKey }> = [
@@ -51,6 +55,9 @@ const SystemConfig: React.FC<SystemConfigProps> = ({ vscode }) => {
     const petSupported = platform === 'darwin' || platform === 'win32' || platform === 'linux';
     const thinkingEnabled = config.thinking || false;
     const showThinkingText = config.showThinkingText ?? true;
+    // 浏览器控制：win32 不支持（disabled），linux 实验性；执行中禁用开关等宿主回结果
+    const browserControlSupported = platform !== 'win32';
+    const [browserControlBusy, setBrowserControlBusy] = useState<false | 'enabling' | 'disabling'>(false);
 
     // 字符计数状态
     const [systemPromptCount, setSystemPromptCount] = useState(0);
@@ -107,6 +114,19 @@ const SystemConfig: React.FC<SystemConfigProps> = ({ vscode }) => {
                         // 使用 msg.value 更新已保存的配置
                         setSavedConfig(prev => ({ ...prev, [msg.key]: msg.value }));
                     } else {
+                        setMessage({
+                            text: `✗ ${msg.message || t('config.system.saveFailed')}`,
+                            type: 'error'
+                        });
+                        setTimeout(() => setMessage(null), 3000);
+                    }
+                    break;
+                case 'setBrowserControlResult':
+                    // 成功 enabled 为目标值，失败为原值：统一按 enabled 回填即可实现回弹
+                    setBrowserControlBusy(false);
+                    setConfig(prev => ({ ...prev, enableBrowserControl: !!msg.enabled }));
+                    setSavedConfig(prev => ({ ...prev, enableBrowserControl: !!msg.enabled }));
+                    if (!msg.success) {
                         setMessage({
                             text: `✗ ${msg.message || t('config.system.saveFailed')}`,
                             type: 'error'
@@ -197,6 +217,13 @@ const SystemConfig: React.FC<SystemConfigProps> = ({ vscode }) => {
         if (isDefaultRules) {
             saveConfigByKey('customRules', DEFAULT_CUSTOM_RULES[lang]);
         }
+    };
+
+    /** 浏览器控制开关：不走 saveSystemConfigByKey，发「执行动作」消息，配置键由宿主在动作成功后写入 */
+    const handleBrowserControlChange = (enabled: boolean) => {
+        if (browserControlBusy || !browserControlSupported) return;
+        setBrowserControlBusy(enabled ? 'enabling' : 'disabling');
+        vscode.postMessage({ command: 'setBrowserControl', enabled });
     };
 
     const handleReset = () => {
@@ -350,6 +377,53 @@ const SystemConfig: React.FC<SystemConfigProps> = ({ vscode }) => {
                     </div>
                 </div>
             </div>
+
+            {/* 集成（JB 不渲染） */}
+            {!IS_JB && (
+                <div className="config-section">
+                    <h3 className="config-section-title">{t('config.system.integrations')}</h3>
+                    <div className="form-row">
+                        <div className="form-group">
+                            <label
+                                className={`checkbox-label${browserControlSupported ? '' : ' disabled'}`}
+                                title={t('config.system.browserControlTip')}
+                                style={browserControlBusy ? { cursor: 'progress' } : undefined}
+                            >
+                                <input
+                                    type="checkbox"
+                                    checked={browserControlSupported && (config.enableBrowserControl || false)}
+                                    disabled={!browserControlSupported || !!browserControlBusy}
+                                    onChange={(e) => handleBrowserControlChange(e.target.checked)}
+                                />
+                                <span className="checkmark"></span>
+                                {t('config.system.browserControl')}
+                                {!browserControlSupported && t('config.system.browserControlUnsupportedSuffix')}
+                                {platform === 'linux' && t('config.system.browserControlExperimentalSuffix')}
+                            </label>
+                            {browserControlBusy && (
+                                <div className="browser-control-hint">
+                                    {browserControlBusy === 'enabling'
+                                        ? t('config.system.browserControlEnabling')
+                                        : t('config.system.browserControlDisabling')}
+                                </div>
+                            )}
+                            {!browserControlBusy && browserControlSupported && config.enableBrowserControl && (
+                                <div className="browser-control-hint">
+                                    {t('config.system.browserControlInstallPrefix')}
+                                    <a
+                                        href="#"
+                                        className="browser-control-hint-link"
+                                        onClick={(e) => { e.preventDefault(); vscode.postMessage({ command: 'openExternal', url: CHROME_EXTENSION_STORE_URL }); }}
+                                    >
+                                        {t('config.system.browserControlInstallLink')}
+                                    </a>
+                                    {t('config.system.browserControlInstallSuffix')}
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* 开关配置 */}
             <div className="config-section">
