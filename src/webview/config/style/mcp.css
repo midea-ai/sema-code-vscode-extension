@@ -243,6 +243,33 @@
     gap: 16px;
 }
 
+/* 手动添加弹窗：写入位置单选行 */
+.mcp-scope-row {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-top: 10px;
+    font-size: var(--s-font-base);
+}
+
+.mcp-scope-label {
+    color: var(--vscode-descriptionForeground);
+    flex-shrink: 0;
+}
+
+.mcp-scope-option {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin: 0;
+    cursor: pointer;
+}
+
+.mcp-json-editor::placeholder {
+    color: var(--vscode-input-placeholderForeground);
+    opacity: 0.7;
+}
+
 /* 市场列表 */
 .mcp-market-list {
     display: flex;

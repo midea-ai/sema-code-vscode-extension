@@ -238,6 +238,13 @@ export const zh = {
     'config.mcp.systemTools': '系统工具',
     'config.mcp.empty': '暂无 MCP 服务',
     'config.mcp.searchPlaceholder': '搜索 MCP 服务...',
+    'config.mcp.manualAdd': '手动添加',
+    'config.mcp.manualAddTip': '粘贴 MCP 服务的 JSON 配置手动添加',
+    'config.mcp.manualAddTitle': '手动添加 MCP',
+    'config.mcp.scopeLabel': '位置：',
+    'config.mcp.scopeProject': '项目级（默认）',
+    'config.mcp.scopeUser': '用户级',
+    'config.mcp.err.nameExists': '已存在名为 {name} 的 MCP 服务，请改用其它名称',
 
     // ── 配置页：插件 ──
     'config.plugin.group.local': '本地 Plugins',

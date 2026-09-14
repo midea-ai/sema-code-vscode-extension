@@ -237,6 +237,13 @@ export const en: Record<keyof typeof zh, string> = {
     'config.mcp.systemTools': 'System tools',
     'config.mcp.empty': 'No MCP servers',
     'config.mcp.searchPlaceholder': 'Search MCP servers...',
+    'config.mcp.manualAdd': 'Add manually',
+    'config.mcp.manualAddTip': 'Paste an MCP server JSON config to add it manually',
+    'config.mcp.manualAddTitle': 'Add MCP manually',
+    'config.mcp.scopeLabel': 'Location:',
+    'config.mcp.scopeProject': 'Project (default)',
+    'config.mcp.scopeUser': 'User',
+    'config.mcp.err.nameExists': 'An MCP server named {name} already exists, please use another name',
 
     // ── config: plugins ──
     'config.plugin.group.local': 'Local plugins',

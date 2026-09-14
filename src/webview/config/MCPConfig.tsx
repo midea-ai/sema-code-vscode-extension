@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { VscodeApi, ToolInfo, SystemToolInfo } from './types';
 import { MCPServerInfo, MCPServerConfig, MCPScopeType } from './types/mcp';
-import { ExpandArrowIcon, RefreshIcon, EditIcon, TrashIcon, CloseIcon, GearIcon, GitHubIcon, WarningCircleIcon, ChevronLeftIcon, ChevronRightIcon } from './utils/svgIcons';
+import { ExpandArrowIcon, RefreshIcon, EditIcon, TrashIcon, CloseIcon, GearIcon, GitHubIcon, WarningCircleIcon, ChevronLeftIcon, ChevronRightIcon, PlusIcon } from './utils/svgIcons';
 import { defaultMCPMarketInfos, MCPMarketInfo } from './default/defaultMCPMarket';
 import { inlineSvgIcons } from './utils/mcpIcon';
 import { initialBgColors, hashString } from './utils/iconUtils';
@@ -38,6 +38,17 @@ const GROUP_ACTIONS: Record<MCPGroupScope, { canEdit: boolean; canDelete: boolea
 
 const MAX_TOOL_COUNT = 30;
 const TOOLS_PAGE_SIZE = 8;
+
+// 「手动添加」弹窗编辑器为空时展示的示例（仅作 placeholder，不写入内容）
+const MANUAL_ADD_PLACEHOLDER = `{
+  "mcpServers": {
+    "server-name": {
+      "transport": "stdio",
+      "command": "npx",
+      "args": ["-y", "package-name"]
+    }
+  }
+}`;
 
 const statusColors: Record<string, string> = {
     disconnected: '#6b7280',
@@ -288,30 +299,43 @@ const SystemToolsCard: React.FC<{
 
 // ─── MCPEditModal ─────────────────────────────────────────────────────────────
 
+type MCPEditMode = 'edit' | 'add';
+type MCPAddScope = 'project' | 'user';
+
 const MCPEditModal: React.FC<{
     server: MCPServerInfo | null;
     scope: MCPGroupScope;
     require?: Record<string, string>;
+    /** add 模式：标题改为手动添加，弹窗内可切换作用域，并校验与已安装服务重名 */
+    mode?: MCPEditMode;
+    installedNames?: Set<string>;
     onClose: () => void;
     onSave: (config: MCPServerConfig, scope: MCPGroupScope) => void;
     vscode: VscodeApi;
     isSaving?: boolean;
-}> = ({ server, scope, require, onClose, onSave, vscode, isSaving }) => {
+}> = ({ server, scope: initialScope, require, mode = 'edit', installedNames, onClose, onSave, vscode, isSaving }) => {
     const t = useT();
     const [jsonText, setJsonText] = useState('');
     const [error, setError] = useState<string | null>(null);
+    const [scope, setScope] = useState<MCPGroupScope>(initialScope);
 
-    const showNpxHint = useMemo(() => {
-        if (!server) return false;
-        const cmd = server.config.command?.toLowerCase();
-        return cmd === 'npx' || cmd?.endsWith('/npx');
-    }, [server]);
+    useEffect(() => { setScope(initialScope); }, [initialScope]);
 
-    const showUvxHint = useMemo(() => {
-        if (!server) return false;
-        const cmd = server.config.command?.toLowerCase();
-        return cmd === 'uvx' || cmd?.endsWith('/uvx');
-    }, [server]);
+    // 根据编辑器当前内容解析 command，用户改成 uvx/npx 时环境提示实时跟随
+    const currentCommand = useMemo(() => {
+        try {
+            const parsed = JSON.parse(jsonText);
+            const servers = parsed?.mcpServers;
+            if (!servers || typeof servers !== 'object') return '';
+            const first = Object.values(servers)[0] as any;
+            return typeof first?.command === 'string' ? first.command.toLowerCase() : '';
+        } catch {
+            return '';
+        }
+    }, [jsonText]);
+
+    const showNpxHint = currentCommand === 'npx' || currentCommand.endsWith('/npx');
+    const showUvxHint = currentCommand === 'uvx' || currentCommand.endsWith('/uvx');
 
     const checkRequirePlaceholders = (config: MCPServerConfig, requireKeys: string[]): string[] => {
         const unreplacedKeys: string[] = [];
@@ -325,12 +349,15 @@ const MCPEditModal: React.FC<{
     };
 
     useEffect(() => {
-        if (server) {
+        if (!server) return;
+        if (mode === 'add') {
+            setJsonText('');
+        } else {
             const { name, ...restConfig } = server.config;
             setJsonText(JSON.stringify({ mcpServers: { [name]: restConfig } }, null, 2));
-            setError(null);
         }
-    }, [server]);
+        setError(null);
+    }, [server, mode]);
 
     const handleSave = () => {
         try {
@@ -345,6 +372,9 @@ const MCPEditModal: React.FC<{
             const name = serverNames[0];
             const config: MCPServerConfig = { name, ...parsed.mcpServers[name] };
             if (!config.transport) { setError(t('config.mcp.err.transportRequired')); return; }
+            if (mode === 'add' && installedNames?.has(name)) {
+                setError(t('config.mcp.err.nameExists', { name })); return;
+            }
             if (require) {
                 const unreplacedKeys = checkRequirePlaceholders(config, Object.keys(require));
                 if (unreplacedKeys.length > 0) {
@@ -382,7 +412,7 @@ const MCPEditModal: React.FC<{
         <div className="section-modal-overlay" onClick={onClose}>
             <div className="section-modal" onClick={(e) => e.stopPropagation()}>
                 <div className="section-modal-header">
-                    <span>{t('config.mcp.editTitle', { name: server.config.name })}</span>
+                    <span>{mode === 'add' ? t('config.mcp.manualAddTitle') : t('config.mcp.editTitle', { name: server.config.name })}</span>
                     <button className="section-modal-close" onClick={onClose}><CloseIcon /></button>
                 </div>
                 <div className="section-modal-body">
@@ -402,9 +432,31 @@ const MCPEditModal: React.FC<{
                     <textarea
                         className="mcp-json-editor"
                         value={jsonText}
+                        placeholder={mode === 'add' ? MANUAL_ADD_PLACEHOLDER : undefined}
                         onChange={(e) => { setJsonText(e.target.value); setError(null); }}
                         spellCheck={false}
                     />
+                    {mode === 'add' && (
+                        <div className="mcp-scope-row">
+                            <span className="mcp-scope-label">{t('config.mcp.scopeLabel')}</span>
+                            {(['project', 'user'] as MCPAddScope[]).map(s => (
+                                <label
+                                    key={s}
+                                    className="checkbox-label mcp-scope-option"
+                                    title={`${s === 'project' ? t('common.installToProjectTip') : t('common.installToUserTip')} (${GROUP_PATHS[s]})`}
+                                >
+                                    <input
+                                        type="radio"
+                                        name="mcp-add-scope"
+                                        value={s}
+                                        checked={scope === s}
+                                        onChange={() => setScope(s)}
+                                    />
+                                    <span>{s === 'project' ? t('config.mcp.scopeProject') : t('config.mcp.scopeUser')}</span>
+                                </label>
+                            ))}
+                        </div>
+                    )}
                     {error && <div className="section-edit-error">{error}</div>}
                 </div>
                 <div className="section-modal-footer">
@@ -536,7 +588,7 @@ const MCPConfig: React.FC<MCPConfigProps> = ({ vscode, onOpenSystemConfig }) => 
     const [loading, setLoading] = useState(true);
     const [isRefreshing, setIsRefreshing] = useState(false);
     const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set());
-    const [editingServer, setEditingServer] = useState<{ server: MCPServerInfo; scope: MCPGroupScope; require?: Record<string, string> } | null>(null);
+    const [editingServer, setEditingServer] = useState<{ server: MCPServerInfo; scope: MCPGroupScope; require?: Record<string, string>; mode?: MCPEditMode } | null>(null);
     const [isSavingEdit, setIsSavingEdit] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
 
@@ -617,7 +669,11 @@ const MCPConfig: React.FC<MCPConfigProps> = ({ vscode, onOpenSystemConfig }) => 
                 case 'addMCPServerResult':
                     setIsSavingEdit(false);
                     setEditingServer(null);
-                    if (message.success && message.data) setServers(flattenServers(message.data));
+                    if (message.success && message.data) {
+                        setServers(flattenServers(message.data));
+                        // 添加成功后切到已安装页，让用户直接看到新服务与连接状态
+                        setActiveTab('installed');
+                    }
                     break;
                 case 'loadSystemConfigResult':
                     if (message.success && message.data) {
@@ -705,6 +761,17 @@ const MCPConfig: React.FC<MCPConfigProps> = ({ vscode, onOpenSystemConfig }) => 
         setEditingServer({ server: serverInfo, scope, require: (item as any).require });
     };
 
+    // 市场页「手动添加」：以示例配置为模板打开弹窗，默认写入用户级
+    const handleManualAdd = () => {
+        // add 模式下弹窗不预填内容，这里只是占位让弹窗渲染
+        const serverInfo: MCPServerInfo = {
+            config: { name: '', transport: 'stdio' } as MCPServerConfig,
+            connectStatus: 'disconnected',
+            status: false,
+        };
+        setEditingServer({ server: serverInfo, scope: 'project', mode: 'add' });
+    };
+
     const handleMCPToolToggle = (mcpName: string, toolName: string, enabled: boolean) => {
         const server = [...groupedServers.project, ...groupedServers.user, ...groupedServers.plugin].find(s => s.config.name === mcpName);
         if (!server) return;
@@ -769,6 +836,14 @@ const MCPConfig: React.FC<MCPConfigProps> = ({ vscode, onOpenSystemConfig }) => 
                     {t('config.mcp.tab.market')}
                 </div>
                 <div className="section-tab-actions">
+                    <button
+                        className="section-btn primary small"
+                        onClick={handleManualAdd}
+                        title={t('config.mcp.manualAddTip')}
+                    >
+                        <PlusIcon />
+                        {t('config.mcp.manualAdd')}
+                    </button>
                     {activeTab === 'installed' && (
                         <button
                             className={`section-icon-btn ${isRefreshing ? 'btn-loading' : ''}`}
@@ -918,6 +993,8 @@ const MCPConfig: React.FC<MCPConfigProps> = ({ vscode, onOpenSystemConfig }) => 
                     server={editingServer.server}
                     scope={editingServer.scope}
                     require={editingServer.require}
+                    mode={editingServer.mode}
+                    installedNames={installedNames}
                     onClose={() => { setEditingServer(null); setIsSavingEdit(false); }}
                     onSave={handleSaveEdit}
                     vscode={vscode}
