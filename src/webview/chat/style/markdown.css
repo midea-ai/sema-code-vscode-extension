@@ -45,22 +45,26 @@
   background: none;
   cursor: pointer;
   text-decoration: none;
-  display: inline-flex;
-  align-items: center;
-  gap: 0.3em;
-  vertical-align: baseline;
 }
 
 .markdown-content .file-path-code:hover {
   text-decoration: underline;
 }
 
-/* 文件类型图标（verifyFilePath 确认后由 AiResponseBlock 动态插入，SVG 走 currentColor） */
+/* 文件类型图标（verifyFilePath 确认后由 AiResponseBlock 动态插入，SVG 走 currentColor）
+   与 .md-link-icon 同一套：普通 inline-block + 负 vertical-align，让图标和文字共用正文基线。
+   不能用 inline-flex + align-items:center 包住整个链接：inline-flex 的对外基线取第一个 flex 子项，
+   而图标 span 无文字、基线即底边，会把文件名整体抬高，与前后正文错位 */
 .markdown-content .md-file-icon {
-  display: inline-flex;
-  width: 13px;
-  height: 13px;
-  flex-shrink: 0;
+  display: inline-block;
+  width: 1em;
+  height: 1em;
+  vertical-align: -0.15em;
+  margin-right: 0.3em;
+}
+
+.markdown-content .md-file-icon svg {
+  display: block;
 }
 
 /* 链接前的站点图标：外网 https 为 favicon <img>，其余为 CSS mask 地球
