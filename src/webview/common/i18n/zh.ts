@@ -153,7 +153,6 @@ export const zh = {
     'config.system.browserControlExperimentalSuffix': '（实验性）',
     'config.system.browserControlInstallPrefix': '需安装 ',
     'config.system.browserControlInstallLink': 'Chrome 扩展',
-    'config.system.browserControlInstallSuffix': '',
     'config.system.browserControlEnabling': '正在启用…',
     'config.system.browserControlDisabling': '正在关闭…',
     'config.system.tools': '工具设置',

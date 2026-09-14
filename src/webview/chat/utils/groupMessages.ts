@@ -37,55 +37,74 @@ export const getToolTitle = (message: Message): string => {
     return message.content?.title || '';
 };
 
-const stripLeadingCdSegments = (command: string): string => {
-    const segments = command.split(/\s+&&\s+/).map(segment => segment.trim()).filter(Boolean);
-    let index = 0;
-    while (index < segments.length - 1 && /^cd(?:\s|$)/.test(segments[index])) {
-        index += 1;
-    }
-    return segments.slice(index).join(' && ');
+/** 命令段分隔符：&&、||、; 一视同仁，每一段都要单独通过只读检查 */
+export const SHELL_SEGMENT_SEPARATOR = /\s*(?:&&|\|\||;)\s*/;
+
+/** 管道右侧允许出现的纯过滤命令，出现其它命令（如 xargs、tee）即不算探索 */
+const READ_ONLY_PIPE_FILTERS = new Set([
+    'head', 'tail', 'grep', 'egrep', 'fgrep', 'wc', 'sort', 'uniq', 'cut', 'tr', 'cat', 'column', 'nl',
+]);
+
+export type ShellExploreKind = 'list' | 'find' | 'path';
+
+const isCdSegment = (segment: string): boolean => /^cd(?:\s|$)/.test(segment);
+
+const isReadOnlyPipeFilter = (segment: string): boolean => {
+    const command = segment.trim().split(/\s+/)[0] || '';
+    return READ_ONLY_PIPE_FILTERS.has(command);
 };
 
-export const isLsShellCommand = (message: Message): boolean => {
-    const command = stripLeadingCdSegments(getToolTitle(message).trim());
-    return /^ls(?:\s|$)/.test(command);
-};
-
-export const isFindShellCommand = (message: Message): boolean => {
-    const command = getToolTitle(message).trim();
-    if (!/^find(?:\s|$)/.test(command)) {
-        return false;
-    }
-
-    return !/(?:^|\s)-(?:delete|exec|execdir|ok|okdir)(?:\s|$)/.test(command);
-};
-
-export const isPwdShellCommand = (message: Message): boolean => {
-    const command = getToolTitle(message).trim();
-    return /^pwd(?:\s+-(?:L|P))*\s*$/.test(command);
-};
-
-export const isExploratoryShellCommand = (message: Message): boolean => {
-    const command = getToolTitle(message).trim();
-    const segments = command.split(/\s+&&\s+/).map(segment => segment.trim()).filter(Boolean);
-
-    if (segments.length < 2) {
-        return false;
+/** 单个命令段（不含 && / || / ;）的探索类型：ls/tree → list，find → find，pwd → path；含写入副作用则为 null */
+const getShellSegmentKind = (segment: string): ShellExploreKind | null => {
+    // 输出重定向会写文件，不算只读
+    if (/>/.test(segment)) {
+        return null;
     }
 
-    return segments.every(segment => {
-        const segmentMessage = {
-            ...message,
-            content: {
-                ...message.content,
-                title: segment,
-            },
-        };
+    const [head = '', ...pipes] = segment.split(/\s*\|\s*/);
+    if (!pipes.every(isReadOnlyPipeFilter)) {
+        return null;
+    }
 
-        return isLsShellCommand(segmentMessage)
-            || isFindShellCommand(segmentMessage)
-            || isPwdShellCommand(segmentMessage);
-    });
+    const command = head.trim();
+    if (/^(?:ls|tree)(?:\s|$)/.test(command)) {
+        return 'list';
+    }
+    if (/^find(?:\s|$)/.test(command)) {
+        // -delete/-exec 等会执行动作或写文件，不算只读
+        return /(?:^|\s)-(?:delete|exec|execdir|ok|okdir|fprint|fprint0|fprintf|fls)(?:\s|$)/.test(command) ? null : 'find';
+    }
+    if (/^pwd(?:\s+-(?:L|P))*$/.test(command)) {
+        return 'path';
+    }
+    return null;
+};
+
+/**
+ * 终端命令的探索类型。整条命令按 && / || / ; 切段，cd 段视为中性跳过，
+ * 其余每一段都必须是只读的 ls/tree、find、pwd（可接只读过滤管道），否则不算探索。
+ * 只有一个有效段时返回该段类型，多段返回 'explore'。
+ */
+export const getShellExploreKind = (message: Message): ShellExploreKind | 'explore' | null => {
+    const segments = getToolTitle(message).trim()
+        .split(SHELL_SEGMENT_SEPARATOR)
+        .map(segment => segment.trim())
+        .filter(segment => segment && !isCdSegment(segment));
+
+    if (segments.length === 0) {
+        return null;
+    }
+
+    const kinds: (ShellExploreKind | null)[] = [];
+    for (const segment of segments) {
+        const kind = getShellSegmentKind(segment);
+        if (kind === null) {
+            return null;
+        }
+        kinds.push(kind);
+    }
+
+    return kinds.length === 1 ? kinds[0] : 'explore';
 };
 
 export const getGroupableToolKind = (message: Message): string | null => {
@@ -96,17 +115,8 @@ export const getGroupableToolKind = (message: Message): string | null => {
     if (toolName === TOOL_NAME_SEARCH_FILES || toolName === TOOL_NAME_SEARCH_CONTENT) {
         return 'search';
     }
-    if (toolName === TOOL_NAME_RUN_SHELL && isLsShellCommand(message)) {
-        return 'list';
-    }
-    if (toolName === TOOL_NAME_RUN_SHELL && isFindShellCommand(message)) {
-        return 'find';
-    }
-    if (toolName === TOOL_NAME_RUN_SHELL && isPwdShellCommand(message)) {
-        return 'path';
-    }
-    if (toolName === TOOL_NAME_RUN_SHELL && isExploratoryShellCommand(message)) {
-        return 'explore';
+    if (toolName === TOOL_NAME_RUN_SHELL) {
+        return getShellExploreKind(message);
     }
     return null;
 };

@@ -8,7 +8,7 @@ import {
     TOOL_NAME_SEARCH_FILES,
     TOOL_NAME_VIEW_FILE,
 } from '../../../../utils/tool';
-import { getMcpServerName, getToolName, getToolTitle, isExploratoryShellCommand, isFindShellCommand, isLsShellCommand, isPwdShellCommand, isShellRunMessage } from '../../utils/groupMessages';
+import { SHELL_SEGMENT_SEPARATOR, getMcpServerName, getShellExploreKind, getToolName, getToolTitle, isShellRunMessage } from '../../utils/groupMessages';
 import { formatSearchTitle } from './utils';
 import { hasTextSelection } from '../../utils/selection';
 import PubBlock from './PubBlock';
@@ -139,19 +139,30 @@ const splitCommand = (command: string): string[] => {
     });
 };
 
+/** 去掉管道及其右侧，只保留主命令部分 */
+const stripPipe = (command: string): string => command.split(/\s*\|\s*/)[0] || '';
+
+/** ls/tree 中带独立参数值的选项（如 tree -L 2、ls -I pattern），解析目标路径时要连同下一个 token 一起跳过 */
+const LS_OPTIONS_WITH_VALUE = new Set(['-L', '-P', '-I', '-o', '-w', '-T', '--filelimit', '--charset']);
+
 const parseLsTarget = (lsCommand: string): string => {
-    const tokens = splitCommand(lsCommand.trim());
-    if (tokens.length === 0 || tokens[0] !== 'ls') {
+    const tokens = splitCommand(stripPipe(lsCommand.trim()));
+    if (tokens.length === 0 || (tokens[0] !== 'ls' && tokens[0] !== 'tree')) {
         return '';
     }
 
     let afterOptions = false;
-    for (const token of tokens.slice(1)) {
+    const rest = tokens.slice(1);
+    for (let i = 0; i < rest.length; i++) {
+        const token = rest[i];
         if (!afterOptions && token === '--') {
             afterOptions = true;
             continue;
         }
         if (!afterOptions && token.startsWith('-') && token !== '-') {
+            if (LS_OPTIONS_WITH_VALUE.has(token)) {
+                i += 1;
+            }
             continue;
         }
         return token;
@@ -187,14 +198,14 @@ const joinPaths = (base: string, target: string): string => {
 };
 
 export const getLsListTarget = (command: string): string => {
-    const segments = command.trim().split(/\s+&&\s+/).map(segment => segment.trim()).filter(Boolean);
+    const segments = command.trim().split(SHELL_SEGMENT_SEPARATOR).map(segment => segment.trim()).filter(Boolean);
     let cwd = '';
     let lsTarget = '';
 
     for (const segment of segments) {
         if (/^cd(?:\s|$)/.test(segment)) {
             cwd = parseCdTarget(segment) || cwd;
-        } else if (/^ls(?:\s|$)/.test(segment)) {
+        } else if (/^(?:ls|tree)(?:\s|$)/.test(segment)) {
             lsTarget = parseLsTarget(segment);
         }
     }
@@ -203,7 +214,9 @@ export const getLsListTarget = (command: string): string => {
 };
 
 export const getFindTarget = (command: string): string => {
-    const tokens = splitCommand(command.trim());
+    const segments = command.trim().split(SHELL_SEGMENT_SEPARATOR).map(segment => segment.trim()).filter(Boolean);
+    const findSegment = segments.find(segment => /^find(?:\s|$)/.test(segment)) || '';
+    const tokens = splitCommand(stripPipe(findSegment));
     if (tokens.length === 0 || tokens[0] !== 'find') {
         return '.';
     }
@@ -321,9 +334,10 @@ export const CommandItemBlock: React.FC<{
     vscode?: any;
 }> = ({ message, vscode }) => {
     const command = getToolTitle(message).trim();
-    const isFind = isFindShellCommand(message);
-    const isPwd = isPwdShellCommand(message);
-    const isExplore = isExploratoryShellCommand(message);
+    const kind = getShellExploreKind(message);
+    const isFind = kind === 'find';
+    const isPwd = kind === 'path';
+    const isExplore = kind === 'explore';
 
     return (
         <CollapsibleResultRow
@@ -347,15 +361,7 @@ const renderExpandedItem = (
         if (isSearchMessage(item.message)) {
             return <SearchItemBlock key={item.message.id} message={item.message} vscode={vscode} />;
         }
-        if (
-            item.message.toolName === TOOL_NAME_RUN_SHELL
-            && (
-                isLsShellCommand(item.message)
-                || isFindShellCommand(item.message)
-                || isPwdShellCommand(item.message)
-                || isExploratoryShellCommand(item.message)
-            )
-        ) {
+        if (item.message.toolName === TOOL_NAME_RUN_SHELL && getShellExploreKind(item.message) !== null) {
             return <CommandItemBlock key={item.message.id} message={item.message} vscode={vscode} />;
         }
         return null;

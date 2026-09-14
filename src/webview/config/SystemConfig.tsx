@@ -417,7 +417,6 @@ const SystemConfig: React.FC<SystemConfigProps> = ({ vscode }) => {
                                     >
                                         {t('config.system.browserControlInstallLink')}
                                     </a>
-                                    {t('config.system.browserControlInstallSuffix')}
                                 </div>
                             )}
                         </div>
