@@ -13,9 +13,10 @@ interface PubBlockProps {
     content: ToolContent;
     messageId: string;
     vscode?: any;
+    isLast?: boolean;
 }
 
-const PubBlock: React.FC<PubBlockProps> = React.memo(({ content, messageId, vscode }) => {
+const PubBlock: React.FC<PubBlockProps> = React.memo(({ content, messageId, vscode, isLast = false }) => {
     const t = useT();
     const sessionId = useContext(SessionContext);
     const streamContentRef = useRef('');
@@ -87,12 +88,18 @@ const PubBlock: React.FC<PubBlockProps> = React.memo(({ content, messageId, vsco
     const visibleLines = totalLines > MAX_VISIBLE_LINES ? contentLines.slice(-MAX_VISIBLE_LINES) : contentLines;
     const omittedCount = totalLines > MAX_VISIBLE_LINES ? totalLines - MAX_VISIBLE_LINES : 0;
 
-    // 默认展开的工具列表，流式中也自动展开
+    // 终端类工具（StopBackgroundJob）与 Shell/BackgroundJob 同一套规则：
+    // 用户未手动操作过时，展开状态跟随「是否为最后一个块」；手动操作后钉住用户设的状态。
+    // 其它工具只在首次渲染处于流式中时展开。
     const DEFAULT_EXPANDED_TOOLS = [TOOL_NAME_STOP_BG_JOB];
-    const [isExpanded, setIsExpanded] = useState(DEFAULT_EXPANDED_TOOLS.includes(toolName) || content.completed === false);
+    const followsLast = DEFAULT_EXPANDED_TOOLS.includes(toolName);
+    const [manualExpanded, setManualExpanded] = useState<boolean | null>(
+        followsLast ? null : (content.completed === false)
+    );
+    const isExpanded = manualExpanded ?? (followsLast && isLast);
 
     const handleToggle = () => {
-        setIsExpanded(!isExpanded);
+        setManualExpanded(!isExpanded);
     };
 
     const handleViewAll = (e: React.MouseEvent) => {

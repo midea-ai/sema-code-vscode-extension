@@ -77,7 +77,7 @@ const MessageItem: React.FC<MessageItemProps> = React.memo(({
             case TOOL_NAME_RUN_SHELL:
                 return <BashBlock content={message.content} messageId={message.id} vscode={vscode} isLast={isLastMessage} />;
             case TOOL_NAME_PEEK_BG_JOB:
-                return <BackgroundJobBlock content={message.content} messageId={message.id} vscode={vscode} />;
+                return <BackgroundJobBlock content={message.content} messageId={message.id} vscode={vscode} isLast={isLastMessage} />;
             case 'Agent':
                 return (
                     <AgentBlock
@@ -90,7 +90,7 @@ const MessageItem: React.FC<MessageItemProps> = React.memo(({
                     />
                 );
             default:
-                return <PubBlock content={message.content} messageId={message.id} vscode={vscode} />;
+                return <PubBlock content={message.content} messageId={message.id} vscode={vscode} isLast={isLastMessage} />;
         }
     };
 
