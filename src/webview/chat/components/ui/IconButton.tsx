@@ -81,6 +81,46 @@ export const ClockIcon: React.FC = () => {
     );
 };
 
+// 地球图标（模型配置提醒块的语言选择入口）
+export const GlobeIcon: React.FC = () => {
+    return (
+        <svg
+            width="12"
+            height="12"
+            viewBox="0 0 16 16"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.4"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+        >
+            <circle cx="8" cy="8" r="6" />
+            <path d="M2 8h12" />
+            <path d="M8 2c1.8 1.8 2.7 3.8 2.7 6S9.8 12.2 8 14c-1.8-1.8-2.7-3.8-2.7-6S6.2 3.8 8 2z" />
+        </svg>
+    );
+};
+
+// 滑块/设置图标（模型配置提醒块左侧）
+export const SlidersIcon: React.FC = () => {
+    return (
+        <svg
+            width="16"
+            height="16"
+            viewBox="0 0 16 16"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.4"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+        >
+            <path d="M2 5h5M11 5h3M2 11h3M9 11h5" />
+            <circle cx="9" cy="5" r="1.8" />
+            <circle cx="7" cy="11" r="1.8" />
+        </svg>
+    );
+};
+
 // 用户输入块 Fork / 撤销图标（git-fork 样式）
 export const ForkIcon: React.FC = () => {
     return (

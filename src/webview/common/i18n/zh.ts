@@ -40,9 +40,10 @@ export const zh = {
     // ── 聊天页 ──
     'chat.initializing': '正在初始化 CLI，请稍候...',
     'chat.inputPlaceholder': '请输入需求...(/指令 @文件)',
-    'chat.modelNotConfigured': 'Code Agent Model 尚未配置，请先配置模型信息',
+    'chat.modelNotConfigured.title': '尚未配置模型',
+    'chat.modelNotConfigured.desc': '添加一个模型并测试连通后即可开始对话',
     'chat.createSessionFailed': '创建会话失败',
-    'chat.openConfig': '打开配置',
+    'chat.openConfig': '去配置模型',
     'chat.welcome.subtitle': 'AI 驱动的智能编程助手',
     'chat.design.hint': '请描述你想要的页面 / 原型 / 演示 ～',
     'chat.task.running': '运行中...',

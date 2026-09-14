@@ -1132,13 +1132,12 @@ html.jb #output-container {
     background-color: var(--chat-bg-light);
 }
 
-/* ModelConfigReminder 组件样式 - 简化版 */
+/* ==================== ModelConfigReminder：未配置模型提示卡片 ==================== */
+/* 普通圆角边框卡片：左侧暖色底图标块 + 标题/描述，下一行按钮靠左、语言入口靠右 */
 .model-config-reminder {
-    background: var(--chat-notification-bg);
-    border-color: var(--chat-notification-border);
-    border-left: 4px solid var(--chat-notification-warning-icon);
+    background: var(--chat-bg-primary);
+    border-radius: var(--chat-radius-md);
     padding: var(--chat-spacing-lg);
-    box-shadow: var(--chat-shadow);
 }
 
 .model-config-reminder-content {
@@ -1147,32 +1146,52 @@ html.jb #output-container {
     gap: var(--chat-spacing-lg);
 }
 
+/* 图标块：暖色浅底圆角方块，图标用警告色（橙色系），深浅主题都能借到色 */
 .model-config-reminder-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    width: 32px;
+    height: 32px;
+    border-radius: var(--chat-radius-md);
+    background: color-mix(in srgb, var(--chat-notification-warning-icon) 12%, var(--chat-bg-primary));
     color: var(--chat-notification-warning-icon);
-    font-size: var(--chat-font-xl);
-    line-height: 1;
-    margin-top: 1px;
 }
 
 .model-config-reminder-text {
     flex: 1;
-    font-size: var(--chat-font-md);
-    color: var(--chat-notification-fg);
+    min-width: 0;
     line-height: 1.5;
-    margin-bottom: 12px;
 }
 
+.model-config-reminder-title {
+    font-size: var(--chat-font-md);
+    font-weight: 600;
+    color: var(--chat-text-primary);
+}
+
+.model-config-reminder-desc {
+    margin-top: 2px;
+    font-size: var(--chat-font-base);
+    color: var(--chat-text-secondary);
+}
+
+/* 按钮行在文字下一行、与图标左对齐；按钮在左、语言入口靠右，窄宽度下换行 */
 .model-config-reminder-actions {
     display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
     gap: 8px;
-    margin-left: 28px;
-    /* 对齐文本内容 */
+    margin-top: var(--chat-spacing-lg);
 }
 
 .model-config-reminder-button {
-    padding: 4px 12px;
+    padding: 5px 12px;
     font-size: var(--chat-font-base);
-    border-radius: 3px;
+    font-weight: 500;
+    border-radius: var(--chat-radius-md);
     border: 1px solid transparent;
     cursor: pointer;
     transition: background-color 0.2s;
@@ -1197,24 +1216,58 @@ html.jb #output-container {
     background-color: var(--chat-bg-hover);
 }
 
+/* 语言入口：无边框，地球图标 + 文字 + 箭头为可见层，透明的原生 select 盖在整块上接管点击 */
 .model-config-reminder-language {
-    display: flex;
+    position: relative;
+    display: inline-flex;
     align-items: center;
-    gap: 6px;
-    margin: 2px 0 0 30px;
+    gap: 5px;
+    margin: 0;
+    padding: 3px 4px;
+    border-radius: var(--chat-radius-sm);
     color: var(--chat-text-secondary);
-    font-size: var(--chat-font-sm);
+    font-size: var(--chat-font-base);
     line-height: 1.4;
+    cursor: pointer;
+    user-select: none;
+}
+
+.model-config-reminder-language:hover {
+    background: var(--chat-bg-hover);
+    color: var(--chat-text-primary);
+}
+
+.model-config-reminder-language svg {
+    flex-shrink: 0;
+}
+
+.model-config-reminder-language-text {
+    white-space: nowrap;
+}
+
+/* 下拉箭头（chevron），跟随文字色 */
+.model-config-reminder-language-chevron {
+    width: 5px;
+    height: 5px;
+    margin: 0 3px 2px 1px;
+    border-right: 1.4px solid currentColor;
+    border-bottom: 1.4px solid currentColor;
+    transform: rotate(45deg);
+    flex-shrink: 0;
 }
 
 .model-config-reminder-language-select {
-    padding: 1px 4px;
-    border: 1px solid var(--chat-border-input);
-    border-radius: 2px;
-    background: var(--chat-bg-primary);
-    color: var(--chat-text-primary);
-    font: inherit;
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    border: none;
+    opacity: 0;
     cursor: pointer;
+    /* 字号跟随可见层，避免下拉列表在部分平台按默认字号渲染 */
+    font: inherit;
 }
 /* ==================== 多会话 tab 栏 ==================== */
 .session-tabs {

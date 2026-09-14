@@ -864,7 +864,7 @@ export const mockDialogMap: Record<string, any[]> = {
     ],
     ModelConfigReminder: [
         {
-            message: '未检测到有效的模型配置，请先配置 API Key 和模型信息。',
+            visible: true,
         },
     ],
     PermissionDialog: [

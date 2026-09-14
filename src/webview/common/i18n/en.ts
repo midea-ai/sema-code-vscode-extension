@@ -39,9 +39,10 @@ export const en: Record<keyof typeof zh, string> = {
     // ── chat ──
     'chat.initializing': 'Initializing CLI, please wait...',
     'chat.inputPlaceholder': 'Type your request... (/command @file)',
-    'chat.modelNotConfigured': 'No Code Agent model configured yet. Please set up a model first.',
+    'chat.modelNotConfigured.title': 'No model configured yet',
+    'chat.modelNotConfigured.desc': 'Add a model and test the connection to start chatting',
     'chat.createSessionFailed': 'Failed to create session',
-    'chat.openConfig': 'Open Settings',
+    'chat.openConfig': 'Configure a model',
     'chat.welcome.subtitle': 'AI-powered coding assistant',
     'chat.design.hint': 'Describe the page / prototype / demo you want ~',
     'chat.task.running': 'Running...',

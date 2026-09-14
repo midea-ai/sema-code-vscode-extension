@@ -692,9 +692,9 @@ const ChatSession: React.FC<ChatSessionProps> = ({ vscode: rawVscode, sessionId,
         setModelReminderDismissed(true);
     };
 
+    // 只打开配置页，不关闭提示卡片：卡片按模型列表实时派生，加好模型后自动消失；未加模型切回来时仍应可见
     const handleOpenConfig = () => {
         vscode.postMessage({ type: 'openConfig' });
-        setModelReminderDismissed(true);
     };
 
     const handleLanguageChange = (lang: Language) => {
@@ -703,10 +703,8 @@ const ChatSession: React.FC<ChatSessionProps> = ({ vscode: rawVscode, sessionId,
         vscode.postMessage({ type: 'updateLanguage', lang });
     };
 
-    /** 横幅文案：模型列表为空且未被用户关闭时显示 */
-    const modelReminderText = modelInfoLoaded && availableModels.length === 0 && !modelReminderDismissed
-        ? t('chat.modelNotConfigured')
-        : '';
+    /** 未配置模型提示卡片：模型列表为空且未被用户关闭时显示，文案由组件自取 */
+    const showModelReminder = modelInfoLoaded && availableModels.length === 0 && !modelReminderDismissed;
     const inputPlaceholder = inputPlaceholderMsg ?? (inputDisabled ? t('chat.initializing') : t('chat.inputPlaceholder'));
 
     const handleAgentModeChange = (mode: AgentMode) => {
@@ -1025,9 +1023,9 @@ const ChatSession: React.FC<ChatSessionProps> = ({ vscode: rawVscode, sessionId,
                             vscode={vscode}
                         />
                     )}
-                    {modelReminderText && (
+                    {showModelReminder && (
                         <ModelConfigReminder
-                            message={modelReminderText}
+                            visible
                             onClose={handleCloseModelConfigReminder}
                             onOpenConfig={handleOpenConfig}
                             onLanguageChange={handleLanguageChange}

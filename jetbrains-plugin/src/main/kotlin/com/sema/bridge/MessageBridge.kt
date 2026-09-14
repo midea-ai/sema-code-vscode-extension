@@ -107,8 +107,13 @@ class MessageBridge(
         if (op == "save" || op == "saveByKey") {
             pushSystemConfigToChat()
         }
-        if (op == "save" || (op == "saveByKey" && payload.str("key") == "lang")) {
+        val savedKey = payload.str("key")
+        if (op == "save" || (op == "saveByKey" && savedKey == "lang")) {
             pushLangToHistory()
+            pushLangToConfig()
+        }
+        // 聊天页切语言时 lang 与 customRules 分两次 saveByKey 落盘，customRules 落盘后再推一次，配置页才能拿到新默认规则
+        if (op == "saveByKey" && savedKey == "customRules") {
             pushLangToConfig()
         }
         replyEditor(reqId, data)
@@ -143,9 +148,13 @@ class MessageBridge(
         bus.pushToHistory(gson.toJson(frame))
     }
 
-    /** 聊天页切换语言后，同步已打开（或正在初始化）的配置 webview。 */
+    /** 聊天页切换语言后，同步已打开（或正在初始化）的配置 webview；customRules 带当前落盘值，供页面在仍为默认规则时跟着切换。 */
     private fun pushLangToConfig() {
-        val uiMsg = linkedMapOf<String, Any?>("command" to "langUpdate", "lang" to sysConfig.lang())
+        val uiMsg = linkedMapOf<String, Any?>(
+            "command" to "langUpdate",
+            "lang" to sysConfig.lang(),
+            "customRules" to sysConfig.getConfig()["customRules"],
+        )
         bus.pushToConfig(editorFrame(uiMsg))
     }
 

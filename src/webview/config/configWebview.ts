@@ -34,11 +34,12 @@ export class ConfigWebviewProvider {
         this.onSystemConfigChanged = callback;
     }
 
-    /** 聊天页切换语言后，同步已打开的配置页及其原生面板标题。 */
+    /** 聊天页切换语言后，同步已打开的配置页及其原生面板标题；customRules 带当前落盘值，供页面在仍为默认规则时跟着切换。 */
     public postLangUpdate(lang: string): void {
         if (!this.panel) return;
         this.panel.title = t('host.cfg.panelTitle');
-        this.postMessage({ command: 'langUpdate', lang });
+        const customRules = (this.coreManager.getSystemConfig() as Record<string, any>)?.customRules;
+        this.postMessage({ command: 'langUpdate', lang, customRules });
     }
 
     public show(extensionUri: vscode.Uri, page?: string, taskId?: string) {

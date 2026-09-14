@@ -74,11 +74,22 @@ const SystemConfig: React.FC<SystemConfigProps> = ({ vscode }) => {
 
             switch (msg.command) {
                 case 'langUpdate':
+                    // 聊天页切换语言：宿主已落盘 lang，且当规则仍为内置默认值时一并落盘了目标语言默认规则（随消息带来）。
+                    // 页面同步 lang；customRules 仅在当前值仍是内置默认值时替换，用户正在编辑的自定义规则不动。
                     if (typeof msg.lang === 'string') {
                         const lang = normalizeLang(msg.lang);
+                        const rules = typeof msg.customRules === 'string' ? msg.customRules : undefined;
                         setLang(lang);
-                        setConfig(prev => ({ ...prev, lang }));
-                        setSavedConfig(prev => ({ ...prev, lang }));
+                        setConfig(prev => ({
+                            ...prev,
+                            lang,
+                            ...(rules !== undefined && isBuiltinCustomRules(prev.customRules) ? { customRules: rules } : {})
+                        }));
+                        setSavedConfig(prev => ({
+                            ...prev,
+                            lang,
+                            ...(rules !== undefined ? { customRules: rules } : {})
+                        }));
                     }
                     break;
                 case 'loadSystemConfigResult':
