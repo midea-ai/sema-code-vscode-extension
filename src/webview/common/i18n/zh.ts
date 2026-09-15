@@ -118,9 +118,13 @@ export const zh = {
     'history.daysAgo': '{n}天前',
 
     // ── 配置页：导航 ──
+    'config.nav.group.basic': '基础',
+    'config.nav.group.extension': '扩展',
+    'config.nav.group.more': '更多',
     'config.nav.models': '模型配置',
     'config.nav.system': '系统配置',
     'config.nav.task': '任务管理',
+    'config.nav.memory': '规则与记忆',
     'config.nav.claw': 'Claw 远程',
     'config.tab.modelList': '模型列表',
     'config.tab.addModel': '新增模型',

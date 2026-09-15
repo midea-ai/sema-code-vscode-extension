@@ -119,95 +119,56 @@ const App: React.FC<AppProps> = ({ vscode }) => {
         setModelTab('list');
     };
 
+    // 侧栏三组导航：组名仅作标题，不可点击。Tools & MCP 等为产品术语，保持英文不走 i18n。
+    // Claw 远程在 JB 下隐藏，但「更多」组名保留。
+    const navGroups: { title: string; items: { page: PageType; label: string }[] }[] = [
+        {
+            title: t('config.nav.group.basic'),
+            items: [
+                { page: 'models', label: t('config.nav.models') },
+                { page: 'system', label: t('config.nav.system') },
+                { page: 'memory', label: t('config.nav.memory') },
+                { page: 'task', label: t('config.nav.task') },
+            ],
+        },
+        {
+            title: t('config.nav.group.extension'),
+            items: [
+                { page: 'mcp', label: 'Tools & MCP' },
+                { page: 'skill', label: 'Skills' },
+                { page: 'agent', label: 'Agents' },
+                { page: 'plugin', label: 'Plugins' },
+                { page: 'command', label: 'Commands' },
+                { page: 'hooks', label: 'Hooks' },
+            ],
+        },
+        {
+            title: t('config.nav.group.more'),
+            items: [
+                { page: 'design', label: 'Design' },
+                ...(IS_JB ? [] : [{ page: 'claw' as PageType, label: t('config.nav.claw') }]),
+            ],
+        },
+    ];
+
     return (
         <div className="app-container">
             {/* 左侧导航 */}
             <div className="sidebar">
-                <div
-                    className={`nav-item nav-main ${currentPage === 'models' ? 'active' : ''}`}
-                    onClick={() => setCurrentPage('models')}
-                >
-                    {t('config.nav.models')}
-                </div>
-
-                <div
-                    className={`nav-item nav-main ${currentPage === 'system' ? 'active' : ''}`}
-                    onClick={() => setCurrentPage('system')}
-                >
-                    {t('config.nav.system')}
-                </div>
-
-                <div
-                    className={`nav-item nav-main ${currentPage === 'task' ? 'active' : ''}`}
-                    onClick={() => setCurrentPage('task')}
-                >
-                    {t('config.nav.task')}
-                </div>
-
-                <div
-                    className={`nav-item nav-main ${currentPage === 'memory' ? 'active' : ''}`}
-                    onClick={() => setCurrentPage('memory')}
-                >
-                    Context
-                </div>
-
-                <div
-                    className={`nav-item nav-main ${currentPage === 'mcp' ? 'active' : ''}`}
-                    onClick={() => setCurrentPage('mcp')}
-                >
-                    Tools & MCP
-                </div>
-
-                <div
-                    className={`nav-item nav-main ${currentPage === 'command' ? 'active' : ''}`}
-                    onClick={() => setCurrentPage('command')}
-                >
-                    Commands
-                </div>
-
-                <div
-                    className={`nav-item nav-main ${currentPage === 'skill' ? 'active' : ''}`}
-                    onClick={() => setCurrentPage('skill')}
-                >
-                    Skills
-                </div>
-
-                <div
-                    className={`nav-item nav-main ${currentPage === 'agent' ? 'active' : ''}`}
-                    onClick={() => setCurrentPage('agent')}
-                >
-                    Agents
-                </div>
-
-                <div
-                    className={`nav-item nav-main ${currentPage === 'hooks' ? 'active' : ''}`}
-                    onClick={() => setCurrentPage('hooks')}
-                >
-                    Hooks
-                </div>
-
-                <div
-                    className={`nav-item nav-main ${currentPage === 'plugin' ? 'active' : ''}`}
-                    onClick={() => setCurrentPage('plugin')}
-                >
-                    Plugins
-                </div>
-
-                <div
-                    className={`nav-item nav-main ${currentPage === 'design' ? 'active' : ''}`}
-                    onClick={() => setCurrentPage('design')}
-                >
-                    Design
-                </div>
-
-                {!IS_JB && (
-                    <div
-                        className={`nav-item nav-main ${currentPage === 'claw' ? 'active' : ''}`}
-                        onClick={() => setCurrentPage('claw')}
-                    >
-                        {t('config.nav.claw')}
+                {navGroups.map(group => (
+                    <div className="nav-group" key={group.title}>
+                        <div className="nav-group-title">{group.title}</div>
+                        {group.items.map(item => (
+                            <div
+                                key={item.page}
+                                className={`nav-item nav-main ${currentPage === item.page ? 'active' : ''}`}
+                                onClick={() => setCurrentPage(item.page)}
+                            >
+                                {item.label}
+                            </div>
+                        ))}
                     </div>
-                )}
+                ))}
             </div>
 
             {/* 主内容区域 */}

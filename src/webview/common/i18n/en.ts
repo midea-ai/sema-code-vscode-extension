@@ -117,9 +117,13 @@ export const en: Record<keyof typeof zh, string> = {
     'history.daysAgo': '{n} days ago',
 
     // ── config: nav ──
+    'config.nav.group.basic': 'Basics',
+    'config.nav.group.extension': 'Extensions',
+    'config.nav.group.more': 'More',
     'config.nav.models': 'Models',
     'config.nav.system': 'System',
     'config.nav.task': 'Tasks',
+    'config.nav.memory': 'Rules & Memory',
     'config.nav.claw': 'Claw Remote',
     'config.tab.modelList': 'Model List',
     'config.tab.addModel': 'Add Model',
