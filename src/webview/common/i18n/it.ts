@@ -408,6 +408,24 @@ export const it: Record<keyof typeof zh, string> = {
     'config.design.tab.systems': 'Design system',
     'config.design.tab.skills': 'Skill di design',
 
+    // ── Configurazione: Importa (da Claude Code / Codex / Cursor) ──
+    'config.nav.import': 'Importa',
+    'config.import.title': 'Importa da altre app AI',
+    'config.import.subtitle': 'Rilevata configurazione che può essere aggiunta a SemaCode',
+    'config.import.detecting': 'Rilevamento...',
+    'config.import.nothingToImport': 'Niente da importare',
+    'config.import.importBtn': 'Importa',
+    'config.import.panelTitle': 'Importa da {source}',
+    'config.import.scope.project': 'Progetto corrente',
+    'config.import.scope.user': 'Globale utente',
+    'config.import.scopeLabel': 'Ambito',
+    'config.import.exists': 'Già presente',
+    'config.import.summary': '{n} elementi verranno importati, {m} saltati',
+    'config.import.start': 'Avvia importazione',
+    'config.import.importing': 'Importazione...',
+    'config.import.loadFailed': 'Lettura non riuscita: {error}',
+    'config.import.cat.rule': 'Regole',
+
     // ── config: task config / background tasks / cron ──
     'config.task.title': 'Config attività',
     'config.task.noModel': 'Nessun modello disponibile',
@@ -607,6 +625,7 @@ Crea qui qualsiasi tipo di file di progetto; l'estensione Sema si adatta automat
     'host.cfg.commandCreated': 'Comando creato',
     'host.cfg.deleteCommandConfirm': 'Eliminare il comando "{name}"?',
     'host.cfg.op.deleteCommand': 'eliminare il comando',
+    'host.cfg.op.import': 'importare la configurazione',
     'host.cfg.op.browserControl': 'attivare/disattivare il controllo del browser',
     'host.cfg.commandDeleted': 'Comando eliminato',
     'host.cfg.op.addMcp': 'aggiungere il server MCP',

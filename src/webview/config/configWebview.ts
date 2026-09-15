@@ -12,6 +12,20 @@ import { CommandConfig } from './types/command';
 import type { ClawCoordinator } from '../../claw/coordinator';
 import { t, getLang, normalizeLang } from '../common/i18n/core';
 import { BrowserControlManager } from '../../managers/BrowserControlManager';
+import { detectSources, previewImport, executeImport } from './import/importer';
+import type { ImportFs, ImportRoots, ImportSource, ImportItem } from './import/types';
+
+/** 「导入」页的文件访问：Node fs.promises 实现 ImportFs（JB 侧同接口下沉到 Kotlin）；异步以免大文件 / 目录拷贝阻塞扩展宿主 */
+const nodeImportFs: ImportFs = {
+    exists: (p) => fs.promises.access(p).then(() => true, () => false),
+    readFile: (p) => fs.promises.readFile(p, 'utf8'),
+    readDir: async (p) => {
+        try { return (await fs.promises.readdir(p, { withFileTypes: true })).map(e => ({ name: e.name, isDir: e.isDirectory() })); }
+        catch { return []; }
+    },
+    writeFile: async (p, content) => { await fs.promises.mkdir(path.dirname(p), { recursive: true }); await fs.promises.writeFile(p, content, 'utf8'); },
+    copyDir: async (src, dst) => { await fs.promises.mkdir(path.dirname(dst), { recursive: true }); await fs.promises.cp(src, dst, { recursive: true, errorOnExist: false }); },
+};
 
 /** 仅落宿主本地、不推 sema-core 的系统配置键（对齐 semaProcessWrapper.LOCAL_SYSTEM_CONFIG_KEYS） */
 const LOCAL_SYSTEM_CONFIG_KEYS = new Set(['enablePet', 'showThinkingText', 'defaultPermissionLevel', 'enableBrowserControl']);
@@ -131,6 +145,9 @@ export class ConfigWebviewProvider {
                 disableMCPServer:           () => this.disableMCPServer(m.name),
                 enableMCPServer:            () => this.enableMCPServer(m.name),
                 updateMCPUseTools:          () => this.updateMCPUseTools(m.name, m.toolNames),
+                importDetectSources:        () => this.importDetectSources(),
+                importPreview:              () => this.importPreview(m.source),
+                importExecute:              () => this.importExecute(m.source, m.items),
                 loadMemoryInfo:             () => this.loadMemoryInfo(),
                 refreshMemoryInfo:          () => this.refreshMemoryInfo(),
                 loadRuleInfo:               () => this.loadRuleInfo(),
@@ -881,6 +898,42 @@ export class ConfigWebviewProvider {
             const servers = await this.coreManager.updateMCPUseTools(name, toolNames);
             this.postMessage({ command: 'updateMCPUseToolsResult', success: true, message: t('host.cfg.toolsUpdated'), data: servers });
         });
+    }
+
+    // ─── 导入（从 Claude Code / Codex / Cursor）──────────────────────────────
+    // 读三家配置用 Node fs；写入走 core 公开 API 或直接落盘，逻辑全在 import/importer.ts（与 JB 共用）。
+
+    private importRoots(): ImportRoots {
+        return { home: os.homedir(), project: vscode.workspace.workspaceFolders?.[0]?.uri.fsPath, sep: path.sep };
+    }
+
+    private async importDetectSources() {
+        try {
+            const data = await detectSources(nodeImportFs, this.importRoots());
+            this.postMessage({ command: 'importDetectSourcesResult', success: true, data });
+        } catch (error) {
+            this.postMessage({ command: 'importDetectSourcesResult', success: false, data: [], message: (error as Error).message });
+        }
+    }
+
+    private async importPreview(source: ImportSource) {
+        try {
+            await this.ensureCoreReady();
+            const data = await previewImport(nodeImportFs, this.importRoots(), this.coreManager, source);
+            this.postMessage({ command: 'importPreviewResult', success: true, source, data });
+        } catch (error) {
+            this.postMessage({ command: 'importPreviewResult', success: false, source, message: (error as Error).message });
+        }
+    }
+
+    private async importExecute(source: ImportSource, items: ImportItem[]) {
+        // 成功消息由 execute 统一发送（successExtra 挂 source / data），fn 里不要再 postMessage
+        await this.execute(
+            'importExecuteResult',
+            t('host.cfg.op.import'),
+            () => executeImport(nodeImportFs, this.importRoots(), this.coreManager, items ?? []),
+            (data) => ({ source, data }),
+        );
     }
 
     // ─── Memory ───────────────────────────────────────────────────────────────

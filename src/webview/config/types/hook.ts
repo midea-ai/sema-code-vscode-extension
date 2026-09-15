@@ -1,6 +1,6 @@
 export type HookSource = 'user' | 'project'
 
-/** 基础功能支持的 7 个 hook 事件（sema-core 未从 types 入口导出该常量，本地维护一份，用于固定展示顺序） */
+/** 基础功能支持的 8 个 hook 事件（与 sema-core HOOK_EVENTS 对齐；core 未从 types 入口导出该常量，本地维护一份，用于固定展示顺序与导入过滤） */
 export const HOOK_EVENTS = [
   'SessionStart',
   'UserPromptSubmit',
@@ -8,6 +8,7 @@ export const HOOK_EVENTS = [
   'PostToolUse',
   'PostToolUseFailure',
   'PermissionRequest',
+  'Stop',
   'SessionEnd',
 ] as const
 

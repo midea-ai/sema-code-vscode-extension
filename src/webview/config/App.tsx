@@ -15,10 +15,11 @@ import BackgroundTaskConfig from './BackgroundTaskConfig';
 import CronTaskConfig from './CronTaskConfig';
 import DesignConfig from './DesignConfig';
 import ClawConfig from './ClawConfig';
+import ImportConfig from './ImportConfig';
 import { RefreshIcon } from './utils/svgIcons';
 import { setLang, useT } from '../common/i18n/react';
 
-type PageType = 'models' | 'system' | 'memory' | 'mcp' | 'skill' | 'agent' | 'hooks' | 'command' | 'plugin' | 'task' | 'design' | 'claw';
+type PageType = 'models' | 'system' | 'memory' | 'mcp' | 'skill' | 'agent' | 'hooks' | 'command' | 'plugin' | 'task' | 'design' | 'import' | 'claw';
 type ModelTabType = 'list' | 'add';
 type TaskTabType = 'background' | 'cron';
 
@@ -147,6 +148,7 @@ const App: React.FC<AppProps> = ({ vscode }) => {
             items: [
                 { page: 'design', label: 'Design' },
                 ...(IS_JB ? [] : [{ page: 'claw' as PageType, label: t('config.nav.claw') }]),
+                { page: 'import', label: t('config.nav.import') },
             ],
         },
     ];
@@ -271,6 +273,13 @@ const App: React.FC<AppProps> = ({ vscode }) => {
                 {currentPage === 'design' && (
                     <div className="page active">
                         <DesignConfig vscode={vscode} />
+                    </div>
+                )}
+
+                {/* 导入页面（从 Claude Code / Codex / Cursor 导入配置） */}
+                {currentPage === 'import' && (
+                    <div className="page active">
+                        <ImportConfig vscode={vscode} />
                     </div>
                 )}
 

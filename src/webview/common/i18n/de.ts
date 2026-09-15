@@ -408,6 +408,24 @@ export const de: Record<keyof typeof zh, string> = {
     'config.design.tab.systems': 'Designsysteme',
     'config.design.tab.skills': 'Design-Skills',
 
+    // ── Konfiguration: Import (aus Claude Code / Codex / Cursor) ──
+    'config.nav.import': 'Importieren',
+    'config.import.title': 'Aus anderen KI-Apps importieren',
+    'config.import.subtitle': 'Konfiguration erkannt, die zu SemaCode hinzugefügt werden kann',
+    'config.import.detecting': 'Wird erkannt...',
+    'config.import.nothingToImport': 'Nichts zu importieren',
+    'config.import.importBtn': 'Importieren',
+    'config.import.panelTitle': 'Aus {source} importieren',
+    'config.import.scope.project': 'Aktuelles Projekt',
+    'config.import.scope.user': 'Benutzerweit',
+    'config.import.scopeLabel': 'Bereich',
+    'config.import.exists': 'Bereits vorhanden',
+    'config.import.summary': '{n} Einträge werden importiert, {m} übersprungen',
+    'config.import.start': 'Import starten',
+    'config.import.importing': 'Importiere...',
+    'config.import.loadFailed': 'Lesen fehlgeschlagen: {error}',
+    'config.import.cat.rule': 'Regeln',
+
     // ── config: task config / background tasks / cron ──
     'config.task.title': 'Aufgabenkonfiguration',
     'config.task.noModel': 'Keine Modelle verfügbar',
@@ -607,6 +625,7 @@ Erstellen Sie hier beliebige Projektdateien; die Sema-Erweiterung passt sich aut
     'host.cfg.commandCreated': 'Befehl erstellt',
     'host.cfg.deleteCommandConfirm': 'Befehl "{name}" löschen?',
     'host.cfg.op.deleteCommand': 'Löschen des Befehls',
+    'host.cfg.op.import': 'Konfiguration importieren',
     'host.cfg.op.browserControl': 'Umschalten der Browsersteuerung',
     'host.cfg.commandDeleted': 'Befehl gelöscht',
     'host.cfg.op.addMcp': 'Hinzufügen des MCP-Servers',

@@ -408,6 +408,24 @@ export const en: Record<keyof typeof zh, string> = {
     'config.design.tab.systems': 'Design Systems',
     'config.design.tab.skills': 'Design Skills',
 
+    // ── Config: Import (from Claude Code / Codex / Cursor) ──
+    'config.nav.import': 'Import',
+    'config.import.title': 'Import from other AI apps',
+    'config.import.subtitle': 'Configuration that can be added to SemaCode was detected',
+    'config.import.detecting': 'Detecting...',
+    'config.import.nothingToImport': 'Nothing to import',
+    'config.import.importBtn': 'Import',
+    'config.import.panelTitle': 'Import from {source}',
+    'config.import.scope.project': 'Current project',
+    'config.import.scope.user': 'User global',
+    'config.import.scopeLabel': 'Scope',
+    'config.import.exists': 'Already exists',
+    'config.import.summary': '{n} items will be imported, {m} skipped',
+    'config.import.start': 'Start import',
+    'config.import.importing': 'Importing...',
+    'config.import.loadFailed': 'Failed to read: {error}',
+    'config.import.cat.rule': 'Rules',
+
     // ── config: task config / background tasks / cron ──
     'config.task.title': 'Task Config',
     'config.task.noModel': 'No models available',
@@ -608,6 +626,7 @@ Create any kind of project files here; the Sema extension adapts to the current 
     'host.cfg.deleteCommandConfirm': 'Delete command "{name}"?',
     'host.cfg.op.deleteCommand': 'delete command',
     'host.cfg.op.browserControl': 'toggle browser control',
+    'host.cfg.op.import': 'import config',
     'host.cfg.commandDeleted': 'Command deleted',
     'host.cfg.op.addMcp': 'add MCP server',
     'host.cfg.mcpAdded': 'MCP server added',

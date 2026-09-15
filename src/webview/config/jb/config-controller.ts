@@ -2,6 +2,8 @@ import type { Transport } from '../../chat/jb/transport';
 import { RemoteCore } from '../../chat/jb/remote';
 import { defaultConfig, DEFAULT_CUSTOM_RULES } from '../default/defaultConfig';
 import { t, normalizeLang } from '../../common/i18n/core';
+import { detectSources, previewImport, executeImport } from '../import/importer';
+import type { ImportFs, ImportRoots, ImportSource, ImportItem } from '../import/types';
 
 /**
  * 配置页控制器（JB 版）—— 1:1 复刻 VSCode 端 ConfigWebviewProvider 的 handler → 出站 command 映射，
@@ -308,6 +310,18 @@ export class ConfigController {
                 await this.respond('updateMCPUseToolsResult', () => this.core.updateMCPUseTools(m.name, m.toolNames), (data) => ({ message: t('host.cfg.toolsUpdated'), data }));
                 break;
 
+            // ─── 导入（从 Claude Code / Codex / Cursor）────────────────
+            // 与 VSCode 同名三个消息；文件读写经 callEditor('fileOps') 下沉到 Kotlin，写入仍走 RemoteCore 公开 API
+            case 'importDetectSources':
+                await this.respond('importDetectSourcesResult', async () => detectSources(this.importFs, await this.importRoots()), (data) => ({ data }));
+                break;
+            case 'importPreview':
+                await this.respond('importPreviewResult', async () => previewImport(this.importFs, await this.importRoots(), this.core, m.source as ImportSource), (data) => ({ source: m.source, data }));
+                break;
+            case 'importExecute':
+                await this.respond('importExecuteResult', async () => executeImport(this.importFs, await this.importRoots(), this.core, (m.items ?? []) as ImportItem[]), (data) => ({ source: m.source, data }));
+                break;
+
             // ─── Memory / Rule ─────────────────────────────────────────
             case 'loadMemoryInfo':
                 await this.respond('loadMemoryInfoResult', () => this.core.getMemoryInfo(), (data) => ({ data }), null);
@@ -467,5 +481,38 @@ export class ConfigController {
 
     private findUserBrowserMcp(servers: any[]): any | undefined {
         return (servers ?? []).find(s => s?.config?.name === BROWSER_MCP_NAME && (s?.scope ?? s?.config?.scope) === 'user');
+    }
+
+    // ─── 导入：ImportFs 的 Kotlin 实现（editor channel，type=fileOps）──────────
+
+    private fileOps(payload: Record<string, any>): Promise<any> { return this.t.callEditor('fileOps', payload); }
+
+    // 只建一次（字段初始化器里 t 会被构造参数 t 遮蔽，故用 getter 惰性建）
+    private importFsCache?: ImportFs;
+    private get importFs(): ImportFs {
+        return this.importFsCache ??= {
+            exists: async (p) => !!(await this.fileOps({ op: 'exists', path: p }))?.exists,
+            readFile: async (p) => {
+                const r = await this.fileOps({ op: 'readFile', path: p });
+                if (typeof r?.content !== 'string') throw new Error(t('host.editorOpFailed'));
+                return r.content;
+            },
+            readDir: async (p) => {
+                const r = await this.fileOps({ op: 'readDir', path: p });
+                return Array.isArray(r?.entries) ? r.entries.map((e: any) => ({ name: String(e.name), isDir: !!e.isDir })) : [];
+            },
+            writeFile: async (p, content) => { await this.fileOps({ op: 'writeFile', path: p, content }); },
+            copyDir: async (src, dst) => { await this.fileOps({ op: 'copyDir', src, dst }); },
+        };
+    }
+
+    /** home / project / sep 在面板生命周期内不变，只向 Kotlin 取一次（调用方均在 respond 内，ensureInit 已由其保证） */
+    private importRootsPromise: Promise<ImportRoots> | null = null;
+    private importRoots(): Promise<ImportRoots> {
+        this.importRootsPromise ??= this.fileOps({ op: 'roots' }).then(
+            r => ({ home: String(r?.home ?? ''), project: r?.project ? String(r.project) : undefined, sep: r?.sep === '\\' ? '\\' : '/' }),
+            e => { this.importRootsPromise = null; throw e; },
+        );
+        return this.importRootsPromise;
     }
 }

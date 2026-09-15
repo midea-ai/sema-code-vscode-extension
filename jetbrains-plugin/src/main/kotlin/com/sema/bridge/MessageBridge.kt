@@ -6,6 +6,7 @@ import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.diagnostic.logger
 import com.intellij.openapi.fileEditor.FileEditorManager
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.vfs.LocalFileSystem
 import com.sema.config.SemaBundle
 import com.sema.config.SemaConfigVirtualFile
 import com.sema.config.SessionHistoryManager
@@ -75,6 +76,7 @@ class MessageBridge(
                 when (obj.str("type")) {
                     "systemConfig" -> handleSystemConfig(obj)
                     "browserControl" -> handleBrowserControl(obj)
+                    "fileOps" -> handleFileOps(obj)
                     "history" -> handleHistory(obj)
                     "confirm" -> handleConfirm(obj)
                     // 跨面板深链（页面各持独立连接，pushToWeb 只能推自己面板，必须经总线）：
@@ -198,6 +200,62 @@ class MessageBridge(
         } catch (e: Exception) {
             replyEditorError(reqId, e.message ?: e.toString())
         }
+    }
+
+    /**
+     * 配置页「导入」的通用文件操作（channel=editor, type=fileOps）：webview 无 fs，读三家配置、拷 skill / Agent / Command / 规则文件、
+     * 合并写 hooks.json 都下沉到这里；只有 MCP 写入走 RemoteCore 公开 API。
+     * 路径一律绝对路径（由 roots 给出 home / project 后在 webview 拼接），读写都直走 java.io.File 不经 VFS。
+     * 大文件读取 / 目录递归拷贝可能较慢，放到池线程执行，避免占住 JCEF 查询线程拖住同面板其他 editor 请求。
+     */
+    private fun handleFileOps(obj: JsonObject) {
+        val reqId = obj.str("reqId")
+        val payload = runCatching { gson.fromJson(obj.str("payload"), JsonObject::class.java) }.getOrNull() ?: JsonObject()
+        ApplicationManager.getApplication().executeOnPooledThread {
+            try {
+                val data: Any = when (val op = payload.str("op")) {
+                    "roots" -> mapOf(
+                        "home" to System.getProperty("user.home"),
+                        "project" to (project.basePath ?: ""),
+                        "sep" to java.io.File.separator,
+                    )
+                    "exists" -> mapOf("exists" to java.io.File(payload.str("path")).exists())
+                    "readFile" -> mapOf("content" to java.io.File(payload.str("path")).readText(Charsets.UTF_8))
+                    "readDir" -> {
+                        val dir = java.io.File(payload.str("path"))
+                        val entries = if (dir.isDirectory) (dir.listFiles() ?: emptyArray()).map {
+                            mapOf("name" to it.name, "isDir" to it.isDirectory)
+                        } else emptyList()
+                        mapOf("entries" to entries)
+                    }
+                    "writeFile" -> {
+                        val f = java.io.File(payload.str("path"))
+                        f.parentFile?.mkdirs()
+                        f.writeText(payload.str("content"), Charsets.UTF_8)
+                        refreshVfs(f)
+                        emptyMap<String, Any?>()
+                    }
+                    "copyDir" -> {
+                        val src = java.io.File(payload.str("src"))
+                        val dst = java.io.File(payload.str("dst"))
+                        if (!src.isDirectory) throw IllegalStateException("源目录不存在: ${src.path}")
+                        dst.parentFile?.mkdirs()
+                        src.copyRecursively(dst, overwrite = false)
+                        refreshVfs(dst)
+                        emptyMap<String, Any?>()
+                    }
+                    else -> throw IllegalStateException("未知 fileOps op: $op")
+                }
+                replyEditor(reqId, data)
+            } catch (e: Exception) {
+                replyEditorError(reqId, e.message ?: e.toString())
+            }
+        }
+    }
+
+    /** 外部写盘后让 IDE 的 VFS 感知（异步，不阻塞回帧）；写在项目目录之外时无害。 */
+    private fun refreshVfs(file: java.io.File) {
+        runCatching { LocalFileSystem.getInstance().refreshIoFiles(listOf(file), true, true, null) }
     }
 
     private fun readResource(path: String): ByteArray? =

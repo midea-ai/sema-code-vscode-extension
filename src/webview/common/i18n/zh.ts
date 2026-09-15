@@ -409,6 +409,24 @@ export const zh = {
     'config.design.tab.systems': '设计系统',
     'config.design.tab.skills': '设计技能',
 
+    // ── 配置页：导入（从 Claude Code / Codex / Cursor）──
+    'config.nav.import': '导入',
+    'config.import.title': '从其他 AI 应用导入',
+    'config.import.subtitle': '检测到可添加到 SemaCode 的配置',
+    'config.import.detecting': '正在检测...',
+    'config.import.nothingToImport': '没有可导入的项',
+    'config.import.importBtn': '导入',
+    'config.import.panelTitle': '从 {source} 导入',
+    'config.import.scope.project': '当前项目',
+    'config.import.scope.user': '用户全局',
+    'config.import.scopeLabel': '范围',
+    'config.import.exists': '已存在',
+    'config.import.summary': '将导入 {n} 项，跳过 {m} 项',
+    'config.import.start': '开始导入',
+    'config.import.importing': '导入中...',
+    'config.import.loadFailed': '读取失败：{error}',
+    'config.import.cat.rule': '规则',
+
     // ── 配置页：任务配置 / 后台任务 / 定时任务 ──
     'config.task.title': '任务配置',
     'config.task.noModel': '无可用模型',
@@ -609,6 +627,7 @@ export const zh = {
     'host.cfg.deleteCommandConfirm': '确定要删除 Command "{name}" 吗？',
     'host.cfg.op.deleteCommand': '删除 Command',
     'host.cfg.op.browserControl': '切换浏览器控制',
+    'host.cfg.op.import': '导入配置',
     'host.cfg.commandDeleted': 'Command 已删除',
     'host.cfg.op.addMcp': '添加 MCP Server',
     'host.cfg.mcpAdded': 'MCP Server 添加成功',
