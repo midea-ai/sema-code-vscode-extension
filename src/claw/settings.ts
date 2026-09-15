@@ -33,11 +33,11 @@ function safeReadJson<T>(p: string): T | null {
   }
 }
 
-/** 读取当前详略档；文件缺失或非法值时回退到 "detailed"。 */
+/** 读取当前详略档；文件缺失或非法值时回退到 "minimal"。 */
 export function loadClawVerbosity(): ClawVerbosity {
   const s = safeReadJson<ClawSettings>(clawSettingsPath());
   const v = s?.verbosity;
-  return v && VALID.has(v) ? v : "detailed";
+  return v && VALID.has(v) ? v : "minimal";
 }
 
 /** 写入详略档（合并保留 settings.json 中的其它字段）。 */

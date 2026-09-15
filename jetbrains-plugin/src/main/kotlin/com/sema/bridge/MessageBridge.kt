@@ -26,6 +26,12 @@ import semacore.transport.SemaEvent
 /** 面板类型：让桥区分自己承载的是哪个 webview（当前仅用于配置页的就绪信号）。 */
 enum class PanelKind { CHAT, CONFIG, HISTORY, OTHER }
 
+// 浏览器控制资产（由 build.gradle.kts 的 syncChromeAssets 从主工程 assets/chrome 同步进插件资源）
+private const val BROWSER_ASSETS_DIR = "assets/chrome"
+private const val BROWSER_SKILL_NAME = "chrome-use"
+private const val BROWSER_MCP_NAME = "chrome"
+private val BROWSER_SKILL_FILES = listOf("SKILL.md")
+
 class MessageBridge(
     private val project: Project,
     private val pushToWeb: (String) -> Unit,
@@ -68,6 +74,7 @@ class MessageBridge(
             "editor" -> {
                 when (obj.str("type")) {
                     "systemConfig" -> handleSystemConfig(obj)
+                    "browserControl" -> handleBrowserControl(obj)
                     "history" -> handleHistory(obj)
                     "confirm" -> handleConfirm(obj)
                     // 跨面板深链（页面各持独立连接，pushToWeb 只能推自己面板，必须经总线）：
@@ -159,6 +166,43 @@ class MessageBridge(
     }
 
     /** 破坏性操作确认弹窗（channel=editor, type=confirm；带 reqId 回帧供 callEditor resolve）。对齐 VSCode configWebview.confirm 的 modal 警告。 */
+    /**
+     * 浏览器控制的宿主侧准备（webview 无 fs，此两步下沉到 Kotlin；其余 skill 刷新 / MCP 增删走 gRPC，见 config-controller）：
+     * op=prepare → 用户级 chrome-use skill 目录缺失时从插件资源拷贝；读取 mcp.json 模板，回传 chrome 项。
+     * 资源在 jar 内无法列目录，skill 文件按已知清单逐个拷贝：assets/chrome/skills/chrome-use 新增文件时需同步更新 BROWSER_SKILL_FILES。
+     */
+    private fun handleBrowserControl(obj: JsonObject) {
+        val reqId = obj.str("reqId")
+        val payload = runCatching { gson.fromJson(obj.str("payload"), JsonObject::class.java) }.getOrNull() ?: JsonObject()
+        try {
+            when (payload.str("op")) {
+                "prepare" -> {
+                    val skillDir = java.io.File(System.getProperty("user.home"), ".sema/skills/$BROWSER_SKILL_NAME")
+                    if (!java.io.File(skillDir, "SKILL.md").exists()) {
+                        skillDir.mkdirs()
+                        for (name in BROWSER_SKILL_FILES) {
+                            val bytes = readResource("$BROWSER_ASSETS_DIR/skills/$BROWSER_SKILL_NAME/$name")
+                                ?: throw IllegalStateException("插件资源缺少 $BROWSER_ASSETS_DIR/skills/$BROWSER_SKILL_NAME/$name")
+                            java.io.File(skillDir, name).writeBytes(bytes)
+                        }
+                    }
+                    val template = readResource("$BROWSER_ASSETS_DIR/mcp.json")?.toString(Charsets.UTF_8)
+                        ?: throw IllegalStateException("插件资源缺少 $BROWSER_ASSETS_DIR/mcp.json")
+                    val entry = gson.fromJson(template, JsonObject::class.java)
+                        ?.getAsJsonObject("mcpServers")?.getAsJsonObject(BROWSER_MCP_NAME)
+                        ?: throw IllegalStateException("$BROWSER_ASSETS_DIR/mcp.json 缺少 mcpServers.$BROWSER_MCP_NAME")
+                    replyEditor(reqId, mapOf("mcp" to toMap(entry)))
+                }
+                else -> replyEditorError(reqId, "未知 browserControl op: ${payload.str("op")}")
+            }
+        } catch (e: Exception) {
+            replyEditorError(reqId, e.message ?: e.toString())
+        }
+    }
+
+    private fun readResource(path: String): ByteArray? =
+        MessageBridge::class.java.classLoader.getResourceAsStream(path)?.use { it.readBytes() }
+
     private fun handleConfirm(obj: JsonObject) {
         val reqId = obj.str("reqId")
         val payload = runCatching { gson.fromJson(obj.str("payload"), JsonObject::class.java) }.getOrNull() ?: JsonObject()

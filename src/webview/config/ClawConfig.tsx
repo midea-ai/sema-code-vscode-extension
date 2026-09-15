@@ -26,10 +26,10 @@ type Verbosity = 'detailed' | 'medium' | 'simple' | 'minimal';
 
 // 信息显示详略：控制远程（微信）会话转发到手机的工具信息多少（文案为 key，渲染期经 t() 取值）。
 const VERBOSITY_OPTIONS: { id: Verbosity; nameKey: I18nKey; descKey: I18nKey; badgeKey?: I18nKey }[] = [
-    { id: 'detailed', nameKey: 'config.claw.verbosity.detailed', descKey: 'config.claw.verbosity.detailedDesc', badgeKey: 'config.claw.default' },
+    { id: 'detailed', nameKey: 'config.claw.verbosity.detailed', descKey: 'config.claw.verbosity.detailedDesc' },
     { id: 'medium', nameKey: 'config.claw.verbosity.medium', descKey: 'config.claw.verbosity.mediumDesc' },
     { id: 'simple', nameKey: 'config.claw.verbosity.simple', descKey: 'config.claw.verbosity.simpleDesc' },
-    { id: 'minimal', nameKey: 'config.claw.verbosity.minimal', descKey: 'config.claw.verbosity.minimalDesc' },
+    { id: 'minimal', nameKey: 'config.claw.verbosity.minimal', descKey: 'config.claw.verbosity.minimalDesc', badgeKey: 'config.claw.default' },
 ];
 
 /**
@@ -55,7 +55,7 @@ const ClawConfig: React.FC<ClawConfigProps> = ({ vscode }) => {
     const [feishuError, setFeishuError] = useState<string | null>(null);
     // 当前绑定的平台（'wechat' | 'feishu' | null）：决定哪张卡可配置——单频道，二选一。
     const [platform, setPlatform] = useState<string | null>(null);
-    const [verbosity, setVerbosity] = useState<Verbosity>('detailed');
+    const [verbosity, setVerbosity] = useState<Verbosity>('minimal');
     // 标记当前二维码是否已展示：用于区分首张二维码与后端自动刷新（不自动换图，转为「已过期」）
     const qrShownRef = useRef(false);
 

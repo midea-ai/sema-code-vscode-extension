@@ -47,11 +47,11 @@ class SystemConfigManager {
             "enableToolSearch" to true,
             "enableInputPrediction" to true,
             "enablePet" to false,
-            "defaultPermissionLevel" to "Ask",
+            "defaultPermissionLevel" to "AutoRun",
         )
 
         // 仅落本地、不推 sema-core 的键（对齐 semaProcessWrapper.LOCAL_SYSTEM_CONFIG_KEYS）
-        private val LOCAL_KEYS = setOf("enablePet", "showThinkingText", "defaultPermissionLevel")
+        private val LOCAL_KEYS = setOf("enablePet", "showThinkingText", "defaultPermissionLevel", "enableBrowserControl")
 
         /** 受支持的界面语言 → <html lang> 值；需与 src/webview/common/i18n/core.ts 的 LANGS 同步维护。 */
         private val HTML_LANGS: Map<String, String> = linkedMapOf(

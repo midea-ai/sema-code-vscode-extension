@@ -15,11 +15,18 @@ import { t, normalizeLang } from '../../common/i18n/core';
  */
 
 // 仅落宿主本地、不推 sema-core 的系统配置键（对齐 semaProcessWrapper.LOCAL_SYSTEM_CONFIG_KEYS）
-const LOCAL_SYSTEM_CONFIG_KEYS = ['enablePet', 'showThinkingText', 'defaultPermissionLevel'];
+const LOCAL_SYSTEM_CONFIG_KEYS = ['enablePet', 'showThinkingText', 'defaultPermissionLevel', 'enableBrowserControl'];
+
+// 浏览器控制：用户级 chrome-use skill + 用户级 chrome MCP（对齐 VSCode BrowserControlManager 的常量）
+const BROWSER_SKILL_NAME = 'chrome-use';
+const BROWSER_MCP_NAME = 'chrome';
 
 export class ConfigController {
     private core: RemoteCore;
     private initialized = false;
+    // 浏览器控制开/关动作串行链：core 的两个 remove 都先查内存缓存，add / 拷目录后的 refresh 是异步的，
+    // 快速点两下若不串行，remove 会因缓存里还没有该项而空转，文件里的项就残留了（对齐 VSCode BrowserControlManager.chain）。
+    private browserControlChain: Promise<unknown> = Promise.resolve();
 
     constructor(private t: Transport, private postToApp: (msg: any) => void) {
         this.core = new RemoteCore(t);
@@ -160,9 +167,13 @@ export class ConfigController {
                     await this.ensureInit();
                     // 重置不改界面语言（对齐 VSCode configWebview.resetSystemConfig）：
                     // lang 保留当前持久化值，customRules 取当前语言对应的默认规则，其余字段回默认。
+                    // enableBrowserControl 只允许由 setBrowserControl 在动作成功后写入，重置时保留当前值，避免键与实际 skill/MCP 状态脱节
                     const current = await this.t.callEditor('systemConfig', { op: 'get' });
                     const lang = normalizeLang(current?.config?.lang);
-                    const resetConfig = { ...defaultConfig, lang, customRules: DEFAULT_CUSTOM_RULES[lang] };
+                    const resetConfig = {
+                        ...defaultConfig, lang, customRules: DEFAULT_CUSTOM_RULES[lang],
+                        enableBrowserControl: !!current?.config?.enableBrowserControl
+                    };
                     await this.t.callEditor('systemConfig', { op: 'save', config: resetConfig });
                     await this.core.updateCoreConfig(this.toCoreSystemConfig(resetConfig));
                     this.postToApp({ command: 'resetSystemConfigResult', success: true, data: resetConfig, message: t('host.cfg.systemReset') });
@@ -170,6 +181,7 @@ export class ConfigController {
                     this.postToApp({ command: 'resetSystemConfigResult', success: false, message: e?.message || t('host.cfg.resetFailed') });
                 }
                 break;
+            case 'setBrowserControl': await this.setBrowserControl(!!m.enabled); break;
 
             // ─── Tools ─────────────────────────────────────────────────
             case 'loadSystemTools':
@@ -399,5 +411,64 @@ export class ConfigController {
         } catch (e: any) {
             this.postToApp({ command: 'loadSystemConfigResult', success: false, data: defaultConfig, message: e?.message || t('host.cfg.loadFailed') });
         }
+    }
+
+    // ─── Browser control（对齐 VSCode configWebview.setBrowserControl + BrowserControlManager）─────────
+
+    /**
+     * 浏览器控制开关：串行执行补齐/删除 skill 与 MCP，全部成功后才落 enableBrowserControl。
+     * 回传 enabled：成功为目标值，失败为原值（页面据此回弹）。任一步失败不回滚（动作幂等，重试即补齐）。
+     */
+    private async setBrowserControl(enabled: boolean): Promise<void> {
+        let previous = false;
+        try {
+            const cur = await this.t.callEditor('systemConfig', { op: 'get' });
+            previous = !!cur?.config?.enableBrowserControl;
+            await this.ensureInit();
+            const run = () => (enabled ? this.enableBrowserControl() : this.disableBrowserControl());
+            const task = this.browserControlChain.then(run, run);
+            this.browserControlChain = task.catch(() => undefined);
+            const result = await task;
+            this.postToApp({ command: 'setBrowserControlResult', success: true, enabled: result });
+        } catch (e: any) {
+            const text = t('host.cfg.opFailed', { op: t('host.cfg.op.browserControl'), error: e?.message || t('common.unknownError') });
+            this.postToApp({ command: 'setBrowserControlResult', success: false, enabled: previous, message: text });
+        }
+    }
+
+    private async enableBrowserControl(): Promise<boolean> {
+        // 1. 拷 skill 目录 + 读 MCP 模板：webview 无 fs，下沉到 Kotlin（从插件资源 assets/chrome 取，与 VSCode 同源）
+        const prepared = await this.t.callEditor('browserControl', { op: 'prepare' });
+        // 2. 让 core 重新扫描 skills，把新目录加载进缓存
+        await this.core.getSkillsInfo(true);
+        // 3. 用户级没有 chrome MCP 就按模板添加
+        const servers: any[] = await this.core.getMCPServerInfo();
+        if (!this.findUserBrowserMcp(servers)) {
+            const entry = prepared?.mcp;
+            if (!entry) throw new Error(`assets/chrome/mcp.json 缺少 mcpServers.${BROWSER_MCP_NAME}`);
+            await this.core.addMCPServer({ ...entry, name: BROWSER_MCP_NAME, scope: 'user' });
+        }
+        // 4. 三步全部完成后才落配置键
+        await this.t.callEditor('systemConfig', { op: 'saveByKey', key: 'enableBrowserControl', value: true });
+        return true;
+    }
+
+    private async disableBrowserControl(): Promise<boolean> {
+        // 1. 只删用户级 chrome MCP；项目级同名项不动
+        const servers: any[] = await this.core.getMCPServerInfo();
+        if (this.findUserBrowserMcp(servers)) {
+            await this.core.removeMCPServer(BROWSER_MCP_NAME);
+        }
+        // 2. 只删用户级 chrome-use skill
+        const skills: any[] = await this.core.getSkillsInfo();
+        if ((skills ?? []).some(s => s?.name === BROWSER_SKILL_NAME && s?.locate === 'user')) {
+            await this.core.removeSkillConf(BROWSER_SKILL_NAME);
+        }
+        await this.t.callEditor('systemConfig', { op: 'saveByKey', key: 'enableBrowserControl', value: false });
+        return false;
+    }
+
+    private findUserBrowserMcp(servers: any[]): any | undefined {
+        return (servers ?? []).find(s => s?.config?.name === BROWSER_MCP_NAME && (s?.scope ?? s?.config?.scope) === 'user');
     }
 }

@@ -461,14 +461,14 @@ export class Controller {
         }
     }
 
-    /** 读系统配置里的默认权限档位（Kotlin 本地持久化，对齐 semaSidebarProvider.getDefaultPermissionLevel），非法值回落 'Ask' */
+    /** 读系统配置里的默认权限档位（Kotlin 本地持久化，对齐 semaSidebarProvider.getDefaultPermissionLevel），非法值回落 'AutoRun' */
     private async getDefaultPermissionLevel(): Promise<PermissionLevel> {
         try {
             const res = await this.t.callEditor('systemConfig', { op: 'get' });
             const level = res?.config?.defaultPermissionLevel;
-            return level === 'AutoEdit' || level === 'AutoRun' || level === 'Bypass' ? level : 'Ask';
+            return level === 'Ask' || level === 'AutoEdit' || level === 'Bypass' ? level : 'AutoRun';
         } catch {
-            return 'Ask';
+            return 'AutoRun';
         }
     }
 

@@ -195,10 +195,10 @@ export class SemaSidebarProvider implements vscode.WebviewViewProvider {
 
     // ─── 会话生命周期 ─────────────────────────────────────────────────────────
 
-    /** 读系统配置里的默认权限档位（扩展端本地字段），非法值回落 'Ask' */
+    /** 读系统配置里的默认权限档位（扩展端本地字段），非法值回落 'AutoRun' */
     private getDefaultPermissionLevel(): PermissionLevel {
         const level = (this.processWrapper.getSystemConfig() as Record<string, any>).defaultPermissionLevel;
-        return level === 'AutoEdit' || level === 'AutoRun' || level === 'Bypass' ? level : 'Ask';
+        return level === 'Ask' || level === 'AutoEdit' || level === 'Bypass' ? level : 'AutoRun';
     }
 
     /**

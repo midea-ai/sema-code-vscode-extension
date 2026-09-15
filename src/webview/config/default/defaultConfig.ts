@@ -41,5 +41,5 @@ export const defaultConfig = {
     enableInputPrediction: true,
     enablePet: false,
     enableBrowserControl: false,
-    defaultPermissionLevel: 'Ask'
+    defaultPermissionLevel: 'AutoRun'
 };

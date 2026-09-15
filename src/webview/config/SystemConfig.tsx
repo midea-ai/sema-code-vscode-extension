@@ -378,51 +378,49 @@ const SystemConfig: React.FC<SystemConfigProps> = ({ vscode }) => {
                 </div>
             </div>
 
-            {/* 集成（JB 不渲染） */}
-            {!IS_JB && (
-                <div className="config-section">
-                    <h3 className="config-section-title">{t('config.system.integrations')}</h3>
-                    <div className="form-row">
-                        <div className="form-group">
-                            <label
-                                className={`checkbox-label${browserControlSupported ? '' : ' disabled'}`}
-                                title={t('config.system.browserControlTip')}
-                                style={browserControlBusy ? { cursor: 'progress' } : undefined}
-                            >
-                                <input
-                                    type="checkbox"
-                                    checked={browserControlSupported && (config.enableBrowserControl || false)}
-                                    disabled={!browserControlSupported || !!browserControlBusy}
-                                    onChange={(e) => handleBrowserControlChange(e.target.checked)}
-                                />
-                                <span className="checkmark"></span>
-                                {t('config.system.browserControl')}
-                                {!browserControlSupported && t('config.system.browserControlUnsupportedSuffix')}
-                                {platform === 'linux' && t('config.system.browserControlExperimentalSuffix')}
-                            </label>
-                            {browserControlBusy && (
-                                <div className="browser-control-hint">
-                                    {browserControlBusy === 'enabling'
-                                        ? t('config.system.browserControlEnabling')
-                                        : t('config.system.browserControlDisabling')}
-                                </div>
-                            )}
-                            {!browserControlBusy && browserControlSupported && config.enableBrowserControl && (
-                                <div className="browser-control-hint">
-                                    {t('config.system.browserControlInstallPrefix')}
-                                    <a
-                                        href="#"
-                                        className="browser-control-hint-link"
-                                        onClick={(e) => { e.preventDefault(); vscode.postMessage({ command: 'openExternal', url: CHROME_EXTENSION_STORE_URL }); }}
-                                    >
-                                        {t('config.system.browserControlInstallLink')}
-                                    </a>
-                                </div>
-                            )}
-                        </div>
+            {/* 集成：VSCode 与 JB 同样渲染，JB 侧由 config-controller 的 setBrowserControl 承接 */}
+            <div className="config-section">
+                <h3 className="config-section-title">{t('config.system.integrations')}</h3>
+                <div className="form-row">
+                    <div className="form-group">
+                        <label
+                            className={`checkbox-label${browserControlSupported ? '' : ' disabled'}`}
+                            title={t('config.system.browserControlTip')}
+                            style={browserControlBusy ? { cursor: 'progress' } : undefined}
+                        >
+                            <input
+                                type="checkbox"
+                                checked={browserControlSupported && (config.enableBrowserControl || false)}
+                                disabled={!browserControlSupported || !!browserControlBusy}
+                                onChange={(e) => handleBrowserControlChange(e.target.checked)}
+                            />
+                            <span className="checkmark"></span>
+                            {t('config.system.browserControl')}
+                            {!browserControlSupported && t('config.system.browserControlUnsupportedSuffix')}
+                            {platform === 'linux' && t('config.system.browserControlExperimentalSuffix')}
+                        </label>
+                        {browserControlBusy && (
+                            <div className="browser-control-hint">
+                                {browserControlBusy === 'enabling'
+                                    ? t('config.system.browserControlEnabling')
+                                    : t('config.system.browserControlDisabling')}
+                            </div>
+                        )}
+                        {!browserControlBusy && browserControlSupported && config.enableBrowserControl && (
+                            <div className="browser-control-hint">
+                                {t('config.system.browserControlInstallPrefix')}
+                                <a
+                                    href="#"
+                                    className="browser-control-hint-link"
+                                    onClick={(e) => { e.preventDefault(); vscode.postMessage({ command: 'openExternal', url: CHROME_EXTENSION_STORE_URL }); }}
+                                >
+                                    {t('config.system.browserControlInstallLink')}
+                                </a>
+                            </div>
+                        )}
                     </div>
                 </div>
-            )}
+            </div>
 
             {/* 开关配置 */}
             <div className="config-section">
@@ -445,7 +443,7 @@ const SystemConfig: React.FC<SystemConfigProps> = ({ vscode }) => {
                             <div className="perm-level-select">
                                 <IconSelect
                                     id="defaultPermissionLevel"
-                                    value={config.defaultPermissionLevel || 'Ask'}
+                                    value={config.defaultPermissionLevel || 'AutoRun'}
                                     onChange={(value) => handleChange('defaultPermissionLevel', value)}
                                     options={PERMISSION_LEVEL_OPTIONS.map(opt => ({
                                         value: opt.value,

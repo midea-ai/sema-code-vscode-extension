@@ -71,8 +71,15 @@ val syncWeb by tasks.registering(Copy::class) {
     include("jb-*.js")
 }
 
+// 从主工程同步浏览器控制资产（chrome-use skill + chrome MCP 模板）到 resources/assets/chrome，
+// 与 VSCode 的 assets/chrome 同源，避免两端 SKILL.md / mcp.json 漂移。
+val syncChromeAssets by tasks.registering(Copy::class) {
+    from("../assets/chrome")
+    into(layout.buildDirectory.dir("resources/main/assets/chrome"))
+}
+
 tasks.named("processResources") {
-    dependsOn(syncWeb)
+    dependsOn(syncWeb, syncChromeAssets)
 }
 
 // 打包产物直接落在 jetbrains-plugin/ 根下，省得进 build/distributions 深目录
