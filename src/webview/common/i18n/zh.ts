@@ -410,10 +410,8 @@ export const zh = {
     'config.design.tab.skills': '设计技能',
 
     // ── 配置页：任务配置 / 后台任务 / 定时任务 ──
-    'config.task.updated': '✓ 任务配置已更新',
     'config.task.title': '任务配置',
     'config.task.noModel': '无可用模型',
-    'config.task.confirm': '确认提交',
     'config.task.recommendMain': '主对话使用的模型',
     'config.task.recommendQuick': '话题识别、命令前缀提取等轻量任务使用的模型',
     'config.bgTask.shellDetail': 'Shell 详情',

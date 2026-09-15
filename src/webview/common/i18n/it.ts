@@ -409,10 +409,8 @@ export const it: Record<keyof typeof zh, string> = {
     'config.design.tab.skills': 'Skill di design',
 
     // ── config: task config / background tasks / cron ──
-    'config.task.updated': '✓ Config attività aggiornata',
     'config.task.title': 'Config attività',
     'config.task.noModel': 'Nessun modello disponibile',
-    'config.task.confirm': 'Applica',
     'config.task.recommendMain': 'Modello usato per la conversazione principale',
     'config.task.recommendQuick': 'Modello per attività leggere come il rilevamento dell\'argomento e l\'estrazione del prefisso dei comandi',
     'config.bgTask.shellDetail': 'Dettagli shell',

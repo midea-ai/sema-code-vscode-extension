@@ -409,10 +409,8 @@ export const de: Record<keyof typeof zh, string> = {
     'config.design.tab.skills': 'Design-Skills',
 
     // ── config: task config / background tasks / cron ──
-    'config.task.updated': '✓ Aufgabenkonfiguration aktualisiert',
     'config.task.title': 'Aufgabenkonfiguration',
     'config.task.noModel': 'Keine Modelle verfügbar',
-    'config.task.confirm': 'Übernehmen',
     'config.task.recommendMain': 'Modell für die Hauptunterhaltung',
     'config.task.recommendQuick': 'Modell für einfache Aufgaben wie Themenerkennung und Extraktion von Befehlspräfixen',
     'config.bgTask.shellDetail': 'Shell-Details',

@@ -10,70 +10,37 @@ interface TaskConfigProps {
     vscode: VscodeApi;
 }
 
+/**
+ * 任务配置：main / quick 两个下拉，选完即落盘，没有单独的提交按钮。
+ * 失败时扩展端会弹错误并重新 loadConfig，本地状态随 config 回滚；
+ * 成功反馈由上方模型表格里的 main / quick 角标移位承担，不再弹 toast。
+ */
 const TaskConfig: React.FC<TaskConfigProps> = ({ config, vscode }) => {
     const t = useT();
     const [taskConfig, setTaskConfig] = useState({
         main: '',
         quick: ''
     });
-    const [savedConfig, setSavedConfig] = useState({
-        main: '',
-        quick: ''
-    });
-    const [hasChanges, setHasChanges] = useState(false);
-    const [message, setMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
 
     // 解析模型名称以显示友好的名称（提供商由选项前的 logo 标识，不再重复文字后缀）
     const parseModelName = (modelName: string) => stripProviderSuffix(modelName);
 
     useEffect(() => {
         if (config && config.taskConfig) {
-            const newConfig = {
+            setTaskConfig({
                 main: config.taskConfig.main || '',
                 quick: config.taskConfig.quick || ''
-            };
-            setTaskConfig(newConfig);
-            setSavedConfig(newConfig);
+            });
         }
     }, [config]);
 
-    useEffect(() => {
-        const changed =
-            taskConfig.main !== savedConfig.main ||
-            taskConfig.quick !== savedConfig.quick;
-        setHasChanges(changed);
-    }, [taskConfig, savedConfig]);
-
-    useEffect(() => {
-        const handleMessage = (event: MessageEvent) => {
-            const msg = event.data;
-            if (msg.command === 'taskConfigConfirmed') {
-                setSavedConfig({ ...taskConfig });
-                setHasChanges(false);
-                setMessage({ text: t('config.task.updated'), type: 'success' });
-                setTimeout(() => setMessage(null), 3000);
-            }
-        };
-
-        window.addEventListener('message', handleMessage);
-        return () => window.removeEventListener('message', handleMessage);
-    }, [taskConfig]);
-
-    const handleChange = (field: string, value: string) => {
-        setTaskConfig(prev => ({ ...prev, [field]: value }));
-        vscode.postMessage({
-            command: 'updateModelPointer',
-            pointer: field,
-            modelName: value
-        });
-    };
-
-    const handleConfirm = () => {
-        if (!hasChanges) return;
-
+    const handleChange = (field: 'main' | 'quick', value: string) => {
+        if (taskConfig[field] === value) return;
+        const next = { ...taskConfig, [field]: value };
+        setTaskConfig(next);
         vscode.postMessage({
             command: 'confirmTaskConfig',
-            data: taskConfig
+            data: next
         });
     };
 
@@ -119,24 +86,6 @@ const TaskConfig: React.FC<TaskConfigProps> = ({ config, vscode }) => {
                     {RECOMMENDED_QUICK_MODEL_KEY && <span className="task-recommend">{t(RECOMMENDED_QUICK_MODEL_KEY)}</span>}
                 </div>
             </div>
-
-            <div className="task-row" style={{ marginTop: '20px' }}>
-                <div></div>
-                <button
-                    type="button"
-                    className="confirm-task-btn"
-                    disabled={!hasChanges}
-                    onClick={handleConfirm}
-                >
-                    {t('config.task.confirm')}
-                </button>
-            </div>
-
-            {message && (
-                <div className={`message ${message.type}`} style={{ marginTop: '12px', display: 'flex' }}>
-                    {message.text}
-                </div>
-            )}
         </div>
     );
 };

@@ -83,7 +83,6 @@ export class ConfigWebviewProvider {
                 saveConfig:                 () => this.saveConfig(m.data),
                 loadConfig:                 () => this.loadConfig(),
                 toggleModelActive:          () => this.toggleModelActive(m.provider, m.modelName),
-                updateModelPointer:         () => this.updateModelPointer(m.pointer, m.modelName),
                 confirmTaskConfig:          () => this.confirmTaskConfig(m.data),
                 testConnection:             () => this.testConnection(m.data),
                 deleteModel:                () => this.deleteModel(m.provider, m.modelName),
@@ -359,14 +358,10 @@ export class ConfigWebviewProvider {
         });
     }
 
-    private async updateModelPointer(pointer: string, modelName: string) {
-        this.postMessage({ command: 'taskConfigChanged', pointer, modelName });
-    }
-
+    /** 任务配置下拉选完即落盘；失败时 execute 弹错，随后 loadConfig 让前端状态回滚 */
     private async confirmTaskConfig(data: { main: string; quick: string }) {
         await this.execute('', t('host.cfg.op.updateTask'), async () => {
             await this.coreManager.applyTaskModel(data);
-            this.postMessage({ command: 'taskConfigConfirmed' });
             this.loadConfig();
         });
     }

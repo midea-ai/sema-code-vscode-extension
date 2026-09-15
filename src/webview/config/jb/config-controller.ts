@@ -93,11 +93,8 @@ export class ConfigController {
                 try { await this.ensureInit(); await this.core.switchModel(m.modelName); } catch { /* ignore */ }
                 await this.loadConfig();
                 break;
-            case 'updateModelPointer':
-                this.postToApp({ command: 'taskConfigChanged', pointer: m.pointer, modelName: m.modelName });
-                break;
             case 'confirmTaskConfig':
-                try { await this.ensureInit(); await this.core.applyTaskModel(m.data); this.postToApp({ command: 'taskConfigConfirmed' }); } catch { /* ignore */ }
+                try { await this.ensureInit(); await this.core.applyTaskModel(m.data); } catch { /* ignore */ }
                 await this.loadConfig();
                 break;
             case 'deleteModel':
