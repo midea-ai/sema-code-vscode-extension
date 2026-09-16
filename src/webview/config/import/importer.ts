@@ -36,6 +36,21 @@ function display(roots: ImportRoots, p: string): string {
     return p;
 }
 
+/**
+ * 在 ~/.claude.json 的 projects 里找当前项目的条目。键是 Claude Code 的 process.cwd() 原样（Windows 形如 C:\Users\x\repo），
+ * 而宿主给的项目根在 Windows 上对不上：VSCode 的 fsPath 盘符小写、JB 的 basePath 是正斜杠，所以 Windows 下按分隔符统一 + 忽略大小写比较。
+ */
+function findClaudeProject(projects: unknown, roots: ImportRoots): any {
+    if (!projects || typeof projects !== 'object' || !roots.project) return undefined;
+    const map = projects as Record<string, any>;
+    if (map[roots.project] !== undefined) return map[roots.project];
+    if (roots.sep !== '\\') return undefined;
+    const norm = (p: string) => p.replace(/\//g, '\\').replace(/\\+$/, '').toLowerCase();
+    const want = norm(roots.project);
+    const key = Object.keys(map).find(k => norm(k) === want);
+    return key === undefined ? undefined : map[key];
+}
+
 /** Sema 落盘根：用户级 ~/.sema，项目级 <项目>/.sema */
 function semaRoot(roots: ImportRoots, scope: ImportScope): string {
     return join(roots.sep, scope === 'user' ? roots.home : roots.project!, '.sema');
@@ -208,7 +223,7 @@ async function scanSource(fs: ImportFs, roots: ImportRoots, source: ImportSource
         if (await exists(fs, j(H, '.claude', 'CLAUDE.md'))) scanRule(ctx, j(H, '.claude', 'CLAUDE.md'), 'user');
         if (P) {
             await scanMcpJson(ctx, j(P, '.mcp.json'), 'project');
-            scanMcpServers(ctx, claudeJson?.projects?.[P]?.mcpServers, 'project', claudeJsonFile);
+            scanMcpServers(ctx, findClaudeProject(claudeJson?.projects, roots)?.mcpServers, 'project', claudeJsonFile);
             await scanSkills(ctx, j(P, '.claude', 'skills'), 'project');
             await scanMd(ctx, 'agent', j(P, '.claude', 'agents'), 'project');
             await scanMd(ctx, 'command', j(P, '.claude', 'commands'), 'project');
