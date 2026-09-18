@@ -23,9 +23,25 @@ const RESOURCE_BUNDLE_PATH = path.join(BIN_DIR, 'SemaPet_SemaPet.bundle');
 const INSTALLED_META_PATH = path.join(BIN_DIR, '.installed-meta.json');
 const SPAWN_READY_TIMEOUT_MS = 15000;  // 冷启动首启较慢，放宽就绪等待上限
 
+// 跨进程 spawn 锁：每个 VSCode 窗口是独立的 extension host，重启电脑 / VSCode 更新
+// 重启时 N 个窗口同时激活、同时 ping 失败、各 spawn 一个桌宠 → 桌面上出现多个桌宠
+// （Windows 二进制先建窗口再抢端口，抢不到就卡在报错弹窗里不退出；macOS 会退出但
+// 已把 runtime.json 的 pid 覆盖成死进程，导致后续 killPet 杀不到真正的桌宠）。
+// 锁文件与 pet/claude-code/lib/launcher.js 共用同一路径，Claude Code hook 与 VSCode
+// 同时拉起时也只会 spawn 一次。
+const SPAWN_LOCK_PATH = path.join(PET_DIR, 'spawn.lock');
+const SPAWN_LOCK_STALE_MS = 30000;      // 持锁进程崩溃 / 卡死时，超过这个时长视为陈旧锁
+const WAIT_OTHER_SPAWN_MS = 25000;      // 没抢到锁时等别的窗口把桌宠拉起来的上限（≥ 安装 + 15s 就绪）
+const WAIT_OTHER_SPAWN_INTERVAL_MS = 300;
+
 interface InstalledMeta {
   zipSize: number;
   zipMtimeMs: number;
+}
+
+interface SpawnLockInfo {
+  pid: number;
+  ts: number;
 }
 
 export function readRuntimeInfo(): PetRuntimeInfo | null {
@@ -36,7 +52,74 @@ export function readRuntimeInfo(): PetRuntimeInfo | null {
 export function killPet(): void {
   const info = readRuntimeInfo();
   if (!info?.pid) return;
+  // runtime.json 可能被抢端口失败的重复实例覆盖成死 pid，或被 pid 复用指向无关进程；
+  // 只对确认是 SemaPet 的进程发信号，避免误杀。
+  if (!isSemaPetProcess(info.pid)) return;
   try { process.kill(info.pid, 'SIGTERM'); } catch {}
+}
+
+function isSemaPetProcess(pid: number): boolean {
+  try {
+    if (process.platform === 'win32') {
+      const r = spawnSync('tasklist', ['/FI', `PID eq ${pid}`, '/FO', 'CSV', '/NH'], { encoding: 'utf8' });
+      return (r.stdout || '').toLowerCase().includes(BIN_NAME.toLowerCase());
+    }
+    const r = spawnSync('ps', ['-p', String(pid), '-o', 'comm='], { encoding: 'utf8' });
+    return path.basename((r.stdout || '').trim()) === BIN_NAME;
+  } catch {
+    return false;
+  }
+}
+
+function isProcessAlive(pid: number): boolean {
+  try { process.kill(pid, 0); return true; }
+  catch (e) { return (e as NodeJS.ErrnoException).code === 'EPERM'; }
+}
+
+function readSpawnLock(): SpawnLockInfo | null {
+  try { return JSON.parse(fs.readFileSync(SPAWN_LOCK_PATH, 'utf8')); }
+  catch { return null; }
+}
+
+function isSpawnLockStale(): boolean {
+  const info = readSpawnLock();
+  if (!info || typeof info.pid !== 'number' || typeof info.ts !== 'number') return true;
+  if (Date.now() - info.ts > SPAWN_LOCK_STALE_MS) return true;
+  return !isProcessAlive(info.pid);
+}
+
+/** 原子创建锁文件（wx）。锁已存在且新鲜 → false；陈旧锁清掉后重试一次。 */
+function tryAcquireSpawnLock(): boolean {
+  const payload = JSON.stringify({ pid: process.pid, ts: Date.now() } satisfies SpawnLockInfo);
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      fs.mkdirSync(PET_DIR, { recursive: true });
+      fs.writeFileSync(SPAWN_LOCK_PATH, payload, { flag: 'wx' });
+      return true;
+    } catch (e) {
+      // 非"已存在"类错误（权限、只读盘等）不阻塞启动，退回旧行为直接 spawn
+      if ((e as NodeJS.ErrnoException).code !== 'EEXIST') return true;
+      if (!isSpawnLockStale()) return false;
+      try { fs.unlinkSync(SPAWN_LOCK_PATH); } catch {}
+    }
+  }
+  return false;
+}
+
+function releaseSpawnLock(): void {
+  const info = readSpawnLock();
+  if (info?.pid !== process.pid) return;
+  try { fs.unlinkSync(SPAWN_LOCK_PATH); } catch {}
+}
+
+/** 别的进程正在拉起桌宠：不重复 spawn，只等它就绪。 */
+async function waitForOtherSpawn(): Promise<boolean> {
+  const deadline = Date.now() + WAIT_OTHER_SPAWN_MS;
+  while (Date.now() < deadline) {
+    if (await ping()) return true;
+    await new Promise(r => setTimeout(r, WAIT_OTHER_SPAWN_INTERVAL_MS));
+  }
+  return false;
 }
 
 /**
@@ -57,13 +140,21 @@ export async function ensurePetRunning(extensionPath: string): Promise<boolean> 
   }
   if (await ping()) return true;
 
-  const bundledZip = path.join(extensionPath, 'dist', 'pet', ZIP_NAME);
-  if (needsInstall(bundledZip)) {
-    const ok = extractFromExtension(bundledZip);
-    if (!ok) return false;
-  }
+  if (!tryAcquireSpawnLock()) return await waitForOtherSpawn();
+  try {
+    // 拿到锁后再探一次：锁在别人手里那段时间桌宠可能已经起来了
+    if (await ping()) return true;
 
-  return await spawnBinary();
+    const bundledZip = path.join(extensionPath, 'dist', 'pet', ZIP_NAME);
+    if (needsInstall(bundledZip)) {
+      const ok = extractFromExtension(bundledZip);
+      if (!ok) return false;
+    }
+
+    return await spawnBinary();
+  } finally {
+    releaseSpawnLock();
+  }
 }
 
 function readInstalledMeta(): InstalledMeta | null {
