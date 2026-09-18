@@ -30,6 +30,8 @@ function formatFileReference(file: any, quoted = true): string {
 export class Controller {
     private core: RemoteCore;
     private sessions = new Map<string, { wrapper: SemaSessionWrapper; remote: RemoteSession }>();
+    /** 正在从历史加载中的会话 id：历史面板双击会连发两次 loadHistorySession，第二次直接忽略 */
+    private loadingSessionIds = new Set<string>();
     private activeSessionId: string | null = null;
     private initialized = false;
     /** createSession ack 返回前到达的会话事件，先按 sessionId 缓冲，wrapper 就绪后回放。 */
@@ -242,6 +244,14 @@ export class Controller {
             this.postToApp({ type: 'sessionCreateFailed', error: res.error });
             return { ok: false, error: res.error };
         }
+        // 兜底：并发建同 id 会话时 core 会复用已有 session，这里也复用已有 wrapper
+        if (this.sessions.has(res.sessionId)) {
+            this.activeSessionId = res.sessionId;
+            this.core.setActiveSession(res.sessionId);
+            this.postToApp({ type: 'switchToSession', sessionId: res.sessionId });
+            this.reportState();
+            return { ok: true };
+        }
         const remote = new RemoteSession(res.sessionId, this.t);
         const wrapper = new SemaSessionWrapper(remote as any, this.callbacks, opts.agentMode ?? 'Agent', permissionLevel);
         this.sessions.set(res.sessionId, { wrapper, remote });
@@ -280,12 +290,19 @@ export class Controller {
             this.reportState();
             return;
         }
-        await this.createSession({
-            sessionId: session.id,
-            historyContent: session.content,
-            title: session.title,
-            agentMode: session.agentMode,
-        });
+        // 建会话是异步往返，期间再次点击同一条目会重复建 wrapper（对齐 semaSidebarProvider）
+        if (this.loadingSessionIds.has(session.id)) return;
+        this.loadingSessionIds.add(session.id);
+        try {
+            await this.createSession({
+                sessionId: session.id,
+                historyContent: session.content,
+                title: session.title,
+                agentMode: session.agentMode,
+            });
+        } finally {
+            this.loadingSessionIds.delete(session.id);
+        }
     }
 
     private handleUserInput(sid: string | undefined, text: string, files?: Array<any>, attachments?: any): void {

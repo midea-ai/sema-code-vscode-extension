@@ -43,6 +43,8 @@ export class SemaSidebarProvider implements vscode.WebviewViewProvider {
     /** 远程入口（claw）。极薄壳，运行时按需懒载，不开则零开销。 */
     private clawCoordinator: ClawCoordinator;
     private sessions: Map<string, SemaSessionWrapper> = new Map();
+    /** 正在从历史加载中的会话 id：历史面板双击会连发两次 loadSession，第二次直接忽略 */
+    private loadingSessionIds: Set<string> = new Set();
     private activeSessionId: string | null = null;
 
     private sessionHistoryManager: SessionHistoryManager;
@@ -227,6 +229,14 @@ export class SemaSidebarProvider implements vscode.WebviewViewProvider {
             if (!result.ok) {
                 this.chatWebviewProvider.postMessage({ type: 'sessionCreateFailed', error: result.error });
                 return { ok: false, error: result.error };
+            }
+
+            // 兜底：并发建同 id 会话时 core 会复用已有 session，这里也复用已有 wrapper，避免事件被转发两次
+            const existing = this.sessions.get(result.session.sessionId);
+            if (existing) {
+                this.switchActiveSession(existing.sessionId);
+                this.chatWebviewProvider.postMessage({ type: 'switchToSession', sessionId: existing.sessionId });
+                return { ok: true };
             }
 
             const wrapper = new SemaSessionWrapper(
@@ -570,14 +580,18 @@ export class SemaSidebarProvider implements vscode.WebviewViewProvider {
     // ─── 历史会话 ─────────────────────────────────────────────────────────────
 
     private async loadHistorySession(sessionId: string): Promise<void> {
-        try {
-            // 已打开则直接切换到对应 tab
-            if (this.sessions.has(sessionId)) {
-                this.switchActiveSession(sessionId);
-                this.chatWebviewProvider.postMessage({ type: 'switchToSession', sessionId });
-                return;
-            }
+        // 已打开则直接切换到对应 tab
+        if (this.sessions.has(sessionId)) {
+            this.switchActiveSession(sessionId);
+            this.chatWebviewProvider.postMessage({ type: 'switchToSession', sessionId });
+            return;
+        }
+        // 读历史与建会话都是异步的，期间再次点击同一条目会重复建 wrapper，
+        // 导致同一会话的事件被转发两次（回复、权限弹窗成对出现）
+        if (this.loadingSessionIds.has(sessionId)) return;
+        this.loadingSessionIds.add(sessionId);
 
+        try {
             const session = await this.sessionHistoryManager.getSession(sessionId);
             if (!session) {
                 vscode.window.showErrorMessage(t('host.sessionNotFound'));
@@ -599,6 +613,8 @@ export class SemaSidebarProvider implements vscode.WebviewViewProvider {
         } catch (error) {
             console.error('Error loading history session:', error);
             vscode.window.showErrorMessage(t('host.loadSessionFailed', { error: error instanceof Error ? error.message : t('common.unknownError') }));
+        } finally {
+            this.loadingSessionIds.delete(sessionId);
         }
     }
 
