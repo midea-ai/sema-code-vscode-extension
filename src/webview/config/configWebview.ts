@@ -159,6 +159,8 @@ export class ConfigWebviewProvider {
                 openBashOutput:             () => this.openBashOutput(m.content, m.title, m.toolId),
                 openAgentDetail:            () => Promise.resolve(this.openAgentDetail(m.taskId)),
                 openFile:                   () => Promise.resolve(this.openFile(m.filePath, m.line, m.endLine)),
+                loadUsageStats:             () => this.loadUsageStats(),
+                clearUsageStats:            () => this.clearUsageStats(),
                 loadCronTasks:              () => this.loadCronTasks(),
                 deleteCronTask:             () => this.deleteCronTask(m.id),
                 enableCronTask:             () => this.enableCronTask(m.id),
@@ -1034,6 +1036,27 @@ export class ConfigWebviewProvider {
             this.unwatchTask(taskId);
             this.postMessage({ command: 'stopTaskResult', success: true, taskId });
         });
+    }
+
+    // ─── 使用统计 ────────────────────────────────────────────────────────────
+    // 数据由 core 采集落盘；页面每次进入拉一次逐日聚合，时间范围求和在页面做。
+
+    private async loadUsageStats() {
+        try {
+            await this.ensureCoreReady();
+            const data = await this.coreManager.getUsageStats();
+            this.postMessage({ command: 'loadUsageStatsResult', success: true, data });
+        } catch (error) {
+            this.postMessage({ command: 'loadUsageStatsResult', success: false, message: (error as Error).message });
+        }
+    }
+
+    private async clearUsageStats() {
+        if (!await this.confirm(t('config.usage.clearConfirm'), t('config.usage.clearOk'))) {
+            this.postMessage({ command: 'clearUsageStatsResult', success: false, cancelled: true });
+            return;
+        }
+        await this.execute('clearUsageStatsResult', t('host.cfg.op.clearUsage'), () => this.coreManager.clearUsageStats());
     }
 
     // ─── Cron Tasks ─────────────────────────────────────────────────────────

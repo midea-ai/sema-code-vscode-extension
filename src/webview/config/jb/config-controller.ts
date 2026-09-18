@@ -23,6 +23,10 @@ const LOCAL_SYSTEM_CONFIG_KEYS = ['enablePet', 'showThinkingText', 'defaultPermi
 const BROWSER_SKILL_NAME = 'chrome-use';
 const BROWSER_MCP_NAME = 'chrome';
 
+// 使用统计的产品标识：读取时按它过滤本产品的数据；采集开关由 Kotlin 在 init 合并 usageProduct 时传给 core
+// （MessageBridge.mergeInitConfig，两处须一致；对齐 VSCode semaProcessWrapper.USAGE_PRODUCT）
+const USAGE_PRODUCT = 'sema-code-jetbrains';
+
 export class ConfigController {
     private core: RemoteCore;
     private initialized = false;
@@ -356,6 +360,18 @@ export class ConfigController {
                 break;
             case 'disableCronTask':
                 try { await this.ensureInit(); const success = await this.core.disableCronTask(m.id); this.postToApp({ command: 'disableCronTaskResult', success, id: m.id }); } catch { this.postToApp({ command: 'disableCronTaskResult', success: false, id: m.id }); }
+                break;
+
+            // ─── 使用统计（core 采集落盘，这里只读取与清除；对齐 VSCode configWebview.loadUsageStats / clearUsageStats）───
+            case 'loadUsageStats':
+                await this.respond('loadUsageStatsResult', () => this.core.getUsageStats(USAGE_PRODUCT), (data) => ({ data }), null);
+                break;
+            case 'clearUsageStats':
+                if (!await this.confirm(t('config.usage.clearConfirm'), t('config.usage.clearOk'))) {
+                    this.postToApp({ command: 'clearUsageStatsResult', success: false, cancelled: true });
+                    break;
+                }
+                await this.respond('clearUsageStatsResult', () => this.core.clearUsageStats(USAGE_PRODUCT), () => ({}), null);
                 break;
 
             // ─── Design ────────────────────────────────────────────────

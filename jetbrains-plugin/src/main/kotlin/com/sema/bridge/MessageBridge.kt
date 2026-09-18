@@ -33,6 +33,9 @@ private const val BROWSER_SKILL_NAME = "chrome-use"
 private const val BROWSER_MCP_NAME = "chrome"
 private val BROWSER_SKILL_FILES = listOf("SKILL.md")
 
+/** 使用统计的产品标识：init 传给 core 即启用采集；配置页读取时按同名常量过滤（config-controller.ts USAGE_PRODUCT，两处须一致）。 */
+private const val USAGE_PRODUCT = "sema-code-jetbrains"
+
 class MessageBridge(
     private val project: Project,
     private val pushToWeb: (String) -> Unit,
@@ -404,6 +407,8 @@ class MessageBridge(
         val payload = runCatching { gson.fromJson(payloadJson, JsonObject::class.java) }.getOrNull() ?: JsonObject()
         val merged = LinkedHashMap<String, Any?>(sysConfig.coreSubset())
         merged["disabledTools"] = sysConfig.getDisabledTools()
+        // 启用使用统计采集（对齐 VSCode semaProcessWrapper 构造 SemaCore 时的 usageProduct）
+        merged["usageProduct"] = USAGE_PRODUCT
         // webview 传入的 init 覆盖项优先级更高（当前为空对象，预留）
         for ((k, v) in payload.entrySet()) merged[k] = jsonToAny(v)
         return gson.toJson(merged)

@@ -147,6 +147,10 @@ export class RemoteCore {
     enableCronTask(id: string): Promise<any> { return this.t.call('enableCronTask', { id }, ''); }
     disableCronTask(id: string): Promise<any> { return this.t.call('disableCronTask', { id }, ''); }
 
+    // 使用统计（core 采集落盘；product 须与 init 时的 usageProduct 一致，按它过滤本产品的数据）
+    getUsageStats(product: string): Promise<any> { return this.t.call('getUsageStats', { product }, ''); }
+    clearUsageStats(product: string): Promise<any> { return this.t.call('clearUsageStats', { product }, ''); }
+
     // 后台任务面板（D4）。桥镜像 core 后任务 action 均为会话级（须带 session_id），
     // 跨会话聚合上移到这里——与 VSCode semaProcessWrapper.getTaskList 同层同构。
     // watchTask 流式：不传回调，起停由 watch/unwatch 控制，delta 走 task:watch:delta 事件上行（带会话 id，按 taskId 归属）。

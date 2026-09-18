@@ -1,4 +1,4 @@
-import { SemaCore, SemaSession } from 'sema-core';
+import { SemaCore, SemaSession, UsageStatsData } from 'sema-core';
 import {
     CreateSessionOptions,
     CreateSessionResult,
@@ -34,6 +34,8 @@ export type ProcessEventName = 'cron:update' | 'mcp:server:status';
 
 /** UI 层支持同时打开的会话数量上限 */
 export const MAX_SESSIONS = 5;
+/** 使用统计的产品标识：传给 core 即启用采集，读取时按它过滤本产品的数据 */
+export const USAGE_PRODUCT = 'sema-code-vscode';
 const LOCAL_SYSTEM_CONFIG_KEYS = new Set(['enablePet', 'showThinkingText', 'defaultPermissionLevel', 'enableBrowserControl']);
 
 function toCoreSystemConfig(config: Record<string, any>): UpdatableCoreConfig {
@@ -79,6 +81,7 @@ export class SemaProcessWrapper {
             ...toCoreSystemConfig(systemConfig as Record<string, any>),
             disabledTools: disabledTools,
             maxSessions: MAX_SESSIONS,
+            usageProduct: USAGE_PRODUCT,
         };
 
         this.semaCore = new SemaCore(config);
@@ -382,6 +385,17 @@ export class SemaProcessWrapper {
 
     public disableCronTask(id: string): boolean {
         return this.semaCore.disableCronTask(id);
+    }
+
+    // ===== 使用统计（core 采集落盘，这里只读取与清除）=====
+
+    /** 本产品的使用统计：逐日聚合与累计，时间范围求和由页面完成 */
+    public getUsageStats(): Promise<UsageStatsData> {
+        return this.semaCore.getUsageStats({ product: USAGE_PRODUCT });
+    }
+
+    public clearUsageStats(): Promise<void> {
+        return this.semaCore.clearUsageStats(USAGE_PRODUCT);
     }
 
     // ===== 后台任务（跨会话聚合，供配置页任务面板使用）=====

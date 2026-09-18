@@ -1,0 +1,684 @@
+/* 「使用情况」页：累计概览 → 范围与指标卡 → 趋势（柱 / 热力图）→ 模型使用 → 能力使用 → 页尾 */
+
+/* 页面过宽时整体限宽居中；悬浮提示定位以本容器为基准，居中后不受影响 */
+.usage-page {
+    --s-card-bg: transparent;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-gap-xl);
+    max-width: 800px;
+    margin: 0 auto;
+    --usage-cell: 11px;
+    /* 数据图形固定色，不跟主题强调色：避免与输出橙撞色，也避免 JB 浅色皮肤下选中色过淡 */
+    --usage-accent: #0a7cff;
+    --usage-hit: var(--usage-accent);
+    --usage-miss: color-mix(in srgb, var(--usage-accent) 45%, transparent);
+    --usage-output: #f59e0b;
+    --usage-bar: var(--usage-accent);
+    --usage-line: color-mix(in srgb, var(--vscode-foreground, #ccc) 12%, transparent);
+}
+
+/* ===== 标题与累计 ===== */
+
+.usage-header {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-gap-sm);
+}
+
+.usage-title {
+    display: flex;
+    align-items: center;
+    gap: var(--s-gap-sm);
+    margin: 0;
+    font-size: var(--s-font-xl);
+    font-weight: 600;
+}
+
+.usage-info {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    color: var(--vscode-descriptionForeground);
+    cursor: help;
+    outline: none;
+}
+
+.usage-info:focus-visible {
+    color: var(--vscode-focusBorder);
+}
+
+.usage-info-bubble {
+    display: none;
+    position: absolute;
+    left: 0;
+    top: calc(100% + 6px);
+    z-index: 20;
+    width: max-content;
+    max-width: 360px;
+    padding: 8px 10px;
+    font-size: var(--s-font-base);
+    font-weight: 400;
+    line-height: 1.5;
+    color: var(--vscode-editorHoverWidget-foreground, var(--vscode-foreground));
+    background: var(--vscode-editorHoverWidget-background, var(--vscode-editorWidget-background));
+    border: 1px solid var(--vscode-editorHoverWidget-border, var(--s-card-border));
+    border-radius: var(--s-radius-md);
+    box-shadow: var(--s-card-hover-shadow);
+    white-space: normal;
+}
+
+.usage-info:hover .usage-info-bubble,
+.usage-info:focus-visible .usage-info-bubble {
+    display: block;
+}
+
+.usage-totals {
+    font-size: var(--s-font-md);
+    color: var(--vscode-descriptionForeground);
+}
+
+/* ===== 区块 ===== */
+
+.usage-block {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-gap-md);
+    padding-top: var(--s-gap-lg);
+    border-top: 1px solid var(--s-card-border);
+}
+
+.usage-section-title {
+    font-size: var(--s-font-lg);
+    font-weight: 600;
+    margin-top: var(--s-gap-sm);
+}
+
+.usage-empty {
+    padding: 16px 0;
+    font-size: var(--s-font-md);
+    color: var(--vscode-descriptionForeground);
+}
+
+.usage-failed {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--s-gap-sm);
+    padding: 40px;
+    font-size: var(--s-font-md);
+    color: var(--vscode-descriptionForeground);
+}
+
+/* ===== 范围与指标卡 ===== */
+
+.usage-range-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: var(--s-gap-sm);
+}
+
+.usage-range-label {
+    font-size: var(--s-font-sm);
+    color: var(--vscode-descriptionForeground);
+    font-variant-numeric: tabular-nums;
+}
+
+.usage-pills {
+    display: inline-flex;
+    gap: 4px;
+}
+
+/* 覆盖 styles.css 里 button[type="button"] 的通用主按钮样式 */
+button[type="button"].usage-pill {
+    padding: 4px 10px;
+    font-size: var(--s-font-base);
+    font-weight: 500;
+    color: var(--vscode-foreground);
+    background: transparent;
+    border: 1px solid var(--s-card-border);
+    border-radius: 999px;
+    box-shadow: none;
+    transform: none;
+}
+
+button[type="button"].usage-pill:hover {
+    background: var(--s-btn-secondary-bg);
+    box-shadow: none;
+    transform: none;
+}
+
+button[type="button"].usage-pill.active {
+    color: var(--vscode-button-foreground);
+    background: var(--vscode-button-background);
+    border-color: transparent;
+}
+
+button[type="button"].usage-link {
+    padding: 0;
+    font-size: var(--s-font-base);
+    font-weight: 400;
+    color: var(--vscode-textLink-foreground);
+    background: transparent;
+    border: none;
+    box-shadow: none;
+    transform: none;
+}
+
+button[type="button"].usage-link:hover {
+    background: transparent;
+    box-shadow: none;
+    transform: none;
+    text-decoration: underline;
+}
+
+.usage-cards {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--s-gap-md);
+}
+
+.usage-card {
+    flex: 1 1 140px;
+    min-width: 140px;
+    padding: 12px 14px;
+    background: var(--s-card-bg);
+    border: 1px solid var(--s-card-border);
+    border-radius: var(--s-radius-lg);
+}
+
+.usage-card-label {
+    font-size: var(--s-font-sm);
+    color: var(--vscode-descriptionForeground);
+    margin-bottom: 4px;
+}
+
+.usage-card-value {
+    font-size: 20px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+}
+
+/* ===== 趋势：柱状图与热力图共用固定高度，切换范围时区块不跳动 ===== */
+
+.usage-trend {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    height: 140px;
+}
+
+.usage-trend .usage-empty { padding: 0; }
+
+.usage-bars {
+    display: flex;
+    gap: var(--s-gap-sm);
+    height: 100%;
+}
+
+.usage-bars-axis {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    width: 44px;
+    padding-bottom: 18px;
+    text-align: right;
+    font-size: var(--s-font-xs);
+    color: var(--vscode-descriptionForeground);
+    font-variant-numeric: tabular-nums;
+}
+
+.usage-bars-axis span {
+    line-height: 1;
+    transform: translateY(50%);
+}
+
+.usage-bars-axis span:first-child { transform: translateY(0); }
+.usage-bars-axis span:last-child { transform: translateY(100%); }
+
+.usage-bars-plot {
+    position: relative;
+    flex: 1;
+    min-width: 0;
+    padding-bottom: 18px;
+}
+
+.usage-bars-grid {
+    position: absolute;
+    inset: 0 0 18px 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    pointer-events: none;
+}
+
+.usage-bars-gridline {
+    border-top: 1px solid var(--usage-line);
+}
+
+.usage-bars-cols {
+    position: absolute;
+    inset: 0 0 18px 0;
+    display: flex;
+    align-items: flex-end;
+    gap: 2px;
+}
+
+.usage-bar-col {
+    flex: 1;
+    min-width: 0;
+    height: 100%;
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    cursor: default;
+}
+
+.usage-bar-col:hover {
+    background: color-mix(in srgb, var(--vscode-foreground, #ccc) 6%, transparent);
+}
+
+.usage-bar {
+    width: 70%;
+    min-height: 1px;
+    background: var(--usage-bar);
+    border-radius: 2px 2px 0 0;
+}
+
+.usage-bar.zero {
+    background: var(--vscode-descriptionForeground);
+    opacity: 0.4;
+}
+
+.usage-bars-labels {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 18px;
+    display: flex;
+    gap: 2px;
+}
+
+.usage-bar-label {
+    flex: 1;
+    min-width: 0;
+    position: relative;
+    font-size: var(--s-font-xs);
+    color: var(--vscode-descriptionForeground);
+    font-variant-numeric: tabular-nums;
+}
+
+.usage-bar-label span {
+    position: absolute;
+    top: 4px;
+    left: 50%;
+    transform: translateX(-50%);
+    white-space: nowrap;
+}
+
+/* ===== 热力图 ===== */
+
+/* 放得下时居中；宽度不够时横向滚动，容器用 rtl 让初始滚动位置和缩窗时都锚定在右侧（最近的日期），内容再切回 ltr */
+.usage-heat-wrap {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-gap-sm);
+    overflow-x: auto;
+    padding-bottom: 4px;
+    direction: rtl;
+}
+
+.usage-heat {
+    direction: ltr;
+    display: grid;
+    grid-auto-rows: var(--usage-cell);
+    gap: 2px;
+    width: max-content;
+    margin: 0 auto;
+    font-size: var(--s-font-xs);
+    color: var(--vscode-descriptionForeground);
+}
+
+.usage-heat-month {
+    grid-row: 1;
+    white-space: nowrap;
+    overflow: visible;
+    line-height: var(--usage-cell);
+}
+
+.usage-cell {
+    display: inline-block;
+    width: var(--usage-cell);
+    height: var(--usage-cell);
+    border-radius: 2px;
+    background: color-mix(in srgb, var(--usage-bar) 100%, transparent);
+    cursor: default;
+}
+
+.usage-cell.outside { visibility: hidden; }
+.usage-cell.unrecorded {
+    background: transparent;
+    background-image: radial-gradient(color-mix(in srgb, var(--vscode-foreground, #ccc) 25%, transparent) 1px, transparent 1px);
+    background-size: 4px 4px;
+    background-position: center;
+}
+/* 四档透明度：高透明度区间肉眼差异小，所以上两档间距拉得更开 */
+.usage-cell.l1 { background: color-mix(in srgb, var(--usage-bar) 10%, transparent); }
+.usage-cell.l2 { background: color-mix(in srgb, var(--usage-bar) 35%, transparent); }
+.usage-cell.l3 { background: color-mix(in srgb, var(--usage-bar) 70%, transparent); }
+.usage-cell.l4 { background: var(--usage-bar); }
+
+.usage-cell:not(.outside):hover {
+    outline: 1px solid var(--vscode-foreground);
+    outline-offset: -1px;
+}
+
+/* ===== 能力使用：横向条形行、表格 ===== */
+
+.usage-pills-sub { margin-bottom: 2px; }
+
+.usage-cap-summary {
+    font-size: var(--s-font-sm);
+    color: var(--vscode-descriptionForeground);
+}
+
+.usage-cap-summary-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: var(--s-gap-sm);
+}
+
+.usage-check {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    cursor: pointer;
+    user-select: none;
+}
+
+.usage-check input {
+    margin: 0;
+    width: 13px;
+    height: 13px;
+    cursor: pointer;
+}
+
+.usage-rows {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.usage-row {
+    display: flex;
+    align-items: center;
+    gap: var(--s-gap-md);
+    min-height: 22px;
+}
+
+.usage-row-name {
+    flex: 0 0 200px;
+    max-width: 45%;
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+    min-width: 0;
+    font-size: var(--s-font-md);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.usage-row-name > span:first-child {
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.usage-row-sub {
+    flex-shrink: 0;
+    font-size: var(--s-font-sm);
+    color: var(--vscode-descriptionForeground);
+}
+
+.usage-row-bar {
+    flex: 1;
+    min-width: 40px;
+    height: 8px;
+    border-radius: 4px;
+    background: var(--usage-line);
+    overflow: hidden;
+}
+
+.usage-row-fill {
+    height: 100%;
+    min-width: 2px;
+    background: var(--usage-bar);
+    border-radius: 4px;
+}
+
+.usage-row-value {
+    flex: 0 0 auto;
+    min-width: 64px;
+    text-align: right;
+    font-size: var(--s-font-md);
+    font-variant-numeric: tabular-nums;
+}
+
+.usage-row-actions {
+    display: flex;
+    align-items: center;
+    gap: var(--s-gap-md);
+    margin-top: 2px;
+}
+
+.usage-row-actions-spacer { flex: 1; }
+
+button[type="button"].usage-errors-toggle {
+    color: var(--vscode-descriptionForeground);
+}
+
+.usage-errors-arrow {
+    display: inline-block;
+    margin-right: 4px;
+    transition: transform 0.15s;
+}
+
+button[type="button"].usage-errors-toggle.open .usage-errors-arrow {
+    transform: rotate(90deg);
+}
+
+.usage-errors {
+    padding: 10px 12px;
+    background: var(--s-card-bg);
+    border: 1px solid var(--s-card-border);
+    border-radius: var(--s-radius-lg);
+}
+
+.usage-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: var(--s-font-md);
+}
+
+.usage-table th {
+    font-weight: 500;
+    font-size: var(--s-font-sm);
+    color: var(--vscode-descriptionForeground);
+    text-align: left;
+    padding: 4px 0;
+    border-bottom: 1px solid var(--s-card-border);
+}
+
+.usage-table td {
+    padding: 5px 0;
+    white-space: nowrap;
+}
+
+/* 只有名称列吃剩余宽度并截断，数值列按内容宽度不截断 */
+.usage-table td:first-child {
+    max-width: 0;
+    width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.usage-table .num {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+    padding-left: 16px;
+}
+
+.usage-note {
+    margin-top: 8px;
+    font-size: var(--s-font-sm);
+    color: var(--vscode-descriptionForeground);
+}
+
+/* ===== 模型使用：堆叠长条 ===== */
+
+.usage-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--s-gap-lg);
+    font-size: var(--s-font-sm);
+    color: var(--vscode-descriptionForeground);
+}
+
+.usage-legend > span {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.usage-swatch {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    border-radius: 2px;
+    margin-right: 5px;
+    vertical-align: -1px;
+}
+
+.usage-swatch.hit { background: var(--usage-hit); }
+.usage-swatch.miss { background: var(--usage-miss); }
+.usage-swatch.output { background: var(--usage-output); }
+
+.usage-models-head {
+    display: flex;
+    justify-content: space-between;
+    font-size: var(--s-font-sm);
+    color: var(--vscode-descriptionForeground);
+    padding-bottom: 4px;
+    border-bottom: 1px solid var(--s-card-border);
+}
+
+.usage-model-row { align-items: center; }
+
+.usage-model-bar-wrap {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.usage-model-bar {
+    display: flex;
+    height: 12px;
+    min-width: 2px;
+    border-radius: 3px;
+    overflow: hidden;
+    cursor: default;
+}
+
+.usage-seg { display: block; height: 100%; }
+.usage-seg.hit { background: var(--usage-hit); }
+.usage-seg.miss { background: var(--usage-miss); }
+.usage-seg.output { background: var(--usage-output); }
+
+.usage-model-total {
+    flex-shrink: 0;
+    font-size: var(--s-font-md);
+    font-variant-numeric: tabular-nums;
+    cursor: default;
+}
+
+/* 窄宽度：模型名与长条上下排布 */
+@media (max-width: 560px) {
+    .usage-model-row {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 4px;
+    }
+    .usage-row-name { flex-basis: auto; max-width: none; }
+}
+
+/* ===== 悬浮详情 ===== */
+
+.usage-tip {
+    position: absolute;
+    z-index: 30;
+    min-width: 180px;
+    max-width: 320px;
+    padding: 8px 10px;
+    font-size: var(--s-font-base);
+    line-height: 1.6;
+    color: var(--vscode-editorHoverWidget-foreground, var(--vscode-foreground));
+    background: var(--vscode-editorHoverWidget-background, var(--vscode-editorWidget-background));
+    border: 1px solid var(--vscode-editorHoverWidget-border, var(--s-card-border));
+    border-radius: var(--s-radius-md);
+    box-shadow: var(--s-card-hover-shadow);
+    pointer-events: none;
+}
+
+.usage-tip-title {
+    font-weight: 600;
+    margin-bottom: 4px;
+    word-break: break-all;
+}
+
+.usage-tip-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+    font-variant-numeric: tabular-nums;
+}
+
+.usage-tip-row > span:first-child { color: var(--vscode-descriptionForeground); }
+
+.usage-tip-sep {
+    border-top: 1px solid var(--s-card-border);
+    margin: 4px 0;
+}
+
+.usage-tip-muted { color: var(--vscode-descriptionForeground); }
+
+/* ===== 页尾 ===== */
+
+.usage-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: var(--s-gap-sm);
+    padding-top: var(--s-gap-lg);
+    border-top: 1px solid var(--s-card-border);
+    font-size: var(--s-font-sm);
+    color: var(--vscode-descriptionForeground);
+}
+
+button[type="button"].usage-clear {
+    font-size: var(--s-font-sm);
+    color: var(--vscode-descriptionForeground);
+}
+
+button[type="button"].usage-clear:hover {
+    color: var(--s-color-danger);
+}

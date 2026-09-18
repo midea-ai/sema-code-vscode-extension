@@ -16,10 +16,11 @@ import CronTaskConfig from './CronTaskConfig';
 import DesignConfig from './DesignConfig';
 import ClawConfig from './ClawConfig';
 import ImportConfig from './ImportConfig';
+import UsageConfig from './UsageConfig';
 import { RefreshIcon } from './utils/svgIcons';
 import { setLang, useT } from '../common/i18n/react';
 
-type PageType = 'models' | 'system' | 'memory' | 'mcp' | 'skill' | 'agent' | 'hooks' | 'command' | 'plugin' | 'task' | 'design' | 'import' | 'claw';
+type PageType = 'models' | 'system' | 'memory' | 'mcp' | 'skill' | 'agent' | 'hooks' | 'command' | 'plugin' | 'task' | 'design' | 'import' | 'claw' | 'usage';
 type ModelTabType = 'list' | 'add';
 type TaskTabType = 'background' | 'cron';
 
@@ -130,6 +131,7 @@ const App: React.FC<AppProps> = ({ vscode }) => {
                 { page: 'system', label: t('config.nav.system') },
                 { page: 'memory', label: t('config.nav.memory') },
                 { page: 'task', label: t('config.nav.task') },
+                { page: 'usage', label: t('config.nav.usage') },
             ],
         },
         {
@@ -229,70 +231,77 @@ const App: React.FC<AppProps> = ({ vscode }) => {
 
                 {/* MCP页面 */}
                 {currentPage === 'mcp' && (
-                    <div className="page active">
+                    <div className="page active extension-page">
                         <MCPConfig vscode={vscode} onOpenSystemConfig={() => setCurrentPage('system')} />
                     </div>
                 )}
 
                 {/* 子代理页面 */}
                 {currentPage === 'agent' && (
-                    <div className="page active">
+                    <div className="page active extension-page">
                         <AgentConfig vscode={vscode} />
                     </div>
                 )}
 
                 {/* command页面 */}
                 {currentPage === 'command' && (
-                    <div className="page active">
+                    <div className="page active extension-page">
                         <CommandConfig vscode={vscode} />
                     </div>
                 )}
 
                 {/* Skill页面 */}
                 {currentPage === 'skill' && (
-                    <div className="page active">
+                    <div className="page active extension-page">
                         <SkillConfig vscode={vscode} />
                     </div>
                 )}
 
                 {/* Hooks页面 */}
                 {currentPage === 'hooks' && (
-                    <div className="page active">
+                    <div className="page active extension-page">
                         <HooksConfig vscode={vscode} />
                     </div>
                 )}
 
                 {/* Plugin页面 */}
                 {currentPage === 'plugin' && (
-                    <div className="page active">
+                    <div className="page active extension-page">
                         <PluginConfig vscode={vscode} />
                     </div>
                 )}
 
                 {/* Design页面 */}
                 {currentPage === 'design' && (
-                    <div className="page active">
+                    <div className="page active more-page">
                         <DesignConfig vscode={vscode} />
                     </div>
                 )}
 
                 {/* 导入页面（从 Claude Code / Codex / Cursor 导入配置） */}
                 {currentPage === 'import' && (
-                    <div className="page active">
+                    <div className="page active more-page">
                         <ImportConfig vscode={vscode} />
+                    </div>
+                )}
+
+                {/* 使用情况页面 */}
+                {currentPage === 'usage' && (
+                    <div className="page active">
+                        <UsageConfig vscode={vscode} />
                     </div>
                 )}
 
                 {/* Claw 远程页面 */}
                 {!IS_JB && currentPage === 'claw' && (
-                    <div className="page active">
+                    <div className="page active more-page">
                         <ClawConfig vscode={vscode} />
                     </div>
                 )}
 
                 {/* 任务管理页面 */}
                 {currentPage === 'task' && (
-                    <div className="page active">
+                    <div className="page active task-management">
                         <div className="tab-navigation">
                             <div
                                 className={`tab-item ${taskTab === 'background' ? 'active' : ''}`}

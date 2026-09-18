@@ -120,7 +120,7 @@
     "highlight.js": "11.9.0",
     "katex": "^0.16.47",
     "qrcode": "^1.5.4",
-    "sema-core": "^2.1.0",
+    "sema-core": "^2.1.1",
     "turndown": "^7.2.4"
   }
 }
