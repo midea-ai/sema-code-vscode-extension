@@ -219,36 +219,15 @@
 }
 
 /* ========== Tool Error Block ========== */
-/* 容器：继承 .chat-block--borderless */
-
-.tool-error-block {
-    flex-direction: column;
-}
+/* 结构与折叠/截断样式复用 .pub-block，这里只补红点 */
 
 .tool-error-header {
-    display: flex;
-    align-items: baseline;
-    gap: var(--chat-spacing-sm);
-    font-size: var(--chat-font-base);
-    line-height: 1.4;
-    overflow: visible;
-    white-space: nowrap;
+    cursor: pointer;
 }
 
 .tool-error-header .tool-error-indicator {
     color: var(--chat-color-error);
     flex-shrink: 0;
-}
-
-.tool-error-content {
-    font-size: var(--chat-font-base);
-    color: var(--chat-color-muted);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    line-height: 1.4;
-    margin-top: 2px;
-    margin-left: 8px;
 }
 
 /* ========== Light 主题覆盖 ========== */

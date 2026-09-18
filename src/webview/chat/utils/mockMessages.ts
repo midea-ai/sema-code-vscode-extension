@@ -184,6 +184,19 @@ export const mockMessageMap: Record<string, Message[]> = {
         },
     ],
 
+    ToolError: [
+        {
+            id: nextId(),
+            type: 'system',
+            content: {
+                type: 'tool_error',
+                toolName: TOOL_NAME_RUN_SHELL,
+                title: 'npm run build',
+                content: 'Error: Cannot find module \'typescript\'\n    at Function.Module._resolveFilename (node:internal/modules/cjs/loader:1075:15)',
+            },
+        },
+    ],
+
     StopBackgroundJob: [
         {
             id: nextId(),
@@ -680,19 +693,6 @@ print()
                         { type: 'textarea', id: 'extra_notes', label: '其他备注', placeholder: '可选：补充任何需要特别说明的内容' },
                     ],
                 },
-            },
-        },
-    ],
-
-    ToolError: [
-        {
-            id: nextId(),
-            type: 'system',
-            content: {
-                type: 'tool_error',
-                toolName: TOOL_NAME_RUN_SHELL,
-                title: 'npm run build',
-                content: 'Error: Cannot find module \'typescript\'\n    at Function.Module._resolveFilename (node:internal/modules/cjs/loader:1075:15)',
             },
         },
     ],
