@@ -1,9 +1,11 @@
 import { Message } from '../types';
 import {
+    TOOL_NAME_PATCH_FILE,
     TOOL_NAME_RUN_SHELL,
     TOOL_NAME_SEARCH_CONTENT,
     TOOL_NAME_SEARCH_FILES,
     TOOL_NAME_VIEW_FILE,
+    TOOL_NAME_WRITE_FILE,
 } from '../../../utils/tool';
 import { isMcpToolType, parseMcpToolName } from './permissionUtils';
 
@@ -143,10 +145,33 @@ export const isShellRunMessage = (message: Message): boolean => {
 };
 
 const SHELL_RUN_KEY = 'shell';
+const MEMORY_RUN_KEY = 'memory';
+
+/** 新增/编辑 memory 目录下 md 文件的工具消息（如 .../memory/foo.md、.../memory/MEMORY.md） */
+export const isMemoryEditMessage = (message: Message): boolean => {
+    if (message.type !== 'tool') {
+        return false;
+    }
+
+    const toolName = getToolName(message);
+    if (toolName !== TOOL_NAME_WRITE_FILE && toolName !== TOOL_NAME_PATCH_FILE) {
+        return false;
+    }
+
+    const segments = getToolTitle(message).trim().split(/[/\\]/).filter(Boolean);
+    if (segments.length < 2) {
+        return false;
+    }
+
+    const fileName = segments[segments.length - 1];
+    const parentDir = segments[segments.length - 2];
+    return /\.md$/i.test(fileName) && parentDir === 'memory';
+};
 
 /**
  * 可分组消息的 run key：相邻消息 key 相同才会合并进同一组。
- * 探索类工具统一为 'explore'，MCP 工具按服务名区分为 'mcp:<服务名>'，其余终端命令为 'shell'。
+ * 探索类工具统一为 'explore'，MCP 工具按服务名区分为 'mcp:<服务名>'，
+ * memory 目录下的 md 文件写入为 'memory'，其余终端命令为 'shell'。
  */
 const getRunKey = (message: Message): string | null => {
     if (message.type !== 'tool') {
@@ -161,6 +186,10 @@ const getRunKey = (message: Message): string | null => {
     const toolName = getToolName(message);
     if (GROUPABLE_TOOL_NAMES.has(toolName) || getGroupableToolKind(message) !== null) {
         return 'explore';
+    }
+
+    if (isMemoryEditMessage(message)) {
+        return MEMORY_RUN_KEY;
     }
 
     if (isShellRunMessage(message)) {
@@ -218,7 +247,8 @@ const toMessageItems = (run: RunItem[]): RenderItem[] => {
 
 /**
  * @param closed run 之后是否已有其它渲染内容。终端组只在 closed 时折叠：
- * 末尾还可能继续追加的终端命令逐条展示，数量不再变化后才收成 Ran N commands
+ * 末尾还可能继续追加的终端命令逐条展示，数量不再变化后才收成 Ran N commands。
+ * memory 组特殊：一条也折叠，流式中也直接成组，避免先展开 diff 再折叠的闪动
  */
 const flushRun = (
     items: RenderItem[],
@@ -231,8 +261,9 @@ const flushRun = (
         return;
     }
 
+    const alwaysGrouped = runKey === MEMORY_RUN_KEY;
     const hasStreamingTool = run.some(({ message }) => isStreamingToolMessage(message, streamingToolId));
-    if (run.length < 2 || hasStreamingTool || (runKey === SHELL_RUN_KEY && !closed)) {
+    if (!alwaysGrouped && (run.length < 2 || hasStreamingTool || (runKey === SHELL_RUN_KEY && !closed))) {
         items.push(...toMessageItems(run));
         return;
     }

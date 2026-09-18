@@ -880,9 +880,14 @@ const ChatSession: React.FC<ChatSessionProps> = ({ vscode: rawVscode, sessionId,
             <div key={group.key} className="turn-group">
                 {groupMessages(group.items.map(item => item.message), { streamingToolId, showThinkingText: shouldShowThinkingText, tailClosed: gi < groups.length - 1 }).map((item) => {
                     if (item.kind === 'group') {
+                        const groupStartIndex = group.items[item.originalStartIndex].index;
                         return (
                             <div key={item.id} className="msg-wrap">
-                                <GroupedToolBlock messages={item.messages} vscode={vscode} />
+                                <GroupedToolBlock
+                                    messages={item.messages}
+                                    vscode={vscode}
+                                    onFileChange={groupStartIndex > lastUserInputIndex ? handleFileChange : undefined}
+                                />
                             </div>
                         );
                     }

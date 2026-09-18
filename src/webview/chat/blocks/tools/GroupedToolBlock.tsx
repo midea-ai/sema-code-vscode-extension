@@ -1,23 +1,28 @@
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import { ToggleIcon } from '../../components/ui/IconButton';
-import { Message } from '../../types';
+import { FileChange, Message } from '../../types';
 import { CONTINUATION_SYMBOL } from '../../utils/symbols';
+import { countDiffChanges } from '../../utils/diffParser';
 import {
     TOOL_NAME_RUN_SHELL,
     TOOL_NAME_SEARCH_CONTENT,
     TOOL_NAME_SEARCH_FILES,
     TOOL_NAME_VIEW_FILE,
+    TOOL_NAME_WRITE_FILE,
 } from '../../../../utils/tool';
-import { SHELL_SEGMENT_SEPARATOR, getMcpServerName, getShellExploreKind, getToolName, getToolTitle, isShellRunMessage } from '../../utils/groupMessages';
+import { SHELL_SEGMENT_SEPARATOR, getMcpServerName, getShellExploreKind, getToolName, getToolTitle, isMemoryEditMessage, isShellRunMessage } from '../../utils/groupMessages';
 import { formatSearchTitle } from './utils';
 import { hasTextSelection } from '../../utils/selection';
 import PubBlock from './PubBlock';
 import BashBlock from './BashBlock';
+import EditBlock from './EditBlock';
 import { useT } from '../../../common/i18n/react';
 
 interface GroupedToolBlockProps {
     messages: Message[];
     vscode: any;
+    /** 仅 memory 写入组使用：透传给组内 EditBlock 以上报文件变更，与单条渲染时行为一致 */
+    onFileChange?: (change: FileChange) => void;
 }
 
 const formatCount = (count: number, singular: string, plural: string): string => {
@@ -83,6 +88,9 @@ export const getGroupTitle = (messages: Message[]): string => {
     const mcpServerName = messages.length > 0 ? getMcpServerName(messages[0]) : null;
     if (mcpServerName) {
         return `Called ${mcpServerName} ${formatCount(messages.length, 'time', 'times')}`;
+    }
+    if (messages.length > 0 && isMemoryEditMessage(messages[0])) {
+        return `Wrote ${formatCount(messages.length, 'memory', 'memories')}`;
     }
     if (messages.length > 0 && isShellRunMessage(messages[0])) {
         return `Ran ${formatCount(messages.length, 'command', 'commands')}`;
@@ -444,6 +452,66 @@ const GroupedShellToolBlock: React.FC<GroupedToolBlockProps> = ({ messages, vsco
     );
 };
 
+/** 与 EditBlock.reportFileChange 口径一致；组默认折叠、EditBlock 不挂载，需由组块自行上报 */
+const getMemoryFileChange = (message: Message): FileChange | null => {
+    const fileName = getToolTitle(message);
+    const diffContent = message.content?.content;
+    if (!fileName || typeof diffContent !== 'object' || diffContent === null
+        || (diffContent.type !== 'diff' && diffContent.type !== 'new')) {
+        return null;
+    }
+
+    const { addedCount, removedCount } = countDiffChanges(diffContent);
+    return {
+        fileName: fileName.split(/[/\\]/).pop() || fileName,
+        fullPath: fileName,
+        type: getToolName(message) === TOOL_NAME_WRITE_FILE ? 'write' : 'edit',
+        isNotebook: false,
+        additions: addedCount,
+        removals: removedCount,
+        minLine: diffContent.patch?.[0]?.oldStart || 1,
+    };
+};
+
+/** memory 目录下 md 文件的连续写入组：标题为 Wrote N memories，展开后逐条复用 EditBlock */
+const GroupedMemoryToolBlock: React.FC<GroupedToolBlockProps> = ({ messages, vscode, onFileChange }) => {
+    const [isExpanded, setIsExpanded] = useState(false);
+
+    const count = useMemo(() => formatCount(messages.length, 'memory', 'memories'), [messages]);
+
+    useEffect(() => {
+        if (!onFileChange) {
+            return;
+        }
+        messages.forEach(message => {
+            const change = getMemoryFileChange(message);
+            if (change) {
+                onFileChange(change);
+            }
+        });
+    }, [messages, onFileChange]);
+
+    return (
+        <div className="chat-block chat-block--borderless grouped-tool-block">
+            <div className="chat-block-header grouped-tool-header" onClick={() => setIsExpanded(prev => !prev)}>
+                <div className="chat-block-title">
+                    <span className="chat-block-title-label"><strong>Wrote</strong> <span className="grouped-tool-muted-text">{count}</span></span>
+                    <div className="grouped-tool-toggle-btn">
+                        <ToggleIcon isExpanded={isExpanded} />
+                    </div>
+                </div>
+            </div>
+            {isExpanded && (
+                <div className="chat-block-content grouped-tool-content">
+                    {messages.map(message => (
+                        <EditBlock key={message.id} content={message.content} vscode={vscode} />
+                    ))}
+                </div>
+            )}
+        </div>
+    );
+};
+
 const GroupedExploreToolBlock: React.FC<GroupedToolBlockProps> = ({ messages, vscode }) => {
     const [isExpanded, setIsExpanded] = useState(false);
 
@@ -488,11 +556,14 @@ const GroupedExploreToolBlock: React.FC<GroupedToolBlockProps> = ({ messages, vs
     );
 };
 
-/** 按组内首条消息判定分组类型：同一 MCP 服务的连续调用走 MCP 组，连续终端命令走终端组，其余走探索组 */
-const GroupedToolBlock: React.FC<GroupedToolBlockProps> = ({ messages, vscode }) => {
+/** 按组内首条消息判定分组类型：同一 MCP 服务的连续调用走 MCP 组，memory 写入走记忆组，连续终端命令走终端组，其余走探索组 */
+const GroupedToolBlock: React.FC<GroupedToolBlockProps> = ({ messages, vscode, onFileChange }) => {
     const mcpServerName = messages.length > 0 ? getMcpServerName(messages[0]) : null;
     if (mcpServerName) {
         return <GroupedMcpToolBlock messages={messages} serverName={mcpServerName} vscode={vscode} />;
+    }
+    if (messages.length > 0 && isMemoryEditMessage(messages[0])) {
+        return <GroupedMemoryToolBlock messages={messages} vscode={vscode} onFileChange={onFileChange} />;
     }
     if (messages.length > 0 && isShellRunMessage(messages[0])) {
         return <GroupedShellToolBlock messages={messages} vscode={vscode} />;
@@ -501,6 +572,7 @@ const GroupedToolBlock: React.FC<GroupedToolBlockProps> = ({ messages, vscode })
 };
 
 export default React.memo(GroupedToolBlock, (prev, next) => {
+    if (prev.onFileChange !== next.onFileChange) return false;
     if (prev.messages.length !== next.messages.length) return false;
     return prev.messages.every((msg, i) => msg === next.messages[i]);
 });
