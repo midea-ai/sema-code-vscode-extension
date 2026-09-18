@@ -178,7 +178,7 @@ const RuleMemoryConfig: React.FC<RuleMemoryConfigProps> = ({ vscode }) => {
                     <pre style={{
                         fontSize: '12px',
                         color: 'var(--vscode-foreground)',
-                        background: 'var(--vscode-textCodeBlock-background)',
+                        background: 'transparent',
                         padding: '10px',
                         borderRadius: '4px',
                         whiteSpace: 'pre-wrap',
@@ -261,7 +261,7 @@ const RuleMemoryConfig: React.FC<RuleMemoryConfigProps> = ({ vscode }) => {
                     <pre style={{
                         fontSize: '12px',
                         color: 'var(--vscode-foreground)',
-                        background: 'var(--vscode-textCodeBlock-background)',
+                        background: 'transparent',
                         padding: '10px',
                         borderRadius: '4px',
                         whiteSpace: 'pre-wrap',
@@ -280,7 +280,7 @@ const RuleMemoryConfig: React.FC<RuleMemoryConfigProps> = ({ vscode }) => {
     // ─── Render ───────────────────────────────────────────────────────────────
 
     return (
-        <div className="agent-config plugin-config">
+        <div className="agent-config plugin-config rule-memory-config">
             {/* Tab 导航 */}
             <div className="tab-navigation">
                 <div

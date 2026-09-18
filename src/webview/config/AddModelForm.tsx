@@ -376,7 +376,7 @@ const AddModelForm: React.FC<AddModelFormProps> = ({ onSuccess, onCancelEdit, ed
     const defaults = defaultModelProvider[provider];
 
     return (
-        <div className="form-card">
+        <div className="form-card model-form-card">
             <form onSubmit={handleSubmit}>
                 <div className="form-group">
                     <label htmlFor="provider">{t('config.modelForm.provider')}</label>

@@ -12,6 +12,9 @@
     --s-gap-lg: 16px;
     --s-gap-xl: 24px;
 
+    /* 操作按钮组间距 */
+    --s-action-gap: 2px;
+
     /* 字号 */
     --s-font-xs: 10px;
     --s-font-sm: 11px;
@@ -61,6 +64,11 @@
     --s-btn-secondary-bg: color-mix(in srgb, var(--vscode-foreground, #ccc) 15%, transparent);
     --s-btn-secondary-fg: var(--vscode-foreground, #ccc);
     --s-btn-secondary-hover-bg: color-mix(in srgb, var(--vscode-foreground, #ccc) 22%, transparent);
+
+    /* 开关 */
+    --s-switch-bg: #ccc;
+    --s-switch-active-bg: #007aff;
+    --s-switch-thumb-bg: #fff;
 
     /* Badge */
     --s-badge-main-bg: rgba(255, 186, 73, 0.2);

@@ -234,7 +234,7 @@ const SystemConfig: React.FC<SystemConfigProps> = ({ vscode }) => {
     };
 
     return (
-        <div className="form-card">
+        <div className="form-card system-config">
             <h2 className="section-title">{t('config.system.title')}</h2>
 
             {/* 开关配置 */}

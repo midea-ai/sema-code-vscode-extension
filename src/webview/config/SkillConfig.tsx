@@ -46,7 +46,7 @@ const SkillConfig: React.FC<SkillConfigProps> = ({ vscode }) => {
     const [skills, setSkills] = useState<SkillConfigItem[]>([]);
     const [loading, setLoading] = useState(true);
     const [isRefreshing, setIsRefreshing] = useState(false);
-    const [expandedDescriptions, setExpandedDescriptions] = useState<Set<number>>(new Set());
+    const [expandedDescriptions, setExpandedDescriptions] = useState<Set<string>>(new Set());
     const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set());
 
     // Hub 状态
@@ -67,6 +67,9 @@ const SkillConfig: React.FC<SkillConfigProps> = ({ vscode }) => {
             if (loc && groups[loc]) {
                 groups[loc].push(skill);
             }
+        });
+        LOCATE_ORDER.forEach(scope => {
+            groups[scope].sort((a, b) => Number(a.status === false) - Number(b.status === false));
         });
         return groups;
     }, [skills]);
@@ -179,10 +182,10 @@ const SkillConfig: React.FC<SkillConfigProps> = ({ vscode }) => {
         return slugs;
     }, [skills]);
 
-    const toggleDescriptionExpand = (index: number) => {
+    const toggleDescriptionExpand = (skillKey: string) => {
         setExpandedDescriptions(prev => {
             const next = new Set(prev);
-            if (next.has(index)) next.delete(index); else next.add(index);
+            if (next.has(skillKey)) next.delete(skillKey); else next.add(skillKey);
             return next;
         });
     };
@@ -209,10 +212,11 @@ const SkillConfig: React.FC<SkillConfigProps> = ({ vscode }) => {
         vscode.postMessage({ command: 'toggleSkill', name: skill.name, enabled });
     };
 
-    const renderSkillCard = (skill: SkillConfigItem, globalIndex: number) => {
+    const renderSkillCard = (skill: SkillConfigItem) => {
+        const skillKey = `${skill.locate}:${skill.filePath || skill.name}`;
         const DESC_MAX = 150;
         const description = skill.description || t('common.noDescription');
-        const isDescExpanded = expandedDescriptions.has(globalIndex);
+        const isDescExpanded = expandedDescriptions.has(skillKey);
         const isLongDesc = description.length > DESC_MAX;
         const isReadonly = skill.locate === 'plugin';
         const isDisabled = skill.status === false;
@@ -228,7 +232,7 @@ const SkillConfig: React.FC<SkillConfigProps> = ({ vscode }) => {
         );
 
         return (
-            <div key={globalIndex} className="section-card">
+            <div key={skillKey} className="section-card">
                 <div className="section-card-header">
                     <div className="section-card-icon" style={{ backgroundColor: getColorByName(skill.name), opacity: isDisabled ? 0.5 : 1 }}>
                         {getSkillInitial(skill.name)}
@@ -281,7 +285,7 @@ const SkillConfig: React.FC<SkillConfigProps> = ({ vscode }) => {
                     {isLongDesc && (
                         <span
                             className="description-toggle"
-                            onClick={() => toggleDescriptionExpand(globalIndex)}
+                            onClick={() => toggleDescriptionExpand(skillKey)}
                         >
                             {isDescExpanded ? t('common.collapse') : t('common.more')}
                         </span>
@@ -289,15 +293,6 @@ const SkillConfig: React.FC<SkillConfigProps> = ({ vscode }) => {
                 </div>
             </div>
         );
-    };
-
-    const getGlobalIndex = (locate: SkillScope, localIndex: number): number => {
-        let offset = 0;
-        for (const loc of LOCATE_ORDER) {
-            if (loc === locate) break;
-            offset += groupedSkills[loc].length;
-        }
-        return offset + localIndex;
     };
 
     return (
@@ -492,9 +487,7 @@ const SkillConfig: React.FC<SkillConfigProps> = ({ vscode }) => {
                                             <div className="section-empty">{t('config.skill.empty')}</div>
                                         ) : (
                                             <div className="section-list">
-                                                {sectionSkills.map((skill, localIndex) =>
-                                                    renderSkillCard(skill, getGlobalIndex(scope, localIndex))
-                                                )}
+                                                {sectionSkills.map(renderSkillCard)}
                                             </div>
                                         )
                                     )}

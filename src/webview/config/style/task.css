@@ -1,6 +1,10 @@
 /* Background Task 配置页面样式 */
 @import './agent.css';
 
+.task-management {
+    --s-card-bg: transparent;
+}
+
 /* Task 行 */
 .agent-config .task-row {
     display: flex;
@@ -137,7 +141,7 @@
     white-space: pre-wrap;
     word-break: break-all;
     color: var(--vscode-editor-foreground);
-    background: var(--vscode-editor-background);
+    background: transparent;
     border: 1px solid var(--s-card-border);
     border-radius: var(--s-radius-sm);
 }
@@ -206,4 +210,3 @@
 .cron-next-fire-section {
     margin-top: 12px;
 }
-

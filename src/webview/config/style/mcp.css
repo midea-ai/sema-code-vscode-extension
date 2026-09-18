@@ -366,18 +366,22 @@
     margin-bottom: 4px;
 }
 
+/* 市场辅助标签：使用低对比度中性色 */
+.mcp-command-type,
+.mcp-tag {
+    background: rgba(128, 128, 128, 0.12);
+    color: var(--vscode-descriptionForeground);
+}
+
 /* 命令类型标签 (NPX/UVX) */
 .mcp-command-type {
     display: inline-block;
     margin-left: 4px;
     padding: 0px 4px;
-    background: var(--vscode-badge-background);
-    color: var(--vscode-badge-foreground);
     border-radius: 3px;
     font-size: 9px;
     font-weight: 500;
     text-transform: uppercase;
-    opacity: 0.5;
 }
 
 .mcp-market-desc {
@@ -405,13 +409,10 @@
 .mcp-tag {
     display: inline-block;
     padding: 1px 6px;
-    background: var(--vscode-badge-background);
-    color: var(--vscode-badge-foreground);
     border-radius: var(--s-radius-lg);
     font-size: var(--s-font-xs);
     flex-shrink: 0;
     white-space: nowrap;
-    opacity: 0.7;
 }
 
 /* 卡片底部 */
@@ -575,34 +576,30 @@
     width: 28px;
     height: 16px;
     margin-top: 4px;
-    background-color: var(--vscode-input-background);
-    border: 1px solid var(--vscode-input-border);
+    background-color: var(--s-switch-bg);
+    border: none;
     border-radius: 8px;
-    transition: background-color 0.2s, border-color 0.2s;
+    transition: background-color 0.2s;
 }
 
 .mcp-tool-switch-slider:before {
     position: absolute;
     content: "";
-    height: 10px;
-    width: 10px;
+    height: 12px;
+    width: 12px;
     left: 2px;
     top: 2px;
-    background-color: var(--vscode-foreground);
+    background-color: var(--s-switch-thumb-bg);
     border-radius: 50%;
-    transition: 0.2s;
-    opacity: 0.6;
+    transition: transform 0.2s;
 }
 
 .mcp-tool-switch input:checked + .mcp-tool-switch-slider {
-    background-color: var(--vscode-button-background);
-    border-color: var(--vscode-button-background);
+    background-color: var(--s-switch-active-bg);
 }
 
 .mcp-tool-switch input:checked + .mcp-tool-switch-slider:before {
     transform: translateX(12px);
-    background-color: var(--vscode-button-foreground);
-    opacity: 1;
 }
 
 /* 响应式调整 */

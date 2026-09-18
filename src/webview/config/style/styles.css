@@ -150,7 +150,7 @@ body {
     width: 100%;
     border-collapse: separate;
     border-spacing: 0;
-    background: var(--vscode-sideBar-background);
+    background: transparent;
     border: 1px solid var(--vscode-panel-border);
     border-radius: var(--s-radius-lg);
     overflow: hidden;
@@ -233,7 +233,7 @@ body {
 .task-config {
     margin-top: 40px;
     padding: var(--s-gap-xl);
-    background: var(--s-card-bg);
+    background: transparent;
     border: 1px solid var(--s-card-border);
     border-radius: var(--s-radius-lg);
     box-shadow: var(--s-card-shadow);
@@ -279,6 +279,27 @@ body {
     border-radius: var(--s-radius-lg);
     padding: 32px;
     box-shadow: var(--s-card-shadow);
+}
+
+.model-form-card,
+.system-config,
+.rule-memory-config .section-card,
+.rule-memory-config .section-empty {
+    background: transparent;
+}
+
+/* 扩展页和更多页的卡片、列表统一使用页面底色。 */
+.extension-page,
+.more-page {
+    --s-card-bg: transparent;
+}
+
+.extension-page .mcp-server-tools,
+.extension-page .plugin-detail,
+.extension-page .plugin-available-list,
+.extension-page .hook-command,
+.more-page .import-list {
+    background: transparent;
 }
 
 .form-group {

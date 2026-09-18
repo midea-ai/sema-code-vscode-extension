@@ -137,7 +137,7 @@
     word-break: break-word;
 }
 
-.section-card-name-link:hover {
+.section-card-name-link {
     color: var(--vscode-textLink-foreground);
     text-decoration: underline;
 }
@@ -146,7 +146,7 @@
 .section-card-actions {
     display: flex;
     align-items: center;
-    gap: var(--s-gap-xs);
+    gap: var(--s-action-gap);
     margin-left: auto;
 }
 
@@ -214,7 +214,7 @@
     margin-left: auto;
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: var(--s-action-gap);
     padding: 0 12px;
 }
 
@@ -307,7 +307,7 @@
     padding: 0;
     border: none;
     background: transparent;
-    color: var(--vscode-foreground);
+    color: var(--vscode-descriptionForeground, var(--vscode-foreground));
     cursor: pointer;
     opacity: 0.6;
     transition: all 0.2s ease;
@@ -339,7 +339,7 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    gap: 4px;
+    gap: var(--s-action-gap);
 }
 
 /* ===== 开关样式 ===== */
@@ -367,34 +367,30 @@
     cursor: pointer;
     width: 36px;
     height: 20px;
-    background-color: var(--vscode-input-background);
-    border: 1px solid var(--vscode-input-border);
+    background-color: var(--s-switch-bg);
+    border: none;
     border-radius: 10px;
-    transition: background-color 0.2s, border-color 0.2s;
+    transition: background-color 0.2s;
 }
 
 .section-switch-slider:before {
     position: absolute;
     content: "";
-    height: 14px;
-    width: 14px;
+    height: 16px;
+    width: 16px;
     left: 2px;
     top: 2px;
-    background-color: var(--vscode-foreground);
+    background-color: var(--s-switch-thumb-bg);
     border-radius: 50%;
-    transition: 0.2s;
-    opacity: 0.6;
+    transition: transform 0.2s;
 }
 
 .section-switch input:checked + .section-switch-slider {
-    background-color: var(--vscode-button-background);
-    border-color: var(--vscode-button-background);
+    background-color: var(--s-switch-active-bg);
 }
 
 .section-switch input:checked + .section-switch-slider:before {
     transform: translateX(16px);
-    background-color: var(--vscode-button-foreground);
-    opacity: 1;
 }
 
 /* ===== 弹窗样式 ===== */
