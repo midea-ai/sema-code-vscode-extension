@@ -207,7 +207,7 @@ export function renderMarkdownToHtml(content: string, vscode?: any): string {
   processedContent = processBlockquoteMarkdown(processedContent);
 
   // 步骤3.8: 无序列表处理 - 连续的 "- " 行合并为 <ul>
-  // 只支持 "-" 符号、平铺不嵌套（缩进一律视为同级），有序列表/任务列表不处理，稳定性优先
+  // 只支持 "-" 符号，按缩进嵌套；有序列表/任务列表不处理，稳定性优先
   processedContent = processListMarkdown(processedContent);
 
   // 步骤4: 表格处理
@@ -262,8 +262,11 @@ export function renderMarkdownToHtml(content: string, vscode?: any): string {
   processedContent = processedContent.replace(/<\/table>(<br>)+/g, '</table><br>');
   // 引用块同表格：块级元素后的连续 <br> 收敛为 1 个，避免渲染出 2 个空行
   processedContent = processedContent.replace(/<\/blockquote>(<br>)+/g, '</blockquote><br>');
-  // 列表同理
-  processedContent = processedContent.replace(/<\/ul>(<br>)+/g, '</ul><br>');
+  // 列表：块级元素自带换行，紧跟的第一个 <br>（源文本的行尾换行）不应再占一行，
+  // 否则"列表后直接接文字"会多出一个空行；源文本有空行（≥2 个 <br>）时保留 1 个空行
+  processedContent = processedContent.replace(/<\/ul>((?:<br>)+)/g, (_match, brs: string) =>
+    brs.length > '<br>'.length ? '</ul><br>' : '</ul>'
+  );
   // 图片（.md-image 为 display:block）与表格不同：自带上下 margin，段落间距交给 margin，
   // 前后的连续 <br> 全部移除，避免 margin + 空行叠加出双重间距。
   // 图片不存在回退为原始文本时的换行由 AiResponseBlock 用块级 span 兜底。
@@ -328,30 +331,62 @@ function processBlockquoteMarkdown(content: string): string {
   return result.join('\n');
 }
 
+interface ListItem {
+  text: string;
+  children: ListItem[];
+}
+
+function renderListItems(items: ListItem[]): string {
+  const lis = items.map(item =>
+    `<li>${item.text}${item.children.length > 0 ? renderListItems(item.children) : ''}</li>`
+  );
+  return `<ul class="md-list">${lis.join('')}</ul>`;
+}
+
 /**
- * 处理Markdown无序列表 - 连续的 "- " 行合并为一个 <ul>
- * 行首允许最多 3 个空格缩进；"-" 后必须有空格，避开 "--flag" / "-1" 等写法。
+ * 处理Markdown无序列表 - 连续的 "- " 行合并为 <ul>，按缩进生成嵌套
+ * 列表首行允许最多 3 个空格缩进（更深的视为缩进文本，不开列表）；"-" 后必须有空格，避开 "--flag" / "-1" 等写法。
+ * 嵌套规则：比当前层缩进多 2 格及以上为子级，缩进回退则回到对应的外层，其余视为同级。
+ * 空行、续行等非列表行一律结束当前列表，不支持多段落列表项，稳定性优先。
  * 列表项内的粗体/内联代码/链接占位符由后续步骤统一处理。
  */
 function processListMarkdown(content: string): string {
   const lines = content.split('\n');
   const result: string[] = [];
-  let items: string[] = [];
+  let roots: ListItem[] = [];
+  // 当前打开的各层：indent 为该层列表项的缩进，items 为该层的列表项数组
+  let levels: { indent: number; items: ListItem[] }[] = [];
 
   const flushList = () => {
-    if (items.length === 0) return;
-    result.push(`<ul class="md-list">${items.map(item => `<li>${item}</li>`).join('')}</ul>`);
-    items = [];
+    if (roots.length === 0) return;
+    result.push(renderListItems(roots));
+    roots = [];
+    levels = [];
   };
 
   for (const line of lines) {
-    const match = line.match(/^\s{0,3}-\s+(\S.*)$/);
-    if (match) {
-      items.push(match[1]);
-    } else {
+    const match = line.match(/^([ \t]*)-\s+(\S.*)$/);
+    const indent = match ? match[1].replace(/\t/g, '    ').length : 0;
+    if (!match || (levels.length === 0 && indent > 3)) {
       flushList();
       result.push(line);
+      continue;
     }
+
+    const item: ListItem = { text: match[2], children: [] };
+    if (levels.length === 0) {
+      levels.push({ indent, items: roots });
+    } else {
+      while (levels.length > 1 && indent < levels[levels.length - 1].indent) {
+        levels.pop();
+      }
+      const current = levels[levels.length - 1];
+      if (indent >= current.indent + 2) {
+        const parent = current.items[current.items.length - 1];
+        levels.push({ indent, items: parent.children });
+      }
+    }
+    levels[levels.length - 1].items.push(item);
   }
   flushList();
 

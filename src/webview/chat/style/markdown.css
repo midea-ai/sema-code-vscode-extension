@@ -287,9 +287,16 @@
 }
 
 /* 无序列表：收紧默认间距，与引用块/表格的块级节奏一致 */
+/* 标记沿用原文的 "- " 而非圆点；2ch 缩进让标记贴左，视觉等同原始文本，折行仍有悬挂缩进 */
 .markdown-content .md-list {
   margin: 2px 0;
-  padding-left: 1.4em;
+  padding-left: 2ch;
+  list-style-type: '- ';
+}
+
+/* 嵌套列表：上下间距交给 li，每层只多 2ch 缩进，与源文本的 2 空格缩进观感一致 */
+.markdown-content .md-list .md-list {
+  margin: 0;
 }
 
 .markdown-content .md-list li {
