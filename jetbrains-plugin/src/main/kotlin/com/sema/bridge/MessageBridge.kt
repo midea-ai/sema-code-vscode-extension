@@ -85,6 +85,7 @@ class MessageBridge(
                     // 跨面板深链（页面各持独立连接，pushToWeb 只能推自己面板，必须经总线）：
                     "openConfig" -> handleOpenConfig(obj)          // 聊天页 → 配置页定位子页
                     "openAgentDetail" -> handleOpenAgentDetail(obj) // 配置页任务详情 → 聊天页弹子代理详情
+                    "notifySessionCreated" -> handleNotifySessionCreated() // 聊天页新会话就绪 → 配置页重拉扩展子页
                     else -> editorOps.handle(obj)
                 }
             }
@@ -294,6 +295,15 @@ class MessageBridge(
         val uiMsg = linkedMapOf<String, Any?>("command" to "navigateTo", "page" to page)
         if (taskId.isNotEmpty()) uiMsg["taskId"] = taskId
         bus.pushToConfig(editorFrame(uiMsg))
+    }
+
+    /**
+     * 新会话就绪 → 通知配置页重拉扩展子页（对齐 VSCode handleSessionReady → notifySessionCreated）。
+     * session:ready 是会话级事件，只到聊天页那条 gRPC 连接，配置页收不到，故经总线转一手。
+     * 用 IfReady：配置页没开时这信号没有意义，缓冲下来只会在下次打开时 flush 出一串重复拉取。
+     */
+    private fun handleNotifySessionCreated() {
+        bus.pushToConfigIfReady(editorFrame(mapOf("command" to "sessionCreated")))
     }
 
     /**

@@ -47,6 +47,8 @@ export class ConfigController {
             // 模型变更跨面板同步：聊天页改模型后桥广播 model:update，配置页据此刷新模型列表
             // （对齐 VSCode handleModelUpdate → configWebviewProvider.refreshConfigPage）。
             else if (event === 'model:update') void this.loadConfig();
+            // 注：新会话后重拉扩展子页（sessionCreated）不走这里——session:ready 是会话级事件，
+            // 只推给建会话的那条连接（聊天页），配置页收不到；由聊天页经宿主总线转发到本页的 UI 入站帧。
             // 后台任务生命周期跨面板同步：会话开启/结束任务时桥广播 task:start/transfer/end，
             // 配置页任务面板据此实时增删（对齐 VSCode handleTaskStart/End → pushTaskStart/pushTaskEnd）。
             else if (event === 'task:start' || event === 'task:transfer') this.postToApp({ command: 'taskStart', data });

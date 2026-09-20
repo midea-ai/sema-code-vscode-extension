@@ -22,6 +22,19 @@ import { setLang, useT } from '../common/i18n/react';
 
 type PageType = 'models' | 'system' | 'memory' | 'mcp' | 'skill' | 'agent' | 'hooks' | 'command' | 'plugin' | 'task' | 'design' | 'import' | 'claw' | 'usage';
 type ModelTabType = 'list' | 'add';
+
+/**
+ * 扩展的几个子页 → 各自的拉取命令。新会话时 core 会重扫插件并级联刷新
+ * skills/agents/commands/MCP/hooks，停在这些页上的列表已过期，重走一次各页原有的加载流程。
+ */
+const EXTENSION_PAGE_LOAD: Partial<Record<PageType, string>> = {
+    mcp: 'loadMCPConfig',
+    agent: 'loadAgentsInfo',
+    command: 'loadCommandsInfo',
+    skill: 'loadSkillsInfo',
+    hooks: 'loadHooksInfo',
+    plugin: 'loadPluginConfig',
+};
 type TaskTabType = 'background' | 'cron';
 
 interface AppProps {
@@ -35,7 +48,7 @@ const App: React.FC<AppProps> = ({ vscode }) => {
     const t = useT();
     const [currentPage, setCurrentPage] = useState<PageType>('models');
     const [modelTab, setModelTab] = useState<ModelTabType>('list');
-    const [taskTab, setTaskTab] = useState<TaskTabType>('background');
+    const [taskTab, setTaskTab] = useState<TaskTabType>('cron');
     const [taskRefreshTrigger, setTaskRefreshTrigger] = useState(0);
     const [backgroundTaskCount, setBackgroundTaskCount] = useState(0);
     const [cronTaskCount, setCronTaskCount] = useState(0);
@@ -85,6 +98,11 @@ const App: React.FC<AppProps> = ({ vscode }) => {
                         setInitialTaskNonce(n => n + 1);
                     }
                     break;
+                case 'sessionCreated': {
+                    const loadCommand = EXTENSION_PAGE_LOAD[currentPageRef.current];
+                    if (loadCommand) vscode.postMessage({ command: loadCommand });
+                    break;
+                }
                 case 'cronUpdate':
                     if (currentPageRef.current === 'task' && taskTabRef.current === 'cron') {
                         setTaskRefreshTrigger(n => n + 1);
@@ -304,21 +322,21 @@ const App: React.FC<AppProps> = ({ vscode }) => {
                     <div className="page active task-management">
                         <div className="tab-navigation">
                             <div
-                                className={`tab-item ${taskTab === 'background' ? 'active' : ''}`}
-                                onClick={() => setTaskTab('background')}
-                            >
-                                {t('config.tab.backgroundTasks')}
-                                {backgroundTaskCount > 0 && (
-                                    <span className="section-tab-count">{backgroundTaskCount}</span>
-                                )}
-                            </div>
-                            <div
                                 className={`tab-item ${taskTab === 'cron' ? 'active' : ''}`}
                                 onClick={() => setTaskTab('cron')}
                             >
                                 {t('config.tab.cronTasks')}
                                 {cronTaskCount > 0 && (
                                     <span className="section-tab-count">{cronTaskCount}</span>
+                                )}
+                            </div>
+                            <div
+                                className={`tab-item ${taskTab === 'background' ? 'active' : ''}`}
+                                onClick={() => setTaskTab('background')}
+                            >
+                                {t('config.tab.backgroundTasks')}
+                                {backgroundTaskCount > 0 && (
+                                    <span className="section-tab-count">{backgroundTaskCount}</span>
                                 )}
                             </div>
                             <div style={{ marginLeft: 'auto' }}>
@@ -332,11 +350,11 @@ const App: React.FC<AppProps> = ({ vscode }) => {
                             </div>
                         </div>
                         <div className="tab-content">
-                            <div style={{ display: taskTab === 'background' ? 'block' : 'none' }}>
-                                <BackgroundTaskConfig vscode={vscode} refreshTrigger={taskRefreshTrigger} onCountChange={setBackgroundTaskCount} initialTaskId={initialTaskId} initialTaskNonce={initialTaskNonce} />
-                            </div>
                             <div style={{ display: taskTab === 'cron' ? 'block' : 'none' }}>
                                 <CronTaskConfig vscode={vscode} refreshTrigger={taskRefreshTrigger} onCountChange={setCronTaskCount} />
+                            </div>
+                            <div style={{ display: taskTab === 'background' ? 'block' : 'none' }}>
+                                <BackgroundTaskConfig vscode={vscode} refreshTrigger={taskRefreshTrigger} onCountChange={setBackgroundTaskCount} initialTaskId={initialTaskId} initialTaskNonce={initialTaskNonce} />
                             </div>
                         </div>
                     </div>

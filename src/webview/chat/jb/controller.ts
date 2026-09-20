@@ -106,6 +106,10 @@ export class Controller {
             onMessage: (m) => this.postToApp(m),
             // 读时快照（对齐 VSCode handleSessionReady）：按历史读过的文件补快照（按会话隔离）。
             onSessionReady: (sid, data: any) => {
+                // core 建会话会重扫插件并级联刷新 skills/agents/commands/MCP/hooks，配置页长开时列表会过期。
+                // 配置页那条 gRPC 连接收不到本会话的 session:ready，只能经宿主总线转一手
+                // （对齐 VSCode handleSessionReady → configWebviewProvider.notifySessionCreated）。
+                this.t.editor('notifySessionCreated', {});
                 const ts = data?.readFileTimestamps;
                 if (ts && typeof ts === 'object') for (const filePath of Object.keys(ts)) this.addFileToSnapshotIfNew(sid, filePath);
             },

@@ -488,6 +488,11 @@ export class SemaSidebarProvider implements vscode.WebviewViewProvider {
     // ─── 会话事件 handlers ────────────────────────────────────────────────────
 
     private handleSessionReady = async (sessionId: string, data: any): Promise<void> => {
+        // core 建会话会重扫插件并级联刷新 skills / agents / commands / MCP / hooks，
+        // 通知配置页：停在扩展的那几个子页时自行重拉（面板没开则空转）。
+        // 放在 session:ready 而非 createSession 返回处：级联刷新是 core 内部 setImmediate 起的，
+        // ready 比 createSession 的返回晚一拍，命中刷新后数据的概率更高。
+        this.configWebviewProvider.notifySessionCreated();
         try {
             if (data.readFileTimestamps && typeof data.readFileTimestamps === 'object') {
                 for (const filePath of Object.keys(data.readFileTimestamps)) {

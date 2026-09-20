@@ -339,6 +339,14 @@ export class ConfigWebviewProvider {
         if (this.panel) this.loadConfig();
     }
 
+    /**
+     * 新会话通知：core 建会话会重扫插件并级联刷新 skills/agents/commands/MCP/hooks，
+     * 配置页停在扩展的那几个子页时列表已过期。这里只发信号，由页面按当前所在子页自行重拉。
+     */
+    public notifySessionCreated(): void {
+        if (this.panel) this.postMessage({ command: 'sessionCreated' });
+    }
+
     // ─── Models ───────────────────────────────────────────────────────────────
 
     private async loadConfig() {

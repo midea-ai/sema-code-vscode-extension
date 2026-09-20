@@ -100,6 +100,17 @@ class SemaPanelBus {
         if (p != null && configReady) p(json) else pendingConfig.add(json)
     }
 
+    /**
+     * 向配置 webview 推一帧，未就绪直接丢弃（不缓冲）。
+     * 用于「页面开着才有意义」的刷新信号（如新会话后重拉扩展子页）：配置页没开时无需补发，
+     * 缓冲反而会在下次打开时 flush 出一串重复拉取。
+     */
+    @Synchronized
+    fun pushToConfigIfReady(json: String) {
+        val p = configPush
+        if (p != null && configReady) p(json)
+    }
+
     // ── 历史面板 ──────────────────────────────────────────────────────────────
 
     fun registerHistory(push: (String) -> Unit) { historyPush = push }
