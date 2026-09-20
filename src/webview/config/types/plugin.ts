@@ -31,7 +31,9 @@ export interface PluginComponents {
     commands: PluginComponentEntry[];
     agents: PluginComponentEntry[];
     skills: PluginComponentEntry[];
-    mcp: PluginComponentEntry[]
+    mcp: PluginComponentEntry[];
+    /** 插件自带的 hooks 配置（<插件目录>/hooks/hooks.json），旧版 core 无此字段 */
+    hooks?: PluginComponentEntry[];
 }
 
 export interface PluginInfo {

@@ -104,7 +104,8 @@ const InstalledPluginCard: React.FC<{
         (plugin.components?.commands?.length > 0) ||
         (plugin.components?.agents?.length > 0) ||
         (plugin.components?.skills?.length > 0) ||
-        (plugin.components?.mcp?.length > 0)
+        (plugin.components?.mcp?.length > 0) ||
+        ((plugin.components?.hooks?.length ?? 0) > 0)
     );
     const displayName = `${plugin.name}@${plugin.marketplace}`;
 
@@ -197,6 +198,7 @@ const InstalledPluginCard: React.FC<{
                             <ComponentBadges label="Agents:" items={plugin.components?.agents || []} onOpenFile={onOpenFile} />
                             <ComponentBadges label="Skills:" items={plugin.components?.skills || []} onOpenFile={onOpenFile} />
                             <ComponentBadges label="MCP:" items={plugin.components?.mcp || []} onOpenFile={onOpenFile} />
+                            <ComponentBadges label="Hooks:" items={plugin.components?.hooks || []} onOpenFile={onOpenFile} />
                         </div>
                     )}
                 </div>
@@ -299,11 +301,13 @@ const MarketplaceSection: React.FC<{
     search?: string;
 }> = ({ marketplace, installedPlugins, onInstall, onUpdate, onRemove, onOpenExternal, isUpdating, isRemoving, installingKeys, search = '' }) => {
     const t = useT();
-    const [expanded, setExpanded] = useState(true);
+    const [expanded, setExpanded] = useState(false);
     const [page, setPage] = useState(1);
 
     useEffect(() => {
         setPage(1);
+        // 默认折叠，搜索时自动展开，否则命中结果被折叠看不到
+        if (search.trim()) setExpanded(true);
     }, [search]);
 
     const installedNames = useMemo(() =>
@@ -581,6 +585,8 @@ const PluginConfig: React.FC<PluginConfigProps> = ({ vscode }) => {
                     if (message.success && message.data) {
                         setData(message.data);
                         setShowAddModal(false);
+                        // 「添加市场」按钮在两个 tab 下都可见，添加成功后统一落到插件市场，才能看到新市场
+                        setActiveTab('market');
                     }
                     break;
                 case 'removeMarketplaceResult':

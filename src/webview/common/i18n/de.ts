@@ -282,6 +282,7 @@ export const de: Record<keyof typeof zh, string> = {
     'config.plugin.noMarket': 'Noch keine Marktplätze. Fügen Sie zuerst einen hinzu.',
 
     // ── config: skills ──
+    'config.skill.group.builtin': 'Integrierte Skills',
     'config.skill.group.project': 'Projekt-Skills',
     'config.skill.group.user': 'Benutzer-Skills',
     'config.skill.group.plugin': 'Plug-in-Skills',
@@ -328,6 +329,8 @@ export const de: Record<keyof typeof zh, string> = {
     // ── config: hooks ──
     'config.hooks.group.project': 'Projekt-Hooks',
     'config.hooks.group.user': 'Benutzer-Hooks',
+    'config.hooks.group.plugin': 'Plug-in-Hooks',
+    'config.hooks.pluginSource': 'Plug-in {name}',
     'config.hooks.status.skipped': 'Übersprungen',
     'config.hooks.status.invalid': 'Ungültig',
     'config.hooks.openFile': '{path} öffnen',

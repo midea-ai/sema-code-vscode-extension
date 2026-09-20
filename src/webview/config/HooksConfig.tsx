@@ -13,18 +13,28 @@ interface HooksConfigProps {
     vscode: VscodeApi;
 }
 
-const SOURCE_ORDER: HookSource[] = ['project', 'user'];
+const SOURCE_ORDER: HookSource[] = ['project', 'user', 'plugin'];
 
 // 分组标题 / 状态文案 key，渲染期经 t() 取值
 const SOURCE_SECTION_TITLE_KEYS: Record<HookSource, I18nKey> = {
     project: 'config.hooks.group.project',
-    user: 'config.hooks.group.user'
+    user: 'config.hooks.group.user',
+    plugin: 'config.hooks.group.plugin'
 };
 
+// 插件 hooks 各自在插件目录下，无统一路径
 const SOURCE_PATHS: Record<HookSource, string> = {
     project: '.sema/hooks/hooks.json',
-    user: '~/.sema/hooks/hooks.json'
+    user: '~/.sema/hooks/hooks.json',
+    plugin: ''
 };
+
+interface HookEventGroup {
+    event: string;
+    /** 仅插件来源：同一事件按插件拆成多张卡片 */
+    pluginName?: string;
+    entries: HookEntryInfo[];
+}
 
 const STATUS_LABEL_KEYS: Record<string, I18nKey> = {
     skipped: 'config.hooks.status.skipped',
@@ -40,7 +50,7 @@ const HooksConfig: React.FC<HooksConfigProps> = ({ vscode }) => {
 
     // 按来源分组，同一事件的多条 hook 合并为一组（一张卡片），事件按 HOOK_EVENTS 固定顺序排列
     const groupedEvents = useMemo(() => {
-        const groups: Record<HookSource, Array<{ event: string; entries: HookEntryInfo[] }>> = { project: [], user: [] };
+        const groups: Record<HookSource, HookEventGroup[]> = { project: [], user: [], plugin: [] };
         if (!hooksInfo?.events) return groups;
         const knownEvents = HOOK_EVENTS.filter(e => hooksInfo.events[e]);
         const extraEvents = Object.keys(hooksInfo.events).filter(e => !(HOOK_EVENTS as readonly string[]).includes(e));
@@ -48,14 +58,14 @@ const HooksConfig: React.FC<HooksConfigProps> = ({ vscode }) => {
             (hooksInfo.events[event] || []).forEach(entry => {
                 const list = groups[entry.source];
                 if (!list) return;
-                const existing = list.find(g => g.event === event);
-                if (existing) existing.entries.push(entry); else list.push({ event, entries: [entry] });
+                const existing = list.find(g => g.event === event && g.pluginName === entry.pluginName);
+                if (existing) existing.entries.push(entry); else list.push({ event, pluginName: entry.pluginName, entries: [entry] });
             });
         });
         return groups;
     }, [hooksInfo]);
 
-    const totalCount = [...groupedEvents.project, ...groupedEvents.user]
+    const totalCount = [...groupedEvents.project, ...groupedEvents.user, ...groupedEvents.plugin]
         .reduce((sum, g) => sum + g.entries.length, 0);
 
     useEffect(() => {
@@ -95,6 +105,7 @@ const HooksConfig: React.FC<HooksConfigProps> = ({ vscode }) => {
 
     // 打开对应来源的 hooks.json 配置文件
     const handleOpenConfig = (source: HookSource) => {
+        if (source === 'plugin') return;
         const filePath = source === 'user' ? hooksInfo?.userConfigPath : hooksInfo?.projectConfigPath;
         if (filePath) {
             vscode.postMessage({ command: 'openFile', filePath });
@@ -120,8 +131,11 @@ const HooksConfig: React.FC<HooksConfigProps> = ({ vscode }) => {
     }
 
     // 渲染单个事件卡片（同一事件的多条 hook 合并展示）
-    const renderEventCard = (source: HookSource, event: string, entries: HookEntryInfo[], key: string) => {
+    const renderEventCard = (source: HookSource, group: HookEventGroup, key: string) => {
+        const { event, pluginName, entries } = group;
         const isToolEvent = TOOL_HOOK_EVENTS.has(event);
+        // 插件 hooks 只能靠 entry.filePath 定位，没有则不给打开入口
+        const canOpen = source !== 'plugin' || entries.some(e => e.filePath);
 
         return (
             <div key={key} className="section-card">
@@ -134,16 +148,21 @@ const HooksConfig: React.FC<HooksConfigProps> = ({ vscode }) => {
                         {entries.length > 1 && (
                             <span className="section-tab-count">{entries.length}</span>
                         )}
+                        {pluginName && (
+                            <span className="readonly-tab">{pluginName}</span>
+                        )}
                     </div>
-                    <div className="section-card-actions">
-                        <button
-                            className="section-icon-btn"
-                            title={t('config.hooks.openFile', { path: SOURCE_PATHS[source] })}
-                            onClick={(e) => { e.stopPropagation(); handleOpenEntry(source, entries); }}
-                        >
-                            <OpenIcon />
-                        </button>
-                    </div>
+                    {canOpen && (
+                        <div className="section-card-actions">
+                            <button
+                                className="section-icon-btn"
+                                title={source === 'plugin' ? t('common.open') : t('config.hooks.openFile', { path: SOURCE_PATHS[source] })}
+                                onClick={(e) => { e.stopPropagation(); handleOpenEntry(source, entries); }}
+                            >
+                                <OpenIcon />
+                            </button>
+                        </div>
+                    )}
                 </div>
                 {entries.map((entry, i) => (
                     <div key={i} className="hook-entry">
@@ -211,13 +230,22 @@ const HooksConfig: React.FC<HooksConfigProps> = ({ vscode }) => {
             <div className="tab-content">
                 {hooksInfo?.parseErrors?.map((err, i) => (
                     <div key={i} className="hook-banner hook-banner-error">
-                        {t('config.hooks.parseError', { source: t(SOURCE_SECTION_TITLE_KEYS[err.source]), message: err.message })}
+                        {t('config.hooks.parseError', {
+                            source: err.source === 'plugin' && err.pluginName
+                                ? t('config.hooks.pluginSource', { name: err.pluginName })
+                                : t(SOURCE_SECTION_TITLE_KEYS[err.source]),
+                            message: err.message
+                        })}
                     </div>
                 ))}
                 <div className="section-groups">
                     {SOURCE_ORDER.map(source => {
                         const sectionGroups = groupedEvents[source];
-                        const configExists = source === 'user' ? hooksInfo?.userConfigExists : hooksInfo?.projectConfigExists;
+                        // 项目级 / 用户级 始终显示；插件级为空时隐藏
+                        if (sectionGroups.length === 0 && source === 'plugin') return null;
+                        const configExists = source === 'plugin'
+                            ? false
+                            : source === 'user' ? hooksInfo?.userConfigExists : hooksInfo?.projectConfigExists;
 
                         const isCollapsed = collapsedSections.has(source);
                         const toggleCollapse = () => setCollapsedSections(prev => {
@@ -230,7 +258,9 @@ const HooksConfig: React.FC<HooksConfigProps> = ({ vscode }) => {
                             <div key={source} className={`section-group section-${source}`}>
                                 <div className="section-group-title section-group-title-collapsible" style={{ cursor: 'pointer', userSelect: 'none' }} onClick={toggleCollapse}>
                                     {t(SOURCE_SECTION_TITLE_KEYS[source])}
-                                    <span className="section-group-count">({SOURCE_PATHS[source]})</span>
+                                    {SOURCE_PATHS[source] && (
+                                        <span className="section-group-count">({SOURCE_PATHS[source]})</span>
+                                    )}
                                     {configExists && (
                                         <button
                                             className="section-icon-btn"
@@ -247,7 +277,7 @@ const HooksConfig: React.FC<HooksConfigProps> = ({ vscode }) => {
                                 ) : (
                                     <div className="section-list">
                                         {sectionGroups.map(group =>
-                                            renderEventCard(source, group.event, group.entries, `${source}-${group.event}`)
+                                            renderEventCard(source, group, `${source}-${group.pluginName || ''}-${group.event}`)
                                         )}
                                     </div>
                                 ))}

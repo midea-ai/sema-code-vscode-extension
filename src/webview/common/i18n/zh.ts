@@ -283,6 +283,7 @@ export const zh = {
     'config.plugin.noMarket': '暂无插件市场，请先添加',
 
     // ── 配置页：Skill ──
+    'config.skill.group.builtin': '内置 Skills',
     'config.skill.group.project': '项目级 Skills',
     'config.skill.group.user': '用户级 Skills',
     'config.skill.group.plugin': '插件 Skills',
@@ -329,6 +330,8 @@ export const zh = {
     // ── 配置页：Hooks ──
     'config.hooks.group.project': '项目级 Hooks',
     'config.hooks.group.user': '用户级 Hooks',
+    'config.hooks.group.plugin': '插件 Hooks',
+    'config.hooks.pluginSource': '插件 {name} ',
     'config.hooks.status.skipped': '已跳过',
     'config.hooks.status.invalid': '无效',
     'config.hooks.openFile': '打开 {path}',

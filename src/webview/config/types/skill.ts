@@ -1,4 +1,4 @@
-export type SkillScope = 'user' | 'project' | 'plugin';
+export type SkillScope = 'user' | 'project' | 'plugin' | 'builtin';
 
 export interface SkillConfig {
     name: string;

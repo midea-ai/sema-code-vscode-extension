@@ -1,4 +1,4 @@
-export type HookSource = 'user' | 'project'
+export type HookSource = 'user' | 'project' | 'plugin'
 
 /** 基础功能支持的 8 个 hook 事件（与 sema-core HOOK_EVENTS 对齐；core 未从 types 入口导出该常量，本地维护一份，用于固定展示顺序与导入过滤） */
 export const HOOK_EVENTS = [
@@ -23,6 +23,8 @@ export const TOOL_HOOK_EVENTS = new Set<string>([
 export interface HookEntryInfo {
   event: string
   source: HookSource
+  /** 仅插件来源：所属插件名 */
+  pluginName?: string
   matcher?: string
   command: string
   timeout?: number
@@ -37,6 +39,6 @@ export interface HooksInfo {
   projectConfigPath: string
   userConfigExists: boolean
   projectConfigExists: boolean
-  parseErrors: Array<{ source: HookSource; message: string }>
+  parseErrors: Array<{ source: HookSource; pluginName?: string; message: string }>
   events: Record<string, HookEntryInfo[]>
 }

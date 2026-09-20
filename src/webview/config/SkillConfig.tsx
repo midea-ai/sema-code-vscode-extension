@@ -20,16 +20,18 @@ interface HubSkillResult {
     version: string;
 }
 
-const LOCATE_ORDER: SkillScope[] = ['project', 'user', 'plugin'];
+const LOCATE_ORDER: SkillScope[] = ['builtin', 'project', 'user', 'plugin'];
 
 // 分组标题文案 key，渲染期经 t() 取值
 const LOCATE_SECTION_TITLE_KEYS: Record<SkillScope, I18nKey> = {
+    builtin: 'config.skill.group.builtin',
     plugin: 'config.skill.group.plugin',
     project: 'config.skill.group.project',
     user: 'config.skill.group.user',
 };
 
 const LOCATE_PATHS: Record<SkillScope, string> = {
+    builtin: '',
     plugin: '',
     project: '.sema/skills/',
     user: '~/.sema/skills/',
@@ -58,6 +60,7 @@ const SkillConfig: React.FC<SkillConfigProps> = ({ vscode }) => {
 
     const groupedSkills = useMemo(() => {
         const groups: Record<SkillScope, SkillConfigItem[]> = {
+            builtin: [],
             plugin: [],
             project: [],
             user: [],
@@ -169,6 +172,8 @@ const SkillConfig: React.FC<SkillConfigProps> = ({ vscode }) => {
     const installedSlugs = useMemo(() => {
         const slugs = new Set<string>();
         skills.forEach(s => {
+            // 内置 skill 可被同名用户级/项目级覆盖，不算已安装
+            if (s.locate === 'builtin') return;
             slugs.add(s.name);
             if (s.filePath) {
                 // filePath 形如 /xxx/.sema/skills/pptx-2/SKILL.md，提取目录名作为 slug
@@ -218,7 +223,8 @@ const SkillConfig: React.FC<SkillConfigProps> = ({ vscode }) => {
         const description = skill.description || t('common.noDescription');
         const isDescExpanded = expandedDescriptions.has(skillKey);
         const isLongDesc = description.length > DESC_MAX;
-        const isReadonly = skill.locate === 'plugin';
+        // 内置 / 插件 skill 不可编辑删除；插件 skill 可启停，内置 skill 无任何操作（与内置子代理一致）
+        const isReadonly = skill.locate === 'builtin' || skill.locate === 'plugin';
         const isDisabled = skill.status === false;
         const skillSwitch = (
             <label className="section-switch" title={isDisabled ? (skill.locate === 'project' ? t('config.skill.disabledProject') : t('config.skill.disabledGlobal')) : t('config.skill.enabled')}>
@@ -459,8 +465,8 @@ const SkillConfig: React.FC<SkillConfigProps> = ({ vscode }) => {
                     <div className="section-groups">
                         {LOCATE_ORDER.map(scope => {
                             const sectionSkills = groupedSkills[scope] || [];
-                            // 项目级 / 用户级 始终显示；插件级为空时隐藏
-                            if (sectionSkills.length === 0 && scope === 'plugin') return null;
+                            // 项目级 / 用户级 始终显示；内置 / 插件级为空时隐藏
+                            if (sectionSkills.length === 0 && (scope === 'builtin' || scope === 'plugin')) return null;
 
                             const isCollapsed = collapsedSections.has(scope);
                             const toggleCollapse = () => setCollapsedSections(prev => {
