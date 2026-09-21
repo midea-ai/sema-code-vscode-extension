@@ -97,6 +97,7 @@ const iconColors: { [key: string]: string } = {
     pdf: colors.red,
     word: colors.blue,
     xls: colors.green,
+    ppt: colors.orange,
     csv: colors.green,
 
     // 图片

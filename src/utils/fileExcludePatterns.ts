@@ -30,6 +30,7 @@ export const EXCLUDED_FILES = new Set([
  */
 export const NON_TEXT_EXTENSIONS = new Set([
     '.jar', '.war', '.ear',
+    '.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx',
     '.png', '.jpg', '.jpeg', '.gif', '.bmp', '.webp', '.ico', '.tiff', '.tif',
     '.pdf', '.mp4', '.mov', '.avi', '.mkv', '.webm', '.mp3', '.wav', '.flac', '.ogg',
     '.zip', '.tar', '.gz', '.rar', '.7z', '.exe', '.dll', '.so', '.dylib',

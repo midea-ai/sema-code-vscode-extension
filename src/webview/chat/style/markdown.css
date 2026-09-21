@@ -52,14 +52,14 @@
 }
 
 /* 文件类型图标（verifyFilePath 确认后由 AiResponseBlock 动态插入，SVG 走 currentColor）
-   与 .md-link-icon 同一套：普通 inline-block + 负 vertical-align，让图标和文字共用正文基线。
+   SVG 自带留白，尺寸放大到 1.3em；用 inline-block + 负 vertical-align 保持与文字的垂直对齐。
    不能用 inline-flex + align-items:center 包住整个链接：inline-flex 的对外基线取第一个 flex 子项，
    而图标 span 无文字、基线即底边，会把文件名整体抬高，与前后正文错位 */
 .markdown-content .md-file-icon {
   display: inline-block;
-  width: 1em;
-  height: 1em;
-  vertical-align: -0.15em;
+  width: 1.3em;
+  height: 1.3em;
+  vertical-align: -0.3em;
   margin-right: 0.3em;
 }
 

@@ -82,8 +82,16 @@ export class FileOperationManager {
                 return;
             }
 
-            // 打开文档并跳转到指定行
-            const document = await vscode.workspace.openTextDocument(fileUri);
+            // 未知二进制或不支持的文本编码也交给 VS Code，显示默认编辑器/提示页。
+            let document: vscode.TextDocument;
+            try {
+                document = await vscode.workspace.openTextDocument(fileUri);
+            } catch {
+                await vscode.commands.executeCommand('vscode.open', fileUri);
+                return;
+            }
+
+            // 文本文档保留行号跳转和选区
             const editor = await vscode.window.showTextDocument(document, {
                 preview: false,
                 viewColumn: vscode.ViewColumn.One
