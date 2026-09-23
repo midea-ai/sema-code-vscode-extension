@@ -29,16 +29,16 @@ export function makePastePreview(text: string): string {
     return one.length > PREVIEW_LEN ? one.slice(0, PREVIEW_LEN) + '…' : one;
 }
 
-/** 一行一段粘贴：`## "<预览>": @<绝对路径>`；路径不含空格与标点，裸写不加引号 */
+/** 一行一段粘贴：`## "<预览>": @"<绝对路径>"`；路径一律加引号，用户目录含空格或标点（如 C:\Users\Zhou Jie）时 core 才不会截断引用 */
 export function buildPasteInput(pastes: PasteAttachment[], text: string): string {
     const lines = [PASTE_HEADER, ''];
-    for (const p of pastes) lines.push(`## "${p.preview}": @${p.path}`, '');
+    for (const p of pastes) lines.push(`## "${p.preview}": @"${p.path}"`, '');
     lines.push(PASTE_REQUEST, text);
     return lines.join('\n');
 }
 
 /** 只认 attachments/<uuid>/pasted-text.txt 形状的路径（兼容 Windows 反斜杠），其余行忽略 */
-const PASTE_LINE_RE = /^## "(.*)": @(\S+[\\/]attachments[\\/][^\\/\s]+[\\/]pasted-text\.txt)$/;
+const PASTE_LINE_RE = /^## "(.*)": @"([^"]+[\\/]attachments[\\/][^\\/"]+[\\/]pasted-text\.txt)"$/;
 
 /** 从 input 解析粘贴列表：不是模板格式（无头行或无 `## My request:`）返回 undefined */
 export function parsePasteInput(input: string | undefined | null): PasteAttachment[] | undefined {
