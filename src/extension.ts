@@ -49,7 +49,24 @@ export function activate(context: vscode.ExtensionContext) {
         sidebarProvider.openConfigPanel();
     });
 
-    context.subscriptions.push(newSessionCommand, openHistoryCommand, configCommand);
+    // 资源管理器/编辑器标签右键「添加到聊天」：多选时 uris 有值，否则用单个 uri，再回退到当前活动编辑器
+    const addToChatCommand = vscode.commands.registerCommand('sema-vscode-extension.addToChat', async (uri?: vscode.Uri, uris?: vscode.Uri[]) => {
+        const targets = (uris && uris.length > 0 ? uris : uri ? [uri] : [vscode.window.activeTextEditor?.document.uri])
+            .filter((u): u is vscode.Uri => !!u && u.scheme === 'file');
+        if (targets.length === 0) return;
+        const files: { path: string; isDirectory: boolean }[] = [];
+        for (const u of targets) {
+            let isDirectory = false;
+            try {
+                isDirectory = (await vscode.workspace.fs.stat(u)).type === vscode.FileType.Directory;
+            } catch { /* 取不到状态按文件处理 */ }
+            // 与 @ 面板列表同一格式：工作区相对路径，统一为 / 分隔
+            files.push({ path: vscode.workspace.asRelativePath(u, false).replace(/\\/g, '/'), isDirectory });
+        }
+        await sidebarProvider.addFilesToChat(files);
+    });
+
+    context.subscriptions.push(newSessionCommand, openHistoryCommand, configCommand, addToChatCommand);
 
     // 初始化当前工作区路径
     currentWorkspacePath = getCurrentWorkspacePath();

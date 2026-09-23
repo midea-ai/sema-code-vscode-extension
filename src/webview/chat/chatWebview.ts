@@ -131,6 +131,10 @@ export class ChatWebviewProvider {
         this.view?.webview.postMessage(message);
     }
 
+    public isViewResolved(): boolean {
+        return !!this.view;
+    }
+
     /** 清空指定会话的面板（权限/表单/计划/待办/文件变更等） */
     public clearSessionPanels(sessionId: string): void {
         this.postMessage({ type: 'closePermissionPanel', sessionId });

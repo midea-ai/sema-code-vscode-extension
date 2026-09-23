@@ -61,9 +61,27 @@
         "command": "sema-vscode-extension.openConfig",
         "title": "%command.openConfig.title%",
         "icon": "$(gear)"
+      },
+      {
+        "command": "sema-vscode-extension.addToChat",
+        "title": "Add to SemaCode"
       }
     ],
     "menus": {
+      "explorer/context": [
+        {
+          "command": "sema-vscode-extension.addToChat",
+          "when": "resourceScheme == file",
+          "group": "navigation@0"
+        }
+      ],
+      "editor/title/context": [
+        {
+          "command": "sema-vscode-extension.addToChat",
+          "when": "resourceScheme == file",
+          "group": "navigation@0"
+        }
+      ],
       "view/title": [
         {
           "command": "sema-vscode-extension.newSession",

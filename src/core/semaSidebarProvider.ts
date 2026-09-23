@@ -412,6 +412,17 @@ export class SemaSidebarProvider implements vscode.WebviewViewProvider {
         this.configWebviewProvider.show(this.context.extensionUri, page, taskId);
     }
 
+    /** 右键「添加到聊天」：唤出侧边栏后把文件以 mention 形式插到输入框末尾 */
+    public async addFilesToChat(files: { path: string; isDirectory: boolean }[]): Promise<void> {
+        const alreadyResolved = this.chatWebviewProvider.isViewResolved();
+        try {
+            await vscode.commands.executeCommand('sema-vscode-view.focus');
+        } catch { /* 视图不可用时仍尝试投递 */ }
+        // 首次唤出侧边栏时 webview 还在加载，稍等再发，避免消息丢失
+        if (!alreadyResolved) await new Promise(resolve => setTimeout(resolve, 600));
+        this.chatWebviewProvider.postMessage({ type: 'insertFileMentions', files });
+    }
+
     // ─── 桌宠 ─────────────────────────────────────────────────────────────────
 
     public isPetEnabled(): boolean {
