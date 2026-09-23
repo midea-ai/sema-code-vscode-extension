@@ -46,7 +46,7 @@ export const RECOMMENDED_MAIN_MODEL_KEY: I18nKey | '' = 'config.task.recommendMa
 export const RECOMMENDED_QUICK_MODEL_KEY: I18nKey | '' = 'config.task.recommendQuick';
 
 /** 全局默认上下文窗口大小 */
-export const DEFAULT_CONTEXT_LENGTH = 512000;
+export const DEFAULT_CONTEXT_LENGTH = 1000000;
 
 /** 默认提供商 key */
 export const DEFAULT_PROVIDER = 'deepseek';
@@ -114,7 +114,7 @@ export const defaultModelProvider: Record<string, ProviderDefaults> = {
         baseURL: 'https://open.bigmodel.cn/api/paas/v4',
         baseURLPlaceholder: 'https://open.bigmodel.cn/api/paas/v4',
         apiKeyProviderLabel: 'Zhipu',
-        defaultModel: 'glm-5.2',
+        defaultModel: 'glm-5.3',
         apikeyUrl: 'https://bigmodel.cn/usercenter/proj-mgmt/apikeys',
         defaultAdapt: 'openai',
     },
@@ -133,7 +133,7 @@ export const defaultModelProvider: Record<string, ProviderDefaults> = {
         baseURL: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
         baseURLPlaceholder: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
         apiKeyProviderLabel: 'Alibaba Cloud',
-        defaultModel: 'qwen3.7-max',
+        defaultModel: 'qwen3.8-max',
         apikeyUrl: 'https://bailian.console.aliyun.com/cn-beijing?api-key',
         defaultAdapt: 'openai',
     },
@@ -143,7 +143,7 @@ export const defaultModelProvider: Record<string, ProviderDefaults> = {
         modelsUrl: 'https://api.xiaomimimo.com/v1/models',
         baseURLPlaceholder: 'https://api.xiaomimimo.com/anthropic',
         apiKeyProviderLabel: 'Xiaomi MiMo',
-        defaultModel: 'mimo-v2.5-pro',
+        defaultModel: 'mimo-v2.6-pro',
         apikeyUrl: 'https://platform.xiaomimimo.com/console/api-keys',
         defaultAdapt: 'anthropic',
     },
