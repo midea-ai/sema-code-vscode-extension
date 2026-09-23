@@ -8,6 +8,9 @@ import { transformCommandToPrompt } from '../../utils/prompt';
 import type { InputImageAttachment } from 'sema-core';
 import { DEFAULT_CUSTOM_RULES, isBuiltinCustomRules } from '../config/default/defaultConfig';
 import { t, getLang, normalizeLang, type Language } from '../common/i18n/core';
+import { buildPasteInput, type PasteAttachment } from '../common/paste';
+import { savePastedText, removePastedText, readPastedText } from '../../utils/pasteAttachments';
+import { buildVizEmbedHtml } from '../../utils/vizEmbed';
 
 const FILE_REFERENCE_QUOTE_REGEX = /[\s。，、；：！？""''「」『』（）《》〈〉【】,;!?]/;
 
@@ -47,6 +50,8 @@ function formatFileReference(file: any, quoted = true): string {
  */
 export class ChatWebviewProvider {
     private view?: vscode.WebviewView;
+    /** 当前 webview html 的脚本 nonce；可视化 srcdoc iframe 继承 CSP，其脚本要带同一个 nonce 才能跑 */
+    private nonce = '';
 
     constructor(
         private readonly extensionUri: vscode.Uri,
@@ -82,7 +87,7 @@ export class ChatWebviewProvider {
                 webviewSessionReady: () => this.sessionController.getSessionWrapper(msg.sessionId)?.sendInitialState(),
 
                 // ── 会话级交互 ──
-                sendInput: () => this.handleUserInput(sid, msg.text, msg.files, msg.attachments),
+                sendInput: () => this.handleUserInput(sid, msg.text, msg.files, msg.attachments, msg.pastes),
                 interrupt: () => this.interrupt(sid),
                 toolPermissionResponse: () => this.sessionController.getSessionWrapper(sid!)?.respondToToolPermission(msg.response),
                 askFormResponse: () => this.sessionController.getSessionWrapper(sid!)?.respondToPickOption(msg.response),
@@ -122,6 +127,19 @@ export class ChatWebviewProvider {
                 openBashOutput: () => this.fileOperationManager.openBashOutputAsDocument(msg.content, msg.command, msg.toolId),
                 requestInputHistory: () => this.sendInputHistory(),
                 saveInputHistory: () => this.appendInputHistory(msg.item),
+                // 超长粘贴转附件：落盘（含退场）/ 删除 / 读回（fork 回填）；与会话无关
+                savePastedText: () => {
+                    try {
+                        this.postMessage({ type: 'pastedTextSaved', reqId: msg.reqId, path: savePastedText(String(msg.text ?? '')).path });
+                    } catch (error) {
+                        console.error('Failed to save pasted text:', error);
+                        this.postMessage({ type: 'pastedTextSaved', reqId: msg.reqId, path: null });
+                    }
+                },
+                removePastedText: () => { try { removePastedText(String(msg.path || '')); } catch { /* ignore */ } },
+                readPastedText: () => this.postMessage({ type: 'pastedTextRead', reqId: msg.reqId, path: msg.path, content: readPastedText(String(msg.path || '')) }),
+                // 可视化产物内联嵌入：复制到临时目录并注入 viz-runtime，回 webview 可加载的 url
+                prepareVizEmbed: () => this.prepareVizEmbed(String(msg.path || ''), msg.reqId),
             };
             await handlers[msg.type]?.();
         });
@@ -152,11 +170,12 @@ export class ChatWebviewProvider {
         await this.sessionController.createSession();
     }
 
-    private async handleUserInput(sessionId: string | undefined, text: string, files?: Array<any>, attachments?: InputImageAttachment[]): Promise<void> {
+    private async handleUserInput(sessionId: string | undefined, text: string, files?: Array<any>, attachments?: InputImageAttachment[], pastes?: PasteAttachment[]): Promise<void> {
         const wrapper = sessionId ? this.sessionController.getSessionWrapper(sessionId) : undefined;
         if (!wrapper) return;
         try {
             let content = text;
+            const body = text;
             if (files && files.length > 0) {
                 const refs = files.map((file: any) => ({
                     encoded: formatFileReference(file),
@@ -175,7 +194,11 @@ export class ChatWebviewProvider {
             }
 
             const transformedContent = transformCommandToPrompt(content);
-            if (transformedContent && transformedContent !== content) {
+            // 有粘贴附件：模型收到的 input 按模板把粘贴文件以 @路径 引用；originalInput 传用户实际打的正文（没打字就是空串，不是不传）
+            if (pastes && pastes.length > 0) {
+                const expanded = transformedContent && transformedContent !== content ? transformedContent : content;
+                wrapper.processUserInput(buildPasteInput(pastes, expanded), body, attachments);
+            } else if (transformedContent && transformedContent !== content) {
                 wrapper.processUserInput(transformedContent, content, attachments);
             } else {
                 wrapper.processUserInput(content, undefined, attachments);
@@ -376,6 +399,18 @@ export class ChatWebviewProvider {
         }
     }
 
+    /** 回 srcdoc 用的 html 字符串（脚本带本 webview 的 nonce、内联 runtime）；失败回 null */
+    private prepareVizEmbed(htmlPath: string, reqId: string): void {
+        let html: string | null = null;
+        try {
+            const runtimeFile = vscode.Uri.joinPath(this.extensionUri, 'dist', 'webview', 'viz-runtime.js').fsPath;
+            html = buildVizEmbedHtml(htmlPath, runtimeFile, this.nonce);
+        } catch (error) {
+            console.error('Failed to prepare viz embed:', error);
+        }
+        this.postMessage({ type: 'vizEmbedReady', reqId, html });
+    }
+
     private async requestClipboardFiles(): Promise<void> {
         try {
             const paths = await this.fileOperationManager.readClipboardFiles();
@@ -402,8 +437,9 @@ export class ChatWebviewProvider {
 
     private async verifyFilePath(filePath: string, tempId: string, originalCode: string, lineInfo?: string): Promise<void> {
         try {
-            const exists = await this.fileOperationManager.verifyFilePath(filePath);
-            this.postMessage({ type: 'filePathVerified', tempId, exists, filePath, originalCode, lineInfo });
+            // exists 语义保持"是文件"（markdown 链接只对文件可点）；isDirectory 供用户气泡把目录引用也显示为芯片
+            const { exists, isDirectory } = await this.fileOperationManager.statFilePath(filePath);
+            this.postMessage({ type: 'filePathVerified', tempId, exists, isDirectory, filePath, originalCode, lineInfo });
         } catch (error) {
             console.error('Failed to verify file path:', error);
             this.postMessage({ type: 'filePathVerified', tempId, exists: false, filePath, originalCode, lineInfo });
@@ -487,8 +523,9 @@ export class ChatWebviewProvider {
         const scriptUri = webview.asWebviewUri(
             vscode.Uri.joinPath(this.extensionUri, 'dist', 'webview', 'chat.js')
         );
-        const nonce = this.getNonce();
+        const nonce = this.nonce = this.getNonce();
         // <html lang> 由 i18n 模块在 webview 启动时读取作为初始语言，避免首屏闪中文
+        // connect-src 放行 jsdelivr：可视化 srcdoc iframe 继承本 CSP，地图类图表要从那里拉 TopoJSON
         return `<!DOCTYPE html>
 <html lang="${getLang()}">
 <head>
@@ -497,8 +534,10 @@ export class ChatWebviewProvider {
     <meta http-equiv="Content-Security-Policy" content="default-src 'none';
         style-src ${webview.cspSource} 'unsafe-inline' https://cdnjs.cloudflare.com;
         script-src 'nonce-${nonce}' https://cdnjs.cloudflare.com;
+        connect-src https://cdn.jsdelivr.net;
         font-src ${webview.cspSource} data:;
-        img-src ${webview.cspSource} https: data: blob:;">
+        img-src ${webview.cspSource} https: data: blob:;
+        frame-src ${webview.cspSource};">
     <title>Code Assistant</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css">
 </head>

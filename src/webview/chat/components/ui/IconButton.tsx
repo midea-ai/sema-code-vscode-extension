@@ -185,15 +185,6 @@ export const RemoveIcon: React.FC = () => {
     );
 };
 
-// 输入框 添加文件图标
-export const PlusIcon: React.FC = () => {
-    return (
-        <svg viewBox="0 0 16 16" fill="currentColor">
-            <path d="M8 3.5a.5.5 0 0 1 .5.5v3.5H12a.5.5 0 0 1 0 1H8.5V12a.5.5 0 0 1-1 0V8.5H4a.5.5 0 0 1 0-1h3.5V4a.5.5 0 0 1 .5-.5z" />
-        </svg>
-    );
-};
-
 // 输入框 模型信息 下拉箭头图标
 export const ChevronDownIcon: React.FC = () => {
     return (
@@ -208,28 +199,6 @@ export const CheckIcon: React.FC = () => {
     return (
         <svg className="model-check-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <polyline points="3,8 6,11 13,4" />
-        </svg>
-    );
-};
-
-// 输入框 放大按钮
-export const ExpandIcon: React.FC = () => {
-    return (
-        // 放大图标：向外扩展的箭头
-        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
-            <path d="M2 6 L2 2 L6 2" strokeLinejoin="round" />
-            <path d="M14 10 L14 14 L10 14" strokeLinejoin="round" />
-        </svg>
-    );
-};
-
-// 输入框 缩小按钮
-export const CollapseIcon: React.FC = () => {
-    return (
-        // 缩小图标：向内收缩的箭头
-        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5">
-            <path d="M10 2 L10 6 L14 6" strokeLinejoin="round" />
-            <path d="M6 14 L6 10 L2 10" strokeLinejoin="round" />
         </svg>
     );
 };

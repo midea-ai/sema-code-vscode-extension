@@ -16,7 +16,7 @@ import {
 } from '../../../utils/tool';
 
 /** 手动切换预览范围：null = 全部，['xx'] = 指定组件，[] = 关闭 */
-export const PREVIEW_COMPONENTS: string[] | null = [];
+export const PREVIEW_COMPONENTS: string[] | null = ['UserInputPaste', 'UserInputSkill', 'VizEmbed'];
 
 let id = 0;
 const nextId = () => `mock-${++id}`;
@@ -28,6 +28,57 @@ export const mockMessageMap: Record<string, Message[]> = {
             type: 'user',
             content: '帮我看一下 src/utils/config.ts 这个文件的逻辑，然后优化一下性能',
         },
+    ],
+
+    // @文件引用：存在的文件/目录经宿主确认后显示为「图标 + 文件名」芯片（路径按本仓库取，换项目预览时不存在则保持原文）；
+    // 带行号后缀的芯片显示 `:a-b`；`@nothing` 不存在保持原文
+    UserInputFileRefs: [
+        {
+            id: nextId(),
+            type: 'user',
+            content: '对照 @src/webview/chat/App.tsx:120-160 和 @package.json，检查 @src/webview/chat 目录下还有哪些地方没接上 @nothing 这个引用',
+        },
+    ],
+
+    UserInputPaste: [
+        {
+            id: nextId(),
+            type: 'user',
+            content: '分析一下这段日志里的报错原因',
+            pastes: [
+                { path: '/Users/zhoujie195/.sema/attachments/52d9372a-a649-49ec-bf18-1cd741ff58f2/pasted-text.txt', preview: "[12:00:01] Starting compilation... [12:00:03] Found 0 errors. Watching for file changes. [12:00:15] File change detected…" },
+                { path: '/Users/zhoujie195/.sema/attachments/68e4877b-ec87-4902-aaba-d1dca0810914/pasted-text.txt', preview: '第二段粘贴：只有预览、没有正文' },
+            ],
+            attachments: [
+                { type: 'image', media_type: 'image/png', data: 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==' },
+                { type: 'image', media_type: 'image/png', data: 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==' },
+            ],
+        }
+    ],
+
+    // 内置技能：开头 `/<映射技能名>` 显示为图标 + 名字（Word/Excel/PowerPoint/PDF/Visualize/Chrome/SemaExtend），
+    // 未映射的 `/review-pr` 保持原文
+    UserInputSkill: [
+        {
+            id: nextId(),
+            type: 'user',
+            content: '/pptx-generator 根据 @docs/q3-report.md 做一份 10 页的季度汇报',
+        },
+        {
+            id: nextId(),
+            type: 'user',
+            content: '/minimax-xlsx 把这份估价表按品类汇总',
+        },
+        {
+            id: nextId(),
+            type: 'user',
+            content: '/visualize 画出近 12 个月的销售趋势，按区域分组',
+        },
+        {
+            id: nextId(),
+            type: 'user',
+            content: '/chrome-use 打开 GitHub 看看今天有哪些新 issue',
+        }
     ],
 
     FileReference: [
@@ -855,6 +906,11 @@ export function getPreviewMessages(): Message[] {
 
 /** Mock dialog / 状态组件数据 */
 export const mockDialogMap: Record<string, any[]> = {
+    VizEmbed: [
+        {
+            path: '/Users/zhoujie195/.sema/attachments/b58410b0-abcf-4733-bb2e-649fd8d8b15e/product-metrics-demo.html',
+        },
+    ],
     ProcessingSpinner: [
         {
             accumulatedSeconds: 5,

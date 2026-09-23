@@ -77,3 +77,132 @@
 .vscode-light .chat-block-title-label {
     color: var(--chat-color-muted);
 }
+
+/* ---------- 可视化内联嵌入（VizEmbed）：无标题行、无边框，内容直接铺在消息流里 ---------- */
+.viz-embed {
+    position: relative;
+    margin: 8px 0;
+    width: 100%;
+    max-width: var(--chat-block-max-width);
+    box-sizing: border-box;
+}
+
+.viz-embed-body {
+    position: relative;
+    width: 100%;
+    border-radius: var(--chat-radius-sm);
+    overflow: hidden;
+    background: #fff;
+}
+
+/* 折叠态：只露顶部，底部渐隐到透明（mask 适配任意背景），与 .user-input-content.collapsed / .collapsible-diff.collapsed 同一套 */
+.viz-embed-body--collapsed {
+    -webkit-mask-image: linear-gradient(to bottom, #000 80%, transparent 100%);
+    mask-image: linear-gradient(to bottom, #000 80%, transparent 100%);
+}
+
+/* iframe 高度由组件按真实文档高度设定（内联 style），不在 iframe 内部滚动 */
+.viz-embed-frame {
+    display: block;
+    width: 100%;
+    border: 0;
+    background: transparent;
+    transition: opacity 0.15s;
+}
+
+.viz-embed-frame--pending {
+    opacity: 0;
+}
+
+/* 展开 / 收起：紧贴内容下方右对齐，弱化色，样式同 .user-input-toggle */
+.viz-embed-toggle-row {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 2px;
+}
+
+.viz-embed-toggle {
+    padding: 0;
+    border: none;
+    background: transparent;
+    color: var(--chat-color-muted);
+    font-size: var(--chat-font-sm);
+    line-height: 1.4;
+    cursor: pointer;
+    user-select: none;
+}
+
+.viz-embed-toggle:hover {
+    color: var(--chat-color-muted-hover);
+    text-decoration: underline;
+}
+
+.viz-embed-loading {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--chat-text-secondary);
+    font-size: var(--chat-font-sm);
+    background: var(--chat-bg-primary);
+}
+
+/* 右上角「⋯」：仅悬浮或菜单打开 / 复制进行中时可见 */
+.viz-embed-menu-btn {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    z-index: 2;
+    width: 22px;
+    height: 22px;
+    padding: 0;
+    border: 1px solid var(--chat-border-input);
+    border-radius: var(--chat-radius-sm);
+    background: var(--chat-bg-primary);
+    color: var(--chat-text-secondary);
+    font-size: var(--chat-font-md);
+    line-height: 1;
+    cursor: pointer;
+    opacity: 0;
+    transition: opacity 0.15s;
+}
+
+.viz-embed:hover .viz-embed-menu-btn,
+.viz-embed--active .viz-embed-menu-btn {
+    opacity: 1;
+}
+
+.viz-embed-menu-btn:disabled {
+    cursor: default;
+    opacity: 0;
+}
+
+.viz-embed-menu-btn:hover {
+    color: var(--chat-text-primary);
+}
+
+.viz-embed-menu {
+    position: absolute;
+    top: 28px;
+    right: 4px;
+    z-index: 3;
+    min-width: 140px;
+    padding: 4px 0;
+    border: 1px solid var(--chat-border-input);
+    border-radius: var(--chat-radius-md);
+    background: var(--chat-bg-primary);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.18);
+}
+
+.viz-embed-menu-item {
+    padding: 6px 12px;
+    font-size: var(--chat-font-base);
+    color: var(--chat-text-primary);
+    white-space: nowrap;
+    cursor: pointer;
+}
+
+.viz-embed-menu-item:hover {
+    background: var(--chat-bg-list-hover);
+}

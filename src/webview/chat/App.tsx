@@ -3,7 +3,8 @@ import { FileChange, TokenInfo, AppProps, SelectedFile, TodoItem, Message, Agent
 import { streamingStore } from './utils/StreamingStore';
 import InputBox, { InputBoxHandle } from './components/input/InputBox';
 import MessageItem from './MessageItem';
-import { UserInputSourceTag } from './blocks/UserInputBlock';
+import UserInputBlock from './blocks/UserInputBlock';
+import { parsePasteInput, type PasteAttachment } from '../common/paste';
 import GroupedToolBlock from './blocks/tools/GroupedToolBlock';
 import SessionTabs from './components/SessionTabs';
 import { SessionActiveContext, SessionContext } from './SessionContext';
@@ -21,8 +22,10 @@ import ProcessingSpinner from './components/ui/ProcessingSpinner';
 import { useT, setLang, type Language } from '../common/i18n/react';
 import ModelConfigReminder from './components/ui/ModelConfigReminder';
 import { PREVIEW_MODE, getPreviewMessages, mockDialogMap, isPreviewActive } from './utils/mockMessages';
-import { groupMessages } from './utils/groupMessages';
-import { TOOL_NAME_RUN_SHELL } from '../../utils/tool';
+import { groupMessages, getToolName, getToolTitle } from './utils/groupMessages';
+import VizEmbed from './blocks/VizEmbed';
+import { isAttachmentPath, isVizPath } from '../common/viz';
+import { TOOL_NAME_RUN_SHELL, TOOL_NAME_WRITE_FILE, TOOL_NAME_PATCH_FILE } from '../../utils/tool';
 import { TASK_TYPE_SHELL, TASK_TYPE_AGENT } from '../config/BackgroundTaskConfig';
 import PreviewDialogs from './utils/PreviewDialogs';
 
@@ -109,7 +112,8 @@ const ChatSession: React.FC<ChatSessionProps> = ({ vscode: rawVscode, sessionId,
     const [skipFileEditPermission, setSkipFileEditPermission] = useState<boolean>(false);
     const [thinkingEnabled, setThinkingEnabled] = useState<boolean>(true);
     const [showThinkingText, setShowThinkingText] = useState<boolean>(false);
-    const [pendingInputs, setPendingInputs] = useState<Array<{ inputId: string; content: string; source?: InputSource }>>([]);
+    // 排队中的用户输入：content 为用户实际打的正文（originalInput），附件随 input:received 一并回显
+    const [pendingInputs, setPendingInputs] = useState<Array<{ inputId: string; content: string; source?: InputSource; attachments?: ImageAttachment[]; pastes?: PasteAttachment[] }>>([]);
     // 用户输入预测（core input:predict 事件；空串 = 预计不会回复，清除提示）
     const [inputPrediction, setInputPrediction] = useState<string>('');
     const [runningTasks, setRunningTasks] = useState<Map<string, { taskId: string; filepath: string; type: string; startTime: number }>>(new Map());
@@ -127,6 +131,8 @@ const ChatSession: React.FC<ChatSessionProps> = ({ vscode: rawVscode, sessionId,
     const branchReqRef = useRef<string | null>(null);
 
     const handleFileChange = useCallback(async (change: FileChange) => {
+        // attachments/<uuid>/ 下的文件（可视化产物、粘贴转存）是宿主自己的落盘目录，不算「编辑了项目文件」
+        if (isAttachmentPath(change.fullPath)) return;
         try {
             setFileChanges(prev => {
                 const existingIndex = prev.findIndex(c => c.fullPath === change.fullPath);
@@ -374,8 +380,11 @@ const ChatSession: React.FC<ChatSessionProps> = ({ vscode: rawVscode, sessionId,
                     if (message.data) {
                         setPendingInputs(prev => [...prev, {
                             inputId: message.data.inputId,
-                            content: message.data.originalInput || message.data.input,
+                            // originalInput 存在就用它（空串 = 只有粘贴附件没打字），缺省才退回完整 input
+                            content: message.data.originalInput ?? message.data.input ?? '',
                             source: message.data.source,
+                            attachments: Array.isArray(message.data.attachments) && message.data.attachments.length > 0 ? message.data.attachments : undefined,
+                            pastes: parsePasteInput(message.data.input),
                         }]);
                     }
                     break;
@@ -449,13 +458,14 @@ const ChatSession: React.FC<ChatSessionProps> = ({ vscode: rawVscode, sessionId,
                     if (idx >= 0) {
                         const originalContent = messagesRef.current[idx]?.content;
                         const originalAttachments = messagesRef.current[idx]?.attachments;
+                        const originalPastes = messagesRef.current[idx]?.pastes;
                         const truncated = messagesRef.current.slice(0, idx);
                         messagesRef.current = truncated;
                         setMessages(truncated);
-                        // 回填原输入（文本 + 图片附件），方便用户改了重发；纯图片无文字也要回填
+                        // 回填原输入（文本 + 图片 + 长文粘贴附件），方便用户改了重发；纯附件无文字也要回填
                         const originalText = typeof originalContent === 'string' ? originalContent : '';
-                        if (originalText || (originalAttachments && originalAttachments.length > 0)) {
-                            inputBoxRef.current?.setText(originalText, originalAttachments);
+                        if (originalText || (originalAttachments && originalAttachments.length > 0) || (originalPastes && originalPastes.length > 0)) {
+                            inputBoxRef.current?.setText(originalText, originalAttachments, originalPastes);
                         }
                     }
                     // 2) 文件回滚：移除已回滚的变更条目（restoreFiles=false 时 restoredFiles 为空，不动面板）。
@@ -611,7 +621,7 @@ const ChatSession: React.FC<ChatSessionProps> = ({ vscode: rawVscode, sessionId,
         };
     }, []);
 
-    const handleSend = (text: string, files: SelectedFile[], attachments: ImageAttachment[] = []) => {
+    const handleSend = (text: string, files: SelectedFile[], attachments: ImageAttachment[] = [], pastes: PasteAttachment[] = []) => {
         userScrolledUpRef.current = false;
         setInputPrediction('');
         if (processingState !== 'processing') {
@@ -623,7 +633,8 @@ const ChatSession: React.FC<ChatSessionProps> = ({ vscode: rawVscode, sessionId,
             sessionId,
             text: text,
             files: files,
-            attachments: attachments
+            attachments: attachments,
+            pastes: pastes.length ? pastes : undefined
         });
     };
 
@@ -778,6 +789,24 @@ const ChatSession: React.FC<ChatSessionProps> = ({ vscode: rawVscode, sessionId,
     const renderedContent = useMemo(() => {
         const shouldShowThinkingText = thinkingEnabled && showThinkingText;
 
+        // 本轮新建/修改的可视化产物（attachments/<uuid>/*.html）：轮次结束后在消息末尾内联嵌入（避免半成品页面）
+        const vizPathsOf = (items: Array<{ message: Message }>): string[] => {
+            const out: string[] = [];
+            for (const { message } of items) {
+                if (message.type !== 'tool') continue;
+                const name = getToolName(message);
+                if (name !== TOOL_NAME_WRITE_FILE && name !== TOOL_NAME_PATCH_FILE) continue;
+                const p = getToolTitle(message);
+                if (p && isVizPath(p) && !out.includes(p)) out.push(p);
+            }
+            return out;
+        };
+        const renderVizEmbeds = (paths: string[]) => paths.map(p => (
+            <div key={`viz:${p}`} className="msg-wrap">
+                <VizEmbed path={p} vscode={vscode} />
+            </div>
+        ));
+
         if (!messages || messages.length === 0) {
             if (PREVIEW_MODE) {
                 return groupMessages(getPreviewMessages(), { showThinkingText: shouldShowThinkingText }).map((item) => {
@@ -928,6 +957,7 @@ const ChatSession: React.FC<ChatSessionProps> = ({ vscode: rawVscode, sessionId,
                         </div>
                     );
                 })}
+                {(gi < groups.length - 1 || processingState === 'idle') && renderVizEmbeds(vizPathsOf(group.items))}
             </div>
         ));
     }, [messages, modelName, availableModels, activeDialog, processingState, streamingAssistantId, streamingToolId, openAgentTaskId, agentMode, thinkingEnabled, showThinkingText, handleFork, handleBranch, pendingInputs]);
@@ -976,12 +1006,15 @@ const ChatSession: React.FC<ChatSessionProps> = ({ vscode: rawVscode, sessionId,
                         );
                     })()}
                     {pendingInputs.map(p => (
-                        <div key={p.inputId}>
-                            <UserInputSourceTag source={p.source} />
-                            <div className="user-input-block pending">
-                                <div className="user-input-content pending">{p.content}</div>
-                            </div>
-                        </div>
+                        <UserInputBlock
+                            key={p.inputId}
+                            pending
+                            content={p.content}
+                            attachments={p.attachments}
+                            pastes={p.pastes}
+                            source={p.source}
+                            vscode={vscode}
+                        />
                     ))}
                     {activeDialog?.type === 'quickchat' && (
                         <QuickChatDialog

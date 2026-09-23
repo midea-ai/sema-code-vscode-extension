@@ -19,7 +19,6 @@ export interface UseFileSelectionReturn {
 export const useFileSelection = (
     vscode: VscodeApi,
     filePickerRef: RefObject<HTMLDivElement>,
-    addFileButtonRef: RefObject<HTMLButtonElement>,
     inputBoxRef: RefObject<HTMLElement>
 ): UseFileSelectionReturn => {
     const [selectedFiles, setSelectedFiles] = useState<SelectedFile[]>([]);
@@ -53,10 +52,9 @@ export const useFileSelection = (
         const handleClickOutside = (event: MouseEvent) => {
             const target = event.target as Node;
             const isOutsidePicker = filePickerRef.current && !filePickerRef.current.contains(target);
-            const isOutsideButton = addFileButtonRef.current && !addFileButtonRef.current.contains(target);
             const isOutsideInput = inputBoxRef.current && !inputBoxRef.current.contains(target);
 
-            if (isOutsidePicker && isOutsideButton && isOutsideInput) {
+            if (isOutsidePicker && isOutsideInput) {
                 setShowFilePicker(false);
             }
         };
@@ -67,7 +65,7 @@ export const useFileSelection = (
         return () => {
             document.removeEventListener('mousedown', handleClickOutside);
         };
-    }, [showFilePicker, filePickerRef, addFileButtonRef, inputBoxRef]);
+    }, [showFilePicker, filePickerRef, inputBoxRef]);
 
     const requestWorkspaceFiles = () => {
         const reqId = ++reqIdRef.current;

@@ -7,6 +7,7 @@ import AskFormDialog from '../components/ui/AskFormDialog';
 import PlanExitDialog from '../components/ui/PlanExitDialog';
 import QuickChatDialog from '../components/ui/QuickChatDialog';
 import ForkDialog from '../components/ui/ForkDialog';
+import VizEmbed from '../blocks/VizEmbed';
 
 const log = (name: string, action: string, ...args: any[]) =>
     console.log(`[Preview] ${name}.${action}`, ...args);
@@ -26,6 +27,11 @@ const PreviewDialogs: React.FC<{ vscode: any }> = ({ vscode }) => {
 
     return (
         <>
+            {show('VizEmbed') && mockDialogMap.VizEmbed.map((item, i) => (
+                <div key={`VizEmbed-${i}`} className="msg-wrap">
+                    <VizEmbed path={item.path} vscode={vscode} />
+                </div>
+            ))}
             {show('ProcessingSpinner') && mockDialogMap.ProcessingSpinner.map((item, i) => (
                 <ProcessingSpinner key={`ProcessingSpinner-${i}`} {...item} />
             ))}

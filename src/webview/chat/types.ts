@@ -114,6 +114,8 @@ export interface Message {
     toolArgs?: any;
     reasoning?: string;  // 用于存储思考过程（thinking）
     attachments?: ImageAttachment[];  // 用户消息携带的图片（来自 core input:processing 回吐）
+    /** 超长粘贴转存的附件文件（宿主从 input 的粘贴模板解析；path 绝对路径，preview 单行预览） */
+    pastes?: { path: string; preview: string }[];
     source?: InputSource;             // 输入来源；'cron' 等非 user 来源在气泡上方显示标签
 }
 

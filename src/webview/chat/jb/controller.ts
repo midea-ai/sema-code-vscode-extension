@@ -5,6 +5,7 @@ import { DEFAULT_CUSTOM_RULES, isBuiltinCustomRules } from '../../config/default
 import { Transport } from './transport';
 import { RemoteCore, RemoteSession } from './remote';
 import { normalizeLang, t } from '../../common/i18n/core';
+import { buildPasteInput, type PasteAttachment } from '../../common/paste';
 
 /** 同时打开的会话上限（对齐 semaProcessWrapper.MAX_SESSIONS = 5，本地常量避免拽入 node 依赖）。 */
 const MAX_SESSIONS = 5;
@@ -154,7 +155,7 @@ export class Controller {
             case 'closeSession': this.closeSession(sid); break;
             case 'webviewSessionReady': this.sessions.get(sid ?? '')?.wrapper.sendInitialState(); break;
 
-            case 'sendInput': this.handleUserInput(sid, msg.text, msg.files, msg.attachments); break;
+            case 'sendInput': this.handleUserInput(sid, msg.text, msg.files, msg.attachments, msg.pastes); break;
             case 'interrupt': this.interrupt(sid); break;
             // 撤销/回退（D1）：async 往返，按 reqId 回发预览/结果，避免弹窗挂起。
             case 'getForkPreview': await this.handleGetForkPreview(sid, msg.uuid, msg.reqId); break;
@@ -214,6 +215,12 @@ export class Controller {
             case 'requestClipboardFiles': this.t.editor('requestClipboardFiles'); break;
             // 输入历史：读/写走 Kotlin 项目级持久化
             case 'saveInputHistory': this.t.editor('saveInputHistory', { item: msg.item }); break;
+            // 超长粘贴转附件：落盘 / 删除 / 读回，Kotlin 侧写 <semaRoot>/attachments/<uuid>/pasted-text.txt 并回推结果
+            case 'savePastedText': this.t.editor('savePastedText', { text: msg.text, reqId: msg.reqId }); break;
+            case 'removePastedText': this.t.editor('removePastedText', { path: msg.path }); break;
+            case 'readPastedText': this.t.editor('readPastedText', { path: msg.path, reqId: msg.reqId }); break;
+            // 可视化产物内联嵌入：Kotlin 侧复制到临时目录并注入 viz-runtime，回推 vizEmbedReady{reqId,url}
+            case 'prepareVizEmbed': this.t.editor('prepareVizEmbed', { path: msg.path, reqId: msg.reqId }); break;
 
             default: break;
         }
@@ -309,9 +316,10 @@ export class Controller {
         }
     }
 
-    private handleUserInput(sid: string | undefined, text: string, files?: Array<any>, attachments?: any): void {
+    private handleUserInput(sid: string | undefined, text: string, files?: Array<any>, attachments?: any, pastes?: PasteAttachment[]): void {
         const entry = sid ? this.sessions.get(sid) : undefined;
         if (!entry) return;
+        const body = text;
         // @file 引用编码（对齐 chatWebview.handleUserInput）：把内联的 display 引用替换成 encoded（含引号转义），
         // 再把 content 里尚缺的引用补到末尾。
         let content = text;
@@ -332,7 +340,11 @@ export class Controller {
         // 斜杠命令展开（D6，对齐 chatWebview:150-155）：命中改写时传展开后文本 + 原文为 orgContent，
         // 让 UI 保留「原文 vs 展开」区分；未命中则 orgContent 为 undefined。
         const transformed = transformCommandToPrompt(content);
-        if (transformed && transformed !== content) {
+        // 有粘贴附件（对齐 chatWebview）：input 按模板以 @路径 引用粘贴文件，originalInput 为用户实际打的正文（可为空串）
+        if (pastes && pastes.length > 0) {
+            const expanded = transformed && transformed !== content ? transformed : content;
+            entry.wrapper.processUserInput(buildPasteInput(pastes, expanded), body, attachments);
+        } else if (transformed && transformed !== content) {
             entry.wrapper.processUserInput(transformed, content, attachments);
         } else {
             entry.wrapper.processUserInput(content, undefined, attachments);

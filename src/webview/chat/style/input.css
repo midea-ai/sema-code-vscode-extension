@@ -17,45 +17,13 @@
     border-color: var(--chat-border-focus);
 }
 
-/* 顶部区域：加号按钮和文件标签 */
+/* 顶部区域：图片/长文本粘贴芯片条，仅在有芯片时渲染 */
 .input-header {
     display: flex;
     align-items: center;
-    justify-content: space-between;
     gap: 4px;
     margin-bottom: 4px;
     min-height: 28px;
-    /* 增加最小高度以容纳文件标签，避免抖动 */
-}
-
-.add-file-btn {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 20px;
-    height: 20px;
-    padding: 0;
-    background-color: transparent;
-    border: 1px solid var(--chat-border-input);
-    border-radius: 3px;
-    color: var(--chat-text-primary);
-    cursor: pointer;
-    transition: all 0.2s;
-    flex-shrink: 0;
-}
-
-.add-file-btn svg {
-    width: 14px;
-    height: 14px;
-}
-
-.add-file-btn:hover:not(:disabled) {
-    background-color: var(--chat-bg-list-hover);
-}
-
-.add-file-btn:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
 }
 
 /* 文件选择器：弹窗、列表、分割线复用 .shortcut-panel-* 样式 */
@@ -76,7 +44,7 @@
     height: 18px;
 }
 
-/* 文件信息容器 - 使用flex布局让完整路径靠右；文件名/路径复用 .shortcut-command / .shortcut-desc 样式 */
+/* 文件信息容器：文件名/路径复用 .shortcut-command / .shortcut-desc 样式，路径紧跟文件名（同命令面板的描述） */
 .file-picker-item .file-info {
     flex: 1;
     display: flex;
@@ -93,9 +61,8 @@
     max-width: 40%;
 }
 
-/* 完整路径特有：稍微降低透明度，其余样式继承 .shortcut-desc */
+/* 完整路径：颜色与命令面板描述一致（继承 .shortcut-desc，不再额外降透明度） */
 .file-picker-item .file-full-path {
-    opacity: 0.7;
     min-width: 0;
 }
 
@@ -127,7 +94,7 @@
     display: flex;
     align-items: center;
     gap: 6px;
-    padding: 8px 12px;
+    padding: 6px 12px;
     cursor: pointer;
     font-size: var(--chat-font-md);
     border-radius: 0;
@@ -230,6 +197,20 @@
     text-align: left;
 }
 
+/* 命令面板与文件面板同一规格：描述/路径紧跟在名字后面、浅色同字号 */
+.shortcut-panel-item .shortcut-command {
+    margin-right: 8px;
+}
+
+.shortcut-panel-item .shortcut-desc {
+    font-size: var(--chat-font-md);
+    text-align: left;
+}
+
+.shortcut-panel-item .shortcut-desc-tooltip.tooltip-wrapper {
+    justify-content: flex-start;
+}
+
 /* 输入框（contentEditable div） */
 .input-textarea {
     width: 100%;
@@ -238,7 +219,8 @@
     color: var(--chat-text-input);
     border: none;
     font-size: var(--chat-font-base);
-    min-height: 36px;
+    /* 约 2.5 行：12px 上下内边距 + 16.8px 行高 × 2.5，空态也留出一定书写空间 */
+    min-height: 54px;
     max-height: 300px;
     line-height: 1.4;
     transition: max-height 0.3s ease;
@@ -246,11 +228,6 @@
     white-space: pre-wrap;
     word-wrap: break-word;
     outline: none;
-}
-
-.input-textarea.expanded {
-    min-height: 300px;
-    max-height: 600px;
 }
 
 .input-textarea:focus {
@@ -297,8 +274,7 @@
     text-overflow: ellipsis;
 }
 
-/* @文件 高亮 / 快捷指令高亮（同款视觉） */
-.file-mention,
+/* 快捷指令高亮块 */
 .command-mention {
     background-color: var(--chat-bg-button);
     color: var(--chat-text-button);
@@ -315,47 +291,132 @@
     outline: none;
 }
 
+/* @文件 mention：原子标签（contentEditable=false），内容为「文件图标 + 文件名」芯片；
+   不加 user-select:none —— 全选时 Range.toString() 需包含标签文本，否则全选删除判定失效 */
+.file-mention {
+    display: inline-flex;
+    vertical-align: middle;
+    margin: 0 1px;
+    cursor: pointer;
+}
+
+/* 文件引用芯片（输入框 mention + 用户气泡共用）：图标与文字同用链接强调色、无底色。
+   字号/字体/图标尺寸与 @ 文件面板一行（.file-picker-item）完全一致：13px 界面字体 + 18px 图标 */
+.file-ref-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    max-width: 100%;
+    vertical-align: middle;
+    color: var(--chat-text-link);
+    font-family: var(--vscode-font-family);
+    font-size: var(--chat-font-md);
+    font-weight: 400;
+    white-space: nowrap;
+}
+
+.file-ref-chip.clickable {
+    cursor: pointer;
+}
+
+.file-ref-chip.clickable:hover .file-ref-name {
+    text-decoration: underline;
+    text-underline-offset: 2px;
+}
+
+/* 与 FileIcon 组件的内联样式同一套（18px 盒 + scale 1.1 + 提亮），输入框里的原生 svg 芯片靠此规则对齐。
+   color: inherit 只对输入框芯片生效（图标随文字用链接高亮色）；气泡里的 FileIcon 组件有内联文件类型色，优先级更高 */
+.file-ref-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    width: 18px;
+    height: 18px;
+    color: inherit;
+    filter: contrast(1.2) saturate(1.1);
+    transform: scale(1.1);
+}
+
+.file-ref-icon svg {
+    width: 100%;
+    height: 100%;
+    display: block;
+}
+
+.file-ref-name {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* 技能标签（斜杠面板 / 输入框开头 / 用户气泡开头共用）：图标 + 同色名字，无底色；尺寸规格同文件芯片 */
+.skill-mention {
+    display: inline-flex;
+    vertical-align: middle;
+    margin: 0 1px;
+}
+
+.skill-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    vertical-align: middle;
+    font-family: var(--vscode-font-family);
+    font-size: var(--chat-font-md);
+    white-space: nowrap;
+}
+
+.skill-label-name {
+    font-weight: 500;
+}
+
+/* 图标盒子尺寸由 SkillLabel / buildSkillLabelHtml 内联指定（面板 14、输入框与气泡 15），同 webui */
+.skill-label-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    color: inherit;
+}
+
+.skill-label-icon svg {
+    width: 100%;
+    height: 100%;
+    display: block;
+}
+
+/* 文件类型图标（vscode-icons 实心图形留白多）放大 1.35 与 webui 一致，不加对比度滤镜；线稿图标原尺寸 */
+.skill-label-file {
+    transform: scale(1.35);
+}
+
+.user-input-skill {
+    margin-right: 6px;
+}
+
+/* 面板行里的技能标签：沿用 .shortcut-command 的字号与右间距 */
+.shortcut-skill {
+    display: inline-flex;
+    align-items: center;
+}
+
 /* 底部按钮组 */
+/* 底部行：左侧控件与右侧操作同处一个 flex 行，右侧变宽（如 token 悬浮展开）时左侧按 flex 收缩，不重叠 */
+.input-bottom-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
+    padding-top: 1px;
+}
+
 .input-actions {
     display: flex;
     align-items: center;
     justify-content: flex-end;
     gap: 3px;
-    padding-top: 1px;
-    margin-top: 0;
-}
-
-/* 缩放按钮 */
-.expand-btn {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 20px;
-    height: 20px;
-    padding: 0;
-    background-color: transparent;
-    border: none;
-    border-radius: 50%;
-    color: var(--chat-text-primary);
-    cursor: pointer;
-    opacity: 0.6;
-    transition: all 0.2s;
-}
-
-.expand-btn svg {
-    width: 12px;
-    height: 12px;
-}
-
-.expand-btn:hover:not(:disabled) {
-    opacity: 1;
-    background-color: var(--chat-bg-list-hover);
-    transform: scale(1.05);
-}
-
-.expand-btn:disabled {
-    opacity: 0.3;
-    cursor: not-allowed;
+    flex-shrink: 0;
 }
 
 /* 发送/停止按钮 */
@@ -397,60 +458,88 @@
 
 
 
-/* Token Progress Circle */
+/* 上下文用量：平时只显示圆环，悬浮时变成带背景的胶囊并在圆环左侧显示百分比 */
 .token-progress {
     display: flex;
     align-items: center;
     flex-direction: row-reverse;
     gap: 4px;
-    margin-left: auto;
-    position: relative;
-    background-color: var(--chat-bg-hover);
-    padding: 2px 4px;
-    border-radius: 3px;
+    height: 22px;
+    padding: 0 4px;
+    margin-right: 2px;
+    border-radius: 4px;
+    cursor: default;
+    user-select: none;
+    transition: background-color 0.15s ease;
+}
+
+.token-progress:hover {
+    background-color: var(--chat-bg-list-hover);
 }
 
 .token-circle {
-    width: 10px;
-    height: 10px;
+    width: 14px;
+    height: 14px;
+    flex-shrink: 0;
     transform: rotate(-90deg);
 }
 
 .token-circle-bg {
     fill: none;
-    stroke: var(--chat-bg-active);
-    stroke-width: 3;
+    stroke: var(--chat-text-primary);
+    stroke-width: 3.5;
+    opacity: 0.15;
 }
 
 .token-circle-progress {
     fill: none;
     stroke: var(--chat-text-primary);
-    stroke-width: 3;
+    stroke-width: 3.5;
     stroke-linecap: round;
     transition: stroke-dasharray 0.3s ease;
-    opacity: 0.6;
+    opacity: 0.7;
 }
 
+.token-progress.warn .token-circle-progress {
+    stroke: var(--chat-color-warning);
+    opacity: 1;
+}
+
+.token-progress.danger .token-circle-progress {
+    stroke: var(--chat-color-error);
+    opacity: 1;
+}
+
+/* 百分比常驻占位（visibility 而非 display）：胶囊宽度固定，悬浮时左侧三个控件位置不变 */
 .token-percentage {
+    visibility: hidden;
+    min-width: 38px;
+    text-align: right;
     font-size: var(--chat-font-sm);
     color: var(--chat-text-secondary);
-    font-weight: 400;
     font-variant-numeric: tabular-nums;
-    min-width: 35px;
-    text-align: right;
     letter-spacing: 0.02em;
+    line-height: 1;
+}
+
+.token-progress:hover .token-percentage {
+    visibility: visible;
+}
+
+.token-progress.danger .token-percentage {
+    color: var(--chat-color-error);
 }
 
 /* 左下角容器 - 包含 Agent 模式和模型信息 */
 .bottom-left-container {
-    position: absolute;
-    left: 8px;
-    bottom: 8px;
+    position: relative;
     z-index: 10;
     display: flex;
     align-items: center;
     gap: 6px;
-    max-width: calc(100% - 80px);
+    flex: 1;
+    min-width: 0;
+    padding-left: 2px;
 }
 
 /* 分隔符样式 */
@@ -1084,6 +1173,50 @@ svg.provider-logo-openrouter {
 }
 .image-chip-remove:hover {
     color: var(--chat-text-primary);
+}
+
+/* ─── 超长粘贴芯片（输入框附件条，与图片缩略图同款） ───────────────── */
+.paste-chip {
+    cursor: default;
+}
+
+.paste-chip-icon {
+    display: inline-flex;
+    flex-shrink: 0;
+    width: 12px;
+    height: 12px;
+    color: var(--chat-text-secondary);
+}
+
+.paste-chip-icon svg {
+    width: 100%;
+    height: 100%;
+}
+
+.paste-chip .paste-chip-preview {
+    max-width: 140px;
+}
+
+/* 「在文本框中显示」：紧跟预览的小字按钮，hover 变亮；与叉号错开（叉号占最右 16px） */
+.paste-chip-show {
+    display: flex;
+    align-items: center;
+    align-self: stretch;
+    margin-right: 14px;
+    padding: 0;
+    border: none;
+    background: transparent;
+    font-size: 9px;
+    line-height: 1;
+    white-space: nowrap;
+    color: var(--chat-text-secondary);
+    opacity: 0.8;
+    cursor: pointer;
+}
+
+.paste-chip-show:hover {
+    color: var(--chat-text-link);
+    opacity: 1;
 }
 
 /* 点击缩略图后的放大遮罩 */

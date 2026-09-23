@@ -224,6 +224,56 @@ html.jb #output-container {
     word-wrap: break-word;
 }
 
+/* 气泡里的超长粘贴块：各占一行的胶囊，小图标 + 单行截断预览，点击在编辑器打开转存文件 */
+.user-input-pastes {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+    margin-bottom: 6px;
+}
+
+.paste-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    /* 预览单行截断，胶囊不撑满气泡宽度 */
+    max-width: 240px;
+    height: 24px;
+    padding: 0 10px;
+    border-radius: 12px;
+    border: 1px solid var(--chat-border-input);
+    background-color: var(--chat-bg-list-hover);
+    font-size: var(--chat-font-sm);
+    color: var(--chat-text-primary);
+    white-space: nowrap;
+    cursor: pointer;
+    transition: border-color 0.15s;
+}
+
+.paste-pill:hover {
+    border-color: rgba(128, 128, 128, 0.6);
+}
+
+.paste-pill-icon {
+    display: inline-flex;
+    flex-shrink: 0;
+    width: 12px;
+    height: 12px;
+    color: var(--chat-text-secondary);
+}
+
+.paste-pill-icon svg {
+    width: 100%;
+    height: 100%;
+}
+
+.paste-pill-preview {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
 /* 折叠态：限制约 3 行，底部渐隐到透明（mask 适配任意背景） */
 .user-input-content.collapsed {
     max-height: calc(1.5em * 3);

@@ -1,6 +1,7 @@
 import { SemaSession } from 'sema-core';
 import type { ForkOptions, ForkPreview, ForkResult, BranchResult } from 'sema-core';
 import { t } from '../webview/common/i18n/core';
+import { parsePasteInput, type PasteAttachment } from '../webview/common/paste';
 import {
     MessageCompleteData,
     StateUpdateData,
@@ -51,6 +52,7 @@ export interface Message {
     type: 'user' | 'assistant' | 'tool' | 'system' | 'permission_request' | 'askForm';
     content: any;
     attachments?: InputImageAttachment[];  // 用户消息携带的图片（core input:processing 回吐）
+    pastes?: PasteAttachment[];            // 超长粘贴转存的附件文件（从 input 粘贴模板解析），随历史持久化
     source?: InputSource;                  // 输入来源；非 user（如 cron）时气泡上方渲染来源标签，随历史持久化
     toolName?: string;
     toolArgs?: any;
@@ -500,7 +502,10 @@ export class SemaSessionWrapper {
 
     private setupInputListeners(): void {
         this.session.on<InputProcessingData>('input:processing', (data) => {
-            const content = data.originalInput || data.input;
+            // originalInput 存在就用它（空串 = 只有粘贴附件没打字，气泡无文字），缺省才退回完整 input
+            const content = data.originalInput ?? data.input;
+            // 超长粘贴转存的附件：从完整 input 的模板解析出路径与预览，气泡显示为粘贴胶囊
+            const pastes = parsePasteInput(data.input);
 
             const hasUserMessages = this.messageHistory.some(m => m.type === 'user');
             if (!hasUserMessages) {
@@ -517,6 +522,7 @@ export class SemaSessionWrapper {
                 type: 'user',
                 content: content,
                 attachments: data.attachments,  // core 回吐的规范化图片，按 inputId 天然对应
+                ...(pastes ? { pastes } : {}),
                 source: data.source,
             };
             this.messageHistory.push(userMsg);

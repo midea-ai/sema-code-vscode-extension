@@ -240,4 +240,38 @@ const sessionHistoryWebviewJbConfig = {
   }
 };
 
-module.exports = [extensionConfig, chatWebviewConfig, configWebviewConfig, sessionHistoryWebviewConfig, chatWebviewJbConfig, configWebviewJbConfig, sessionHistoryWebviewJbConfig];
+/**
+ * 可视化页内 runtime（src/webview/viz-runtime/main.ts）：宿主把它注入到可视化 html（VSCode 内联源码走 srcdoc，JB <script src> 引临时副本），
+ * 在内联 iframe（不透明源）里跑，必须是 classic 脚本、单文件 IIFE，不与主应用共享代码。VSCode / JB 共用同一产物。
+ * @type WebpackConfig
+ */
+const vizRuntimeConfig = {
+  target: 'web',
+  mode: 'none',
+  entry: './src/webview/viz-runtime/main.ts',
+  output: {
+    path: path.resolve(__dirname, 'dist/webview'),
+    filename: 'viz-runtime.js',
+    iife: true
+  },
+  resolve: {
+    extensions: ['.ts', '.js']
+  },
+  module: {
+    rules: [
+      {
+        test: /\.ts$/,
+        exclude: /node_modules/,
+        use: {
+          loader: 'babel-loader'
+        }
+      }
+    ]
+  },
+  devtool: false,
+  infrastructureLogging: {
+    level: "log"
+  }
+};
+
+module.exports = [extensionConfig, chatWebviewConfig, configWebviewConfig, sessionHistoryWebviewConfig, chatWebviewJbConfig, configWebviewJbConfig, sessionHistoryWebviewJbConfig, vizRuntimeConfig];

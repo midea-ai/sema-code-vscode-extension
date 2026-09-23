@@ -66,9 +66,9 @@ kotlin {
 val syncWeb by tasks.registering(Copy::class) {
     from("../dist/webview")
     into(layout.buildDirectory.dir("resources/main/web"))
-    // 只打 JB 用的 bundle：插件仅加载 jb-chat/jb-config/jb-sessionHistory。
+    // 只打 JB 用的 bundle：插件仅加载 jb-chat/jb-config/jb-sessionHistory，外加两端共用的可视化页内 runtime。
     // VSCode 版（chat.js/config.js/sessionHistory.js）在 JB 从不加载，别带进来（省 ~3.8MB）。
-    include("jb-*.js")
+    include("jb-*.js", "viz-runtime.js")
 }
 
 // 从主工程同步浏览器控制资产（chrome-use skill + chrome MCP 模板）到 resources/assets/chrome，

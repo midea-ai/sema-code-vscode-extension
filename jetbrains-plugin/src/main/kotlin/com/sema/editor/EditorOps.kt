@@ -95,6 +95,10 @@ class EditorOps(
             "requestClipboardFiles" -> requestClipboardFiles()
             "requestInputHistory" -> sendInputHistory()
             "saveInputHistory" -> saveInputHistory(msg.getAsJsonObject("item"))
+            "savePastedText" -> savePastedText(str(msg, "text"), msg.get("reqId"))
+            "removePastedText" -> removePastedText(str(msg, "path"))
+            "readPastedText" -> readPastedText(str(msg, "path"), msg.get("reqId"))
+            "prepareVizEmbed" -> prepareVizEmbed(str(msg, "path"), msg.get("reqId"))
             "addFileToSnapshotIfNew" -> addFileToSnapshotIfNew(str(msg, "sessionId") ?: "", str(msg, "filePath"))
             "pinEmptySnapshotIfNew" -> pinEmptySnapshotIfNew(str(msg, "sessionId") ?: "", str(msg, "filePath"))
             "resetSnapshots" -> resetSnapshots(str(msg, "sessionId") ?: "")
@@ -158,14 +162,18 @@ class EditorOps(
         }
     }
 
-    /** 校验文件是否存在（对齐 VSCode verifyFilePath）→ 经 editor 通路回推 filePathVerified，原样回带 payload。 */
+    /** 校验文件是否存在（对齐 VSCode verifyFilePath）→ 经 editor 通路回推 filePathVerified，原样回带 payload。
+     *  exists 语义保持"是文件"（markdown 链接只对文件可点）；isDirectory 供用户气泡把目录引用也显示为芯片。 */
     private fun verifyFilePath(filePath: String?, tempId: String?, originalCode: String?, lineInfo: String?) {
         val full = resolveFullPath(filePath)
-        val exists = full != null && File(full).isFile
+        val f = full?.let { File(it) }
+        val exists = f?.isFile == true
+        val isDirectory = f?.isDirectory == true
         val message = JsonObject().apply {
             addProperty("type", "filePathVerified")
             addProperty("tempId", tempId ?: "")
             addProperty("exists", exists)
+            addProperty("isDirectory", isDirectory)
             addProperty("filePath", filePath ?: "")
             addProperty("originalCode", originalCode ?: "")
             if (lineInfo != null) addProperty("lineInfo", lineInfo)
@@ -684,6 +692,120 @@ class EditorOps(
         if (!dup) arr.add(item)
         while (arr.size() > INPUT_HISTORY_MAX) arr.remove(0)
         props.setValue(INPUT_HISTORY_KEY, gson.toJson(arr))
+    }
+
+    // ─── 超长粘贴转附件（对齐 VSCode utils/pasteAttachments.ts）────────────────
+    // <semaRoot>/attachments/<uuid>/pasted-text.txt；semaRoot = SEMA_ROOT 环境变量，缺省 ~/.sema
+
+    private val pasteFileName = "pasted-text.txt"
+    private val pasteMaxDirs = 100
+    private val uuidRe = Regex("^[0-9a-f-]{36}$", RegexOption.IGNORE_CASE)
+
+    private fun attachmentsRoot(): File {
+        val custom = System.getenv("SEMA_ROOT")?.takeIf { it.isNotBlank() }
+        val semaRoot = if (custom != null) File(custom).absoluteFile else File(System.getProperty("user.home"), ".sema")
+        return File(semaRoot, "attachments")
+    }
+
+    /** 落盘一段粘贴文本并回推 pastedTextSaved{reqId, path}；失败 path 为 null。顺带退场最旧目录。 */
+    private fun savePastedText(text: String?, reqId: com.google.gson.JsonElement?) {
+        val path: String? = runCatching {
+            if (text.isNullOrEmpty()) return@runCatching null
+            val root = attachmentsRoot()
+            val dir = File(root, java.util.UUID.randomUUID().toString())
+            dir.mkdirs()
+            val file = File(dir, pasteFileName)
+            file.writeText(text, Charsets.UTF_8)
+            evictPastes(root)
+            file.absolutePath
+        }.getOrNull()
+        val message = JsonObject().apply {
+            addProperty("type", "pastedTextSaved")
+            if (reqId != null && !reqId.isJsonNull) add("reqId", reqId)
+            if (path != null) addProperty("path", path) else add("path", com.google.gson.JsonNull.INSTANCE)
+        }
+        pushAppMessage(message)
+    }
+
+    /** 只接受本模块写出的形状 <root>/<uuid>/pasted-text.txt，返回 uuid 目录；其余 null */
+    private fun ownedPasteDir(p: String?): File? {
+        if (p.isNullOrBlank()) return null
+        val root = attachmentsRoot().absoluteFile
+        val f = File(p).absoluteFile
+        if (f.name != pasteFileName) return null
+        val dir = f.parentFile ?: return null
+        if (!uuidRe.matches(dir.name)) return null
+        if (dir.parentFile?.absoluteFile != root) return null
+        return dir
+    }
+
+    private fun removePastedText(p: String?) {
+        val dir = ownedPasteDir(p) ?: return
+        runCatching { dir.deleteRecursively() }
+    }
+
+    /** 读回正文并回推 pastedTextRead{reqId, path, content}；不是本模块的文件或已被退场清理 content 为 null */
+    private fun readPastedText(p: String?, reqId: com.google.gson.JsonElement?) {
+        val content: String? = ownedPasteDir(p)?.let { runCatching { File(it, pasteFileName).readText(Charsets.UTF_8) }.getOrNull() }
+        val message = JsonObject().apply {
+            addProperty("type", "pastedTextRead")
+            if (reqId != null && !reqId.isJsonNull) add("reqId", reqId)
+            addProperty("path", p ?: "")
+            if (content != null) addProperty("content", content) else add("content", com.google.gson.JsonNull.INSTANCE)
+        }
+        pushAppMessage(message)
+    }
+
+    private fun evictPastes(root: File) {
+        runCatching {
+            val dirs = root.listFiles { f -> f.isDirectory && uuidRe.matches(f.name) }?.sortedByDescending { it.lastModified() } ?: return
+            dirs.drop(pasteMaxDirs).forEach { it.deleteRecursively() }
+        }
+    }
+
+    // ─── 可视化产物内联嵌入（对齐 VSCode utils/vizEmbed.ts）────────────────────
+    // attachments/<uuid>/<title>.html → <tmp>/sema-viz/<uuid>/<title>.html，</head> 前注入 viz-runtime <script>，原文件保持干净
+
+    private val vizPathRe = Regex("""[\\/]attachments[\\/][0-9a-f-]{36}[\\/][^\\/]+\.html?$""", RegexOption.IGNORE_CASE)
+    private val vizInjectMaxBytes = 4L * 1024 * 1024
+    private var vizRuntimeFile: File? = null
+
+    /** viz-runtime.js 从插件资源释放到临时目录（一次），返回 file:// url；资源缺失返回 null */
+    private fun vizRuntimeUrl(): String? {
+        vizRuntimeFile?.let { if (it.isFile) return it.toURI().toString() }
+        val stream = javaClass.getResourceAsStream("/web/viz-runtime.js") ?: return null
+        val dir = File(File(System.getProperty("java.io.tmpdir"), "sema-viz"), "runtime").apply { mkdirs() }
+        val js = File(dir, "viz-runtime.js")
+        stream.use { input -> js.outputStream().use { input.copyTo(it) } }
+        vizRuntimeFile = js
+        return js.toURI().toString()
+    }
+
+    private fun prepareVizEmbed(p: String?, reqId: com.google.gson.JsonElement?) {
+        val url: String? = runCatching {
+            if (p.isNullOrBlank() || !vizPathRe.containsMatchIn(p)) return@runCatching null
+            val src = File(p).absoluteFile
+            if (!src.isFile) return@runCatching null
+            val uuid = src.parentFile.name
+            val dir = File(File(System.getProperty("java.io.tmpdir"), "sema-viz"), uuid).apply { mkdirs() }
+            val out = File(dir, src.name)
+            val runtime = vizRuntimeUrl()
+            if (runtime != null && src.length() <= vizInjectMaxBytes) {
+                val html = src.readText(Charsets.UTF_8)
+                val tag = "<script src=\"$runtime\"></script>"
+                val headRe = Regex("</head>", RegexOption.IGNORE_CASE)
+                out.writeText(if (headRe.containsMatchIn(html)) headRe.replaceFirst(html, Regex.escapeReplacement("$tag</head>")) else tag + html, Charsets.UTF_8)
+            } else {
+                src.copyTo(out, overwrite = true)
+            }
+            out.toURI().toString()
+        }.getOrNull()
+        val message = JsonObject().apply {
+            addProperty("type", "vizEmbedReady")
+            if (reqId != null && !reqId.isJsonNull) add("reqId", reqId)
+            if (url != null) addProperty("url", url) else add("url", com.google.gson.JsonNull.INSTANCE)
+        }
+        pushAppMessage(message)
     }
 
     private fun pushFiles(reqId: com.google.gson.JsonElement?, files: List<Map<String, Any?>>) {
