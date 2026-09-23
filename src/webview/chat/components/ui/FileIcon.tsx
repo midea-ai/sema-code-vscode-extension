@@ -7,6 +7,8 @@ interface FileIconProps {
     isDirectory: boolean;
     className?: string;
     size?: number;
+    /** 覆盖类型色（如传 currentColor 跟随文字色） */
+    color?: string;
 }
 
 // 颜色常量定义
@@ -162,9 +164,9 @@ const iconColors: { [key: string]: string } = {
     default: colors.white
 };
 
-/** 文件图标的 SVG 与颜色（给非 React 场景使用，如 markdown 渲染后按文件名动态插入图标） */
-export function getFileIconHtml(fileName: string): { svg: string; color: string } {
-    const iconName = getFileIconName(fileName, false);
+/** 文件图标的 SVG 与颜色（给非 React 场景使用，如 markdown 渲染后按文件名动态插入图标、输入框 mention 芯片） */
+export function getFileIconHtml(fileName: string, isDirectory = false): { svg: string; color: string } {
+    const iconName = getFileIconName(fileName, isDirectory);
     return { svg: fileIconSvgs[iconName] || fileIconSvgs.default, color: iconColors[iconName] || colors.white };
 }
 
@@ -177,7 +179,8 @@ const FileIcon: React.FC<FileIconProps> = ({
     fileName,
     isDirectory,
     className = '',
-    size = 16
+    size = 16,
+    color
 }) => {
     const iconName = getFileIconName(fileName, isDirectory);
     const svgContent = fileIconSvgs[iconName] || fileIconSvgs.default;
@@ -189,7 +192,7 @@ const FileIcon: React.FC<FileIconProps> = ({
             style={{
                 width: finalSize,
                 height: finalSize,
-                color: iconColors[iconName] || colors.white,
+                color: color || iconColors[iconName] || colors.white,
                 flexShrink: 0,
                 display: 'inline-flex',
                 alignItems: 'center',

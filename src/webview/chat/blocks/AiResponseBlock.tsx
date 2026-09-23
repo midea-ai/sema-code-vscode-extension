@@ -55,7 +55,7 @@ const AiResponseBlock: React.FC<AiResponseBlockProps> = React.memo(({
                         if (lineInfo) {
                             element.setAttribute('data-line-info', lineInfo);
                         }
-                        // 前置文件类型图标（SVG 来自内置常量，非用户内容，可直接 innerHTML）
+                        // 前置文件类型图标（SVG 来自内置常量，非用户内容，可直接 innerHTML），按文件类型上色
                         if (!element.querySelector('.md-file-icon')) {
                             const { svg, color } = getFileIconHtml(String(filePath).split(/[\\/]/).pop() || String(filePath));
                             const icon = document.createElement('span');

@@ -31,10 +31,12 @@ const TokenProgress: React.FC<TokenProgressProps> = React.memo(({ tokenInfo }) =
     };
 
     const tooltip = t('chat.tokens.used', { used: formatTokens(tokenInfo.useTokens), max: formatTokens(tokenInfo.maxTokens) });
+    // 占用越高圆环越醒目：>85% 错误色、>60% 警告色；百分比数字只在悬浮时出现
+    const level = percentage > 85 ? 'danger' : percentage > 60 ? 'warn' : '';
 
     return (
         <Tooltip content={tooltip}>
-            <div className="token-progress">
+            <div className={`token-progress ${level}`}>
                 <svg className="token-circle" viewBox="0 0 36 36">
                     <circle
                         className="token-circle-bg"

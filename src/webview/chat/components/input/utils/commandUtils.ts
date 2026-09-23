@@ -2,6 +2,7 @@ import { getBuiltinShortcutCommands, ShortcutCommand } from '../../../../../util
 import { CommandConfig } from '../../../../config/types/command';
 import { SkillConfig } from '../../../../config/types/skill';
 import { AgentConfig } from '../../../../config/types/agent';
+import { skillDisplayOf, skillDisplayOrder } from '../../../utils/skillDisplay';
 
 // 存储自定义命令（由后端推送更新）
 let customCommands: ShortcutCommand[] = [];
@@ -28,11 +29,14 @@ export const setCustomCommands = (commands: CommandConfig[]) => {
  * 由后端推送技能时调用，更新技能列表
  */
 export const setSkills = (skillList: SkillConfig[]) => {
-    skills = skillList.map(skill => ({
-        text: skill.name,
-        desc: skill.description,
-        category: 'skill'
-    }));
+    // 有显示映射的技能按 SKILL_DISPLAY 顺序排在技能组最前，其余保持原顺序
+    skills = [...skillList]
+        .sort((a, b) => skillDisplayOrder(a.name) - skillDisplayOrder(b.name))
+        .map(skill => ({
+            text: skill.name,
+            desc: skill.description,
+            category: 'skill'
+        }));
 };
 
 /**
@@ -49,14 +53,15 @@ export const setAgents = (agentList: AgentConfig[]) => {
 };
 
 /**
- * 获取所有命令（内置 + 自定义 + 技能 + 子代理）
+ * 获取所有命令（技能 + 子代理 + 内置 + 自定义）。
+ * 扁平顺序须与面板分组顺序一致，键盘 ↑↓ 才与视觉一致
  */
 const getAllCommands = (): ShortcutCommand[] => {
     return [
-        ...getBuiltinShortcutCommands().map(cmd => ({ send: false, category: 'command' as const, ...cmd })),
-        ...customCommands,
         ...skills,
-        ...agents
+        ...agents,
+        ...getBuiltinShortcutCommands().map(cmd => ({ send: false, category: 'command' as const, ...cmd })),
+        ...customCommands
     ];
 };
 
@@ -131,17 +136,20 @@ export const filterShortcutCommands = (
     const matched: Ranked[] = [];
 
     commands.forEach((cmd, idx) => {
-        const text = cmd.text.toLowerCase();
-        const desc = (cmd.desc ?? '').toLowerCase();
+        // 有显示映射的技能：显示名 / 短描述也参与匹配（输入 "word" 能命中 minimax-docx）
+        const names = [cmd.text.toLowerCase()];
+        const descs = [(cmd.desc ?? '').toLowerCase()];
+        const d = cmd.category === 'skill' ? skillDisplayOf(cmd.text) : undefined;
+        if (d) { names.push(d.name.toLowerCase()); descs.push(d.desc.toLowerCase()); }
 
         let rank: number;
-        if (text.startsWith(query)) {
+        if (names.some(n => n.startsWith(query))) {
             rank = 0;
-        } else if (desc.startsWith(query)) {
+        } else if (descs.some(s => s.startsWith(query))) {
             rank = 1;
-        } else if (text.includes(query)) {
+        } else if (names.some(n => n.includes(query))) {
             rank = 2;
-        } else if (desc.includes(query)) {
+        } else if (descs.some(s => s.includes(query))) {
             rank = 3;
         } else {
             return;

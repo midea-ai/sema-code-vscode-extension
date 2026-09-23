@@ -2,6 +2,7 @@ import React, { useMemo, useEffect, useRef, useState, useCallback } from 'react'
 import { ShortcutCommand } from '../../../../../utils/command';
 import { filterShortcutCommands } from '../utils/commandUtils';
 import Tooltip from '../../ui/Tooltip';
+import { SkillLabel, skillDisplayOf } from '../../../utils/skillDisplay';
 
 // 描述文本：当被 ellipsis 截断时，悬浮显示完整内容
 const ShortcutDesc: React.FC<{ desc: string }> = ({ desc }) => {
@@ -93,24 +94,34 @@ const ShortcutPanel: React.FC<ShortcutPanelProps> = ({
         }
     });
 
-    const renderItem = ({ item, flatIndex }: Indexed) => (
-        <div
-            key={flatIndex}
-            ref={flatIndex === safeSelectedIndex ? selectedItemRef : null}
-            className={`shortcut-panel-item ${flatIndex === safeSelectedIndex ? 'selected' : ''}`}
-            onClick={() => onExecuteShortcut(item.text, item.send ?? false)}
-        >
-            <span className="shortcut-slash">/</span>
-            <span className="shortcut-command">{item.text}</span>
-            <ShortcutDesc desc={item.desc} />
-        </div>
-    );
+    const renderItem = ({ item, flatIndex }: Indexed) => {
+        // 有显示映射的 skill：用「图标 + 名字 + 短描述」代替斜杠名与 frontmatter 描述
+        const d = item.category === 'skill' ? skillDisplayOf(item.text) : undefined;
+        return (
+            <div
+                key={flatIndex}
+                ref={flatIndex === safeSelectedIndex ? selectedItemRef : null}
+                className={`shortcut-panel-item ${flatIndex === safeSelectedIndex ? 'selected' : ''}`}
+                onClick={() => onExecuteShortcut(item.text, item.send ?? false)}
+            >
+                {d ? (
+                    <span className="shortcut-command shortcut-skill"><SkillLabel display={d} size={14} /></span>
+                ) : (
+                    <>
+                        <span className="shortcut-slash">/</span>
+                        <span className="shortcut-command">{item.text}</span>
+                    </>
+                )}
+                <ShortcutDesc desc={d ? d.desc : item.desc} />
+            </div>
+        );
+    };
 
-    // 渲染顺序与 getAllCommands 一致：命令 → 技能 → 子代理；分组间按非空插入分隔线
+    // 渲染顺序与 getAllCommands 一致：技能 → 子代理 → 命令；分组间按非空插入分隔线
     const sections = [
-        { title: 'Command', items: commandItems },
         { title: 'Skill', items: skillItems },
         { title: 'Agent', items: agentItems },
+        { title: 'Command', items: commandItems },
     ].filter(s => s.items.length > 0);
 
     return (

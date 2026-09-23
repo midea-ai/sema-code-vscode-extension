@@ -516,6 +516,11 @@ end try`;
      * 验证文件路径是否存在
      */
     public async verifyFilePath(filePath: string): Promise<boolean> {
+        return (await this.statFilePath(filePath)).exists;
+    }
+
+    /** 路径状态：exists=是文件；isDirectory=是目录（相对路径按第一个工作区目录解析） */
+    public async statFilePath(filePath: string): Promise<{ exists: boolean; isDirectory: boolean }> {
         try {
             const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
 
@@ -526,15 +531,18 @@ end try`;
                 fileUri = vscode.Uri.file(filePath);
             } else {
                 if (!workspaceFolder) {
-                    return false;
+                    return { exists: false, isDirectory: false };
                 }
                 fileUri = vscode.Uri.joinPath(workspaceFolder.uri, filePath);
             }
 
             const stat = await vscode.workspace.fs.stat(fileUri);
-            return stat.type === vscode.FileType.File;
+            return {
+                exists: (stat.type & vscode.FileType.File) !== 0,
+                isDirectory: (stat.type & vscode.FileType.Directory) !== 0
+            };
         } catch {
-            return false;
+            return { exists: false, isDirectory: false };
         }
     }
 }

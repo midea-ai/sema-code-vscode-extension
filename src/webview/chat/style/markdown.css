@@ -1,6 +1,7 @@
 /* ===== Markdown 内容样式 ===== */
+/* 正文沿用 body 的界面字体（与用户气泡、文件面板、输入框一致）；
+   代码块 / 内联代码由全局 `code, pre` 规则保持编辑器等宽字体 */
 .markdown-content {
-  font-family: var(--vscode-editor-font-family);
   line-height: 1.4;
   color: var(--chat-text-editor);
   width: 100%;
@@ -40,9 +41,13 @@
 }
 
 /* 文件路径内联代码样式 - 可点击的文件路径：前置文件类型图标，悬停下划线 */
+/* 字号/字体与输入框文件芯片统一：13px 界面字体；文件名用 VS Code 链接高亮色，图标保持文件类型色 */
 .markdown-content .file-path-code {
-  color: var(--chat-text-symbol);
+  color: var(--chat-text-link);
   background: none;
+  padding: 0;
+  font-family: var(--vscode-font-family);
+  font-size: var(--chat-font-md);
   cursor: pointer;
   text-decoration: none;
 }
@@ -52,19 +57,23 @@
 }
 
 /* 文件类型图标（verifyFilePath 确认后由 AiResponseBlock 动态插入，SVG 走 currentColor）
-   SVG 自带留白，尺寸放大到 1.3em；用 inline-block + 负 vertical-align 保持与文字的垂直对齐。
-   不能用 inline-flex + align-items:center 包住整个链接：inline-flex 的对外基线取第一个 flex 子项，
+   尺寸与 @ 文件面板 / 输入框芯片同一套：18px 盒 + scale 1.1 + 提亮；用 inline-block + vertical-align 居中，
+   不能用 inline-flex 包住整个链接：inline-flex 的对外基线取第一个 flex 子项，
    而图标 span 无文字、基线即底边，会把文件名整体抬高，与前后正文错位 */
 .markdown-content .md-file-icon {
   display: inline-block;
-  width: 1.3em;
-  height: 1.3em;
-  vertical-align: -0.3em;
-  margin-right: 0.3em;
+  width: 18px;
+  height: 18px;
+  vertical-align: middle;
+  margin-right: 4px;
+  filter: contrast(1.2) saturate(1.1);
+  transform: scale(1.1);
 }
 
 .markdown-content .md-file-icon svg {
   display: block;
+  width: 100%;
+  height: 100%;
 }
 
 /* 链接前的站点图标：外网 https 为 favicon <img>，其余为 CSS mask 地球
@@ -252,9 +261,9 @@
 }
 
 /* URL 链接样式 - 裸 http(s) 地址与 [text](url) 共用；本机/局域网地址由扩展端在 Simple Browser 打开，其余系统浏览器
-   颜色与内联代码一致，仅用下划线区分，避免正文出现多种高亮色 */
+   与文件链接同用 VS Code 链接高亮色，正文只保留这一种高亮色 */
 .markdown-content .md-url-link {
-  color: var(--chat-text-symbol);
+  color: var(--chat-text-link);
   cursor: pointer;
   text-decoration: none;
   /* 裸 URL 或长链接文本可能是超长无空格串，避免撑破布局 */
@@ -282,7 +291,7 @@
 }
 
 .markdown-content .md-local-link.file-path-code {
-  color: var(--chat-text-symbol);
+  color: var(--chat-text-link);
   cursor: pointer;
 }
 
