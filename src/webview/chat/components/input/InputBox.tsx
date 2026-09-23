@@ -578,6 +578,39 @@ const InputBox = forwardRef<InputBoxHandle, InputBoxProps>(({
         setFilePickerQuery('');
     };
 
+    // 宿主右键「添加到聊天」：把文件以 mention 形式追加到输入框末尾，效果与 @ 面板选中一致
+    useEffect(() => {
+        const handler = (event: MessageEvent) => {
+            const msg = event.data;
+            if (msg?.type !== 'insertFileMentions' || !Array.isArray(msg.files)) return;
+            if (disabled) return;
+            const el = inputBoxRef.current; if (!el) return;
+            const items = (msg.files as { path: string; isDirectory?: boolean }[]).filter(f => typeof f.path === 'string' && f.path);
+            if (items.length === 0) return;
+
+            let newText = inputValue;
+            const newMentions: InputMention[] = [...mentions];
+            for (const item of items) {
+                // 已存在同一路径的 mention 则跳过，避免重复插入
+                if (newMentions.some(m => m.path === item.path)) continue;
+                if (newText.length > 0 && !newText.endsWith(' ') && !newText.endsWith('\n')) newText += ' ';
+                const mentionText = '@' + item.path;
+                newMentions.push({ start: newText.length, length: mentionText.length, path: item.path, isDirectory: !!item.isDirectory });
+                newText += mentionText + ' ';
+            }
+            if (newText === inputValue) { el.focus(); return; }
+
+            renderEditorContent(el, newText, newMentions);
+            setInputValue(newText);
+            setMentions(newMentions);
+            setCaretOffset(el, newText.length);
+            el.focus();
+            commitHistory({ text: newText, mentions: newMentions, caret: newText.length }, 'op');
+        };
+        window.addEventListener('message', handler);
+        return () => window.removeEventListener('message', handler);
+    }, [inputValue, mentions, disabled]);
+
     const handleAddFileClick = () => {
         if (disabled) return;
         const el = inputBoxRef.current; if (!el) return;
@@ -828,7 +861,9 @@ const InputBox = forwardRef<InputBoxHandle, InputBoxProps>(({
                 e.preventDefault();
                 if (files.length > 0) setSelectedFileIndex(prev => prev > 0 ? prev - 1 : files.length - 1);
                 return;
-            } else if (e.key === 'Tab') {
+            } else if (e.key === 'Tab' || (e.key === 'Enter' && !e.shiftKey)) {
+                // 回车与 Tab 一致：选中文件，不触发发送（输入法合成中的回车放行）
+                if (e.key === 'Enter' && (IS_JB ? eventIsComposing(e) : composingRef.current)) return;
                 e.preventDefault();
                 if (files.length > 0) {
                     const safeIndex = Math.min(selectedFileIndex, files.length - 1);
