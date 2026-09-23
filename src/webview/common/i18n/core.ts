@@ -5,6 +5,10 @@
  *   之后由 systemConfigUpdate / langUpdate 消息驱动 setLang；宿主在 activate 与每次保存 lang 时调 setLang。
  * - React 组件请用 react.ts 的 useT()，非组件代码直接 import { t }。
  * - 模块顶层常量里不要调 t()（求值早于 setLang），改成函数或在渲染期取值。
+ * - 字典分两档：zh / en 必须全量（漏写编译报错）；其他语言可选（Partial），缺的条目回退英文。
+ *   以下分组只写 zh / en，不翻译到其他语言：
+ *   config.usage.* / host.cfg.op.* / chat.task.* / config.mcp.status.* / config.hooks.status.* / host.demoReadme，
+ *   以及各处错误提示（*.error、*Failed、*Error、*.err.*、*NotFound、*Invalid 等）。
  * - 新增语言：加字典文件 → 在 LANGS 登记一行 → 补 defaultConfig 的 DEFAULT_CUSTOM_RULES（漏写编译报错）
  *   → JB 侧补 SystemConfigManager.kt 的 HTML_LANGS 与 messages/SemaBundle_xx.properties。
  */
@@ -21,8 +25,8 @@ interface LanguageMeta {
     label: string;
     /** toLocaleDateString / toLocaleTimeString 使用的 locale */
     dateLocale: string;
-    /** 字典，key 集合必须与 zh 完全一致 */
-    dict: Record<I18nKey, string>;
+    /** 字典；zh / en 全量，其余语言可缺条目（缺的回退英文） */
+    dict: Partial<Record<I18nKey, string>>;
 }
 
 /** 受支持的界面语言注册表，Language 类型与下拉选项均由此推导。 */
