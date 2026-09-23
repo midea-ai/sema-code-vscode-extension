@@ -1,12 +1,9 @@
 import * as vscode from 'vscode';
-import * as https from 'https';
-import * as http from 'http';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
-import AdmZip from 'adm-zip';
 import { defaultConfig, DEFAULT_CUSTOM_RULES } from './default/defaultConfig';
-import { skillHubConfig } from './default/defaultSkillHub';
+import { SkillCatalogManager, CatalogScope } from '../../managers/SkillCatalogManager';
 import { AgentConfig } from './types/agent';
 import { CommandConfig } from './types/command';
 import type { ClawCoordinator } from '../../claw/coordinator';
@@ -36,6 +33,7 @@ export class ConfigWebviewProvider {
     private fileOperationManager: any;
     private clawCoordinator?: ClawCoordinator;
     private browserControl?: BrowserControlManager;
+    private skillCatalog?: SkillCatalogManager;
     private mcpStatusHandler?: (data: any) => void;
     private cronUpdateHandler?: () => void;
     private taskWatcherMap: Map<string, () => void> = new Map();
@@ -66,6 +64,8 @@ export class ConfigWebviewProvider {
         this.pendingTaskId = taskId;
         // 需要扩展根路径定位 assets/chrome/，构造时拿不到，首次 show 时创建
         this.browserControl ??= new BrowserControlManager(this.coreManager, extensionUri.fsPath);
+        // Skill 市场内置资源在扩展根目录 resources/，同样首次 show 时创建
+        this.skillCatalog ??= new SkillCatalogManager(path.join(extensionUri.fsPath, 'resources'));
         if (this.panel) {
             this.panel.reveal(vscode.ViewColumn.One);
             this.navigateTo(page || 'models', taskId);
@@ -129,8 +129,9 @@ export class ConfigWebviewProvider {
                 refreshSkills:              () => this.refreshSkillsInfo(),
                 removeSkill:                () => this.removeSkill(m.name),
                 toggleSkill:                () => this.toggleSkill(m.name, m.enabled),
-                searchSkillHub:             () => this.searchSkillHub(m.query),
-                installSkillFromHub:        () => this.installSkillFromHub(m.slug, m.scope),
+                loadSkillCatalog:           () => Promise.resolve(this.loadSkillCatalog()),
+                installCatalogSkill:        () => this.installCatalogSkill(m.id, m.scope),
+                uninstallCatalogSkill:      () => this.uninstallCatalogSkill(m.id),
                 loadHooksInfo:              () => this.loadHooksInfo(),
                 refreshHooks:               () => this.refreshHooksInfo(),
                 loadCommandsInfo:           () => this.loadCommandsInfo(),
@@ -693,52 +694,55 @@ export class ConfigWebviewProvider {
         );
     }
 
-    private async searchSkillHub(query: string) {
+    // ─── Skill 市场（内置资源目录） ──────────────────────────────────────────
+
+    private get workspaceRoot(): string | undefined {
+        return vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    }
+
+    /** 目录列表是纯本地扫描，不依赖 core，同步返回 */
+    private loadSkillCatalog() {
         try {
-            const data = await this.httpsGet(skillHubConfig.searchUrl(query));
-            const json = JSON.parse(data);
-            this.postMessage({ command: 'searchSkillHubResult', success: true, data: json.results || [] });
+            this.postMessage({ command: 'loadSkillCatalogResult', success: true, data: this.skillCatalog!.listCatalog(this.workspaceRoot) });
         } catch (error) {
-            this.postMessage({ command: 'searchSkillHubResult', success: false, data: [], message: (error as Error).message });
+            this.postMessage({ command: 'loadSkillCatalogResult', success: false, data: [], message: (error as Error).message });
         }
     }
 
-    private async installSkillFromHub(slug: string, scope: 'project' | 'user') {
-        try {
-            // 确定安装目录（绝对路径）
-            let skillsDir: string;
-            if (scope === 'project') {
-                const wsFolder = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-                if (!wsFolder) throw new Error(t('host.cfg.noWorkspace'));
-                skillsDir = path.join(wsFolder, '.sema', 'skills');
-            } else {
-                skillsDir = path.join(os.homedir(), '.sema', 'skills');
-            }
+    /** 安装后一并带回最新目录与已安装 skills，页面不用再发两次请求 */
+    private async installCatalogSkill(id: string, scope: CatalogScope) {
+        await this.execute(
+            'installCatalogSkillResult',
+            t('host.cfg.op.installSkill'),
+            async () => {
+                const catalog = this.skillCatalog!;
+                const r = await catalog.install(id, scope, false, this.workspaceRoot);
+                if (r !== true) {
+                    const name = catalog.listCatalog().find(s => s.id === id)?.name || id;
+                    if (!await this.confirm(t('host.cfg.confirmOverwriteSkill', { name }), t('host.cfg.overwrite'))) return { cancelled: true };
+                    await catalog.install(id, scope, true, this.workspaceRoot);
+                }
+                return { skills: await this.coreManager.getSkillsInfo(true), catalog: catalog.listCatalog(this.workspaceRoot) };
+            },
+            (r) => ({ id, scope, ...r }),
+        );
+    }
 
-            // 确保目录存在
-            fs.mkdirSync(skillsDir, { recursive: true });
-
-            // 下载 zip 到系统临时目录（避免工作目录问题）
-            const zipPath = path.join(os.tmpdir(), `sema-skill-${slug}-${Date.now()}.zip`);
-            await this.downloadFile(skillHubConfig.downloadUrl(slug), zipPath);
-
-            // zip 根目录直接是文件，解压到 skillsDir/<slug>/ 下
-            const destSkillDir = path.join(skillsDir, slug);
-            fs.mkdirSync(destSkillDir, { recursive: true });
-            const zip = new AdmZip(zipPath);
-            zip.extractAllTo(destSkillDir, true);
-
-            // 删除 zip
-            fs.unlinkSync(zipPath);
-
-            // 刷新 skill 信息
-            await this.ensureCoreReady();
-            const skills = await this.coreManager.getSkillsInfo(true);
-            this.postMessage({ command: 'installSkillFromHubResult', success: true, slug, data: skills });
-        } catch (error) {
-            this.postMessage({ command: 'installSkillFromHubResult', success: false, slug, message: (error as Error).message });
-            vscode.window.showErrorMessage(t('host.cfg.installSkillFailed', { slug, error: (error as Error).message }));
-        }
+    private async uninstallCatalogSkill(id: string) {
+        await this.execute(
+            'uninstallCatalogSkillResult',
+            t('host.cfg.op.uninstallSkill'),
+            async () => {
+                const catalog = this.skillCatalog!;
+                const name = catalog.listCatalog().find(s => s.id === id)?.name || id;
+                if (!await this.confirm(t('host.cfg.confirmUninstallSkill', { name }), t('config.skill.uninstall'))) return { cancelled: true };
+                const skillName = catalog.uninstall(id, this.workspaceRoot);
+                // 清掉禁用残留，否则重装后开关显示开、实际仍禁用；失败不阻塞卸载
+                try { await this.coreManager.enableSkill(skillName); } catch { /* ignore */ }
+                return { skills: await this.coreManager.getSkillsInfo(true), catalog: catalog.listCatalog(this.workspaceRoot) };
+            },
+            (r) => ({ id, ...r }),
+        );
     }
 
     // ─── Hooks ────────────────────────────────────────────────────────────────
@@ -761,50 +765,6 @@ export class ConfigWebviewProvider {
         } catch (error) {
             this.postMessage({ command: 'refreshHooksInfoResult', success: false, data: null, message: (error as Error).message });
         }
-    }
-
-    /** 发起 HTTPS GET 请求，返回响应体字符串，自动跟随重定向 */
-    private httpsGet(url: string): Promise<string> {
-        return new Promise((resolve, reject) => {
-            const get = (targetUrl: string) => {
-                const mod = targetUrl.startsWith('https') ? https : http;
-                (mod as typeof https).get(targetUrl, { headers: { 'User-Agent': 'sema-vscode' } }, (res) => {
-                    if (res.statusCode && res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
-                        get(res.headers.location);
-                        return;
-                    }
-                    let body = '';
-                    res.on('data', (chunk) => { body += chunk; });
-                    res.on('end', () => resolve(body));
-                    res.on('error', reject);
-                }).on('error', reject);
-            };
-            get(url);
-        });
-    }
-
-    /** 下载文件到指定绝对路径，自动跟随重定向 */
-    private downloadFile(url: string, destPath: string): Promise<void> {
-        return new Promise((resolve, reject) => {
-            const get = (targetUrl: string) => {
-                const mod = targetUrl.startsWith('https') ? https : http;
-                (mod as typeof https).get(targetUrl, { headers: { 'User-Agent': 'sema-vscode' } }, (res) => {
-                    if (res.statusCode && res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
-                        get(res.headers.location);
-                        return;
-                    }
-                    if (res.statusCode !== 200) {
-                        reject(new Error(t('host.cfg.downloadFailed', { status: String(res.statusCode) })));
-                        return;
-                    }
-                    const file = fs.createWriteStream(destPath);
-                    res.pipe(file);
-                    file.on('finish', () => file.close(() => resolve()));
-                    file.on('error', (err) => { fs.unlink(destPath, () => {}); reject(err); });
-                }).on('error', reject);
-            };
-            get(url);
-        });
     }
 
     // ─── Commands ─────────────────────────────────────────────────────────────

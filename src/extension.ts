@@ -5,7 +5,11 @@ import * as os from 'os';
 import { SemaSidebarProvider } from './core/semaSidebarProvider';
 import { pet } from './pet/pet-client';
 import { SystemConfigManager } from './managers/SystemConfigManager';
+import { SkillCatalogManager } from './managers/SkillCatalogManager';
 import { t } from './webview/common/i18n/core';
+
+/** globalState 键：已处理过的默认安装 skill id（用户卸载后不再重装） */
+const DEFAULT_SKILLS_INSTALLED_KEY = 'sema.defaultSkillsInstalled';
 
 // 保存 sidebarProvider 实例以便在 deactivate 时使用
 let sidebarProvider: SemaSidebarProvider;
@@ -18,6 +22,13 @@ export function activate(context: vscode.ExtensionContext) {
 
     // 检查并设置默认工作区
     checkAndSetDefaultWorkspace();
+
+    // 内置资源里标记 defaultInstall 的 skill 首次激活时装到用户级；异步不阻塞启动，失败只打日志下次重试
+    const handled = context.globalState.get<string[]>(DEFAULT_SKILLS_INSTALLED_KEY, []);
+    void new SkillCatalogManager(path.join(context.extensionPath, 'resources'))
+        .installDefaultSkills(handled)
+        .then(ids => { if (ids.length) return context.globalState.update(DEFAULT_SKILLS_INSTALLED_KEY, [...new Set([...handled, ...ids])]); })
+        .then(undefined, err => console.error('[skill-catalog] default install failed:', err));
 
     sidebarProvider = new SemaSidebarProvider(context);
 

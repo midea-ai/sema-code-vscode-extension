@@ -1,9 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { VscodeApi } from './types';
 import { getColorByName } from './utils/iconUtils';
-import { RefreshIcon, EditIcon, TrashIcon, OpenIcon } from './utils/svgIcons';
+import { RefreshIcon, EditIcon, TrashIcon, OpenIcon, GitHubIcon } from './utils/svgIcons';
 import { SkillScope, SkillConfig as SkillConfigItem } from './types/skill';
-import { skillHubConfig } from './default/defaultSkillHub';
 import { useT, I18nKey } from '../common/i18n/react';
 import './style/section.css';
 
@@ -11,13 +10,17 @@ interface SkillConfigProps {
     vscode: VscodeApi;
 }
 
-interface HubSkillResult {
-    displayName: string;
-    score: number;
-    slug: string;
-    summary: string;
-    updatedAt: number;
-    version: string;
+/** 市场卡片：宿主扫描扩展自带 resources/skills/ 得到（对齐 SkillCatalogManager.CatalogSkill） */
+interface CatalogSkill {
+    id: string;
+    name: string;
+    description: string;
+    category?: string;
+    skillName: string;
+    repo?: string;
+    repoUrl?: string;
+    installedUser: boolean;
+    installedProject: boolean;
 }
 
 const LOCATE_ORDER: SkillScope[] = ['builtin', 'project', 'user', 'plugin'];
@@ -37,10 +40,24 @@ const LOCATE_PATHS: Record<SkillScope, string> = {
     user: '~/.sema/skills/',
 };
 
+/** 市场分类展示顺序；不在列表里的归入「其他」 */
+const CATEGORY_ORDER = ['doc', 'office', 'writing', 'dev', 'web', 'mobile', 'design', 'media', 'other'];
+const CATEGORY_TITLE_KEYS: Record<string, I18nKey> = {
+    doc: 'config.skill.cat.doc',
+    office: 'config.skill.cat.office',
+    writing: 'config.skill.cat.writing',
+    dev: 'config.skill.cat.dev',
+    web: 'config.skill.cat.web',
+    mobile: 'config.skill.cat.mobile',
+    design: 'config.skill.cat.design',
+    media: 'config.skill.cat.media',
+    other: 'config.skill.cat.other',
+};
+
 type SkillTabType = 'installed' | 'hub';
 
 const SkillConfig: React.FC<SkillConfigProps> = ({ vscode }) => {
-    // JB 插件不支持 SkillHub 在线搜索/安装，隐藏其标签页（VSCode 下 __SEMA_JB__ 为 undefined，行为不变）。
+    // JB 插件尚未实现 Skill 市场安装，隐藏其标签页（VSCode 下 __SEMA_JB__ 为 undefined，行为不变）。
     // 必须在组件内读取：模块顶层求值早于 jb-index 设置该标记，会恒为 false。
     const IS_JB = !!(window as any).__SEMA_JB__;
     const t = useT();
@@ -51,12 +68,12 @@ const SkillConfig: React.FC<SkillConfigProps> = ({ vscode }) => {
     const [expandedDescriptions, setExpandedDescriptions] = useState<Set<string>>(new Set());
     const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set());
 
-    // Hub 状态
-    const [hubSearch, setHubSearch] = useState('');
-    const [hubResults, setHubResults] = useState<HubSkillResult[]>([]);
-    const [hubLoading, setHubLoading] = useState(false);
-    const [hubSearched, setHubSearched] = useState(false);
-    const [installingHubKeys, setInstallingHubKeys] = useState<Set<string>>(new Set());
+    // 市场状态：目录来自宿主本地扫描；busyKeys 记录进行中的安装 / 卸载（`${id}-project|user|uninstall`），各卡片独立转圈
+    const [catalog, setCatalog] = useState<CatalogSkill[] | null>(null);
+    const [catalogError, setCatalogError] = useState<string | null>(null);
+    const [catalogLoading, setCatalogLoading] = useState(false);
+    const [marketQuery, setMarketQuery] = useState('');
+    const [busyKeys, setBusyKeys] = useState<Set<string>>(new Set());
 
     const groupedSkills = useMemo(() => {
         const groups: Record<SkillScope, SkillConfigItem[]> = {
@@ -77,7 +94,23 @@ const SkillConfig: React.FC<SkillConfigProps> = ({ vscode }) => {
         return groups;
     }, [skills]);
 
+    const loadCatalog = () => {
+        setCatalogLoading(true);
+        vscode.postMessage({ command: 'loadSkillCatalog' });
+    };
+
     useEffect(() => {
+        const clearBusy = (...keys: string[]) => setBusyKeys(prev => {
+            const next = new Set(prev);
+            keys.forEach(k => next.delete(k));
+            return next;
+        });
+        // 安装 / 卸载成功后宿主一并带回最新目录与已安装 skills；用户取消覆盖 / 卸载时 cancelled 为真，不动列表
+        const applyCatalogResult = (message: any) => {
+            if (!message.success || message.cancelled) return;
+            if (Array.isArray(message.catalog)) setCatalog(message.catalog);
+            if (Array.isArray(message.skills)) setSkills(message.skills);
+        };
         const handleMessage = (event: MessageEvent) => {
             const message = event.data;
             switch (message.command) {
@@ -96,6 +129,8 @@ const SkillConfig: React.FC<SkillConfigProps> = ({ vscode }) => {
                 case 'removeSkillResult':
                     if (message.success) {
                         vscode.postMessage({ command: 'loadSkillsInfo' });
+                        // 删掉的可能是市场装的，同步卡片安装态
+                        vscode.postMessage({ command: 'loadSkillCatalog' });
                     }
                     break;
                 case 'toggleSkillResult':
@@ -106,33 +141,29 @@ const SkillConfig: React.FC<SkillConfigProps> = ({ vscode }) => {
                         vscode.postMessage({ command: 'loadSkillsInfo' });
                     }
                     break;
-                case 'searchSkillHubResult':
-                    setHubLoading(false);
-                    setHubSearched(true);
+                case 'loadSkillCatalogResult':
+                    setCatalogLoading(false);
                     if (message.success) {
-                        setHubResults(message.data || []);
+                        setCatalog(message.data || []);
+                        setCatalogError(null);
                     } else {
-                        setHubResults([]);
+                        setCatalogError(message.message || '');
                     }
                     break;
-                case 'installSkillFromHubResult':
-                    setInstallingHubKeys(prev => {
-                        const next = new Set(prev);
-                        if (message.slug) {
-                            next.delete(`${message.slug}-project`);
-                            next.delete(`${message.slug}-user`);
-                        }
-                        return next;
-                    });
-                    if (message.success) {
-                        vscode.postMessage({ command: 'loadSkillsInfo' });
-                    }
+                case 'installCatalogSkillResult':
+                    clearBusy(`${message.id}-${message.scope}`);
+                    applyCatalogResult(message);
+                    break;
+                case 'uninstallCatalogSkillResult':
+                    clearBusy(`${message.id}-uninstall`);
+                    applyCatalogResult(message);
                     break;
             }
         };
 
         window.addEventListener('message', handleMessage);
         vscode.postMessage({ command: 'loadSkillsInfo' });
+        if (!IS_JB) loadCatalog();
 
         return () => {
             window.removeEventListener('message', handleMessage);
@@ -144,48 +175,31 @@ const SkillConfig: React.FC<SkillConfigProps> = ({ vscode }) => {
         vscode.postMessage({ command: 'refreshSkills' });
     };
 
-    const handleHubSearchChange = (value: string) => {
-        setHubSearch(value);
-        if (!value.trim()) {
-            setHubResults([]);
-            setHubSearched(false);
-            setHubLoading(false);
-        }
+    const handleInstallCatalog = (item: CatalogSkill, scope: 'project' | 'user') => {
+        setBusyKeys(prev => new Set(prev).add(`${item.id}-${scope}`));
+        vscode.postMessage({ command: 'installCatalogSkill', id: item.id, scope });
     };
 
-    const handleHubSearchSubmit = () => {
-        if (!hubSearch.trim()) {
-            setHubResults([]);
-            setHubSearched(false);
-            setHubLoading(false);
-            return;
-        }
-        setHubLoading(true);
-        vscode.postMessage({ command: 'searchSkillHub', query: hubSearch.trim() });
+    const handleUninstallCatalog = (item: CatalogSkill) => {
+        setBusyKeys(prev => new Set(prev).add(`${item.id}-uninstall`));
+        vscode.postMessage({ command: 'uninstallCatalogSkill', id: item.id });
     };
 
-    const handleInstallFromHub = (slug: string, scope: 'project' | 'user') => {
-        setInstallingHubKeys(prev => new Set(prev).add(`${slug}-${scope}`));
-        vscode.postMessage({ command: 'installSkillFromHub', slug, scope });
-    };
-
-    const installedSlugs = useMemo(() => {
-        const slugs = new Set<string>();
-        skills.forEach(s => {
-            // 内置 skill 可被同名用户级/项目级覆盖，不算已安装
-            if (s.locate === 'builtin') return;
-            slugs.add(s.name);
-            if (s.filePath) {
-                // filePath 形如 /xxx/.sema/skills/pptx-2/SKILL.md，提取目录名作为 slug
-                const parts = s.filePath.replace(/\\/g, '/').split('/');
-                const skillMdIndex = parts.findIndex(p => p.toUpperCase() === 'SKILL.MD');
-                if (skillMdIndex > 0) {
-                    slugs.add(parts[skillMdIndex - 1]);
-                }
-            }
-        });
-        return slugs;
-    }, [skills]);
+    // 市场：本地按名称 / 描述 / id 过滤，再按分类分组（宿主已按 card.order 排好组内顺序）
+    const marketGroups = useMemo(() => {
+        const q = marketQuery.trim().toLowerCase();
+        const filtered = (catalog || []).filter(i => !q
+            || i.name.toLowerCase().includes(q)
+            || i.description.toLowerCase().includes(q)
+            || i.id.toLowerCase().includes(q)
+            || i.skillName.toLowerCase().includes(q));
+        return CATEGORY_ORDER
+            .map(key => ({
+                key,
+                items: filtered.filter(i => (CATEGORY_ORDER.includes(i.category || '') ? i.category : 'other') === key),
+            }))
+            .filter(g => g.items.length > 0);
+    }, [catalog, marketQuery]);
 
     const toggleDescriptionExpand = (skillKey: string) => {
         setExpandedDescriptions(prev => {
@@ -301,6 +315,129 @@ const SkillConfig: React.FC<SkillConfigProps> = ({ vscode }) => {
         );
     };
 
+    const renderMarketCard = (item: CatalogSkill) => {
+        const installed = item.installedUser || item.installedProject;
+        const installingProject = busyKeys.has(`${item.id}-project`);
+        const installingUser = busyKeys.has(`${item.id}-user`);
+        const uninstalling = busyKeys.has(`${item.id}-uninstall`);
+        const installedTip = [
+            item.installedUser ? t('config.skill.installedUser') : '',
+            item.installedProject ? t('config.skill.installedProject') : '',
+        ].filter(Boolean).join(' / ');
+        const description = item.description || t('common.noDescription');
+        return (
+            <div key={item.id} className="skill-market-card">
+                <div className="skill-market-head">
+                    <div className="section-card-icon" style={{ backgroundColor: getColorByName(item.name) }}>
+                        {getSkillInitial(item.name)}
+                    </div>
+                    <div className="skill-market-title">
+                        <span className="skill-market-name" title={item.name}>{item.name}</span>
+                        {item.skillName && item.skillName !== item.name && (
+                            <span className="skill-market-sub" title={item.skillName}>{item.skillName}</span>
+                        )}
+                    </div>
+                </div>
+                <div className="skill-market-desc" title={description}>{description}</div>
+                <div className="skill-market-foot">
+                    {item.repoUrl && (
+                        <a
+                            href="#"
+                            className="skill-market-repo"
+                            title={item.repoUrl}
+                            onClick={(e) => { e.preventDefault(); vscode.postMessage({ command: 'openExternal', url: item.repoUrl }); }}
+                        >
+                            <GitHubIcon size={12} />
+                            <span>{item.repo}</span>
+                        </a>
+                    )}
+                    <span className="skill-market-spacer" />
+                    {installed ? (
+                        <div className="skill-market-installed">
+                            <span className="section-installed-badge" title={installedTip}>{t('common.installed')}</span>
+                            <button
+                                className="section-icon-btn section-icon-btn-danger"
+                                title={t('config.skill.uninstall')}
+                                disabled={uninstalling}
+                                onClick={() => handleUninstallCatalog(item)}
+                            >
+                                {uninstalling ? <span className="spinner" /> : <TrashIcon size={14} />}
+                            </button>
+                        </div>
+                    ) : (
+                        <div className="section-install-btns">
+                            <button
+                                className={`section-btn secondary small ${installingProject ? 'btn-loading' : ''}`}
+                                onClick={() => handleInstallCatalog(item, 'project')}
+                                title={t('common.installToProjectTip')}
+                                disabled={installingProject || installingUser}
+                            >
+                                {installingProject && <span className="spinner" />}
+                                {t('common.installProject')}
+                            </button>
+                            <button
+                                className={`section-btn primary small ${installingUser ? 'btn-loading' : ''}`}
+                                onClick={() => handleInstallCatalog(item, 'user')}
+                                title={t('common.installToUserTip')}
+                                disabled={installingProject || installingUser}
+                            >
+                                {installingUser && <span className="spinner" />}
+                                {t('common.installUser')}
+                            </button>
+                        </div>
+                    )}
+                </div>
+            </div>
+        );
+    };
+
+    const renderMarket = () => {
+        const hasQuery = !!marketQuery.trim();
+        let body: React.ReactNode;
+        if (!catalog && catalogLoading) {
+            body = <div className="section-loading">{t('common.loading')}</div>;
+        } else if (!catalog && catalogError !== null) {
+            body = (
+                <div className="skill-market-error">
+                    <span>Failed to load: {catalogError}</span>
+                    <button className="section-btn secondary small" onClick={loadCatalog}>Retry</button>
+                </div>
+            );
+        } else if (marketGroups.length === 0) {
+            body = <div className="section-empty">{hasQuery ? t('config.skill.noMatch') : t('config.skill.marketEmpty')}</div>;
+        } else {
+            body = (
+                <div className="section-groups">
+                    {marketGroups.map(g => (
+                        <div key={g.key} className="section-group">
+                            <div className="section-group-title">
+                                {t(CATEGORY_TITLE_KEYS[g.key])}
+                                <span className="section-group-count">({g.items.length})</span>
+                            </div>
+                            <div className="skill-market-grid">
+                                {g.items.map(renderMarketCard)}
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            );
+        }
+        return (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                <div className="section-search-box">
+                    <input
+                        type="text"
+                        className="section-search-input"
+                        placeholder={t('config.skill.hubSearchPlaceholder')}
+                        value={marketQuery}
+                        onChange={(e) => setMarketQuery(e.target.value)}
+                    />
+                </div>
+                {body}
+            </div>
+        );
+    };
+
     return (
         <div className="agent-config plugin-config">
             {/* Tab 导航 */}
@@ -323,7 +460,7 @@ const SkillConfig: React.FC<SkillConfigProps> = ({ vscode }) => {
                     </div>
                 )}
                 <div className="section-tab-actions">
-                    {activeTab === 'installed' && (
+                    {activeTab === 'installed' ? (
                         <button
                             className={`section-icon-btn ${isRefreshing ? 'btn-loading' : ''}`}
                             onClick={handleRefresh}
@@ -336,132 +473,28 @@ const SkillConfig: React.FC<SkillConfigProps> = ({ vscode }) => {
                                 <RefreshIcon size={14} />
                             )}
                         </button>
+                    ) : (
+                        <button
+                            className={`section-icon-btn ${catalogLoading ? 'btn-loading' : ''}`}
+                            onClick={loadCatalog}
+                            title={t('config.skill.refresh')}
+                            disabled={catalogLoading}
+                        >
+                            {catalogLoading ? (
+                                <span className="spinner" />
+                            ) : (
+                                <RefreshIcon size={14} />
+                            )}
+                        </button>
                     )}
                 </div>
             </div>
 
             {/* 内容 */}
             <div className="tab-content">
-                <div style={{ display: activeTab === 'hub' ? 'flex' : 'none', flexDirection: 'column', gap: '12px' }}>
-                    <div className="section-search-box" style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                        <input
-                            type="text"
-                            className="section-search-input"
-                            placeholder={t('config.skill.hubSearchPlaceholder')}
-                            value={hubSearch}
-                            onChange={(e) => handleHubSearchChange(e.target.value)}
-                            onKeyDown={(e) => { if (e.key === 'Enter') handleHubSearchSubmit(); }}
-                            style={{ flex: 1 }}
-                        />
-                        <button
-                            className={`section-btn primary small ${hubLoading ? 'btn-loading' : ''}`}
-                            onClick={handleHubSearchSubmit}
-                            disabled={hubLoading}
-                        >
-                            {hubLoading && <span className="spinner" />}
-                            {hubLoading ? t('config.skill.searching') : t('common.search')}
-                        </button>
-                    </div>
-                    {hubLoading ? (
-                        <div className="section-loading">{t('config.skill.searchingDots')}</div>
-                    ) : !hubSearched ? (
-                        <div className="section-empty" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', padding: '24px 16px' }}>
-                            <div>{t('config.skill.hubHint')}</div>
-                            <div style={{ fontSize: '12px', color: 'var(--vscode-descriptionForeground)', lineHeight: '1.6', textAlign: 'center', maxWidth: '360px' }}>
-                                {t('config.skill.hubDescription')}
-                            </div>
-                            <div style={{ fontSize: '12px', color: 'var(--vscode-descriptionForeground)', marginTop: '4px' }}>
-                                {t('config.skill.hubSourceLabel')}{' '}
-                                <a
-                                    href="#"
-                                    className="skillhub-source-link"
-                                    onClick={(e) => { e.preventDefault(); vscode.postMessage({ command: 'openExternal', url: skillHubConfig.homepageUrl }); }}
-                                >
-                                    {skillHubConfig.sourceName}
-                                </a>
-                            </div>
-                        </div>
-                    ) : hubResults.length === 0 ? (
-                        <div className="section-empty">{t('config.skill.noMatch')}</div>
-                    ) : (
-                        <div className="plugin-available-list" style={{ borderRadius: '8px', border: '1px solid var(--vscode-panel-border)' }}>
-                            {[...hubResults]
-                                .sort((a, b) => {
-                                    const aInstalled = installedSlugs.has(a.slug) ? 1 : 0;
-                                    const bInstalled = installedSlugs.has(b.slug) ? 1 : 0;
-                                    if (bInstalled !== aInstalled) return bInstalled - aInstalled;
-                                    return b.score - a.score;
-                                })
-                                .map((item) => {
-                                const isInstalled = installedSlugs.has(item.slug);
-                                const isInstallingProject = installingHubKeys.has(`${item.slug}-project`);
-                                const isInstallingUser = installingHubKeys.has(`${item.slug}-user`);
-                                return (
-                                    <div key={item.slug} className="plugin-available-card">
-                                        <div className="plugin-available-left">
-                                            <div
-                                                className="section-card-icon"
-                                                style={{ backgroundColor: getColorByName(item.slug), borderRadius: '50%', flexShrink: 0 }}
-                                            >
-                                                {item.displayName.charAt(0).toUpperCase()}
-                                            </div>
-                                            <div className="plugin-available-info">
-                                                <span className="plugin-available-name">{item.displayName}</span>
-                                                {item.version && (
-                                                    <span className="plugin-available-author">v{item.version}</span>
-                                                )}
-                                                {item.summary && (
-                                                    <span className="plugin-available-desc" title={item.summary}>{item.summary}</span>
-                                                )}
-                                            </div>
-                                        </div>
-                                        <div className="plugin-available-right">
-                                            {isInstalled ? (
-                                                <span className="section-installed-badge">{t('common.installed')}</span>
-                                            ) : (
-                                                <div className="section-install-btns">
-                                                    <button
-                                                        className={`section-btn secondary small ${isInstallingProject ? 'btn-loading' : ''}`}
-                                                        onClick={() => handleInstallFromHub(item.slug, 'project')}
-                                                        title={t('common.installToProjectTip')}
-                                                        disabled={isInstallingProject || isInstallingUser}
-                                                    >
-                                                        {isInstallingProject && <span className="spinner" />}
-                                                        {t('common.installProject')}
-                                                    </button>
-                                                    <button
-                                                        className={`section-btn primary small ${isInstallingUser ? 'btn-loading' : ''}`}
-                                                        onClick={() => handleInstallFromHub(item.slug, 'user')}
-                                                        title={t('common.installToUserTip')}
-                                                        disabled={isInstallingProject || isInstallingUser}
-                                                    >
-                                                        {isInstallingUser && <span className="spinner" />}
-                                                        {t('common.installUser')}
-                                                    </button>
-                                                </div>
-                                            )}
-                                        </div>
-                                    </div>
-                                );
-                            })}
-                        </div>
-                    )}
-                    {hubSearched && hubResults.length > 0 && !hubLoading && (
-                        <div style={{ textAlign: 'center', fontSize: '12px', color: 'var(--vscode-descriptionForeground)', marginTop: '4px' }}>
-                            {t('config.skill.hubSourceLabel')}{' '}
-                            <a
-                                href="#"
-                                className="skillhub-source-link"
-                                onClick={(e) => { e.preventDefault(); vscode.postMessage({ command: 'openExternal', url: skillHubConfig.homepageUrl }); }}
-                            >
-                                {skillHubConfig.sourceName}
-                            </a>
-                        </div>
-                    )}
-                </div>
-                {activeTab !== 'hub' && loading ? (
+                {activeTab === 'hub' ? renderMarket() : loading ? (
                     <div className="section-loading">{t('common.loading')}</div>
-                ) : activeTab !== 'hub' ? (
+                ) : (
                     <div className="section-groups">
                         {LOCATE_ORDER.map(scope => {
                             const sectionSkills = groupedSkills[scope] || [];
@@ -501,7 +534,7 @@ const SkillConfig: React.FC<SkillConfigProps> = ({ vscode }) => {
                             );
                         })}
                     </div>
-                ) : null}
+                )}
             </div>
         </div>
     );

@@ -40,6 +40,8 @@ node_modules/**
 docs/**
 *.md
 !README.md
+# Skill 市场内置资源：本地目录形式的技能靠 SKILL.md 识别，不能被上面的 *.md 剔掉
+!resources/**/*.md
 
 # 测试文件
 test/**

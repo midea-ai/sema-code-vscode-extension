@@ -267,11 +267,15 @@ export class ConfigController {
                 // 写入哪层 settings 由 core 按技能所在层决定；失败时 UI 收到 success:false 会重拉恢复真实状态
                 await this.respond('toggleSkillResult', () => (m.enabled ? this.core.enableSkill(m.name) : this.core.disableSkill(m.name)), (data) => ({ data }));
                 break;
-            case 'searchSkillHub':
-                this.postToApp({ command: 'searchSkillHubResult', success: false, data: [], message: t('host.cfg.jbNoSkillHubSearch') });
+            // Skill 市场（内置资源目录）JB 侧尚未实现，页面已隐藏该 tab，这里兜底回失败
+            case 'loadSkillCatalog':
+                this.postToApp({ command: 'loadSkillCatalogResult', success: false, data: [], message: 'Skill market is not supported in the JetBrains edition yet' });
                 break;
-            case 'installSkillFromHub':
-                this.postToApp({ command: 'installSkillFromHubResult', success: false, slug: m.slug, message: t('host.cfg.jbNoSkillHubInstall') });
+            case 'installCatalogSkill':
+                this.postToApp({ command: 'installCatalogSkillResult', success: false, id: m.id, scope: m.scope, message: 'Skill market is not supported in the JetBrains edition yet' });
+                break;
+            case 'uninstallCatalogSkill':
+                this.postToApp({ command: 'uninstallCatalogSkillResult', success: false, id: m.id, message: 'Skill market is not supported in the JetBrains edition yet' });
                 break;
 
             // ─── Commands ──────────────────────────────────────────────
