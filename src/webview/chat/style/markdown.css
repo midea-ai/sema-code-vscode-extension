@@ -41,13 +41,13 @@
 }
 
 /* 文件路径内联代码样式 - 可点击的文件路径：前置文件类型图标，悬停下划线 */
-/* 字号/字体与输入框文件芯片统一：13px 界面字体；文件名用 VS Code 链接高亮色，图标保持文件类型色 */
+/* 规格同 webui md-file：字号继承正文（与文件芯片一致），界面字体；文件名用 VS Code 链接高亮色，图标保持文件类型色 */
 .markdown-content .file-path-code {
   color: var(--chat-text-link);
   background: none;
   padding: 0;
   font-family: var(--vscode-font-family);
-  font-size: var(--chat-font-md);
+  font-size: inherit;
   cursor: pointer;
   text-decoration: none;
 }
@@ -57,17 +57,16 @@
 }
 
 /* 文件类型图标（verifyFilePath 确认后由 AiResponseBlock 动态插入，SVG 走 currentColor）
-   尺寸与 @ 文件面板 / 输入框芯片同一套：18px 盒 + scale 1.1 + 提亮；用 inline-block + vertical-align 居中，
+   规格同 webui：13px 盒 + scale 1.35（Seti 图形留白大）、不加滤镜，inline-block 按 -0.15em 基线偏移与文字对齐。
    不能用 inline-flex 包住整个链接：inline-flex 的对外基线取第一个 flex 子项，
    而图标 span 无文字、基线即底边，会把文件名整体抬高，与前后正文错位 */
 .markdown-content .md-file-icon {
   display: inline-block;
-  width: 18px;
-  height: 18px;
-  vertical-align: middle;
-  margin-right: 4px;
-  filter: contrast(1.2) saturate(1.1);
-  transform: scale(1.1);
+  width: 13px;
+  height: 13px;
+  vertical-align: -0.15em;
+  margin-right: 0.3em;
+  transform: scale(1.35);
 }
 
 .markdown-content .md-file-icon svg {

@@ -138,23 +138,17 @@
     background-color: var(--chat-bg-list-hover);
 }
 
-/* 选中项样式（键盘导航） */
+/* 选中项（键盘导航）：只换浅色背景，名字 / 描述 / 路径颜色不变（对齐 webui） */
 .shortcut-panel-item.selected {
-    background-color: var(--chat-bg-list-active);
-    color: var(--chat-text-list-active);
+    background-color: var(--chat-bg-list-selected);
 }
 
-.shortcut-panel-item.selected .shortcut-command,
-.shortcut-panel-item.selected .shortcut-desc {
-    color: var(--chat-text-list-active);
-}
-
-/* / 符号高亮 */
+/* / 符号：浅色不加粗，与命令名留间距 */
 .shortcut-slash {
     flex-shrink: 0;
     font-size: var(--chat-font-md);
-    font-weight: bold;
-    color: var(--chat-text-link);
+    color: var(--chat-text-secondary);
+    margin-right: 6px;
 }
 
 /* 命令名称正常颜色 */
@@ -167,11 +161,12 @@
     /* 与描述之间的间距 */
 }
 
-/* 描述文本灰色 */
+/* 描述文本：次要色再降 30% 透明度（webui text-muted/70），文件面板路径同规格 */
 .shortcut-desc {
     flex: 1;
     font-size: var(--chat-font-base);
     color: var(--chat-text-secondary);
+    opacity: 0.7;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -294,24 +289,25 @@
 /* @文件 mention：原子标签（contentEditable=false），内容为「文件图标 + 文件名」芯片；
    不加 user-select:none —— 全选时 Range.toString() 需包含标签文本，否则全选删除判定失效 */
 .file-mention {
-    display: inline-flex;
-    vertical-align: middle;
+    display: inline-block;
+    vertical-align: top;
     margin: 0 1px;
     cursor: pointer;
 }
 
 /* 文件引用芯片（输入框 mention + 用户气泡共用）：图标与文字同用链接强调色、无底色。
-   字号/字体/图标尺寸与 @ 文件面板一行（.file-picker-item）完全一致：13px 界面字体 + 18px 图标 */
+   规格与对齐方式同 webui FileRefChip：字号/字体继承正文、名字 500 字重；
+   高度取整行行高（1lh）并 vertical-align: top 贴满行框，图标与文字在行框内 flex 居中，
+   与父级文字的垂直位置一致（middle 按 x-height 算会偏高；字号不继承则 1lh 与正文行高不等） */
 .file-ref-chip {
     display: inline-flex;
     align-items: center;
     gap: 4px;
+    height: 1lh;
     max-width: 100%;
-    vertical-align: middle;
+    vertical-align: top;
     color: var(--chat-text-link);
-    font-family: var(--vscode-font-family);
-    font-size: var(--chat-font-md);
-    font-weight: 400;
+    font-weight: 500;
     white-space: nowrap;
 }
 
@@ -324,18 +320,26 @@
     text-underline-offset: 2px;
 }
 
-/* 与 FileIcon 组件的内联样式同一套（18px 盒 + scale 1.1 + 提亮），输入框里的原生 svg 芯片靠此规则对齐。
-   color: inherit 只对输入框芯片生效（图标随文字用链接高亮色）；气泡里的 FileIcon 组件有内联文件类型色，优先级更高 */
+/* 图标盒 15px，同 webui FileIcon：Seti 文件图形在 viewBox 里留白大，文件放大 1.35 补偿、不加对比度滤镜；
+   folder 图形本身占满，不放大、内缩 1px。color: inherit 只对输入框芯片生效（随文字用链接高亮色）；
+   气泡里的芯片图标带内联文件类型色，优先级更高 */
 .file-ref-icon {
     display: inline-flex;
     align-items: center;
     justify-content: center;
     flex-shrink: 0;
-    width: 18px;
-    height: 18px;
+    box-sizing: border-box;
+    width: 15px;
+    height: 15px;
     color: inherit;
-    filter: contrast(1.2) saturate(1.1);
-    transform: scale(1.1);
+}
+
+.file-ref-icon-file {
+    transform: scale(1.35);
+}
+
+.file-ref-icon-folder {
+    padding: 1px;
 }
 
 .file-ref-icon svg {
@@ -352,18 +356,18 @@
 
 /* 技能标签（斜杠面板 / 输入框开头 / 用户气泡开头共用）：图标 + 同色名字，无底色；尺寸规格同文件芯片 */
 .skill-mention {
-    display: inline-flex;
-    vertical-align: middle;
+    display: inline-block;
+    vertical-align: top;
     margin: 0 1px;
 }
 
+/* 规格与对齐方式同文件芯片（webui SkillLabel）：字号继承正文，高度取整行行高并 vertical-align: top，图标与名字在行框内居中 */
 .skill-label {
     display: inline-flex;
     align-items: center;
     gap: 4px;
-    vertical-align: middle;
-    font-family: var(--vscode-font-family);
-    font-size: var(--chat-font-md);
+    height: 1lh;
+    vertical-align: top;
     white-space: nowrap;
 }
 
@@ -1056,23 +1060,20 @@ svg.provider-logo-openrouter {
     padding: 2px 0;
 }
 
-/* 气泡：顶部单独一行，样式与输入框一致 */
-.user-input-images {
+/* 气泡：图片一行、粘贴一行，芯片样式与输入框一致；气泡窄时自动折成多行，不横向滚动 */
+.user-input-images,
+.user-input-pastes {
     display: flex;
-    flex-wrap: nowrap;
+    flex-wrap: wrap;
     align-items: center;
     gap: 6px;
-    overflow-x: auto;
-    overflow-y: hidden;
     margin-bottom: 6px;
 }
 
-.image-thumb-strip::-webkit-scrollbar,
-.user-input-images::-webkit-scrollbar {
+.image-thumb-strip::-webkit-scrollbar {
     height: 4px;
 }
-.image-thumb-strip::-webkit-scrollbar-thumb,
-.user-input-images::-webkit-scrollbar-thumb {
+.image-thumb-strip::-webkit-scrollbar-thumb {
     background: var(--chat-border-input);
     border-radius: 2px;
 }
@@ -1175,9 +1176,14 @@ svg.provider-logo-openrouter {
     color: var(--chat-text-primary);
 }
 
-/* ─── 超长粘贴芯片（输入框附件条，与图片缩略图同款） ───────────────── */
+/* ─── 超长粘贴芯片（输入框附件条与气泡共用，与图片缩略图同款） ───────────────── */
 .paste-chip {
     cursor: default;
+}
+
+/* 气泡里的粘贴芯片可点击（在编辑器打开转存文件） */
+.user-input-pastes .paste-chip {
+    cursor: pointer;
 }
 
 .paste-chip-icon {

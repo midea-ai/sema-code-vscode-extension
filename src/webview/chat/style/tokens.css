@@ -56,6 +56,8 @@
     --chat-bg-panel-header: var(--vscode-panel-sectionHeader-background);
     --chat-bg-list-hover: var(--vscode-list-hoverBackground);
     --chat-bg-list-active: var(--vscode-list-activeSelectionBackground);
+    /* 输入框弹层（命令 / 文件面板）的键盘选中行：浅色不改前景，不用 activeSelection 的高亮蓝底白字 */
+    --chat-bg-list-selected: var(--vscode-list-inactiveSelectionBackground, var(--chat-bg-list-hover));
     --chat-bg-button: var(--vscode-button-background);
     --chat-bg-button-hover: var(--vscode-button-hoverBackground);
     --chat-bg-button-secondary: var(--vscode-button-secondaryBackground, #5a5a5a);

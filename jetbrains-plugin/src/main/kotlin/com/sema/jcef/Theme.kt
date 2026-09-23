@@ -66,6 +66,8 @@ object Theme {
         v("list-hoverBackground", hex(hoverBg))
         v("list-activeSelectionBackground", hex(selBg))
         v("list-activeSelectionForeground", hex(selFg))
+        // 输入框弹层的键盘选中行：hoverBg 已是 IDE 的非焦点选中色，再用前景色低透明叠加区分于 hover，不改文字色
+        v("list-inactiveSelectionBackground", rgba(fg, 0.1))
         v("panel-border", hex(border))
         v("focusBorder", hex(border))
         v("contrastBorder", hex(border))

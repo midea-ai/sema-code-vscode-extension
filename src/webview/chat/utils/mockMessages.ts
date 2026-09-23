@@ -16,7 +16,7 @@ import {
 } from '../../../utils/tool';
 
 /** 手动切换预览范围：null = 全部，['xx'] = 指定组件，[] = 关闭 */
-export const PREVIEW_COMPONENTS: string[] | null = ['UserInputPaste', 'UserInputSkill', 'VizEmbed'];
+export const PREVIEW_COMPONENTS: string[] | null = [];
 
 let id = 0;
 const nextId = () => `mock-${++id}`;
@@ -908,7 +908,7 @@ export function getPreviewMessages(): Message[] {
 export const mockDialogMap: Record<string, any[]> = {
     VizEmbed: [
         {
-            path: '/Users/zhoujie195/.sema/attachments/b58410b0-abcf-4733-bb2e-649fd8d8b15e/product-metrics-demo.html',
+            path: '/Users/zhoujie195/.sema/attachments/ed5ed36e-15e6-4503-8e46-473d9a384867/compound-interest-simulator.html',
         },
     ],
     ProcessingSpinner: [

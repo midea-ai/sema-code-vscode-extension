@@ -3,7 +3,7 @@
  * 输入框（mention span）与用户气泡共用。只影响显示，发给 core 的文本仍是原始 `@...` 字面量。
  */
 import React from 'react';
-import FileIcon, { getFileIconHtml } from '../components/ui/FileIcon';
+import { getFileIconHtml } from '../components/ui/FileIcon';
 
 /** 与 core util/fileReference 的解析正则一致：@ 前须为行首或边界字符，引用体为双引号串或连续非边界字符 */
 const BOUNDARY = '\\s。，、；：！？“”‘’「」『』（）《》〈〉【】,;!?';
@@ -63,12 +63,20 @@ export function refLabel(path: string, isDirectory: boolean, line?: number, endL
     return line ? `${name}:${line}${endLine ? `-${endLine}` : ''}` : name;
 }
 
+/** 芯片图标的 svg 与类名（尺寸 / 放大规则由 .file-ref-icon-file / -folder 给出，同 webui FileIcon：文件放大 1.35，目录不放大） */
+function refIcon(path: string, isDirectory: boolean) {
+    const { svg, color } = getFileIconHtml(path.split(/[\\/]/).pop() || path, isDirectory);
+    return { svg, color, className: `file-icon file-ref-icon ${isDirectory ? 'file-ref-icon-folder' : 'file-ref-icon-file'}` };
+}
+
 /**
  * 图标 + 文件名，内联在文字中（无底色）；有 onOpen 时可点击。
  * 用户气泡里用：文件名走链接高亮色，图标保持文件类型色（与 chat 正文文件链接一致）；
  * 只有输入框芯片（buildMentionChipHtml）把图标与文字统一成链接高亮色。
+ * 不用 FileIcon 组件是为了避开其内联的 scale(1.1)+contrast 滤镜，与输入框 HTML 路径结构完全一致。
  */
 export function FileRefChip({ seg, onOpen }: { seg: RefSegment; onOpen?: (seg: RefSegment) => void }) {
+    const icon = refIcon(seg.path, seg.isDirectory);
     return (
         <span
             className={`file-ref-chip${onOpen ? ' clickable' : ''}`}
@@ -76,7 +84,7 @@ export function FileRefChip({ seg, onOpen }: { seg: RefSegment; onOpen?: (seg: R
             onMouseDown={onOpen ? e => { e.preventDefault(); e.stopPropagation(); } : undefined}
             onClick={onOpen ? e => { e.stopPropagation(); onOpen(seg); } : undefined}
         >
-            <FileIcon fileName={seg.path} isDirectory={seg.isDirectory} size={18} className="file-ref-icon" />
+            <span className={icon.className} style={{ color: icon.color }} dangerouslySetInnerHTML={{ __html: icon.svg }} />
             <span className="file-ref-name">{refLabel(seg.path, seg.isDirectory, seg.line, seg.endLine)}</span>
         </span>
     );
@@ -84,11 +92,9 @@ export function FileRefChip({ seg, onOpen }: { seg: RefSegment; onOpen?: (seg: R
 
 const escapeHtml = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
-/** 输入框 mention span 的内部 HTML（非 React DOM）：与 FileRefChip 同一套结构与类名 */
+/** 输入框 mention span 的内部 HTML（非 React DOM）：与 FileRefChip 同一套结构与类名，图标不设类型色、随文字用链接色 */
 export function buildMentionChipHtml(m: { path: string; isDirectory?: boolean; startLine?: number; endLine?: number }): string {
-    const { svg } = getFileIconHtml(m.path.split(/[\\/]/).pop() || m.path, !!m.isDirectory);
+    const icon = refIcon(m.path, !!m.isDirectory);
     const label = refLabel(m.path, !!m.isDirectory, m.startLine, m.endLine);
-    // 与 FileIcon 组件一致：folder 图形本身占满，缩到 14px；其余 18px 由 .file-ref-icon 规则给出
-    const iconStyle = m.isDirectory ? ' style="width:14px;height:14px"' : '';
-    return `<span class="file-ref-chip"><span class="file-icon file-ref-icon"${iconStyle}>${svg}</span><span class="file-ref-name">${escapeHtml(label)}</span></span>`;
+    return `<span class="file-ref-chip"><span class="${icon.className}">${icon.svg}</span><span class="file-ref-name">${escapeHtml(label)}</span></span>`;
 }
