@@ -3,7 +3,7 @@
     "name": "结构化头脑风暴",
     "description": "Superpowers 核心技能：先发散再收敛，产出可执行方案而非泛泛而谈。",
     "category": "dev",
-    "order": 10
+    "order": 30
   },
   "source": {
     "repo": "obra/superpowers",
