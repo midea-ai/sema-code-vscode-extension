@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { VscodeApi, FileChange, DiffContent } from '../../types';
-import { ToggleIcon } from '../../components/ui/IconButton';
-import FileIcon from '../../components/ui/FileIcon';
+import { PencilIcon } from '../../components/ui/IconButton';
+import { getFileIconHtml } from '../../components/ui/FileIcon';
+import ToolRowHeader from './ToolRowHeader';
 import { ToolContent } from '../../types';
-import UpdateCodeDiff from '../../components/ui/UpdateCodeDiff';
+import CollapsibleDiff from '../../components/ui/CollapsibleDiff';
+import { countDiffChanges } from '../../utils/diffParser';
 import { hasTextSelection } from '../../utils/selection';
 import { useT } from '../../../common/i18n/react';
 
@@ -12,18 +14,23 @@ interface NotebookEditBlockProps {
     vscode: VscodeApi;
     onFileChange?: (change: FileChange) => void;
     language?: string;
+    /** 是否位于最后一轮；出现下一条用户输入后自动折叠 */
+    inLastTurn?: boolean;
 }
 
 const NotebookEditBlock: React.FC<NotebookEditBlockProps> = React.memo(({
     content: toolContent,
     vscode,
     onFileChange,
-    language = 'python'
+    language = 'python',
+    inLastTurn = true
 }) => {
     const t = useT();
     const { title, summary, content } = toolContent;
 
-    const [isExpanded, setIsExpanded] = useState(true);
+    // null = 用户未手动操作过，展开状态跟随「是否位于最后一轮」；手动操作后钉住用户设的状态
+    const [manualExpanded, setManualExpanded] = useState<boolean | null>(null);
+    const isExpanded = manualExpanded ?? inLastTurn;
 
     const parsedContent = useMemo(() => {
         // 解析 title，格式可能是 "example.ipynb cell:4" 或纯文件名 "example.ipynb"
@@ -43,11 +50,9 @@ const NotebookEditBlock: React.FC<NotebookEditBlockProps> = React.memo(({
 
         // 解析 diff 内容
         let diffContent: DiffContent | null = null;
-        let isNewFile = false;
 
         if (typeof content === 'object' && content !== null && ((content as any).type === 'diff' || (content as any).type === 'new')) {
             diffContent = content as DiffContent;
-            isNewFile = (content as any).type === 'new';
         } else if (typeof content === 'string' && content.trim()) {
             // content 是字符串时（cell 原始内容），转换为 new 类型的 diff 格式
             const contentLines = content.split('\n');
@@ -62,20 +67,34 @@ const NotebookEditBlock: React.FC<NotebookEditBlockProps> = React.memo(({
                 }],
                 diffText: ''
             };
-            isNewFile = true;
+        }
+
+        // 通过 diffParser 计算增减行数
+        let additions = 0;
+        let removals = 0;
+        if (diffContent) {
+            const { addedCount, removedCount } = countDiffChanges(diffContent);
+            additions = addedCount;
+            removals = removedCount;
         }
 
         return {
             fileName,
             cellNum,
             diffContent,
-            isNewFile,
+            additions,
+            removals,
         };
     }, [title, summary, content]);
 
-    const { fileName, cellNum, diffContent, isNewFile } = parsedContent;
+    const { fileName, cellNum, diffContent, additions, removals } = parsedContent;
 
-    const displayFileName = fileName;
+    const displayFileName = useMemo(() => {
+        return fileName.split('/').pop() || fileName;
+    }, [fileName]);
+
+    // 文件类型图标（SVG 来自内置常量，可直接 innerHTML），与 EditBlock 同色同规格
+    const fileIcon = useMemo(() => getFileIconHtml(displayFileName), [displayFileName]);
 
     const reportFileChange = useCallback(() => {
         if (onFileChange && fileName) {
@@ -112,7 +131,7 @@ const NotebookEditBlock: React.FC<NotebookEditBlockProps> = React.memo(({
     }, [diffContent]);
 
     const handleToggle = useCallback(() => {
-        setIsExpanded(!isExpanded);
+        setManualExpanded(!isExpanded);
     }, [isExpanded]);
 
     const handleShowDiff = useCallback((e: React.MouseEvent) => {
@@ -142,32 +161,43 @@ const NotebookEditBlock: React.FC<NotebookEditBlockProps> = React.memo(({
     }
 
     return (
-        <div className="chat-block edit-block">
-            <div className="chat-block-header edit-block-header" onClick={handleHeaderClick}>
-                <div className="edit-title-left" onClick={handleShowDiff}>
-                    <FileIcon
-                        fileName={displayFileName}
-                        isDirectory={false}
-                        size={18}
-                    />
-                    <span className="file-name">{displayFileName}</span>
-                    <span className="edit-stats">
-                        {cellNum >= 0 && (
-                            <span className="cell-info">cell:{cellNum}</span>
+        <div className="chat-block chat-block--borderless edit-block">
+            {/* 行头与 EditBlock 同规格：[铅笔] 已编辑 [文件类型图标] 路径 cell:n +a -b；仅路径可点打开 diff，整行点击折叠 */}
+            <ToolRowHeader
+                icon={<PencilIcon />}
+                verb={t('tool.edited')}
+                target={(
+                    <>
+                        <span className="edit-file-icon" style={{ color: fileIcon.color }} dangerouslySetInnerHTML={{ __html: fileIcon.svg }} />
+                        <span className="edit-file-path">{String.fromCharCode(0x200e) + fileName}</span>
+                    </>
+                )}
+                targetTitle={fileName}
+                onTargetClick={handleShowDiff}
+                extra={(
+                    <>
+                        {/* cell:n 只作文字，不参与链接悬浮与点击 */}
+                        <span className="cell-info">cell:{cellNum}</span>
+                        {(additions > 0 || removals > 0) && (
+                            <span className="edit-stats">
+                                {additions > 0 && <span className="additions">+{additions}</span>}
+                                {removals > 0 && <span className="removals">-{removals}</span>}
+                            </span>
                         )}
-                    </span>
-                </div>
-                <div className="edit-toggle-btn">
-                    <ToggleIcon isExpanded={isExpanded} />
-                </div>
-                <div className="edit-spacer"></div>
-                <div className="edit-copy-btn" onClick={(e) => { e.stopPropagation(); handleCopy(); }}>
-                    {t('common.copy')}
-                </div>
-            </div>
+                    </>
+                )}
+                expandable
+                isExpanded={isExpanded}
+                onClick={handleHeaderClick}
+                className="edit-block-header"
+                right={<div className="edit-copy-btn" onClick={(e) => { e.stopPropagation(); handleCopy(); }}>{t('common.copy')}</div>}
+            />
             {isExpanded && (
-                <div className={`chat-block-content edit-block-content ${isNewFile ? 'new-file' : ''}`}>
-                    <UpdateCodeDiff diffContent={diffContent} language={language} />
+                <div className="chat-block-content edit-block-content" onClick={handleShowDiff}>
+                    <CollapsibleDiff
+                        diffContent={diffContent}
+                        language={language}
+                    />
                 </div>
             )}
         </div>

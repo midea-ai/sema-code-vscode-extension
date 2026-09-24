@@ -978,6 +978,7 @@ const ChatSession: React.FC<ChatSessionProps> = ({ vscode: rawVscode, sessionId,
                                 processingState={processingState}
                                 onFork={handleFork}
                                 isLastMessage={message.id === lastMessageId}
+                                inLastTurn={gi === groups.length - 1}
                                 canBranch={branchMessageIds.has(message.id)}
                                 onBranch={handleBranch}
                             />

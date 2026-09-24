@@ -15,17 +15,22 @@ interface EditBlockProps {
     content: ToolContent;
     vscode: VscodeApi;
     onFileChange?: (change: FileChange) => void;
+    /** 是否位于最后一轮；出现下一条用户输入后自动折叠 */
+    inLastTurn?: boolean;
 }
 
 const EditBlock: React.FC<EditBlockProps> = React.memo(({
     content: toolContent,
     vscode,
-    onFileChange
+    onFileChange,
+    inLastTurn = true
 }) => {
     const t = useT();
     const { toolName, title, content } = toolContent;
 
-    const [isExpanded, setIsExpanded] = useState(true);
+    // null = 用户未手动操作过，展开状态跟随「是否位于最后一轮」；手动操作后钉住用户设的状态
+    const [manualExpanded, setManualExpanded] = useState<boolean | null>(null);
+    const isExpanded = manualExpanded ?? inLastTurn;
 
     const parsedContent = useMemo(() => {
         let fileName = title || '';
@@ -113,7 +118,7 @@ const EditBlock: React.FC<EditBlockProps> = React.memo(({
     }, [diffContent]);
 
     const handleToggle = useCallback(() => {
-        setIsExpanded(!isExpanded);
+        setManualExpanded(!isExpanded);
     }, [isExpanded]);
 
     const handleShowDiff = useCallback((e: React.MouseEvent) => {

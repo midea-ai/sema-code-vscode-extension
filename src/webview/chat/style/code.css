@@ -133,7 +133,7 @@
     padding-right: 0;
 }
 
-/* 以下两条只作用于已改为无边框行头的 EditBlock（NotebookEditBlock 仍用旧的带边框容器，不受影响） */
+/* 以下几条作用于无边框行头的 EditBlock / NotebookEditBlock */
 
 /* 行头目标 = [文件类型图标] 路径：目标容器改 flex 容纳图标，省略逻辑下放到路径 span */
 .chat-block--borderless.edit-block .tool-row-target {
@@ -184,7 +184,7 @@
 }
 
 /* CollapsibleDiff：diff 不再内部滚动，改为内容整体折叠 + 底部渐隐 + 左下角「展开/收起」。
-   仅作用于被 CollapsibleDiff 包裹的 diff（EditBlock / 权限弹窗），不影响其他 UpdateCodeDiff（如 NotebookEditBlock）。 */
+   仅作用于被 CollapsibleDiff 包裹的 diff（EditBlock / NotebookEditBlock / 权限弹窗），不影响其他直接使用的 UpdateCodeDiff。 */
 .collapsible-diff .update-code-diff {
     max-height: none;
 }
@@ -221,9 +221,9 @@
     text-decoration: underline;
 }
 
+/* NotebookEditBlock 行头目标里的 cell 号：跟随文件名样式，路径过长时不被截断 */
 .cell-info {
-    color: var(--chat-color-warning);
-    font-weight: 500;
+    flex-shrink: 0;
 }
 
 /* 切换图标动画 */
