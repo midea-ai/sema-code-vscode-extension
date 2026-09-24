@@ -764,21 +764,19 @@ class EditorOps(
     }
 
     // ─── 可视化产物内联嵌入（对齐 VSCode utils/vizEmbed.ts）────────────────────
-    // attachments/<uuid>/<title>.html → <tmp>/sema-viz/<uuid>/<title>.html，</head> 前注入 viz-runtime <script>，原文件保持干净
+    // attachments/<uuid>/<title>.html → <tmp>/sema-viz/<uuid>/<title>.html，</head> 前把 viz-runtime 源码以内联 <script> 注入，原文件保持干净。
+    // 必须内联：webview 里的 iframe 沙箱不带 allow-same-origin（不透明源），Chromium 禁止它加载 file:// 子资源
+    //（外链 <script src="file:…/viz-runtime.js"> 会报 Not allowed to load local resource），页面能显示但 runtime 不跑：高度不上报、主题不切。
 
     private val vizPathRe = Regex("""[\\/]attachments[\\/][0-9a-f-]{36}[\\/][^\\/]+\.html?$""", RegexOption.IGNORE_CASE)
     private val vizInjectMaxBytes = 4L * 1024 * 1024
-    private var vizRuntimeFile: File? = null
+    private var vizRuntimeJs: String? = null
 
-    /** viz-runtime.js 从插件资源释放到临时目录（一次），返回 file:// url；资源缺失返回 null */
-    private fun vizRuntimeUrl(): String? {
-        vizRuntimeFile?.let { if (it.isFile) return it.toURI().toString() }
+    /** viz-runtime.js 源码从插件资源读一次并缓存；资源缺失返回 null */
+    private fun vizRuntimeJs(): String? {
+        vizRuntimeJs?.let { return it }
         val stream = javaClass.getResourceAsStream("/web/viz-runtime.js") ?: return null
-        val dir = File(File(System.getProperty("java.io.tmpdir"), "sema-viz"), "runtime").apply { mkdirs() }
-        val js = File(dir, "viz-runtime.js")
-        stream.use { input -> js.outputStream().use { input.copyTo(it) } }
-        vizRuntimeFile = js
-        return js.toURI().toString()
+        return stream.use { it.readBytes().toString(Charsets.UTF_8) }.also { vizRuntimeJs = it }
     }
 
     private fun prepareVizEmbed(p: String?, reqId: com.google.gson.JsonElement?) {
@@ -789,10 +787,11 @@ class EditorOps(
             val uuid = src.parentFile.name
             val dir = File(File(System.getProperty("java.io.tmpdir"), "sema-viz"), uuid).apply { mkdirs() }
             val out = File(dir, src.name)
-            val runtime = vizRuntimeUrl()
+            val runtime = vizRuntimeJs()
             if (runtime != null && src.length() <= vizInjectMaxBytes) {
                 val html = src.readText(Charsets.UTF_8)
-                val tag = "<script src=\"$runtime\"></script>"
+                // runtime 源码里的 </script 转义，避免提前闭合（同 VSCode prepareVizHtml）
+                val tag = "<script>" + runtime.replace(Regex("</script", RegexOption.IGNORE_CASE), Regex.escapeReplacement("<\\/script")) + "</script>"
                 val headRe = Regex("</head>", RegexOption.IGNORE_CASE)
                 out.writeText(if (headRe.containsMatchIn(html)) headRe.replaceFirst(html, Regex.escapeReplacement("$tag</head>")) else tag + html, Charsets.UTF_8)
             } else {
