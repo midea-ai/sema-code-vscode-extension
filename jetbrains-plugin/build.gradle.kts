@@ -78,8 +78,32 @@ val syncChromeAssets by tasks.registering(Copy::class) {
     into(layout.buildDirectory.dir("resources/main/assets/chrome"))
 }
 
+// 从主工程同步 Skill 市场资源（resources/skills）到 resources/assets/skills，与 VSCode 同源。
+// jar 内资源无法列目录，另生成 assets/skills-index.json（全部文件相对路径），供 SkillCatalogManager 扫描 / 逐个拷贝。
+val skillsSrcDir = layout.projectDirectory.dir("../resources/skills")
+val syncSkillAssets by tasks.registering(Copy::class) {
+    from(skillsSrcDir)
+    into(layout.buildDirectory.dir("resources/main/assets/skills"))
+}
+val genSkillIndex by tasks.registering {
+    val srcDir = skillsSrcDir.asFile
+    val indexFile = layout.buildDirectory.file("resources/main/assets/skills-index.json")
+    inputs.dir(skillsSrcDir)
+    outputs.file(indexFile)
+    doLast {
+        // 跳过与 Copy 默认排除一致的系统垃圾文件，避免清单里出现未打包的路径
+        val files = srcDir.walkTopDown()
+            .filter { it.isFile && it.name != ".DS_Store" && !it.name.startsWith("._") }
+            .map { it.relativeTo(srcDir).invariantSeparatorsPath }
+            .sorted()
+            .toList()
+        indexFile.get().asFile.apply { parentFile.mkdirs() }
+            .writeText(files.joinToString(",", "[", "]") { "\"" + it.replace("\\", "\\\\").replace("\"", "\\\"") + "\"" })
+    }
+}
+
 tasks.named("processResources") {
-    dependsOn(syncWeb, syncChromeAssets)
+    dependsOn(syncWeb, syncChromeAssets, syncSkillAssets, genSkillIndex)
 }
 
 // 打包产物直接落在 jetbrains-plugin/ 根下，省得进 build/distributions 深目录

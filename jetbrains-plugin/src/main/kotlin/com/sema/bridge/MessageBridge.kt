@@ -10,6 +10,7 @@ import com.intellij.openapi.vfs.LocalFileSystem
 import com.sema.config.SemaBundle
 import com.sema.config.SemaConfigVirtualFile
 import com.sema.config.SessionHistoryManager
+import com.sema.config.SkillCatalogManager
 import com.sema.config.SystemConfigManager
 import com.sema.editor.EditorOps
 import com.sema.sidecar.SidecarService
@@ -80,6 +81,7 @@ class MessageBridge(
                     "systemConfig" -> handleSystemConfig(obj)
                     "browserControl" -> handleBrowserControl(obj)
                     "fileOps" -> handleFileOps(obj)
+                    "skillCatalog" -> handleSkillCatalog(obj)
                     "history" -> handleHistory(obj)
                     "confirm" -> handleConfirm(obj)
                     // 跨面板深链（页面各持独立连接，pushToWeb 只能推自己面板，必须经总线）：
@@ -249,6 +251,36 @@ class MessageBridge(
                         emptyMap<String, Any?>()
                     }
                     else -> throw IllegalStateException("未知 fileOps op: $op")
+                }
+                replyEditor(reqId, data)
+            } catch (e: Exception) {
+                replyEditorError(reqId, e.message ?: e.toString())
+            }
+        }
+    }
+
+    /**
+     * Skill 市场（channel=editor, type=skillCatalog）：目录扫描与安装 / 卸载下沉到 SkillCatalogManager，
+     * 确认弹窗与 core 刷新由 config-controller 编排（对齐 VSCode configWebview 的 installCatalogSkill）。
+     * 远程安装要下载 zip，放池线程执行。
+     */
+    private fun handleSkillCatalog(obj: JsonObject) {
+        val reqId = obj.str("reqId")
+        val payload = runCatching { gson.fromJson(obj.str("payload"), JsonObject::class.java) }.getOrNull() ?: JsonObject()
+        val catalog = SkillCatalogManager.instance()
+        val root = project.basePath
+        ApplicationManager.getApplication().executeOnPooledThread {
+            try {
+                val data: Any = when (val op = payload.str("op")) {
+                    "list" -> mapOf("catalog" to catalog.listCatalog(root))
+                    "install" -> {
+                        val scope = payload.str("scope")
+                        val ok = catalog.install(payload.str("id"), scope, payload.get("overwrite")?.asBoolean == true, root)
+                        if (ok) refreshVfs(catalog.skillDir(scope, payload.str("id"), root))
+                        mapOf("needConfirm" to !ok)
+                    }
+                    "uninstall" -> mapOf("skillName" to catalog.uninstall(payload.str("id"), root))
+                    else -> throw IllegalStateException("未知 skillCatalog op: $op")
                 }
                 replyEditor(reqId, data)
             } catch (e: Exception) {

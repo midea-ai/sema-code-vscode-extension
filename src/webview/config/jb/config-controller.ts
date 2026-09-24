@@ -13,7 +13,8 @@ import type { ImportFs, ImportRoots, ImportSource, ImportItem } from '../import/
  * - A 类（纯 sema-core 方法）→ RemoteCore（gRPC），返回原始值后翻译成 UI 出站 command。
  * - System Config / disabledTools 的本地持久化 → Kotlin（t.callEditor('systemConfig'...)），core 推送仍在此走 RemoteCore。
  * - openFile / openExternal → 复用聊天已通的编辑器 channel。
- * - Claw / Skill Hub 在线安装 / 后台任务面板 → 后置，优雅降级避免 UI 卡住。
+ * - Skill Hub 目录扫描 / 安装落盘 → Kotlin（t.callEditor('skillCatalog'...)），确认与 core 刷新在此编排。
+ * - Claw / 后台任务面板 → 后置，优雅降级避免 UI 卡住。
  */
 
 // 仅落宿主本地、不推 sema-core 的系统配置键（对齐 semaProcessWrapper.LOCAL_SYSTEM_CONFIG_KEYS）
@@ -252,7 +253,7 @@ export class ConfigController {
                 await this.respond('removeAgentResult', () => this.core.removeAgentConf(m.name), (data) => ({ message: t('host.cfg.agentDeleted'), data }));
                 break;
 
-            // ─── Skills（读/删走 core；Hub 后置）──────────────────────────
+            // ─── Skills（读/删走 core；Hub 落盘走 Kotlin）──────────────────
             case 'loadSkillsInfo':
                 await this.respond('loadSkillsInfoResult', () => this.core.getSkillsInfo(), (data) => ({ data }));
                 break;
@@ -267,15 +268,21 @@ export class ConfigController {
                 // 写入哪层 settings 由 core 按技能所在层决定；失败时 UI 收到 success:false 会重拉恢复真实状态
                 await this.respond('toggleSkillResult', () => (m.enabled ? this.core.enableSkill(m.name) : this.core.disableSkill(m.name)), (data) => ({ data }));
                 break;
-            // Skill 市场（内置资源目录）JB 侧尚未实现，页面已隐藏该 tab，这里兜底回失败
+            // Skill 市场（内置资源目录）：扫描 / 落盘走 Kotlin（callEditor('skillCatalog')），确认与 core 刷新在此编排（对齐 VSCode configWebview）
             case 'loadSkillCatalog':
-                this.postToApp({ command: 'loadSkillCatalogResult', success: false, data: [], message: 'Skill market is not supported in the JetBrains edition yet' });
+                // 目录列表是纯本地扫描，不依赖 core
+                try {
+                    const r = await this.skillCatalog({ op: 'list' });
+                    this.postToApp({ command: 'loadSkillCatalogResult', success: true, data: r?.catalog ?? [] });
+                } catch (e: any) {
+                    this.postToApp({ command: 'loadSkillCatalogResult', success: false, data: [], message: e?.message || t('host.cfg.failed') });
+                }
                 break;
             case 'installCatalogSkill':
-                this.postToApp({ command: 'installCatalogSkillResult', success: false, id: m.id, scope: m.scope, message: 'Skill market is not supported in the JetBrains edition yet' });
+                await this.installCatalogSkill(m.id, m.scope);
                 break;
             case 'uninstallCatalogSkill':
-                this.postToApp({ command: 'uninstallCatalogSkillResult', success: false, id: m.id, message: 'Skill market is not supported in the JetBrains edition yet' });
+                await this.uninstallCatalogSkill(m.id);
                 break;
 
             // ─── Commands ──────────────────────────────────────────────
@@ -503,6 +510,55 @@ export class ConfigController {
 
     private findUserBrowserMcp(servers: any[]): any | undefined {
         return (servers ?? []).find(s => s?.config?.name === BROWSER_MCP_NAME && (s?.scope ?? s?.config?.scope) === 'user');
+    }
+
+    // ─── Skill 市场（editor channel，type=skillCatalog）────────────────────────
+
+    private skillCatalog(payload: Record<string, any>): Promise<any> { return this.t.callEditor('skillCatalog', payload); }
+
+    private async catalogName(id: string): Promise<string> {
+        const r = await this.skillCatalog({ op: 'list' });
+        return (r?.catalog ?? []).find((s: any) => s?.id === id)?.name || id;
+    }
+
+    /** 安装后一并带回最新目录与已安装 skills，页面不用再发两次请求（对齐 VSCode installCatalogSkill） */
+    private async installCatalogSkill(id: string, scope: string): Promise<void> {
+        try {
+            await this.ensureInit();
+            const r = await this.skillCatalog({ op: 'install', id, scope, overwrite: false });
+            if (r?.needConfirm) {
+                if (!await this.confirm(t('host.cfg.confirmOverwriteSkill', { name: await this.catalogName(id) }), t('host.cfg.overwrite'))) {
+                    this.postToApp({ command: 'installCatalogSkillResult', success: true, id, scope, cancelled: true });
+                    return;
+                }
+                await this.skillCatalog({ op: 'install', id, scope, overwrite: true });
+            }
+            const skills = await this.core.getSkillsInfo(true);
+            const catalog = (await this.skillCatalog({ op: 'list' }))?.catalog ?? [];
+            this.postToApp({ command: 'installCatalogSkillResult', success: true, id, scope, skills, catalog });
+        } catch (e: any) {
+            const message = t('host.cfg.opFailed', { op: t('host.cfg.op.installSkill'), error: e?.message || t('common.unknownError') });
+            this.postToApp({ command: 'installCatalogSkillResult', success: false, id, scope, message });
+        }
+    }
+
+    private async uninstallCatalogSkill(id: string): Promise<void> {
+        try {
+            await this.ensureInit();
+            if (!await this.confirm(t('host.cfg.confirmUninstallSkill', { name: await this.catalogName(id) }), t('config.skill.uninstall'))) {
+                this.postToApp({ command: 'uninstallCatalogSkillResult', success: true, id, cancelled: true });
+                return;
+            }
+            const r = await this.skillCatalog({ op: 'uninstall', id });
+            // 清掉禁用残留，否则重装后开关显示开、实际仍禁用；失败不阻塞卸载
+            try { if (r?.skillName) await this.core.enableSkill(r.skillName); } catch { /* ignore */ }
+            const skills = await this.core.getSkillsInfo(true);
+            const catalog = (await this.skillCatalog({ op: 'list' }))?.catalog ?? [];
+            this.postToApp({ command: 'uninstallCatalogSkillResult', success: true, id, skills, catalog });
+        } catch (e: any) {
+            const message = t('host.cfg.opFailed', { op: t('host.cfg.op.uninstallSkill'), error: e?.message || t('common.unknownError') });
+            this.postToApp({ command: 'uninstallCatalogSkillResult', success: false, id, message });
+        }
     }
 
     // ─── 导入：ImportFs 的 Kotlin 实现（editor channel，type=fileOps）──────────

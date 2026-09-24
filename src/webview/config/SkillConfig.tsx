@@ -57,9 +57,6 @@ const CATEGORY_TITLE_KEYS: Record<string, I18nKey> = {
 type SkillTabType = 'installed' | 'hub';
 
 const SkillConfig: React.FC<SkillConfigProps> = ({ vscode }) => {
-    // JB 插件尚未实现 Skill 市场安装，隐藏其标签页（VSCode 下 __SEMA_JB__ 为 undefined，行为不变）。
-    // 必须在组件内读取：模块顶层求值早于 jb-index 设置该标记，会恒为 false。
-    const IS_JB = !!(window as any).__SEMA_JB__;
     const t = useT();
     const [activeTab, setActiveTab] = useState<SkillTabType>('installed');
     const [skills, setSkills] = useState<SkillConfigItem[]>([]);
@@ -163,7 +160,7 @@ const SkillConfig: React.FC<SkillConfigProps> = ({ vscode }) => {
 
         window.addEventListener('message', handleMessage);
         vscode.postMessage({ command: 'loadSkillsInfo' });
-        if (!IS_JB) loadCatalog();
+        loadCatalog();
 
         return () => {
             window.removeEventListener('message', handleMessage);
@@ -451,14 +448,12 @@ const SkillConfig: React.FC<SkillConfigProps> = ({ vscode }) => {
                         <span className="section-tab-count">{skills.length}</span>
                     )}
                 </div>
-                {!IS_JB && (
-                    <div
-                        className={`tab-item ${activeTab === 'hub' ? 'active' : ''}`}
-                        onClick={() => setActiveTab('hub')}
-                    >
-                        SkillHub
-                    </div>
-                )}
+                <div
+                    className={`tab-item ${activeTab === 'hub' ? 'active' : ''}`}
+                    onClick={() => setActiveTab('hub')}
+                >
+                    SkillHub
+                </div>
                 <div className="section-tab-actions">
                     {activeTab === 'installed' ? (
                         <button
