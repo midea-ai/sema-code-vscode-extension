@@ -29,15 +29,6 @@ object Theme {
         val tipBg = UIUtil.getToolTipBackground()
         val tipFg = UIUtil.getToolTipForeground()
         val link = if (JBColor.isBright()) Color(0x00, 0x66, 0xCC) else Color(0x37, 0x94, 0xFF)
-        // chat 内 React diff 配色对齐 IDE 原生 diff 的词级模式（TextDiffTypeFactory）：
-        // 词级块 = DIFF_INSERTED/DIFF_DELETED 的背景主色；整行 = "ignored" 浅色 ——
-        // 配色方案在前景色字段显式定义了就用它，否则按 IDE 同款算法向编辑器背景混 60%。
-        val diffInsAttr = scheme.getAttributes(com.intellij.openapi.diff.DiffColors.DIFF_INSERTED)
-        val diffDelAttr = scheme.getAttributes(com.intellij.openapi.diff.DiffColors.DIFF_DELETED)
-        val diffInsBg = diffInsAttr?.backgroundColor
-        val diffDelBg = diffDelAttr?.backgroundColor
-        val diffInsLineBg = diffInsAttr?.foregroundColor ?: diffInsBg?.let { mix(it, editorBg, 0.6) }
-        val diffDelLineBg = diffDelAttr?.foregroundColor ?: diffDelBg?.let { mix(it, editorBg, 0.6) }
 
         val sb = StringBuilder(":root{")
         fun v(name: String, value: String) { sb.append("--vscode-").append(name).append(':').append(value).append(';') }
@@ -77,6 +68,9 @@ object Theme {
         v("editorLineNumber-foreground", hex(desc))
         v("textLink-foreground", hex(link))
         v("textLink-activeForeground", hex(link))
+        // 浮层控件底色（如 chat 回到底部按钮），取 IDE 弹层背景
+        v("editorWidget-background", hex(JBColor.namedColor("Popup.background", bg)))
+        v("widget-border", hex(border))
         v("editorHoverWidget-background", hex(tipBg))
         v("editorHoverWidget-foreground", hex(tipFg))
         v("editorHoverWidget-border", hex(border))
@@ -93,11 +87,18 @@ object Theme {
         v("terminal-ansiBrightCyan", "#29b8db")
         v("charts-green", "#4ec9b0")
         v("charts-purple", "#9575ff")
-        // 与原生 diff 词级模式同源；配色方案缺省时回退到原写死值。
-        v("diffEditor-insertedLineBackground", diffInsLineBg?.let { hex(it) } ?: "rgba(78,201,176,0.15)")
-        v("diffEditor-removedLineBackground", diffDelLineBg?.let { hex(it) } ?: "rgba(244,135,113,0.15)")
-        v("diffEditor-insertedTextBackground", diffInsBg?.let { hex(it) } ?: "rgba(78,201,176,0.35)")
-        v("diffEditor-removedTextBackground", diffDelBg?.let { hex(it) } ?: "rgba(244,135,113,0.35)")
+        // diff 整行 / 词级背景对齐 VSCode 默认主题 2026 Light / 2026 Dark（Light 整行未覆盖，取 VSCode 内置默认）
+        if (JBColor.isBright()) {
+            v("diffEditor-insertedLineBackground", "rgba(155,185,85,0.2)")
+            v("diffEditor-removedLineBackground", "rgba(255,0,0,0.2)")
+            v("diffEditor-insertedTextBackground", "#587c0c26")
+            v("diffEditor-removedTextBackground", "#ad070726")
+        } else {
+            v("diffEditor-insertedLineBackground", "#347d3926")
+            v("diffEditor-removedLineBackground", "#c93c3726")
+            v("diffEditor-insertedTextBackground", "#57ab5a4d")
+            v("diffEditor-removedTextBackground", "#f470674d")
+        }
         v("notificationsWarningIcon-foreground", "#ffba49")
         v("inputValidation-warningBackground", "rgba(255,186,73,0.15)")
         v("inputValidation-warningForeground", hex(fg))
@@ -153,12 +154,6 @@ object Theme {
         "\"" + s.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n").replace("\r", "") + "\""
 
     private fun hex(c: Color) = String.format("#%02x%02x%02x", c.red, c.green, c.blue)
-    /** c1 向 c2 线性混合 ratio（0=纯 c1，1=纯 c2），同 ColorUtil.mix。 */
-    private fun mix(c1: Color, c2: Color, ratio: Double): Color = Color(
-        (c1.red + (c2.red - c1.red) * ratio).toInt().coerceIn(0, 255),
-        (c1.green + (c2.green - c1.green) * ratio).toInt().coerceIn(0, 255),
-        (c1.blue + (c2.blue - c1.blue) * ratio).toInt().coerceIn(0, 255)
-    )
     private fun rgba(c: Color, a: Double) = "rgba(${c.red},${c.green},${c.blue},$a)"
     private fun shade(c: Color): Color = if (JBColor.isBright()) c.darker() else c.brighter()
 }
