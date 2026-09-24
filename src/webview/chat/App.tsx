@@ -120,8 +120,13 @@ const ChatSession: React.FC<ChatSessionProps> = ({ vscode: rawVscode, sessionId,
     const [openAgentTaskId, setOpenAgentTaskId] = useState<string | null>(null);
 
     const outputContainerRef = useRef<HTMLDivElement>(null);
+    const outputContentRef = useRef<HTMLDivElement>(null);
     const inputBoxRef = useRef<InputBoxHandle>(null);
-    const userScrolledUpRef = useRef<boolean>(false);
+    // 贴底跟随：state 驱动回到底部按钮显隐，ref 供 scroll/ResizeObserver 回调同步读取
+    const [stick, setStick] = useState<boolean>(true);
+    const stickRef = useRef<boolean>(true);
+    // 内容是否超出一屏，不可滚动时不显示回到底部按钮
+    const [overflow, setOverflow] = useState<boolean>(false);
     const programmaticScrollRef = useRef<boolean>(false);
     const lastScrollTopRef = useRef<number>(0);
     const spinnerStartTimeRef = useRef<number>(0);
@@ -231,7 +236,6 @@ const ChatSession: React.FC<ChatSessionProps> = ({ vscode: rawVscode, sessionId,
                         streamingAssistantIdRef.current = message.id;
                         setStreamingAssistantId(message.id);
                     }
-                    scrollToBottom();
                     break;
                 }
                 case 'completeUpdate': {
@@ -255,7 +259,6 @@ const ChatSession: React.FC<ChatSessionProps> = ({ vscode: rawVscode, sessionId,
                         streamingToolIdRef.current = message.id;
                         setStreamingToolId(message.id);
                     }
-                    scrollToBottom();
                     break;
                 }
                 case 'showProgress':
@@ -527,7 +530,6 @@ const ChatSession: React.FC<ChatSessionProps> = ({ vscode: rawVscode, sessionId,
     }, [isSpinnerVisible]);
 
     useEffect(() => {
-        scrollToBottom();
         if (active && window.hljs && outputContainerRef.current && messages.length > prevMessagesLenRef.current) {
             outputContainerRef.current.querySelectorAll('pre code:not(.hljs)').forEach((block) => {
                 window.hljs.highlightElement(block);
@@ -561,12 +563,9 @@ const ChatSession: React.FC<ChatSessionProps> = ({ vscode: rawVscode, sessionId,
         }
     }, [activeDialog]);
 
-    const isUserAtBottom = (): boolean => {
-        if (!outputContainerRef.current) return true;
-        const threshold = 100;
-        const position = outputContainerRef.current.scrollTop + outputContainerRef.current.clientHeight;
-        const bottom = outputContainerRef.current.scrollHeight;
-        return bottom - position < threshold;
+    const setStickState = (v: boolean) => {
+        stickRef.current = v;
+        setStick(v);
     };
 
     // 程序触发的置底:打标志位,让 scroll 监听能区分“程序滚的”和“用户滚的”
@@ -581,35 +580,63 @@ const ChatSession: React.FC<ChatSessionProps> = ({ vscode: rawVscode, sessionId,
     };
 
     const scrollToBottom = () => {
-        if (!userScrolledUpRef.current) {
+        if (stickRef.current) {
             doScrollToBottom();
         }
     };
 
+    // 用户点击回到底部：置底并恢复贴底跟随
+    const handleScrollBottomClick = () => {
+        doScrollToBottom();
+        setStickState(true);
+    };
+
+    // 置底由内容/视口尺寸变化驱动（流式 setState commit、hljs 高亮、iframe 加载、面板展开都会改高度），
+    // ResizeObserver 在 layout 之后回调，此时 scrollHeight 已是新值，不会像事件里同步置底那样慢一拍
+    useEffect(() => {
+        const container = outputContainerRef.current;
+        const content = outputContentRef.current;
+        if (!container || !content) return;
+
+        const onResize = () => {
+            const canScroll = container.scrollHeight - container.clientHeight > 1;
+            setOverflow(canScroll);
+            if (stickRef.current && canScroll) {
+                doScrollToBottom();
+            }
+        };
+        const ro = new ResizeObserver(onResize);
+        ro.observe(container);
+        ro.observe(content);
+        return () => ro.disconnect();
+    }, []);
+
+    // 贴底判定按滚动方向：向上滚立即离底，不设距离阈值（流式高频置底时小步上滑会被反复拽回）；
+    // 向下滚到底部附近恢复贴底。dist>1 排除 macOS 橡皮筋回弹与内容缩短时的 scrollTop 钳位被误判为上滑。
     useEffect(() => {
         const container = outputContainerRef.current;
         if (!container) return;
 
         const handleScroll = () => {
-            const scrollTop = container.scrollTop;
+            const top = container.scrollTop;
+            const up = top < lastScrollTopRef.current;
+            lastScrollTopRef.current = top;
             if (programmaticScrollRef.current) {
                 programmaticScrollRef.current = false;
-                lastScrollTopRef.current = scrollTop;
                 return;
             }
-            const scrolledUp = scrollTop < lastScrollTopRef.current;
-            lastScrollTopRef.current = scrollTop;
-            if (scrolledUp) {
-                userScrolledUpRef.current = true;
-            } else if (isUserAtBottom()) {
-                userScrolledUpRef.current = false;
+            const dist = container.scrollHeight - top - container.clientHeight;
+            if (up && dist > 1) {
+                setStickState(false);
+            } else if (!up && dist < 80) {
+                setStickState(true);
             }
         };
 
         // wheel 在 scroll 事件之前触发,能在流式置底与用户滚动合并成一次 scroll 事件时保住用户的上划意图
         const handleWheel = (e: WheelEvent) => {
-            if (e.deltaY < 0) {
-                userScrolledUpRef.current = true;
+            if (e.deltaY < 0 && container.scrollHeight - container.clientHeight > 1) {
+                setStickState(false);
             }
         };
 
@@ -622,7 +649,7 @@ const ChatSession: React.FC<ChatSessionProps> = ({ vscode: rawVscode, sessionId,
     }, []);
 
     const handleSend = (text: string, files: SelectedFile[], attachments: ImageAttachment[] = [], pastes: PasteAttachment[] = []) => {
-        userScrolledUpRef.current = false;
+        setStickState(true);
         setInputPrediction('');
         if (processingState !== 'processing') {
             setSpinnerAccumulatedSeconds(0);
@@ -966,7 +993,9 @@ const ChatSession: React.FC<ChatSessionProps> = ({ vscode: rawVscode, sessionId,
         <SessionContext.Provider value={sessionId}>
             <SessionActiveContext.Provider value={active}>
             <div className="chat-session" style={{ display: active ? 'flex' : 'none' }}>
+                <div className="output-scroll-wrap">
                 <div id="output-container" ref={outputContainerRef}>
+                <div className="output-content" ref={outputContentRef}>
                     {renderedContent}
                     {progressMessage && (
                         <div className="output-line ai-response-block" id="progress-message">
@@ -1070,6 +1099,24 @@ const ChatSession: React.FC<ChatSessionProps> = ({ vscode: rawVscode, sessionId,
                         />
                     )}
                     {PREVIEW_MODE && <PreviewDialogs vscode={vscode} />}
+                </div>
+                </div>
+                {/* 回到底部：内容超出一屏且离底时悬浮显示；运行中换成三点动画表示仍在生成 */}
+                {overflow && !stick && (
+                    <button
+                        className="scroll-bottom-btn"
+                        title={t('chat.scrollBottom')}
+                        onClick={handleScrollBottomClick}
+                    >
+                        {processingState === 'processing' ? (
+                            <span className="run-dots"><i /><i /><i /></span>
+                        ) : (
+                            <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+                                <path d="M8 3v10M3.5 8.5L8 13l4.5-4.5" />
+                            </svg>
+                        )}
+                    </button>
+                )}
                 </div>
                 <TodosPanel todos={todos} onScrollToBottom={scrollToBottom} />
                 <FileChangesPanel changes={fileChanges} vscode={vscode} onScrollToBottom={scrollToBottom} />

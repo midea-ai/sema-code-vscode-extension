@@ -103,8 +103,16 @@ code, pre, .code {
     overflow: hidden;
 }
 
-#output-container {
+/* 滚动区外层：给回到底部按钮提供定位基准 */
+.output-scroll-wrap {
+    position: relative;
     flex: 1;
+    min-height: 0;
+    width: 100%;
+}
+
+#output-container {
+    height: 100%;
     overflow-y: auto;
     overflow-x: hidden;
     /* 左右留出 > 滚动条宽度(8px) 的间距，避免滚动条出现时压住正文 */
@@ -113,6 +121,65 @@ code, pre, .code {
     line-height: 1.6;
     width: 100%;
     overflow-anchor: none;
+}
+
+/* 内容包裹层：ResizeObserver 观察对象；min-height 撑满滚动区，让空状态欢迎页能按滚动区高度居中 */
+.output-content {
+    position: relative;
+    min-height: 100%;
+}
+
+/* 回到底部悬浮按钮 */
+.scroll-bottom-btn {
+    position: absolute;
+    left: 50%;
+    bottom: 10px;
+    transform: translateX(-50%);
+    width: 30px;
+    height: 30px;
+    padding: 0;
+    border-radius: 50%;
+    border: 1px solid var(--vscode-widget-border, var(--vscode-panel-border));
+    background: var(--vscode-editorWidget-background);
+    color: var(--vscode-descriptionForeground);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    z-index: 5;
+}
+
+.scroll-bottom-btn:hover {
+    color: var(--vscode-foreground);
+}
+
+/* 运行中的三点动画 */
+.run-dots {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+}
+
+.run-dots i {
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    background: currentColor;
+    animation: dot-bounce 1.2s ease-in-out infinite;
+}
+
+.run-dots i:nth-child(2) {
+    animation-delay: 0.15s;
+}
+
+.run-dots i:nth-child(3) {
+    animation-delay: 0.3s;
+}
+
+@keyframes dot-bounce {
+    0%, 60%, 100% { transform: translateY(0); opacity: 0.4; }
+    30% { transform: translateY(-3px); opacity: 1; }
 }
 
 /* JCEF 专属：常驻滚动条槽，避免内容高度在视口边界横跳时竖直滚动条闪现/消失改变正文宽度、
@@ -376,8 +443,10 @@ html.jb #output-container {
 }
 
 /* 补充信息信息样式 如文件引用、中断、压缩 */
+/* 与工具行同节奏：外边距 3 + 上下内边距 4，块边缘到文字行盒 7px */
 .supplementary-info {
-    margin-top: 1px;
+    margin: var(--chat-block-margin);
+    padding: 4px 0;
     width: 100%;
 }
 
@@ -385,15 +454,16 @@ html.jb #output-container {
     color: var(--chat-text-secondary);
     font-size: var(--chat-font-base);
     line-height: 1.3;
-    margin: 1px var(--chat-spacing-xs);
-    margin-left: 8px;
+    margin: 0 var(--chat-spacing-xs) 0 8px;
     opacity: 0.8;
 }
 
+/* AI 响应 / TaskEnd：上下内边距 4 与工具行头一致，块间距统一为 14px */
 .ai-resp-block {
     display: flex;
     flex-direction: column;
     margin: var(--chat-block-margin);
+    padding: 4px 0;
     width: var(--chat-block-max-width);
     max-width: var(--chat-block-max-width);
     box-sizing: border-box;
@@ -453,6 +523,8 @@ html.jb #output-container {
 }
 
 .output-line.ai-response-content {
+    /* 覆盖 .output-line 的 margin-bottom 4px（那是进度行用的），上下留白统一由 .ai-resp-block 的 padding 提供 */
+    margin-bottom: 0;
     line-height: 1.4;
     white-space: pre-wrap;
     word-break: break-word;
@@ -538,9 +610,10 @@ html.jb #output-container {
     color: var(--chat-color-muted);
 }
 
-/* 欢迎页：空状态下铺满 chat 区域、居中的极简标题 */
+/* 欢迎页：空状态下铺满 chat 区域、居中的极简标题（绝对定位铺满 .output-content，百分比高度在 auto 高度父层里不生效） */
 .welcome-container {
-    height: 100%;
+    position: absolute;
+    inset: 0;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -847,11 +920,11 @@ html.jb #output-container {
 }
 
 .file-change-stats .additions {
-    color: var(--chat-color-success);
+    color: var(--chat-color-diff-add);
 }
 
 .file-change-stats .removals {
-    color: var(--chat-color-error);
+    color: var(--chat-color-diff-del);
 }
 
 .file-info {
