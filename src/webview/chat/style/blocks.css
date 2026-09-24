@@ -17,6 +17,12 @@
     overflow: visible;
 }
 
+/* 带边框面板的 4px 内边距在边框里面，补 4px 上下外边距，与文字/工具行的 4+4 节奏一致 */
+.chat-block:not(.chat-block--borderless) {
+    margin-top: 4px;
+    margin-bottom: 4px;
+}
+
 /* ---------- 通用块头部 ---------- */
 .chat-block-header {
     display: flex;
@@ -81,7 +87,8 @@
 /* ---------- 可视化内联嵌入（VizEmbed）：无标题行、无边框，内容直接铺在消息流里 ---------- */
 .viz-embed {
     position: relative;
-    margin: 8px 0;
+    /* 左右与 --chat-block-margin（0 8px）一致，和其它面板竖直对齐 */
+    margin: 8px;
     width: 100%;
     max-width: var(--chat-block-max-width);
     box-sizing: border-box;

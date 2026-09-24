@@ -105,7 +105,7 @@ const ShortcutPanel: React.FC<ShortcutPanelProps> = ({
                 onClick={() => onExecuteShortcut(item.text, item.send ?? false)}
             >
                 {d ? (
-                    <span className="shortcut-command shortcut-skill"><SkillLabel display={d} size={14} /></span>
+                    <span className="shortcut-command shortcut-skill"><SkillLabel display={d} /></span>
                 ) : (
                     <>
                         <span className="shortcut-slash">/</span>

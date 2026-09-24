@@ -371,11 +371,14 @@
     white-space: nowrap;
 }
 
+/* 面板 / 输入框 / 气泡三处统一按面板规格：名字固定 13px、行高 normal（外框仍取所在行 1lh，不撑高行），图标 14px */
 .skill-label-name {
+    font-size: var(--chat-font-md);
+    line-height: normal;
     font-weight: 500;
 }
 
-/* 图标盒子尺寸由 SkillLabel / buildSkillLabelHtml 内联指定（面板 14、输入框与气泡 15），同 webui */
+/* 图标盒子尺寸由 SkillLabel / buildSkillLabelHtml 内联指定，三处统一 14 */
 .skill-label-icon {
     display: inline-flex;
     align-items: center;
