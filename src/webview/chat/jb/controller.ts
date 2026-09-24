@@ -383,7 +383,8 @@ export class Controller {
             return;
         }
         try {
-            const result = await entry.remote.fork(uuid, { restoreFiles: !!restoreFiles });
+            // 走 wrapper.fork：core 截断后同步截断宿主 messageHistory，存档才不会带上作废消息
+            const result = await entry.wrapper.fork(uuid, { restoreFiles: !!restoreFiles });
             // core（sidecar 进程）直接写盘回滚，IDE 的 VFS/已打开编辑器不感知外部改动，
             // 按实际回滚的文件列表（绝对路径）让 Kotlin 主动刷新 VFS 重读磁盘。
             const restored = Array.isArray(result?.restoredFiles) ? result.restoredFiles : [];

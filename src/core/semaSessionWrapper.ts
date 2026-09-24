@@ -10,7 +10,6 @@ import {
     SessionReadyData,
     SessionErrorData,
     SessionInterruptedData,
-    ToolPermissionAutoData,
     ToolPermissionResponse,
     ToolExecutionCompleteData,
     ToolExecutionErrorData,
@@ -111,7 +110,6 @@ export class SemaSessionWrapper {
     private streamingToolMap: Map<string, Message> = new Map();
     private taskAgentThrottleTimer: NodeJS.Timeout | null = null;
     private pendingTaskUpdates: Set<string> = new Set();
-    private pendingAutoPermissions: Map<string, string> = new Map(); // toolId → content
     private _agentMode: AgentMode;
     private _permissionLevel: PermissionLevel;
     /** 本会话实际生效的主模型名；只由 core 的会话级 model:update 事件与 refreshModelInfo 赋值，不手写 */
@@ -156,8 +154,23 @@ export class SemaSessionWrapper {
     /** 原地回退（Fork / 撤销）到该用户消息之前；restoreFiles=true 时同时回滚文件。会话 id 不变 */
     public async fork(messageUuid: string, options?: ForkOptions): Promise<ForkResult> {
         const result = await this.session.fork(messageUuid, options);
-        // console.log('[fork] fork', messageUuid, JSON.stringify(options), '=>', JSON.stringify(result));
+        // core 已截断自身历史，宿主侧 messageHistory 也要同步截断，否则存档（SessionHistoryManager 以此为源）
+        // 会把作废消息一并落盘，下次加载历史时重新出现。不主动推 updateContent：前端 forkResult 自行截断并回填输入。
+        if (result.ok !== false) this.truncateMessageHistoryBefore(messageUuid);
         return result;
+    }
+
+    /** 截掉 uuid 对应用户消息及其之后的所有消息，并清理指向被删消息的 task 索引 */
+    private truncateMessageHistoryBefore(messageUuid: string): void {
+        const idx = this.messageHistory.findIndex(m => m.uuid === messageUuid);
+        if (idx < 0) return;
+        this.messageHistory = this.messageHistory.slice(0, idx);
+        for (const [taskId, entry] of this.taskAgentMap.entries()) {
+            if (entry.idx >= idx) {
+                this.taskAgentMap.delete(taskId);
+                this.pendingTaskUpdates.delete(taskId);
+            }
+        }
     }
 
     /**
@@ -307,7 +320,6 @@ export class SemaSessionWrapper {
         this.streamingToolMap.clear();
         this.streamingAssistantMap.clear();
         this.pendingTaskUpdates.clear();
-        this.pendingAutoPermissions.clear();
         if (this.taskAgentThrottleTimer) {
             clearTimeout(this.taskAgentThrottleTimer);
             this.taskAgentThrottleTimer = null;
@@ -429,8 +441,7 @@ export class SemaSessionWrapper {
             this.streamingAssistantMap.clear();
             this.streamingToolMap.clear();
             this.pendingTaskUpdates.clear();
-            this.pendingAutoPermissions.clear();
-
+    
             if (this.messageHistory.length === 0) {
                 return;
             }
@@ -442,10 +453,6 @@ export class SemaSessionWrapper {
             };
             this.messageHistory.push(interruptedMsg);
             this.sendAppendMessages([interruptedMsg]);
-        });
-
-        this.session.on<ToolPermissionAutoData>('tool:permission:auto', (data) => {
-            this.pendingAutoPermissions.set(data.toolId, data.content);
         });
 
         this.session.on<SessionErrorData>('session:error', (data) => {
@@ -698,16 +705,11 @@ export class SemaSessionWrapper {
         this.session.on<ToolExecutionCompleteData & { agentId?: string }>('tool:execution:complete', (data) => {
             this.callbacks.onToolExecutionComplete?.(this.sessionId, data);
 
-            const autoAllowedContent = data.toolId ? this.pendingAutoPermissions.get(data.toolId) : undefined;
-            if (data.toolId) {
-                this.pendingAutoPermissions.delete(data.toolId);
-            }
-
             if (this.isSubAgent(data.agentId)) {
                 this.addMessageToTaskAgent(data.agentId!, {
                     id: this.generateId(),
                     type: 'tool',
-                    content: { ...data, completed: true, ...(autoAllowedContent ? { autoAllowedContent } : {}) },
+                    content: { ...data, completed: true },
                     toolName: data.toolName,
                 });
                 return;
@@ -720,7 +722,7 @@ export class SemaSessionWrapper {
             const toolId = data.toolId;
             if (toolId && this.streamingToolMap.has(toolId)) {
                 const existingMessage = this.streamingToolMap.get(toolId)!;
-                const updatedContent = { ...data, completed: true, ...(autoAllowedContent ? { autoAllowedContent } : {}) };
+                const updatedContent = { ...data, completed: true };
                 const updatedMessage = { ...existingMessage, content: updatedContent };
                 const idx = this.messageHistory.indexOf(existingMessage);
                 if (idx >= 0) this.messageHistory[idx] = updatedMessage;
@@ -730,7 +732,7 @@ export class SemaSessionWrapper {
                 const newToolMsg: Message = {
                     id: this.generateId(),
                     type: 'tool',
-                    content: { ...data, completed: true, ...(autoAllowedContent ? { autoAllowedContent } : {}) },
+                    content: { ...data, completed: true },
                     toolName: data.toolName,
                 };
                 this.messageHistory.push(newToolMsg);
@@ -981,8 +983,7 @@ export class SemaSessionWrapper {
                 this.taskAgentThrottleTimer = null;
                 const taskIds = [...this.pendingTaskUpdates];
                 this.pendingTaskUpdates.clear();
-                this.pendingAutoPermissions.clear();
-                for (const tid of taskIds) {
+                        for (const tid of taskIds) {
                     const e = this.taskAgentMap.get(tid);
                     if (e) {
                         this.sendUpdateMessage(e.msg.id, e.msg.content);
@@ -1042,8 +1043,7 @@ export class SemaSessionWrapper {
             this.streamingToolMap.clear();
             this.taskAgentMap.clear();
             this.pendingTaskUpdates.clear();
-            this.pendingAutoPermissions.clear();
-            this.callbacks = {};
+                this.callbacks = {};
         } catch (error) {
             console.error('Error disposing SemaSessionWrapper:', error);
         }
