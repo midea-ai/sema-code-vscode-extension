@@ -535,7 +535,7 @@
 /* 禁用的开关样式 */
 .mcp-switch-disabled .section-switch-slider {
     cursor: not-allowed;
-    opacity: 0.6;
+    opacity: 0.5;
 }
 
 /* 带开关的工具项 */
@@ -590,6 +590,7 @@
     left: 2px;
     top: 2px;
     background-color: var(--s-switch-thumb-bg);
+    box-shadow: var(--s-switch-thumb-shadow);
     border-radius: 50%;
     transition: transform 0.2s;
 }

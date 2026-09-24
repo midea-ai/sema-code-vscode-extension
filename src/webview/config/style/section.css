@@ -348,7 +348,7 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 36px;
+    width: 28px;
     height: 28px;
     flex-shrink: 0;
     margin: 0 0 0 4px;
@@ -365,22 +365,23 @@
 .section-switch-slider {
     position: relative;
     cursor: pointer;
-    width: 36px;
-    height: 20px;
+    width: 28px;
+    height: 16px;
     background-color: var(--s-switch-bg);
     border: none;
-    border-radius: 10px;
+    border-radius: 8px;
     transition: background-color 0.2s;
 }
 
 .section-switch-slider:before {
     position: absolute;
     content: "";
-    height: 16px;
-    width: 16px;
+    height: 12px;
+    width: 12px;
     left: 2px;
     top: 2px;
     background-color: var(--s-switch-thumb-bg);
+    box-shadow: var(--s-switch-thumb-shadow);
     border-radius: 50%;
     transition: transform 0.2s;
 }
@@ -390,7 +391,7 @@
 }
 
 .section-switch input:checked + .section-switch-slider:before {
-    transform: translateX(16px);
+    transform: translateX(12px);
 }
 
 /* ===== 弹窗样式 ===== */

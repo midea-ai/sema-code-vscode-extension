@@ -11,9 +11,9 @@
     margin: 0 auto;
     --usage-cell: 11px;
     /* 数据图形固定色，不跟主题强调色：避免与输出橙撞色，也避免 JB 浅色皮肤下选中色过淡 */
-    --usage-accent: #0a7cff;
+    --usage-accent: #2e83d2;
     --usage-hit: var(--usage-accent);
-    --usage-miss: color-mix(in srgb, var(--usage-accent) 45%, transparent);
+    --usage-miss: color-mix(in srgb, var(--usage-hit) 45%, transparent);
     --usage-output: #f59e0b;
     --usage-bar: var(--usage-accent);
     --usage-line: color-mix(in srgb, var(--vscode-foreground, #ccc) 12%, transparent);

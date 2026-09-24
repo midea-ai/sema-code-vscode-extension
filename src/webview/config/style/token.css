@@ -65,10 +65,11 @@
     --s-btn-secondary-fg: var(--vscode-foreground, #ccc);
     --s-btn-secondary-hover-bg: color-mix(in srgb, var(--vscode-foreground, #ccc) 22%, transparent);
 
-    /* 开关 */
-    --s-switch-bg: #ccc;
-    --s-switch-active-bg: #007aff;
+    /* 开关：对齐 webui Toggle（底 #d4d4d4 / 开 accent #2e83d2 / 白滑块带阴影） */
+    --s-switch-bg: #d4d4d4;
+    --s-switch-active-bg: #2e83d2;
     --s-switch-thumb-bg: #fff;
+    --s-switch-thumb-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
 
     /* Badge */
     --s-badge-main-bg: rgba(255, 186, 73, 0.2);
