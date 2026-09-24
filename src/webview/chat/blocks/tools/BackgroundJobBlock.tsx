@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect, useRef, useContext } from 'react';
-import { ToggleIcon } from '../../components/ui/IconButton';
+import { WrenchIcon } from '../../components/ui/IconButton';
 import { SessionContext } from '../../SessionContext';
+import ToolRowHeader from './ToolRowHeader';
 import { ToolContent } from '../../types';
 import { streamingStore } from '../../utils/StreamingStore';
 import { useT } from '../../../common/i18n/react';
@@ -118,16 +119,16 @@ const BackgroundJobBlock: React.FC<BackgroundJobBlockProps> = ({ content: toolCo
 
     return (
         <div className="chat-block chat-block--borderless bash-block">
-            <div className="chat-block-header bash-block-header" onClick={handleToggle}>
-                <div className="chat-block-title bash-block-title">
-                    <span className="chat-block-title-label">BackgroundJob</span>
-                    {title && <span className="chat-block-title-detail">{title}</span>}
-                    {isStreaming && <span className="bash-streaming-dot" />}
-                    <div className="bash-toggle-btn">
-                        <ToggleIcon isExpanded={isExpanded} />
-                    </div>
-                </div>
-            </div>
+            <ToolRowHeader
+                icon={<WrenchIcon />}
+                streaming={isStreaming}
+                verb={isStreaming ? t('tool.jobPeeking') : t('tool.jobPeek')}
+                target={title || undefined}
+                targetTitle={title || undefined}
+                expandable
+                isExpanded={isExpanded}
+                onClick={handleToggle}
+            />
             {isExpanded && (
                 <div className="chat-block-content bash-block-content">
                     {visibleLines.length > 0 && (

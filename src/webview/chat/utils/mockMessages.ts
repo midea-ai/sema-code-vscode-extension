@@ -219,6 +219,16 @@ export const mockMessageMap: Record<string, Message[]> = {
                 content: '#12 Support Windows paths\n#15 Add --json output\n#18 Improve error messages',
             },
         },
+        {
+            id: nextId(),
+            type: 'system',
+            content: {
+                type: 'tool_error',
+                toolName: 'mcp__github__create_issue',
+                title: 'sema-code/cli "Add --json output"',
+                content: 'Error: Resource not accessible by integration (HTTP 403)',
+            },
+        },
     ],
 
     BackgroundJob: [

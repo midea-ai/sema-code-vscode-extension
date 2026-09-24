@@ -1,9 +1,15 @@
 import { Message } from '../types';
 import {
+    TOOL_NAME_CREATE_CRON,
+    TOOL_NAME_DEL_CRON,
+    TOOL_NAME_FETCH_URL,
+    TOOL_NAME_LIST_CRONS,
     TOOL_NAME_PATCH_FILE,
+    TOOL_NAME_PEEK_BG_JOB,
     TOOL_NAME_RUN_SHELL,
     TOOL_NAME_SEARCH_CONTENT,
     TOOL_NAME_SEARCH_FILES,
+    TOOL_NAME_STOP_BG_JOB,
     TOOL_NAME_VIEW_FILE,
     TOOL_NAME_WRITE_FILE,
 } from '../../../utils/tool';
@@ -16,7 +22,7 @@ export type RenderItem =
 interface GroupMessagesOptions {
     streamingToolId?: string | null;
     showThinkingText?: boolean;
-    /** 列表末尾之后是否已有其它渲染内容（如下一轮用户输入），为 true 时末尾的终端命令也可折叠 */
+    /** 列表末尾之后是否已有其它渲染内容（如下一轮用户输入），为 true 时段尾的工具也并入组 */
     tailClosed?: boolean;
 }
 
@@ -30,6 +36,13 @@ const GROUPABLE_TOOL_NAMES = new Set([
     TOOL_NAME_SEARCH_FILES,
     TOOL_NAME_SEARCH_CONTENT,
 ]);
+
+export const FETCH_TOOL_NAMES = new Set([TOOL_NAME_FETCH_URL]);
+export const JOB_TOOL_NAMES = new Set([TOOL_NAME_PEEK_BG_JOB, TOOL_NAME_STOP_BG_JOB]);
+export const CRON_TOOL_NAMES = new Set([TOOL_NAME_CREATE_CRON, TOOL_NAME_DEL_CRON, TOOL_NAME_LIST_CRONS]);
+
+/** 走默认 PubBlock 渲染但可并入组的工具：抓网页、后台任务查看/停止、定时任务管理 */
+const PUB_GROUPABLE_TOOL_NAMES = new Set([...FETCH_TOOL_NAMES, ...JOB_TOOL_NAMES, ...CRON_TOOL_NAMES]);
 
 export const getToolName = (message: Message): string => {
     return message.toolName || message.content?.toolName || '';
@@ -58,8 +71,8 @@ const isReadOnlyPipeFilter = (segment: string): boolean => {
 
 /** 单个命令段（不含 && / || / ;）的探索类型：ls/tree → list，find → find，pwd → path；含写入副作用则为 null */
 const getShellSegmentKind = (segment: string): ShellExploreKind | null => {
-    // 输出重定向会写文件，不算只读
-    if (/>/.test(segment)) {
+    // 输出重定向会写文件，不算只读；丢弃到 /dev/null 或合并到 stdout 的 2>&1 不写文件，先剔除再判断
+    if (/>/.test(segment.replace(/\d?>&\d|\d?>\s*\/dev\/null/g, ''))) {
         return null;
     }
 
@@ -137,15 +150,17 @@ export const getMcpServerName = (message: Message): string | null => {
     return parseMcpToolName(toolName).mcpName || null;
 };
 
+/** 工具执行报错（system/tool_error）：任何工具的报错都可并入混合工具组，但不计入组头文案与成组门槛 */
+export const isToolErrorMessage = (message: Message): boolean => {
+    return message.type === 'system' && message.content?.type === 'tool_error';
+};
+
 /** 非探索类的终端命令（ls/find/pwd 等归探索组，不算在内） */
 export const isShellRunMessage = (message: Message): boolean => {
     return message.type === 'tool'
         && getToolName(message) === TOOL_NAME_RUN_SHELL
         && getGroupableToolKind(message) === null;
 };
-
-const SHELL_RUN_KEY = 'shell';
-const MEMORY_RUN_KEY = 'memory';
 
 /** 新增/编辑 memory 目录下 md 文件的工具消息（如 .../memory/foo.md、.../memory/MEMORY.md） */
 export const isMemoryEditMessage = (message: Message): boolean => {
@@ -169,34 +184,25 @@ export const isMemoryEditMessage = (message: Message): boolean => {
 };
 
 /**
- * 可分组消息的 run key：相邻消息 key 相同才会合并进同一组。
- * 探索类工具统一为 'explore'，MCP 工具按服务名区分为 'mcp:<服务名>'，
- * memory 目录下的 md 文件写入为 'memory'，其余终端命令为 'shell'。
+ * 可并入混合工具组的消息：探索类（Read/Search/只读命令）、其余终端命令、MCP 调用，
+ * 抓网页、后台任务查看/停止、定时任务管理、memory 写入，以及任何工具的执行报错。
+ * 相邻的可并入消息不分种类进同一段；文件编辑、Skill、子代理、提问等其它工具与可见正文一样作为段边界。
  */
-const getRunKey = (message: Message): string | null => {
-    if (message.type !== 'tool') {
-        return null;
+export const isGroupableToolMessage = (message: Message): boolean => {
+    if (isToolErrorMessage(message) || isMemoryEditMessage(message)) {
+        return true;
     }
 
-    const mcpServerName = getMcpServerName(message);
-    if (mcpServerName) {
-        return `mcp:${mcpServerName}`;
+    if (message.type !== 'tool') {
+        return false;
+    }
+
+    if (getMcpServerName(message)) {
+        return true;
     }
 
     const toolName = getToolName(message);
-    if (GROUPABLE_TOOL_NAMES.has(toolName) || getGroupableToolKind(message) !== null) {
-        return 'explore';
-    }
-
-    if (isMemoryEditMessage(message)) {
-        return MEMORY_RUN_KEY;
-    }
-
-    if (isShellRunMessage(message)) {
-        return SHELL_RUN_KEY;
-    }
-
-    return null;
+    return GROUPABLE_TOOL_NAMES.has(toolName) || PUB_GROUPABLE_TOOL_NAMES.has(toolName) || toolName === TOOL_NAME_RUN_SHELL;
 };
 
 const isStreamingToolMessage = (message: Message, streamingToolId?: string | null): boolean => {
@@ -245,15 +251,23 @@ const toMessageItems = (run: RunItem[]): RenderItem[] => {
     }));
 };
 
+const toGroupItem = (run: RunItem[]): RenderItem => ({
+    kind: 'group',
+    id: `tool-group-${run[0].message.id}`,
+    messages: run.map(({ message }) => message),
+    originalStartIndex: run[0].index,
+});
+
 /**
- * @param closed run 之后是否已有其它渲染内容。终端组只在 closed 时折叠：
- * 末尾还可能继续追加的终端命令逐条展示，数量不再变化后才收成 Ran N commands。
- * memory 组特殊：一条也折叠，流式中也直接成组，避免先展开 diff 再折叠的闪动
+ * 把一段可并入的工具消息输出为渲染项。
+ * closed 表示段之后是否已有其它渲染内容。未封口（或末条仍在流式）时段尾一条作为「尾巴」原样单独渲染，
+ * 便于查看运行中的输出，其余并入组；段一封口尾巴随之并入。并入的部分中非报错消息 ≥2 条才出组头，否则逐条渲染。
+ * memory 写入不做尾巴、1 条也折叠、流式中也直接进组，避免先展开 diff 再折叠的闪动。
+ * 组 id 只取首条消息 id，尾巴并入时组件实例不重建，已展开状态得以保留。
  */
 const flushRun = (
     items: RenderItem[],
     run: RunItem[],
-    runKey: string | null,
     closed: boolean,
     streamingToolId?: string | null,
 ): void => {
@@ -261,21 +275,21 @@ const flushRun = (
         return;
     }
 
-    const alwaysGrouped = runKey === MEMORY_RUN_KEY;
-    const hasStreamingTool = run.some(({ message }) => isStreamingToolMessage(message, streamingToolId));
-    if (!alwaysGrouped && (run.length < 2 || hasStreamingTool || (runKey === SHELL_RUN_KEY && !closed))) {
-        items.push(...toMessageItems(run));
-        return;
+    const last = run[run.length - 1];
+    const keepTail = (!closed || isStreamingToolMessage(last.message, streamingToolId))
+        && !isMemoryEditMessage(last.message);
+    const head = keepTail ? run.slice(0, -1) : run;
+
+    const toolCount = head.filter(({ message }) => !isToolErrorMessage(message)).length;
+    if (toolCount >= 2 || head.some(({ message }) => isMemoryEditMessage(message))) {
+        items.push(toGroupItem(head));
+    } else {
+        items.push(...toMessageItems(head));
     }
 
-    const first = run[0].message;
-    const last = run[run.length - 1].message;
-    items.push({
-        kind: 'group',
-        id: `tool-group-${first.id}-${last.id}`,
-        messages: run.map(({ message }) => message),
-        originalStartIndex: run[0].index,
-    });
+    if (keepTail) {
+        items.push(...toMessageItems([last]));
+    }
 };
 
 export const groupMessages = (
@@ -284,17 +298,9 @@ export const groupMessages = (
 ): RenderItem[] => {
     const items: RenderItem[] = [];
     let run: RunItem[] = [];
-    let runKey: string | null = null;
 
     messages.forEach((message, index) => {
-        const key = getRunKey(message);
-        if (key !== null) {
-            // 相邻但 key 不同（如 explore → mcp:xxx，或不同 MCP 服务）时先切段
-            if (runKey !== null && runKey !== key) {
-                flushRun(items, run, runKey, true, options.streamingToolId);
-                run = [];
-            }
-            runKey = key;
+        if (isGroupableToolMessage(message)) {
             run.push({ message, index });
             return;
         }
@@ -304,13 +310,12 @@ export const groupMessages = (
         }
 
         const closed = !isPendingEmptyAssistantMessage(message, options.showThinkingText);
-        flushRun(items, run, runKey, closed, options.streamingToolId);
+        flushRun(items, run, closed, options.streamingToolId);
         run = [];
-        runKey = null;
         items.push({ kind: 'message', message, originalIndex: index });
     });
 
-    flushRun(items, run, runKey, !!options.tailClosed, options.streamingToolId);
+    flushRun(items, run, !!options.tailClosed, options.streamingToolId);
 
     return items;
 };

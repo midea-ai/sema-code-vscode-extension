@@ -45,25 +45,21 @@
     text-align: left;
 }
 
-/* 统计信息样式：+N -M 整体加粗，增/删用颜色区分 */
+/* 统计信息样式：+N -M 不加粗，仅靠增/删颜色区分 */
 .edit-stats {
     display: flex;
     align-items: center;
     gap: 4px;
     font-size: var(--chat-font-base);
-    font-weight: 700;
     flex-shrink: 0;
 }
 
 .edit-stats .additions {
-    color: var(--chat-color-success);
-    font-weight: 700;
+    color: var(--chat-color-diff-add);
 }
 
 .edit-stats .removals {
-    color: var(--chat-color-error);
-    font-weight: 700;
-    font-size: var(--chat-font-base);
+    color: var(--chat-color-diff-del);
 }
 
 /* 折叠按钮 - 在增减号右侧，悬浮时显示 */
@@ -137,6 +133,56 @@
     padding-right: 0;
 }
 
+/* 以下两条只作用于已改为无边框行头的 EditBlock（NotebookEditBlock 仍用旧的带边框容器，不受影响） */
+
+/* 行头目标 = [文件类型图标] 路径：目标容器改 flex 容纳图标，省略逻辑下放到路径 span */
+.chat-block--borderless.edit-block .tool-row-target {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+
+/* 文件类型图标：规格同正文文件链接的 .md-file-icon（13px 盒 + scale 1.35 补偿 Seti 图形留白），颜色由内联 style 给文件类型色 */
+.chat-block--borderless.edit-block .edit-file-icon {
+    display: inline-block;
+    flex-shrink: 0;
+    width: 13px;
+    height: 13px;
+    transform: scale(1.35);
+}
+
+.chat-block--borderless.edit-block .edit-file-icon svg {
+    display: block;
+    width: 100%;
+    height: 100%;
+}
+
+/* 路径：省略前段、保留靠近文件名的尾部（rtl 截断手法，开头 LRM 保证 "." 不被排到末尾） */
+.chat-block--borderless.edit-block .edit-file-path {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    direction: rtl;
+    text-align: left;
+}
+
+/* 目标容器是 flex，text-decoration 不会传给子项，悬浮下划线补到路径文字上 */
+.chat-block--borderless.edit-block .tool-row-target--link:hover .edit-file-path {
+    text-decoration: underline;
+}
+
+/* 容器已无边框，展开后的 diff 自成一个带边框的框，与 Shell 输出框同规格；左右缩进 8px 与行头 padding 对齐 */
+.chat-block--borderless.edit-block .edit-block-content {
+    width: auto;
+    /* 边框紧贴 diff，去掉上下内边距，避免框内出现空白带 */
+    padding: 0;
+    margin: 0 8px var(--chat-spacing-sm);
+    border: 1px solid var(--chat-border);
+    border-radius: var(--chat-radius-sm);
+    overflow: hidden;
+}
+
 /* CollapsibleDiff：diff 不再内部滚动，改为内容整体折叠 + 底部渐隐 + 左下角「展开/收起」。
    仅作用于被 CollapsibleDiff 包裹的 diff（EditBlock / 权限弹窗），不影响其他 UpdateCodeDiff（如 NotebookEditBlock）。 */
 .collapsible-diff .update-code-diff {
@@ -189,22 +235,7 @@
     transform: rotate(90deg);
 }
 
-/* Read Block 样式 — 容器继承 .chat-block--borderless */
-
-.read-block-header {
-    cursor: pointer;
-    gap: var(--chat-spacing-sm);
-    transition: opacity 0.15s;
-}
-
-.read-block-header:hover .read-file-name {
-    color: var(--chat-text-link);
-    opacity: 1;
-}
-
-.read-file-name {
-    transition: color 0.2s, opacity 0.2s;
-}
+/* Read Block：容器继承 .chat-block--borderless，行头由 tools.css 的 .tool-row-* 提供 */
 
 /* UpdateCodeDiff 样式 */
 .update-code-diff {

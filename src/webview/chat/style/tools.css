@@ -3,15 +3,6 @@
 /* ========== Bash Block ========== */
 /* 容器：继承 .chat-block，无额外属性 */
 
-.bash-block-header {
-    cursor: pointer;
-}
-
-.bash-block-title {
-    gap: var(--chat-spacing-sm);
-}
-
-
 .bash-streaming-dot {
     display: inline-block;
     width: 6px;
@@ -24,8 +15,7 @@
 
 .bash-toggle-btn,
 .pub-toggle-btn,
-.thought-toggle-btn,
-.grouped-tool-toggle-btn {
+.thought-toggle-btn {
     display: none;
     align-items: center;
     justify-content: center;
@@ -36,21 +26,111 @@
     margin-left: 0;
 }
 
-.bash-block-header:hover .bash-toggle-btn,
 .bash-permission-header:hover .bash-toggle-btn,
 .pub-block-header:hover .pub-toggle-btn,
-.thought-block-header:hover .thought-toggle-btn,
-.grouped-tool-header:hover .grouped-tool-toggle-btn {
+.thought-block-header:hover .thought-toggle-btn {
     display: flex;
 }
 
-/* “Explored N tools” / “Called xxx N times” 折叠图标始终显示 */
-.grouped-tool-block > .grouped-tool-header .grouped-tool-toggle-btn,
-.grouped-mcp-header .grouped-tool-toggle-btn {
+/* ========== 工具行统一行头（ToolRowHeader：组头 / 组内行 / 单条 Read、Shell、Pub、BackgroundJob） ========== */
+/* [图标 14px] [动词] [目标 单行省略] [附加] [箭头]，图标列固定宽，所有行文字起点对齐 */
+
+.tool-row-header {
+    cursor: default;
+}
+
+.tool-row-header--clickable {
+    cursor: pointer;
+}
+
+/* 工具行标题统一弱化色，悬浮不变色；只有可跳转的目标（文件等）悬浮时变链接色 */
+.tool-row-title {
+    gap: var(--chat-spacing-sm);
+    font-size: var(--chat-font-base);
+    color: var(--chat-color-muted);
+}
+
+.tool-row-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 14px;
+    height: 14px;
+    flex-shrink: 0;
+    color: var(--chat-color-muted);
+}
+
+.tool-row-verb {
+    flex-shrink: 0;
+    white-space: nowrap;
+}
+
+/* 无目标时动词即整行内容：允许收缩并省略，保持单行 */
+.tool-row-verb--fill {
+    flex-shrink: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.tool-row-target {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--chat-color-muted);
+}
+
+/* Read 合并行：多个文件名允许换行 */
+.tool-row-target--wrap {
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
+}
+
+/* 搜索行的位置（在 目录 (glob)）：不随关键词收缩，过长时自身省略 */
+.tool-row-location {
+    flex-shrink: 0;
+    max-width: 50%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.tool-row-target--link {
+    cursor: pointer;
+}
+
+.tool-row-target--link:hover {
+    color: var(--chat-text-link);
+    text-decoration: underline;
+}
+
+/* 折叠箭头：折叠时 hover 才显示，展开时常显 */
+.tool-row-toggle {
+    display: none;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    width: 14px;
+    height: 14px;
+    color: var(--chat-color-muted);
+}
+
+.tool-row-header:hover .tool-row-toggle,
+.tool-row-toggle--visible {
     display: flex;
 }
 
-/* 内容区：继承 .chat-block-content */
+/* 内容区：容器已无边框，展开后的命令 + 输出合成一个带边框的框，与组内结果行的输出框同规格；
+   左右缩进 8px 与行头 padding 对齐 */
+.bash-block-content {
+    width: auto;
+    margin: 0 8px var(--chat-spacing-sm);
+    border: 1px solid var(--chat-border);
+    border-radius: var(--chat-radius-sm);
+}
+
 .bash-command {
     margin-bottom: var(--chat-spacing-md);
     background-color: transparent;
@@ -139,16 +219,6 @@
     text-overflow: ellipsis;
 }
 
-/* Auto 放行提示：颜色与工具内容文字一致，最多一行超长省略 */
-.auto-allowed-info {
-    color: var(--chat-color-muted);
-    font-size: var(--chat-font-base);
-    line-height: 1.3;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-
 /* ========== Pub Block ========== */
 /* 容器：继承 .chat-block--borderless */
 
@@ -218,16 +288,11 @@
     color: var(--chat-color-muted-light);
 }
 
-/* ========== Tool Error Block ========== */
-/* 结构与折叠/截断样式复用 .pub-block，这里只补红点 */
+/* ========== 工具执行失败行（组内与单条共用） ========== */
+/* 只有叉号图标取错误色，动词、目标与展开体沿用普通结果行样式 */
 
-.tool-error-header {
-    cursor: pointer;
-}
-
-.tool-error-header .tool-error-indicator {
+.tool-row-header--error .tool-row-icon {
     color: var(--chat-color-error);
-    flex-shrink: 0;
 }
 
 /* ========== Light 主题覆盖 ========== */
@@ -238,18 +303,29 @@
 }
 
 /* ========== Grouped Tool Block ========== */
+/* 组头无图标：首个动词加粗、计数弱化色、箭头常显；组内行的行头由 .tool-row-* 提供 */
 
 .grouped-tool-header {
     cursor: pointer;
 }
 
-/* 组内所有 label（Explored / List / Search / Read 等）统一用 hover 色，hover 不再变化 */
-.grouped-tool-block .chat-block-title-label {
-    color: var(--chat-text-primary);
+/* 组头标题过长时单行省略，不越界被裁 */
+.grouped-tool-header .chat-block-title-label {
+    color: var(--chat-color-muted);
+    flex-shrink: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
-.grouped-tool-header:hover .chat-block-title-label {
-    color: var(--chat-text-primary);
+.grouped-tool-toggle-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    width: 14px;
+    height: 14px;
+    color: var(--chat-color-muted);
 }
 
 .grouped-tool-content {
@@ -260,31 +336,6 @@
 .grouped-tool-item .chat-block {
     margin-left: 0;
     margin-right: 0;
-}
-
-/* List / Search 等结果行：标题过长换行时，后续行与“值”首字符悬挂对齐 */
-.grouped-tool-content .grouped-tool-header .chat-block-title {
-    align-items: flex-start;
-}
-
-/* 标题用 flex-start 顶部对齐后，折叠图标盒子高度跟首行行高对齐，
-   使图标与首行文字居中对齐，而非贴着行顶（否则视觉偏高） */
-.grouped-tool-content .grouped-tool-header .grouped-tool-toggle-btn {
-    height: 1lh;
-}
-
-.grouped-tool-content .grouped-tool-header .grouped-tool-muted-text {
-    min-width: 0;
-    overflow-wrap: anywhere;
-}
-
-.grouped-read-summary {
-    display: flex;
-    align-items: flex-start;
-    flex-wrap: nowrap;
-    gap: var(--chat-spacing-xs) var(--chat-spacing-sm);
-    padding: var(--chat-block-header-padding);
-    line-height: 1.4;
 }
 
 .grouped-read-files {
@@ -309,19 +360,64 @@
 }
 
 .grouped-read-file:hover {
-    color: var(--chat-text-primary);
+    color: var(--chat-text-link);
     text-decoration: underline;
 }
 
-.grouped-result-content {
+/* 组内结果行展开体（List / Search / Ran / MCP / Job 等共用）：完整文本 + 输出框 */
+.grouped-result-body {
     margin: 0;
-    padding: var(--chat-block-header-padding);
-    font-size: var(--chat-font-sm);
-    line-height: 1.3;
-    white-space: pre-wrap;
-    color: var(--chat-color-muted);
-    font-family: var(--vscode-editor-font-family);
+    padding: var(--chat-spacing-xs) var(--chat-spacing-sm) var(--chat-spacing-sm);
     background: transparent;
+}
+
+/* 完整命令 / 检索条件 / MCP 参数：纯文本，比行头小一号，自动换行，不截断 */
+.grouped-result-full {
+    font-size: var(--chat-font-sm);
+    line-height: 1.4;
+    color: var(--chat-text-secondary);
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    padding: 0 var(--chat-spacing-xs);
+}
+
+/* 输出框：带边框，字号与行头一致；过长时由 CollapsibleContent 渐隐折叠（.collapsible-diff.collapsed）并显示展开/收起 */
+.grouped-result-output {
+    border: 1px solid var(--chat-border);
+    border-radius: var(--chat-radius-sm);
+    padding: var(--chat-spacing-xs) 0;
+    overflow: hidden;
+}
+
+.grouped-result-full + .grouped-result-output {
+    margin-top: var(--chat-spacing-sm);
+}
+
+.grouped-result-output pre {
+    margin: 0;
+    padding: var(--chat-spacing-xs) var(--chat-spacing-sm);
+    font-family: var(--vscode-font-family);
+    font-size: var(--chat-font-base);
+    line-height: 1.4;
+    color: var(--chat-color-muted);
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    background: transparent;
+}
+
+/* 无输出占位 */
+.grouped-result-empty {
+    padding: 0 var(--chat-spacing-xs);
+    font-size: var(--chat-font-sm);
+    color: var(--chat-color-muted);
+}
+
+/* 组内 memory 写入行展开的 diff：与结果行同缩进，点击打开文件对比 */
+.grouped-diff-content {
+    margin: 0;
+    padding: var(--chat-spacing-xs) 0 var(--chat-spacing-xs) var(--chat-spacing-sm);
+    background: transparent;
+    cursor: pointer;
 }
 
 /* ========== Task Block (Agent) ========== */

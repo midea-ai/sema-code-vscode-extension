@@ -37,6 +37,9 @@
     --chat-color-error-bg: rgba(244, 135, 113, 0.1);
     --chat-color-warning: #ffba49;
     --chat-color-warning-bg: rgba(255, 186, 73, 0.2);
+    /* 增删行数 +N -M 专用色（编辑块标题 / 文件变更面板），亮色在 .vscode-light 覆盖为 webui 同值 */
+    --chat-color-diff-add: var(--chat-color-success);
+    --chat-color-diff-del: var(--chat-color-error);
 
     /* -------- 语义色 -------- */
     --chat-color-purple: #9575ff;
@@ -106,7 +109,8 @@
     --chat-diff-removed-bg: rgba(248, 81, 73, 0.15);
 
     /* -------- 块级组件公共尺寸 -------- */
-    --chat-block-margin: 3px 8px;
+    /* 上下 0：相邻块间距 = 4+4 = 8px，全靠各块统一的 4px 上下内边距 */
+    --chat-block-margin: 0 8px;
     --chat-block-header-padding: 4px 8px;
     --chat-block-content-padding: 6px 8px;
     --chat-block-header-min-height: 22px;
@@ -119,4 +123,7 @@
     --chat-page-bg: var(--chat-bg-light);
     /* 亮色背景下黑色遮罩观感更重，调浅避免过黑 */
     --chat-overlay: rgba(0, 0, 0, 0.4);
+    /* 增删行数颜色与 webui 一致（--color-ok / --color-danger） */
+    --chat-color-diff-add: #1a7f37;
+    --chat-color-diff-del: #d1242f;
 }

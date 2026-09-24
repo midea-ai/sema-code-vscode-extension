@@ -2,6 +2,9 @@ import React from 'react';
 import { VscodeApi } from '../../types';
 import { ToolContent } from '../../types';
 import { hasTextSelection } from '../../utils/selection';
+import { FileTextIcon } from '../../components/ui/IconButton';
+import ToolRowHeader from './ToolRowHeader';
+import { useT } from '../../../common/i18n/react';
 
 interface ReadBlockProps {
     content: ToolContent;
@@ -9,6 +12,7 @@ interface ReadBlockProps {
 }
 
 const ReadBlock: React.FC<ReadBlockProps> = React.memo(({ content, vscode }) => {
+    const t = useT();
     const title = content.title || '';
 
     const getFileInfo = () => {
@@ -72,14 +76,14 @@ const ReadBlock: React.FC<ReadBlockProps> = React.memo(({ content, vscode }) => 
 
     return (
         <div className="chat-block chat-block--borderless read-block">
-            <div className="chat-block-header read-block-header" onClick={handleOpenFile}>
-                <div className="chat-block-title">
-                    <span className="chat-block-title-label">Read</span>
-                    <span className="chat-block-title-detail read-file-name" title={finalFileName + lineRange}>
-                        {displayFileName}{lineRange}
-                    </span>
-                </div>
-            </div>
+            <ToolRowHeader
+                icon={<FileTextIcon />}
+                verb={t('tool.read')}
+                target={`${displayFileName}${lineRange}`}
+                targetTitle={finalFileName + lineRange}
+                onTargetClick={handleOpenFile}
+                onClick={handleOpenFile}
+            />
         </div>
     );
 });

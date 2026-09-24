@@ -179,7 +179,6 @@ const MessageItem: React.FC<MessageItemProps> = React.memo(({
                         toolName={message.content.toolName || ''}
                         title={message.content.title || ''}
                         content={message.content.content || ''}
-                        vscode={vscode}
                     />
                 );
             } else if (['compact', 'clear', 'session_error', 'hook_notice'].includes(message.content.type)) {

@@ -10,6 +10,9 @@ let customCommands: ShortcutCommand[] = [];
 // 存储技能（由后端推送更新）
 let skills: ShortcutCommand[] = [];
 
+// 技能名 → SKILL.md 路径（技能工具行标题点击打开文件）
+let skillFilePaths: Record<string, string> = {};
+
 // 存储子代理（由后端推送更新）
 let agents: ShortcutCommand[] = [];
 
@@ -29,6 +32,10 @@ export const setCustomCommands = (commands: CommandConfig[]) => {
  * 由后端推送技能时调用，更新技能列表
  */
 export const setSkills = (skillList: SkillConfig[]) => {
+    skillFilePaths = {};
+    for (const skill of skillList) {
+        if (skill.filePath) skillFilePaths[skill.name] = skill.filePath;
+    }
     // 有显示映射的技能按 SKILL_DISPLAY 顺序排在技能组最前，其余保持原顺序
     skills = [...skillList]
         .sort((a, b) => skillDisplayOrder(a.name) - skillDisplayOrder(b.name))
@@ -38,6 +45,9 @@ export const setSkills = (skillList: SkillConfig[]) => {
             category: 'skill'
         }));
 };
+
+/** 技能名对应的 SKILL.md 路径；未推送或无路径时返回 undefined */
+export const getSkillFilePath = (name: string): string | undefined => skillFilePaths[name];
 
 /**
  * 由后端推送子代理时调用，更新子代理列表（过滤内置 agent）

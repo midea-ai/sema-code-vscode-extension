@@ -1,9 +1,9 @@
 import React, { useState, useMemo, useEffect, useRef, useContext } from 'react';
-import { ToggleIcon } from '../../components/ui/IconButton';
+import { TerminalIcon } from '../../components/ui/IconButton';
 import { SessionContext } from '../../SessionContext';
 import BaseBashContent from '../../components/ui/BaseBashContent';
+import ToolRowHeader from './ToolRowHeader';
 import { ToolContent } from '../../types';
-import { CONTINUATION_SYMBOL } from '../../utils/symbols';
 import { streamingStore } from '../../utils/StreamingStore';
 import { useT } from '../../../common/i18n/react';
 
@@ -17,7 +17,7 @@ interface BashBlockProps {
 }
 
 // 模拟终端 \r 行为：\r 将光标移到行首，后续字符覆盖原内容
-const processTerminalOutput = (text: string): string[] => {
+export const processTerminalOutput = (text: string): string[] => {
     const resultLines: string[] = [];
     let currentLineChars: string[] = [];
     let pos = 0;
@@ -145,22 +145,18 @@ const BashBlock: React.FC<BashBlockProps> = ({ content: toolContent, messageId, 
     };
 
     return (
-        <div className="chat-block bash-block">
-            <div className="chat-block-header bash-block-header" onClick={handleToggle}>
-                <div className="chat-block-title bash-block-title">
-                    <span className="chat-block-title-label">Shell</span>
-                    {toolContent.summary && (
-                        <span className="chat-block-title-detail">({toolContent.summary})</span>
-                    )}
-                    {isStreaming && <span className="bash-streaming-dot" />}
-                    <div className="bash-toggle-btn">
-                        <ToggleIcon isExpanded={isExpanded} />
-                    </div>
-                </div>
-                {command && (
-                    <div className="bash-copy-btn" onClick={handleCopy}>{t('common.copy')}</div>
-                )}
-            </div>
+        <div className="chat-block chat-block--borderless bash-block">
+            <ToolRowHeader
+                icon={<TerminalIcon />}
+                streaming={isStreaming}
+                verb={isStreaming ? t('tool.running') : t('tool.ran')}
+                target={toolContent.summary || command}
+                targetTitle={command}
+                expandable
+                isExpanded={isExpanded}
+                onClick={handleToggle}
+                right={command ? <div className="bash-copy-btn" onClick={handleCopy}>{t('common.copy')}</div> : undefined}
+            />
             {isExpanded && (
                 <div className="chat-block-content bash-block-content">
                     {command && (
@@ -177,9 +173,6 @@ const BashBlock: React.FC<BashBlockProps> = ({ content: toolContent, messageId, 
                                 ))}
                             </div>
                         </>
-                    )}
-                    {toolContent.autoAllowedContent && (
-                        <div className="auto-allowed-info">{CONTINUATION_SYMBOL} {toolContent.autoAllowedContent}</div>
                     )}
                 </div>
             )}
