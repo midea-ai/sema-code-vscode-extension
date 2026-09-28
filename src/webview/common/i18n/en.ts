@@ -112,7 +112,7 @@ export const en: Record<keyof typeof zh, string> = {
     'viz.openExternal': 'Open in browser',
     'chat.filePicker.empty': 'No files in workspace',
     'chat.modelMenu.manage': 'Manage models',
-    'chat.tokens.used': 'Used: {used} / {max} tokens',
+    'chat.tokens.usedPercent': 'Context used {percent}',
     'chat.fileChanges.discardAll': 'Discard all',
     'chat.fileChanges.markAdopted': 'Mark adopted',
     'chat.fileChanges.discardFile': 'Discard changes to this file',

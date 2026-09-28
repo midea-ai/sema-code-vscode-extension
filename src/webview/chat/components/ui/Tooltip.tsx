@@ -1,10 +1,13 @@
 import React, { useState, ReactNode, useRef, useEffect } from 'react';
 
 interface TooltipProps {
-    content: string;
+    content: ReactNode;
     children: ReactNode;
     className?: string;
 }
+
+const isEmptyContent = (content: ReactNode) =>
+    content === null || content === undefined || content === false || (typeof content === 'string' && content.trim() === '');
 
 const Tooltip: React.FC<TooltipProps> = ({ content, children, className = '' }) => {
     const [show, setShow] = useState(false);
@@ -13,7 +16,7 @@ const Tooltip: React.FC<TooltipProps> = ({ content, children, className = '' }) 
     const autoHideTimeoutRef = useRef<NodeJS.Timeout | null>(null);
     const wrapperRef = useRef<HTMLDivElement | null>(null);
     const isShowingRef = useRef(false);
-    const prevContentRef = useRef<string>(content);
+    const prevContentRef = useRef<ReactNode>(content);
 
     useEffect(() => {
         return () => {
@@ -28,8 +31,8 @@ const Tooltip: React.FC<TooltipProps> = ({ content, children, className = '' }) 
 
     // 监听content变化，当content变为空时立即隐藏tooltip并清除所有延时
     useEffect(() => {
-        const isEmpty = !content || content.trim() === '';
-        const wasEmpty = !prevContentRef.current || prevContentRef.current.trim() === '';
+        const isEmpty = isEmptyContent(content);
+        const wasEmpty = isEmptyContent(prevContentRef.current);
 
         // 如果content从有内容变为空内容，立即清除所有延时并隐藏tooltip
         // 注意：无论show是什么状态都要清除延时，防止延时触发后tooltip显示
@@ -109,7 +112,7 @@ const Tooltip: React.FC<TooltipProps> = ({ content, children, className = '' }) 
         }, 50);
     };
 
-    if (!content || content.trim() === '') {
+    if (isEmptyContent(content)) {
         return <>{children}</>;
     }
 

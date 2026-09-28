@@ -533,6 +533,19 @@
     visibility: visible;
 }
 
+/* 悬浮提示：首行占用百分比，次行 已用 / 上限 */
+.token-tooltip {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 2px 0;
+}
+
+.token-tooltip-detail {
+    color: var(--chat-text-secondary);
+    font-variant-numeric: tabular-nums;
+}
+
 .token-progress.danger .token-percentage {
     color: var(--chat-color-error);
 }

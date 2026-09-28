@@ -113,7 +113,7 @@ export const zh = {
     'viz.openExternal': '在浏览器打开',
     'chat.filePicker.empty': '工作区中没有文件',
     'chat.modelMenu.manage': '模型管理',
-    'chat.tokens.used': '已使用: {used} / {max} tokens',
+    'chat.tokens.usedPercent': '上下文已使用 {percent}',
     'chat.fileChanges.discardAll': '全部放弃',
     'chat.fileChanges.markAdopted': '已采纳',
     'chat.fileChanges.discardFile': '放弃此文件修改',

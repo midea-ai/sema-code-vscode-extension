@@ -25,12 +25,17 @@ const TokenProgress: React.FC<TokenProgressProps> = React.memo(({ tokenInfo }) =
     // 生成 tooltip 文本
     const formatTokens = (tokens: number) => {
         if (tokens >= 1000) {
-            return `${(tokens / 1000).toFixed(1)}k`;
+            return `${(tokens / 1000).toFixed(1).replace(/\.0$/, '')}K`;
         }
         return tokens.toString();
     };
 
-    const tooltip = t('chat.tokens.used', { used: formatTokens(tokenInfo.useTokens), max: formatTokens(tokenInfo.maxTokens) });
+    const tooltip = (
+        <div className="token-tooltip">
+            <div className="token-tooltip-title">{t('chat.tokens.usedPercent', { percent: `${percentage.toFixed(1)}%` })}</div>
+            <div className="token-tooltip-detail">{formatTokens(tokenInfo.useTokens)} / {formatTokens(tokenInfo.maxTokens)} tokens</div>
+        </div>
+    );
     // 占用越高圆环越醒目：>85% 错误色、>60% 警告色；百分比数字只在悬浮时出现
     const level = percentage > 85 ? 'danger' : percentage > 60 ? 'warn' : '';
 

@@ -104,7 +104,7 @@ export const fr: Partial<Record<keyof typeof zh, string>> = {
     'viz.openExternal': 'Ouvrir dans le navigateur',
     'chat.filePicker.empty': "Aucun fichier dans l'espace de travail",
     'chat.modelMenu.manage': 'Gérer les modèles',
-    'chat.tokens.used': 'Utilisés : {used} / {max} tokens',
+    'chat.tokens.usedPercent': 'Contexte utilisé : {percent}',
     'chat.fileChanges.discardAll': 'Tout ignorer',
     'chat.fileChanges.markAdopted': 'Marquer comme adopté',
     'chat.fileChanges.discardFile': 'Ignorer les modifications de ce fichier',
