@@ -782,7 +782,8 @@ class EditorOps(
     private fun prepareVizEmbed(p: String?, reqId: com.google.gson.JsonElement?) {
         val url: String? = runCatching {
             if (p.isNullOrBlank() || !vizPathRe.containsMatchIn(p)) return@runCatching null
-            val src = File(p).absoluteFile
+            // 工具标题可能是相对项目根的路径（如 ../.sema/attachments/...），按项目根解析，不能按 IDE 进程工作目录
+            val src = File(resolveFullPath(p) ?: return@runCatching null).canonicalFile
             if (!src.isFile) return@runCatching null
             val uuid = src.parentFile.name
             val dir = File(File(System.getProperty("java.io.tmpdir"), "sema-viz"), uuid).apply { mkdirs() }
