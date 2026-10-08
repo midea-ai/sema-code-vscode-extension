@@ -20,5 +20,8 @@ scripts/
 
 # 工具与运行时
 .sema
+.claude
 .idea
 .DS_Store
+
+
