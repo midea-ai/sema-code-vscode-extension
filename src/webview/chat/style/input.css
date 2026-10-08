@@ -568,12 +568,13 @@
     opacity: 0.4;
     font-size: var(--chat-font-sm);
     user-select: none;
+    flex-shrink: 0;
 }
 
-/* Agent 模式容器 */
+/* Agent 模式容器：文案短且不截断，不参与压缩，窄屏由容器查询整体隐藏 */
 .agent-mode-container {
     position: relative;
-    min-width: 0;
+    flex-shrink: 0;
 }
 
 /* Agent 模式按钮 */
@@ -632,7 +633,7 @@
 /* 权限档位选择器容器 */
 .permission-level-container {
     position: relative;
-    min-width: 0;
+    flex-shrink: 0;
 }
 
 /* 权限档位按钮 */
@@ -843,7 +844,8 @@
     font-size: var(--chat-font-sm);
     cursor: pointer;
     transition: color 0.15s;
-    max-width: min(200px, calc(100vw - 120px));
+    /* 既封顶 200px，也不能超过容器被压缩后的宽度，否则长模型名会溢出盖住右侧按钮 */
+    max-width: min(200px, 100%);
     overflow: hidden;
     min-width: 0;
 }
@@ -1039,7 +1041,7 @@ svg.provider-logo-openrouter {
 
 /* 响应式隐藏：侧边栏变窄时依次隐藏底部左侧元素 */
 /* 第一阶段：AutoEdit 消失 */
-@container (max-width: 280px) {
+@container (max-width: 320px) {
     .permission-level-container,
     .separator-autoedit {
         display: none;
