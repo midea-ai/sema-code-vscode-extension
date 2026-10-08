@@ -174,12 +174,6 @@ body {
     text-align: center;
 }
 
-.model-table th:nth-child(4),
-.model-table td:nth-child(4) {
-    width: 80px;
-    text-align: center;
-}
-
 .model-table th {
     font-weight: 600;
     font-size: 12px;
@@ -202,6 +196,13 @@ body {
     display: inline-flex;
     align-items: center;
     gap: 6px;
+}
+
+/* 模型单元格：模型名 + main / quick 角标 */
+.model-cell {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
 }
 
 .provider-cell-logo {
@@ -1075,7 +1076,8 @@ textarea:focus {
 /* 任务徽章样式 */
 .task-badge {
     font-size: 12px;
-    padding: 2px 6px;
+    line-height: 18px;
+    padding: 0 6px;
     border-radius: 4px;
     font-weight: 500;
 }

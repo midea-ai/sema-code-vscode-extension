@@ -471,7 +471,6 @@ export const it: Partial<Record<keyof typeof zh, string>> = {
     // ── config: model list / add model ──
     'config.modelList.provider': 'Provider',
     'config.modelList.model': 'Modello',
-    'config.modelList.task': 'Attività',
     'config.modelList.actions': 'Azioni',
     'config.modelList.empty': 'Nessun modello configurato',
     'config.modelList.editTip': 'Modifica questo modello',
@@ -503,6 +502,7 @@ export const it: Partial<Record<keyof typeof zh, string>> = {
     'config.modelForm.fetchModels': 'Recupera modelli',
     'config.modelForm.fetchHelpBefore': "Impossibile recuperare l'elenco? Questo provider potrebbe non supportare l'elenco dei modelli. È possibile ",
     'config.modelForm.fetchHelpLink': 'inserire manualmente il nome del modello',
+    'config.modelForm.presetHelpBefore': "Elenco di modelli integrato, non recuperato dal server. Per i modelli non presenti è possibile ",
     'config.modelForm.modelNamePlaceholderExample': 'Inserire un nome di modello, es. {model}',
     'config.modelForm.modelNamePlaceholder': 'Inserire un nome di modello',
     'config.modelForm.apiType': 'Tipo di API',

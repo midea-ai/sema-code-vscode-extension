@@ -471,7 +471,6 @@ export const fr: Partial<Record<keyof typeof zh, string>> = {
     // ── config: model list / add model ──
     'config.modelList.provider': 'Fournisseur',
     'config.modelList.model': 'Modèle',
-    'config.modelList.task': 'Tâche',
     'config.modelList.actions': 'Actions',
     'config.modelList.empty': 'Aucun modèle configuré',
     'config.modelList.editTip': 'Modifier ce modèle',
@@ -503,6 +502,7 @@ export const fr: Partial<Record<keyof typeof zh, string>> = {
     'config.modelForm.fetchModels': 'Récupérer les modèles',
     'config.modelForm.fetchHelpBefore': 'Impossible de récupérer la liste ? Ce fournisseur ne permet peut-être pas de lister les modèles. Vous pouvez ',
     'config.modelForm.fetchHelpLink': 'saisir le nom du modèle manuellement',
+    'config.modelForm.presetHelpBefore': "Liste de modèles intégrée, non récupérée depuis le serveur. Pour un modèle absent de la liste, vous pouvez ",
     'config.modelForm.modelNamePlaceholderExample': 'Saisissez un nom de modèle, ex. {model}',
     'config.modelForm.modelNamePlaceholder': 'Saisissez un nom de modèle',
     'config.modelForm.apiType': "Type d'API",

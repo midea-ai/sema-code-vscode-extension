@@ -86,14 +86,13 @@ const ModelList: React.FC<ModelListProps> = ({ config, vscode }) => {
                     <tr>
                         <th>{t('config.modelList.provider')}</th>
                         <th>{t('config.modelList.model')}</th>
-                        <th>{t('config.modelList.task')}</th>
                         <th>{t('config.modelList.actions')}</th>
                     </tr>
                 </thead>
                 <tbody>
                     {!hasModels ? (
                         <tr>
-                            <td colSpan={4} className="empty-state">{t('config.modelList.empty')}</td>
+                            <td colSpan={3} className="empty-state">{t('config.modelList.empty')}</td>
                         </tr>
                     ) : (
                         sortedModelList.map((modelName, index) => {
@@ -108,13 +107,15 @@ const ModelList: React.FC<ModelListProps> = ({ config, vscode }) => {
                                             {provider}
                                         </span>
                                     </td>
-                                    <td>{modelDisplayName}</td>
                                     <td>
-                                        {taskType !== '-' && (
-                                            <span className={`task-badge task-${taskType}`}>
-                                                {taskType}
-                                            </span>
-                                        )}
+                                        <span className="model-cell">
+                                            {modelDisplayName}
+                                            {taskType !== '-' && (
+                                                <span className={`task-badge task-${taskType}`}>
+                                                    {taskType}
+                                                </span>
+                                            )}
+                                        </span>
                                     </td>
                                     <td>
                                         <div className="section-icon-btn-group">

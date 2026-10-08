@@ -574,7 +574,6 @@ export const zh = {
     // ── 配置页：模型列表 / 新增模型 ──
     'config.modelList.provider': '服务提供商',
     'config.modelList.model': '模型',
-    'config.modelList.task': '任务',
     'config.modelList.actions': '操作',
     'config.modelList.empty': '暂无配置的模型',
     'config.modelList.editTip': '编辑此模型',
@@ -609,6 +608,7 @@ export const zh = {
     'config.modelForm.fetchModels': '获取模型',
     'config.modelForm.fetchHelpBefore': '获取不到模型列表？该服务商可能不支持列出模型，可以',
     'config.modelForm.fetchHelpLink': '手动输入模型名称',
+    'config.modelForm.presetHelpBefore': '当前为内置模型列表，未从服务端获取；列表中没有的模型可以',
     'config.modelForm.modelNamePlaceholderExample': '输入模型名称，例如: {model}',
     'config.modelForm.modelNamePlaceholder': '输入模型名称',
     'config.modelForm.apiType': 'API 类型',

@@ -471,7 +471,6 @@ export const de: Partial<Record<keyof typeof zh, string>> = {
     // ── config: model list / add model ──
     'config.modelList.provider': 'Anbieter',
     'config.modelList.model': 'Modell',
-    'config.modelList.task': 'Aufgabe',
     'config.modelList.actions': 'Aktionen',
     'config.modelList.empty': 'Keine Modelle konfiguriert',
     'config.modelList.editTip': 'Dieses Modell bearbeiten',
@@ -503,6 +502,7 @@ export const de: Partial<Record<keyof typeof zh, string>> = {
     'config.modelForm.fetchModels': 'Modelle abrufen',
     'config.modelForm.fetchHelpBefore': 'Liste nicht abrufbar? Dieser Anbieter unterstützt das Auflisten von Modellen möglicherweise nicht. Sie können ',
     'config.modelForm.fetchHelpLink': 'den Modellnamen manuell eingeben',
+    'config.modelForm.presetHelpBefore': 'Dies ist eine integrierte Modellliste, nicht vom Server abgerufen. Für nicht aufgeführte Modelle können Sie ',
     'config.modelForm.modelNamePlaceholderExample': 'Modellnamen eingeben, z. B. {model}',
     'config.modelForm.modelNamePlaceholder': 'Modellnamen eingeben',
     'config.modelForm.apiType': 'API-Typ',

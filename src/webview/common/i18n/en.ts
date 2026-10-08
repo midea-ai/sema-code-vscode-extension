@@ -573,7 +573,6 @@ export const en: Record<keyof typeof zh, string> = {
     // ── config: model list / add model ──
     'config.modelList.provider': 'Provider',
     'config.modelList.model': 'Model',
-    'config.modelList.task': 'Task',
     'config.modelList.actions': 'Actions',
     'config.modelList.empty': 'No models configured',
     'config.modelList.editTip': 'Edit this model',
@@ -608,6 +607,7 @@ export const en: Record<keyof typeof zh, string> = {
     'config.modelForm.fetchModels': 'Fetch models',
     'config.modelForm.fetchHelpBefore': "Can't fetch the list? This provider may not support listing models. You can ",
     'config.modelForm.fetchHelpLink': 'enter the model name manually',
+    'config.modelForm.presetHelpBefore': 'This is a built-in model list, not fetched from the server. For models not listed, you can ',
     'config.modelForm.modelNamePlaceholderExample': 'Enter a model name, e.g. {model}',
     'config.modelForm.modelNamePlaceholder': 'Enter a model name',
     'config.modelForm.apiType': 'API type',
