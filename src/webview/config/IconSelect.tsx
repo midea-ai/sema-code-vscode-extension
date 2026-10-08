@@ -35,6 +35,7 @@ const IconSelect: React.FC<IconSelectProps> = ({ id, value, options, onChange, d
     const [open, setOpen] = useState(false);
     const [filter, setFilter] = useState('');
     const wrapperRef = useRef<HTMLDivElement>(null);
+    const menuRef = useRef<HTMLDivElement>(null);
 
     // 点击组件外部时收起
     useEffect(() => {
@@ -46,6 +47,15 @@ const IconSelect: React.FC<IconSelectProps> = ({ id, value, options, onChange, d
         };
         document.addEventListener('mousedown', onClickOutside);
         return () => document.removeEventListener('mousedown', onClickOutside);
+    }, [open]);
+
+    // 展开时把已选项滚到面板中间，而不是停在列表开头（面板是 absolute 定位，item.offsetTop 相对面板）
+    useEffect(() => {
+        if (!open) return;
+        const menu = menuRef.current;
+        const item = menu?.querySelector<HTMLElement>('.icon-select-item.selected');
+        if (!menu || !item) return;
+        menu.scrollTop = item.offsetTop - (menu.clientHeight - item.offsetHeight) / 2;
     }, [open]);
 
     const current = options.find(opt => opt.value === value);
@@ -84,12 +94,11 @@ const IconSelect: React.FC<IconSelectProps> = ({ id, value, options, onChange, d
                 <span className="icon-select-name">{current ? (current.selectedLabel ?? current.label) : (value || placeholder || '')}</span>
             </button>
             {open && (
-                <div className="icon-select-menu">
+                <div className="icon-select-menu" ref={menuRef}>
                     {searchable && (
                         <div className="icon-select-search">
                             <input
                                 type="text"
-                                autoFocus
                                 value={filter}
                                 placeholder={t('config.iconSelect.searchPlaceholder')}
                                 onChange={(e) => setFilter(e.target.value)}
