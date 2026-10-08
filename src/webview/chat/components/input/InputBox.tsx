@@ -85,6 +85,8 @@ interface InputBoxProps {
     modelName: string;
     availableModels: string[];
     agentMode: AgentMode;
+    /** 已有消息的 Design 会话锁定模式，菜单只留 Design */
+    agentModeLocked?: boolean;
     onAgentModeChange: (mode: AgentMode) => void;
     permissionLevel: PermissionLevel;
     onPermissionLevelChange: (level: PermissionLevel) => void;
@@ -104,6 +106,7 @@ const InputBox = forwardRef<InputBoxHandle, InputBoxProps>(({
     modelName,
     availableModels,
     agentMode,
+    agentModeLocked,
     onAgentModeChange,
     permissionLevel,
     onPermissionLevelChange,
@@ -1189,6 +1192,7 @@ const InputBox = forwardRef<InputBoxHandle, InputBoxProps>(({
                         <AgentModeMenu
                             show={agentModeMenu.showAgentModeMenu}
                             currentMode={agentMode}
+                            modes={agentModeLocked ? ['Design'] : undefined}
                             onModeSelect={agentModeMenu.handleAgentModeSelect}
                             agentModeMenuRef={agentModeMenuRef}
                         />

@@ -745,7 +745,10 @@ const ChatSession: React.FC<ChatSessionProps> = ({ vscode: rawVscode, sessionId,
     const showModelReminder = modelInfoLoaded && availableModels.length === 0 && !modelReminderDismissed;
     const inputPlaceholder = inputPlaceholderMsg ?? (inputDisabled ? t('chat.initializing') : t('chat.inputPlaceholder'));
 
+    // 已有消息的 Design 会话不能切到 Agent/Plan：上下文已按 Design 铺开，切出无意义
+    const agentModeLocked = agentMode === 'Design' && messages.length > 0;
     const handleAgentModeChange = (mode: AgentMode) => {
+        if (agentModeLocked && mode !== 'Design') return;
         setAgentMode(mode);
         vscode.postMessage({
             type: 'updateAgentMode',
@@ -1134,6 +1137,7 @@ const ChatSession: React.FC<ChatSessionProps> = ({ vscode: rawVscode, sessionId,
                     modelName={modelName}
                     availableModels={availableModels}
                     agentMode={agentMode}
+                    agentModeLocked={agentModeLocked}
                     onAgentModeChange={handleAgentModeChange}
                     permissionLevel={permissionLevel}
                     onPermissionLevelChange={handlePermissionLevelChange}
