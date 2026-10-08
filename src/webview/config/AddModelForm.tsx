@@ -100,8 +100,6 @@ const AddModelForm: React.FC<AddModelFormProps> = ({ onSuccess, onCancelEdit, ed
     const [message, setMessage] = useState<{ text: string; type: 'success' | 'error' | '' }>({ text: '', type: '' });
     const [isFetchingModels, setIsFetchingModels] = useState(false);
     const [fetchModelsFailed, setFetchModelsFailed] = useState(false);
-    /** 模型列表来源：remote = core 从服务端获取，preset = 应用层内置列表，none = 没有列表 */
-    const [modelListSource, setModelListSource] = useState<'remote' | 'preset' | 'none'>('none');
     const [connectionTested, setConnectionTested] = useState(false);
     const [connectionSuccess, setConnectionSuccess] = useState(false);
     const [lastFetchedConfig, setLastFetchedConfig] = useState({ baseURL: '', apiKey: '' });
@@ -114,8 +112,7 @@ const AddModelForm: React.FC<AddModelFormProps> = ({ onSuccess, onCancelEdit, ed
     }, [active, editModel]);
 
     /** 把模型列表填入下拉并选中默认模型，remote 与 preset 两种来源共用 */
-    const applyModelList = (models: Model[], source: 'remote' | 'preset') => {
-        setModelListSource(source);
+    const applyModelList = (models: Model[]) => {
         setFetchModelsFailed(false);
         setAvailableModels(models);
 
@@ -183,7 +180,7 @@ const AddModelForm: React.FC<AddModelFormProps> = ({ onSuccess, onCancelEdit, ed
                     }
 
                     if (msg.success && msg.models && msg.models.length > 0) {
-                        applyModelList(msg.models, 'remote');
+                        applyModelList(msg.models);
                         setTestStatus({
                             message: t('config.modelForm.fetchedModels', { count: msg.models.length }),
                             type: 'success'
@@ -199,9 +196,8 @@ const AddModelForm: React.FC<AddModelFormProps> = ({ onSuccess, onCancelEdit, ed
                         });
                         // 远端拿不到时用内置列表兜底，没有内置列表才算没有模型列表
                         if (providerConfig.presetModels?.length) {
-                            applyModelList(providerConfig.presetModels, 'preset');
+                            applyModelList(providerConfig.presetModels);
                         } else {
-                            setModelListSource('none');
                             setFetchModelsFailed(true);
                         }
                     }
@@ -228,7 +224,6 @@ const AddModelForm: React.FC<AddModelFormProps> = ({ onSuccess, onCancelEdit, ed
         setTestStatus({ message: '', type: '' });
         setLastFetchedConfig({ baseURL: '', apiKey: '' });
         setFetchModelsFailed(false);
-        setModelListSource('none');
         setIsManualInput(false);
         setMaxTokens(String(defaults.defaultMaxTokens ?? DEFAULT_MAX_TOKENS));
         setSelectedModelMaxTokens(null);
@@ -269,7 +264,6 @@ const AddModelForm: React.FC<AddModelFormProps> = ({ onSuccess, onCancelEdit, ed
         setMessage({ text: '', type: '' });
         setLastFetchedConfig({ baseURL: '', apiKey: '' });
         setFetchModelsFailed(false);
-        setModelListSource('none');
     }, [editModel, editNonce]);
 
     /** 编辑模式下只有连接相关字段相对回填值有改动才要求重新测试连接；只改 token 数不用重测 */
@@ -294,7 +288,7 @@ const AddModelForm: React.FC<AddModelFormProps> = ({ onSuccess, onCancelEdit, ed
 
         // 没有列表接口但有内置列表的服务商，直接使用内置列表，不请求 core
         if (!providerConfig.modelsUrl && providerConfig.presetModels?.length) {
-            applyModelList(providerConfig.presetModels, 'preset');
+            applyModelList(providerConfig.presetModels);
             setTestStatus({ message: '', type: '' });
             return;
         }
@@ -543,17 +537,6 @@ const AddModelForm: React.FC<AddModelFormProps> = ({ onSuccess, onCancelEdit, ed
                             {fetchModelsFailed && availableModels.length === 0 && (
                                 <div className="description" style={{ marginTop: 0 }}>
                                     {t('config.modelForm.fetchHelpBefore')}
-                                    <span
-                                        style={{ color: 'var(--vscode-textLink-foreground)', cursor: 'pointer', textDecoration: 'underline' }}
-                                        onClick={() => setIsManualInput(true)}
-                                    >
-                                        {t('config.modelForm.fetchHelpLink')}
-                                    </span>
-                                </div>
-                            )}
-                            {modelListSource === 'preset' && availableModels.length > 0 && (
-                                <div className="description" style={{ marginTop: 0 }}>
-                                    {t('config.modelForm.presetHelpBefore')}
                                     <span
                                         style={{ color: 'var(--vscode-textLink-foreground)', cursor: 'pointer', textDecoration: 'underline' }}
                                         onClick={() => setIsManualInput(true)}
