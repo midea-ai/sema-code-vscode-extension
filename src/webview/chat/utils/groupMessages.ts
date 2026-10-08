@@ -3,6 +3,7 @@ import {
     TOOL_NAME_CREATE_CRON,
     TOOL_NAME_DEL_CRON,
     TOOL_NAME_FETCH_URL,
+    TOOL_NAME_GENERATE_IMAGE,
     TOOL_NAME_LIST_CRONS,
     TOOL_NAME_PATCH_FILE,
     TOOL_NAME_PEEK_BG_JOB,
@@ -17,7 +18,9 @@ import { isMcpToolType, parseMcpToolName } from './permissionUtils';
 
 export type RenderItem =
     | { kind: 'message'; message: Message; originalIndex: number }
-    | { kind: 'group'; id: string; messages: Message[]; originalStartIndex: number };
+    | { kind: 'group'; id: string; messages: Message[]; originalStartIndex: number }
+    /** 相邻的多次 generate_image 调用合并成一行（对齐 core webui 的 GenImageCard） */
+    | { kind: 'genImage'; id: string; messages: Message[]; originalStartIndex: number };
 
 interface GroupMessagesOptions {
     streamingToolId?: string | null;
@@ -148,6 +151,11 @@ export const getMcpServerName = (message: Message): string | null => {
     }
 
     return parseMcpToolName(toolName).mcpName || null;
+};
+
+/** 生成图片的工具消息（生成中或已完成；执行报错是 system 消息，不在此列，会打断合并） */
+export const isGenImageMessage = (message: Message): boolean => {
+    return message.type === 'tool' && getToolName(message) === TOOL_NAME_GENERATE_IMAGE;
 };
 
 /** 工具执行报错（system/tool_error）：任何工具的报错都可并入混合工具组，但不计入组头文案与成组门槛 */
@@ -298,9 +306,31 @@ export const groupMessages = (
 ): RenderItem[] => {
     const items: RenderItem[] = [];
     let run: RunItem[] = [];
+    // 相邻的生成图片调用（中间只隔无可见内容的 assistant 消息）合并成一行；id 取首条，追加时组件实例不重建
+    let genImageRun: RunItem[] = [];
+    const flushGenImageRun = () => {
+        if (genImageRun.length === 0) {
+            return;
+        }
+        items.push({
+            kind: 'genImage',
+            id: `gen-image-${genImageRun[0].message.id}`,
+            messages: genImageRun.map(({ message }) => message),
+            originalStartIndex: genImageRun[0].index,
+        });
+        genImageRun = [];
+    };
 
     messages.forEach((message, index) => {
+        if (isGenImageMessage(message)) {
+            flushRun(items, run, true, options.streamingToolId);
+            run = [];
+            genImageRun.push({ message, index });
+            return;
+        }
+
         if (isGroupableToolMessage(message)) {
+            flushGenImageRun();
             run.push({ message, index });
             return;
         }
@@ -309,12 +339,14 @@ export const groupMessages = (
             return;
         }
 
+        flushGenImageRun();
         const closed = !isPendingEmptyAssistantMessage(message, options.showThinkingText);
         flushRun(items, run, closed, options.streamingToolId);
         run = [];
         items.push({ kind: 'message', message, originalIndex: index });
     });
 
+    flushGenImageRun();
     flushRun(items, run, !!options.tailClosed, options.streamingToolId);
 
     return items;

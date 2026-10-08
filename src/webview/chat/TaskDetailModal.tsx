@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom';
 import { Message, VscodeApi } from './types';
 import MessageItem from './MessageItem';
 import GroupedToolBlock from './blocks/tools/GroupedToolBlock';
+import GeneratedImageBlock from './blocks/tools/GeneratedImageBlock';
 import { groupMessages } from './utils/groupMessages';
 import { useT } from '../common/i18n/react';
 
@@ -126,6 +127,13 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                 return (
                     <div key={item.id} className="msg-wrap">
                         <GroupedToolBlock messages={item.messages} vscode={vscode} />
+                    </div>
+                );
+            }
+            if (item.kind === 'genImage') {
+                return (
+                    <div key={item.id} className="msg-wrap">
+                        <GeneratedImageBlock contents={item.messages.map(m => m.content)} vscode={vscode} />
                     </div>
                 );
             }

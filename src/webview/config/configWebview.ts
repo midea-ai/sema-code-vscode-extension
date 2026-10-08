@@ -111,6 +111,11 @@ export class ConfigWebviewProvider {
                 updateDisabledTools:        () => this.updateDisabledTools(m.disabledTools),
                 getModelAdapter:            () => Promise.resolve(this.getModelAdapter(m.provider, m.modelName, m.baseURL)),
                 getModelProfile:            () => this.getModelProfile(m.provider, m.modelName),
+                saveImageConfig:            () => this.saveImageConfig(m.data),
+                deleteImageModel:           () => this.deleteImageModel(m.modelName),
+                switchImageModel:           () => this.switchImageModel(m.modelName),
+                fetchImageModels:           () => this.fetchImageModels(m.data),
+                getImageModelProfile:       () => this.getImageModelProfile(m.provider, m.modelName),
                 loadPluginConfig:           () => this.loadPluginConfig(),
                 refreshPluginConfig:        () => this.refreshPluginConfig(),
                 installPlugin:              () => this.installPlugin(m.pluginName, m.marketplaceName, m.scope, m.key),
@@ -431,6 +436,61 @@ export class ConfigWebviewProvider {
             const profile = this.coreManager.getModelProfile(provider, modelName);
             if (!profile) throw new Error(t('host.cfg.modelNotExist', { name: `${modelName}[${provider}]` }));
             this.postMessage({ command: 'modelProfileResult', profile });
+        });
+    }
+
+    // ─── Image Models ─────────────────────────────────────────────────────────
+
+    private async saveImageConfig(data: { provider: string; modelName: string; baseURL: string; apiKey: string; isEdit?: boolean }) {
+        const { provider, modelName, baseURL, apiKey, isEdit } = data;
+        await this.execute('saveImageResult', isEdit ? t('host.cfg.op.saveModel') : t('host.cfg.op.addImageModel'), async () => {
+            // 编辑与新增走同一接口：core 对同名 (provider, modelName) 原地覆盖
+            await this.coreManager.addImageModel({ provider, modelName, baseURL, apiKey });
+            this.postMessage({ command: 'saveImageResult', success: true, message: isEdit ? t('host.cfg.modelSaved') : t('host.cfg.modelAdded') });
+            this.loadConfig();
+        });
+    }
+
+    /** 删除图像模型：与对话模型不同，被 image 指针引用时也允许删除，core 会把指针移到剩余的第一个 */
+    private async deleteImageModel(modelName: string) {
+        if (!await this.confirm(t('host.cfg.deleteImageModelConfirm', { name: modelName }), t('common.delete'))) return;
+        await this.execute('deleteResult', t('host.cfg.op.deleteModel'), async () => {
+            await this.coreManager.deleteImageModel(modelName);
+            this.postMessage({ command: 'deleteResult', success: true, message: t('host.cfg.modelDeleted') });
+            this.loadConfig();
+        });
+    }
+
+    /** 任务配置 Image 行选完即落盘；空串表示停用文生图 */
+    private async switchImageModel(modelName: string) {
+        await this.execute('', t('host.cfg.op.updateTask'), async () => {
+            await this.coreManager.switchImageModel(modelName ?? '');
+            this.loadConfig();
+        });
+    }
+
+    /** 图像模型列表走独立的回包命令，避免与常驻挂载的对话模型表单共用 modelsResult 串台 */
+    private async fetchImageModels(data: { provider: string; baseURL: string; apiKey: string; adapt: 'openai' | 'anthropic'; modelsUrl?: string }) {
+        try {
+            await this.ensureCoreReady();
+            const result = await this.coreManager.fetchAvailableModels(data);
+            this.postMessage({
+                command: 'imageModelsResult', success: result.success,
+                models: result.models || [],
+                message: result.success
+                    ? (result.message || t('host.cfg.fetchModelsOk'))
+                    : `${result.message || t('host.cfg.fetchModelsFailed')}${result.curlCommand ? '\n' + t('host.cfg.debugCommand') + result.curlCommand : ''}`
+            });
+        } catch (error) {
+            this.postMessage({ command: 'imageModelsResult', success: false, models: [], message: `${t('host.cfg.fetchModelsFailed')}: ${(error as Error).message}` });
+        }
+    }
+
+    private async getImageModelProfile(provider: string, modelName: string) {
+        await this.execute('', t('host.cfg.op.readModel'), async () => {
+            const profile = this.coreManager.getImageModelProfile(provider, modelName);
+            if (!profile) throw new Error(t('host.cfg.modelNotExist', { name: `${modelName}[${provider}]` }));
+            this.postMessage({ command: 'imageModelProfileResult', profile });
         });
     }
 

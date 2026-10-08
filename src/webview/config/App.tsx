@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Config, ModelProfile, VscodeApi } from './types';
+import { Config, ModelProfile, ImageModelProfile, VscodeApi } from './types';
 import ModelList from './ModelList';
 import TaskConfig from './TaskConfig';
 import AddModelForm from './AddModelForm';
+import ImageModelList from './ImageModelList';
+import AddImageModelForm from './AddImageModelForm';
 import SystemConfig from './SystemConfig';
 import MCPConfig from './MCPConfig';
 import SkillConfig from './SkillConfig';
@@ -21,7 +23,7 @@ import { RefreshIcon } from './utils/svgIcons';
 import { setLang, useT } from '../common/i18n/react';
 
 type PageType = 'models' | 'system' | 'memory' | 'mcp' | 'skill' | 'agent' | 'hooks' | 'command' | 'plugin' | 'task' | 'design' | 'import' | 'claw' | 'usage';
-type ModelTabType = 'list' | 'add';
+type ModelTabType = 'list' | 'add' | 'addImage';
 
 /**
  * 扩展的几个子页 → 各自的拉取命令。新会话时 core 会重扫插件并级联刷新
@@ -61,6 +63,9 @@ const App: React.FC<AppProps> = ({ vscode }) => {
      */
     const [editModel, setEditModel] = useState<ModelProfile | null>(null);
     const [editNonce, setEditNonce] = useState(0);
+    /** 正在编辑的图像模型，规则同 editModel；两个表单各自独立 */
+    const [editImageModel, setEditImageModel] = useState<ImageModelProfile | null>(null);
+    const [editImageNonce, setEditImageNonce] = useState(0);
     const currentPageRef = useRef(currentPage);
     const taskTabRef = useRef(taskTab);
     currentPageRef.current = currentPage;
@@ -117,6 +122,14 @@ const App: React.FC<AppProps> = ({ vscode }) => {
                         setModelTab('add');
                     }
                     break;
+                case 'imageModelProfileResult':
+                    if (message.profile) {
+                        setEditImageModel(message.profile);
+                        setEditImageNonce(n => n + 1);
+                        setCurrentPage('models');
+                        setModelTab('addImage');
+                    }
+                    break;
             }
         };
 
@@ -131,11 +144,19 @@ const App: React.FC<AppProps> = ({ vscode }) => {
 
     // 离开模型页即退出编辑：模型页是条件渲染，回来时表单重新挂载，不能再带着编辑目标回填
     useEffect(() => {
-        if (currentPage !== 'models') setEditModel(null);
+        if (currentPage !== 'models') {
+            setEditModel(null);
+            setEditImageModel(null);
+        }
     }, [currentPage]);
 
     const exitEditToList = () => {
         setEditModel(null);
+        setModelTab('list');
+    };
+
+    const exitImageEditToList = () => {
+        setEditImageModel(null);
         setModelTab('list');
     };
 
@@ -212,13 +233,20 @@ const App: React.FC<AppProps> = ({ vscode }) => {
                             >
                                 {t('config.tab.addModel')}
                             </div>
+                            <div
+                                className={`tab-item ${modelTab === 'addImage' ? 'active' : ''}`}
+                                onClick={() => { setEditImageModel(null); setModelTab('addImage'); }}
+                            >
+                                {t('config.tab.addImageModel')}
+                            </div>
                         </div>
 
                         {/* 标签页内容 */}
                         <div className="tab-content">
                             <div style={{ display: modelTab === 'list' ? 'block' : 'none' }}>
-                                <ModelList config={config} vscode={vscode} />
+                                <ModelList config={config} vscode={vscode} onAdd={() => { setEditModel(null); setModelTab('add'); }} />
                                 <TaskConfig config={config} vscode={vscode} />
+                                <ImageModelList config={config} vscode={vscode} onAdd={() => { setEditImageModel(null); setModelTab('addImage'); }} />
                             </div>
                             <div style={{ display: modelTab === 'add' ? 'block' : 'none' }}>
                                 <AddModelForm
@@ -227,6 +255,16 @@ const App: React.FC<AppProps> = ({ vscode }) => {
                                     editModel={editModel}
                                     editNonce={editNonce}
                                     active={modelTab === 'add'}
+                                    vscode={vscode}
+                                />
+                            </div>
+                            <div style={{ display: modelTab === 'addImage' ? 'block' : 'none' }}>
+                                <AddImageModelForm
+                                    onSuccess={exitImageEditToList}
+                                    onCancelEdit={exitImageEditToList}
+                                    editModel={editImageModel}
+                                    editNonce={editImageNonce}
+                                    active={modelTab === 'addImage'}
                                     vscode={vscode}
                                 />
                             </div>

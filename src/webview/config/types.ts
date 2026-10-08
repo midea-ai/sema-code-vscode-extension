@@ -24,6 +24,15 @@ export interface ModelProfile {
     thinkingHistoryPolicy?: ThinkingHistoryPolicy;
 }
 
+/** core 落盘的单个图像模型配置（与 sema-core ImageModelProfile 同形），编辑时由 getImageModelProfile 回填表单 */
+export interface ImageModelProfile {
+    name: string;
+    provider: string;
+    modelName: string;
+    baseURL: string;
+    apiKey: string;
+}
+
 export interface TaskConfig {
     main: string;
     quick: string;
@@ -72,7 +81,11 @@ export interface ModelUpdateData {
     taskConfig: {
         main: string;
         quick: string;
+        /** 图像模型指针，空串 / 缺省表示未启用；旧版 core 不返回 */
+        image?: string;
     };
+    /** 图像模型列表（与 modelList 分开），旧版 core 不返回 */
+    imageModelList?: string[];
 }
 
 // webview 配置接口，直接使用 ModelUpdateData

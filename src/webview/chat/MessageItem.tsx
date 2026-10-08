@@ -16,7 +16,8 @@ import AskFormDialog from './components/ui/AskFormDialog';
 import SupplementaryInfo from './components/ui/SupplementaryInfo';
 import PlanImplementPanel from './components/ui/PlanImplementPanel';
 import TaskEndBlock from './blocks/TaskEndBlock';
-import { TOOL_NAME_WRITE_FILE, TOOL_NAME_PATCH_FILE, TOOL_NAME_EDIT_NOTEBOOK, TOOL_NAME_VIEW_FILE, TOOL_NAME_RUN_SHELL, TOOL_NAME_PEEK_BG_JOB } from '../../utils/tool';
+import GeneratedImageBlock from './blocks/tools/GeneratedImageBlock';
+import { TOOL_NAME_WRITE_FILE, TOOL_NAME_PATCH_FILE, TOOL_NAME_EDIT_NOTEBOOK, TOOL_NAME_VIEW_FILE, TOOL_NAME_RUN_SHELL, TOOL_NAME_PEEK_BG_JOB, TOOL_NAME_GENERATE_IMAGE } from '../../utils/tool';
 
 interface MessageItemProps {
     message: Message;
@@ -83,6 +84,8 @@ const MessageItem: React.FC<MessageItemProps> = React.memo(({
                 return <BashBlock content={message.content} messageId={message.id} vscode={vscode} isLast={isLastMessage} />;
             case TOOL_NAME_PEEK_BG_JOB:
                 return <BackgroundJobBlock content={message.content} messageId={message.id} vscode={vscode} isLast={isLastMessage} />;
+            case TOOL_NAME_GENERATE_IMAGE:
+                return <GeneratedImageBlock contents={[message.content]} vscode={vscode} />;
             case 'Agent':
                 return (
                     <AgentBlock

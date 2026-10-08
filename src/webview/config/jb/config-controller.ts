@@ -135,6 +135,42 @@ export class ConfigController {
                     this.postToApp({ command: 'modelProfileResult', success: false, profile: null, message: t('host.cfg.readModelFailed', { error: e?.message || '' }) });
                 }
                 break;
+            // ─── Image Models ─────────────────────────────────────────
+            case 'saveImageConfig':
+                await this.respond('saveImageResult',
+                    () => this.core.addImageModel({ provider: m.data.provider, modelName: m.data.modelName, baseURL: m.data.baseURL, apiKey: m.data.apiKey }),
+                    () => ({ message: m.data.isEdit ? t('host.cfg.modelSaved') : t('host.cfg.modelAdded') }), undefined);
+                await this.loadConfig();
+                break;
+            case 'deleteImageModel':
+                if (!await this.confirm(t('host.cfg.deleteImageModelConfirm', { name: m.modelName }), t('common.delete'))) break;
+                await this.respond('deleteResult', () => this.core.delImageModel(m.modelName), () => ({ message: t('host.cfg.modelDeleted') }), undefined);
+                await this.loadConfig();
+                break;
+            case 'switchImageModel':
+                try { await this.ensureInit(); await this.core.switchImageModel(m.modelName ?? ''); } catch { /* ignore */ }
+                await this.loadConfig();
+                break;
+            case 'fetchImageModels':
+                try {
+                    await this.ensureInit();
+                    const r = await this.core.fetchAvailableModels(m.data);
+                    this.postToApp({ command: 'imageModelsResult', success: r.success, models: r.models || [], message: r.success ? (r.message || t('host.cfg.fetchModelsOk')) : `${r.message || t('host.cfg.fetchModelsFailed')}${r.curlCommand ? '\n' + t('host.cfg.debugCommand') + r.curlCommand : ''}` });
+                } catch (e: any) {
+                    this.postToApp({ command: 'imageModelsResult', success: false, models: [], message: `${t('host.cfg.fetchModelsFailed')}: ${e?.message || ''}` });
+                }
+                break;
+            case 'getImageModelProfile':
+                try {
+                    await this.ensureInit();
+                    const profile = await this.core.getImageModelProfile(m.provider, m.modelName);
+                    if (!profile) throw new Error(t('host.cfg.modelNotExist', { name: `${m.modelName}[${m.provider}]` }));
+                    this.postToApp({ command: 'imageModelProfileResult', profile });
+                } catch (e: any) {
+                    console.warn('[config] getImageModelProfile failed:', e?.message || e);
+                    this.postToApp({ command: 'imageModelProfileResult', success: false, profile: null, message: t('host.cfg.readModelFailed', { error: e?.message || '' }) });
+                }
+                break;
             case 'testConnection':
                 try {
                     await this.ensureInit();

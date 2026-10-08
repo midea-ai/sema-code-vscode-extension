@@ -11,6 +11,8 @@ import {
     ApiTestResult,
     ModelUpdateData,
     ModelProfile,
+    ImageModelConfig,
+    ImageModelProfile,
     UpdatableCoreConfig,
     ToolInfo,
     MarketplacePluginsInfo,
@@ -47,7 +49,7 @@ function toCoreSystemConfig(config: Record<string, any>): UpdatableCoreConfig {
 }
 
 /** 触发全局模型数据变化的操作；switchModel / applyTaskModel 会改全局主模型指针，需同步到活跃会话 */
-export type ModelUpdateOrigin = 'addModel' | 'deleteModel' | 'switchModel' | 'applyTaskModel';
+export type ModelUpdateOrigin = 'addModel' | 'deleteModel' | 'switchModel' | 'applyTaskModel' | 'imageModel';
 
 export interface ProcessWrapperCallbacks {
     /** 模型配置变化（addModel / switchModel 等触发），origin 标明来源 */
@@ -174,6 +176,31 @@ export class SemaProcessWrapper {
     /** 按 (provider, modelName) 取单个模型的完整落盘配置（含明文 apiKey），配置页编辑模型时回填表单用 */
     public getModelProfile(provider: string, modelName: string): ModelProfile | null {
         return this.semaCore.getModelProfile(provider, modelName);
+    }
+
+    // ===== 图像模型（与对话模型分开存放；变更只刷新列表，不涉及主模型指针同步）=====
+
+    public async addImageModel(config: ImageModelConfig): Promise<ModelUpdateData> {
+        const result = await this.semaCore.addImageModel(config);
+        this.callbacks.onModelUpdate?.(result, 'imageModel');
+        return result;
+    }
+
+    public async deleteImageModel(modelName: string): Promise<ModelUpdateData> {
+        const result = await this.semaCore.delImageModel(modelName);
+        this.callbacks.onModelUpdate?.(result, 'imageModel');
+        return result;
+    }
+
+    /** 切换图像模型指针；传空串表示停用文生图 */
+    public async switchImageModel(modelName: string): Promise<ModelUpdateData> {
+        const result = await this.semaCore.switchImageModel(modelName);
+        this.callbacks.onModelUpdate?.(result, 'imageModel');
+        return result;
+    }
+
+    public getImageModelProfile(provider: string, modelName: string): ImageModelProfile | null {
+        return this.semaCore.getImageModelProfile(provider, modelName);
     }
 
     /** 删除单个会话在 ~/.sema/history 下的历史文件（会话从历史列表删除时同步清理） */

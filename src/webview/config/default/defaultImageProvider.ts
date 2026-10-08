@@ -1,0 +1,74 @@
+import type { I18nKey } from '../../common/i18n/react';
+
+/**
+ * 图像模型服务商预设。
+ * core 对所有服务商都按 OpenAI Images 形态请求：baseURL 以 /images 或 /images/generations 结尾时原样使用，否则追加 /images/generations。
+ */
+export interface ImageProviderDefaults {
+    /** 显示名（品牌名写死，不进字典）；需要按语言显示的服务商（如自定义接口）另给 nameKey */
+    name: string;
+    nameKey?: I18nKey;
+    baseURL: string;
+    baseURLPlaceholder?: string;
+    defaultModel?: string;
+    apikeyUrl?: string;
+    /** 获取模型列表的 URL */
+    modelsUrl?: string;
+    /** 是否需要 API Key 才能获取模型列表，默认 true */
+    requiresApiKeyForModelList?: boolean;
+    /** 内置模型列表：无 modelsUrl 时直接使用，有 modelsUrl 时作为远端获取失败的兜底 */
+    presetModels?: { id: string; name: string }[];
+}
+
+export const DEFAULT_IMAGE_PROVIDER = 'openrouter';
+
+export const IMAGE_PROVIDER_ORDER = ['custom', 'volcengine', 'openrouter'];
+
+export const defaultImageProvider: Record<string, ImageProviderDefaults> = {
+    // 图像接口地址是 /api/v1/images，必须带 /images 结尾，否则会被追加成不存在的地址；模型列表接口不需要 API Key
+    'openrouter': {
+        name: 'OpenRouter',
+        baseURL: 'https://openrouter.ai/api/v1/images',
+        modelsUrl: 'https://openrouter.ai/api/v1/images/models',
+        requiresApiKeyForModelList: false,
+        defaultModel: 'openai/gpt-image-2.5-flare',
+        apikeyUrl: 'https://openrouter.ai/settings/keys',
+    },
+    // 火山方舟（豆包 Seedream）：接口 /api/v3/images/generations 与 OpenAI Images 同形；
+    // 没有公开的图像模型列表接口，用内置列表，模型 ID 以方舟控制台「模型列表」页为准
+    'volcengine': {
+        name: 'Volcengine (火山引擎)',
+        baseURL: 'https://ark.cn-beijing.volces.com/api/v3',
+        defaultModel: 'doubao-seedream-5-0-260128',
+        apikeyUrl: 'https://console.volcengine.com/ark/region:ark+cn-beijing/apiKey',
+        presetModels: [
+            { id: 'doubao-seedream-5-0-pro-260628', name: 'Doubao Seedream 5.0 Pro' },
+            { id: 'doubao-seedream-5-0-260128', name: 'Doubao Seedream 5.0' },
+            { id: 'doubao-seedream-5-0-flash-260915', name: 'Doubao Seedream 5.0 Flash' },
+        ],
+    },
+    'custom': {
+        name: 'Custom Image API',
+        nameKey: 'config.imageForm.provider.custom',
+        baseURL: '',
+        baseURLPlaceholder: 'https://your-api.com/v1',
+    },
+};
+
+/** 远端模型列表的单项（OpenRouter /images/models 的字段，其余服务商只保证有 id） */
+export interface ImageListModel {
+    id: string;
+    name?: string;
+    architecture?: { input_modalities?: string[]; output_modalities?: string[] };
+    supported_parameters?: Record<string, { type?: string; min?: number; max?: number; values?: string[] }>;
+}
+
+/** 能否只凭提示词出图：generate_image 不传参考图，必须传参考图的模型（input_references.min ≥ 1）选了必然失败 */
+export function isTextToImageModel(m: ImageListModel): boolean {
+    if (!m?.id) return false;
+    const out = m.architecture?.output_modalities;
+    if (out && !out.includes('image')) return false;
+    const input = m.architecture?.input_modalities;
+    if (input && !input.includes('text')) return false;
+    return !((m.supported_parameters?.input_references?.min ?? 0) >= 1);
+}

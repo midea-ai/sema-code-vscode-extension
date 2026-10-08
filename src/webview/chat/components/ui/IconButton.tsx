@@ -163,6 +163,15 @@ export const WrenchIcon: React.FC<ToolIconProps> = ({ size = 14 }) => (
     </svg>
 );
 
+// 图片图标（工具行：生成图片）
+export const ImageIcon: React.FC<ToolIconProps> = ({ size = 14 }) => (
+    <svg {...toolIconAttrs(size)}>
+        <rect x="2" y="3" width="12" height="10" rx="1.5" />
+        <circle cx="5.5" cy="6.5" r="1.2" />
+        <path d="M14 10.5l-3.5-3.5L5 12.5" />
+    </svg>
+);
+
 // 插头图标（工具行：MCP 调用）
 export const PlugIcon: React.FC<ToolIconProps> = ({ size = 14 }) => (
     <svg {...toolIconAttrs(size)}>

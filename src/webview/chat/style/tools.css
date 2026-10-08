@@ -405,6 +405,55 @@
     background: transparent;
 }
 
+/* 生成图片块：默认折叠，展开后内容区只有方形小缩略图，多张横向换行；点击放大 */
+.generated-image-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--chat-spacing-sm);
+    padding: var(--chat-spacing-xs) var(--chat-spacing-sm) var(--chat-spacing-sm);
+}
+
+.generated-image-thumb {
+    display: block;
+    width: 56px;
+    height: 56px;
+    border: 1px solid var(--chat-border);
+    border-radius: var(--chat-radius-sm);
+    object-fit: cover;
+    cursor: zoom-in;
+}
+
+/* 生成中占位：与缩略图同尺寸，斜向高光条周期性掠过（对齐 core webui 的 .shimmer-block）。
+   底色用中性灰 token 而非列表悬浮色：JB 侧 list-hoverBackground 映射的是 IDE 非焦点选中色（Darcula 下偏蓝） */
+.generated-image-pending {
+    width: 56px;
+    height: 56px;
+    border: 1px solid var(--chat-border);
+    border-radius: var(--chat-radius-sm);
+    background: linear-gradient(
+        110deg,
+        var(--chat-bg-hover) 0%,
+        var(--chat-bg-hover) 30%,
+        var(--chat-bg-active) 50%,
+        var(--chat-bg-hover) 70%,
+        var(--chat-bg-hover) 100%
+    );
+    background-size: 200% 100%;
+    animation: shimmer 2.4s linear infinite;
+}
+
+@keyframes shimmer {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+}
+
+/* 图片解析失败：回退显示文件路径文字 */
+.generated-image-missing {
+    font-size: var(--chat-font-sm);
+    color: var(--chat-text-secondary);
+    overflow-wrap: anywhere;
+}
+
 /* 无输出占位 */
 .grouped-result-empty {
     padding: 0 var(--chat-spacing-xs);

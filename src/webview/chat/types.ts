@@ -157,11 +157,24 @@ export interface DiffContent {
     diffText: string;
 }
 
+// generate_image 工具结果：生成的图片落盘路径（宿主侧按 resolveImagePath 读成 data URI 再展示）
+export interface GeneratedImageItem {
+    filePath: string;
+    mediaType: string;
+    bytes?: number;
+}
+
+export interface GeneratedImagesContent {
+    model?: string;
+    prompt?: string;
+    images: GeneratedImageItem[];
+}
+
 export interface ToolContent {
     toolId?: string;
     toolName: string;
     title: string;
     summary?: string;
-    content: string | DiffContent;  // 支持字符串（旧格式）或 DiffContent 对象（新格式）
+    content: string | DiffContent | GeneratedImagesContent;  // 字符串（旧格式）/ DiffContent（编辑）/ GeneratedImagesContent（生图）
     completed?: boolean;  // false 表示流式中间态，undefined/true 表示完成
 }

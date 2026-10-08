@@ -76,6 +76,8 @@
     --s-badge-main-color: #ffba49;
     --s-badge-quick-bg: rgba(149, 117, 255, 0.2);
     --s-badge-quick-color: #9575ff;
+    --s-badge-image-bg: rgba(46, 131, 210, 0.2);
+    --s-badge-image-color: #2e83d2;
     --s-badge-kill-bg: rgba(176, 124, 232, 0.2);
     --s-badge-kill-color: #b07ce8;
     --s-badge-kill-hover-bg: rgba(176, 124, 232, 0.35);

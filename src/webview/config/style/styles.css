@@ -1091,3 +1091,25 @@ textarea:focus {
     background: var(--s-badge-quick-bg);
     color: var(--s-badge-quick-color);
 }
+
+/* 图像模型列表「使用中」角标 */
+.task-image {
+    background: var(--s-badge-image-bg);
+    color: var(--s-badge-image-color);
+}
+
+/* 图像模型列表：位于任务配置之下，与上方间距对齐 */
+.image-model-list {
+    margin-top: 40px;
+}
+
+/* 模型列表 / 图像模型标题右侧的添加按钮 */
+.model-add-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.image-model-list-desc {
+    margin-top: 0;
+}

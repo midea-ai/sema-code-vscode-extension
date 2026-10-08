@@ -95,6 +95,13 @@ export class RemoteCore {
     /** 单个模型完整落盘配置（含明文 apiKey），配置页编辑模型回填用；不存在回 null */
     getModelProfile(provider: string, modelName: string): Promise<any> { return this.t.call('getModelProfile', { provider, modelName }, ''); }
 
+    // 图像模型（与对话模型分开；桥需支持这 4 个 action）
+    addImageModel(config: any): Promise<any> { return this.t.call('addImageModel', { config }, ''); }
+    delImageModel(modelName: string): Promise<any> { return this.t.call('delImageModel', { modelName }, ''); }
+    /** 切换图像模型指针；空串表示停用 */
+    switchImageModel(modelName: string): Promise<any> { return this.t.call('switchImageModel', { modelName }, ''); }
+    getImageModelProfile(provider: string, modelName: string): Promise<any> { return this.t.call('getImageModelProfile', { provider, modelName }, ''); }
+
     // 工具 / 系统配置推 core
     getToolInfos(): Promise<any> { return this.t.call('getToolInfos', undefined, ''); }
     updateDisabledTools(disabledTools: string[] | null): Promise<any> { return this.t.call('updateDisabledTools', { disabledTools }, ''); }

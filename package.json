@@ -139,7 +139,7 @@
     "html-to-image": "^1.11.11",
     "katex": "^0.16.47",
     "qrcode": "^1.5.4",
-    "sema-core": "^2.1.2",
+    "sema-core": "file:../sema-core/sema-core-2.1.2.tgz",
     "turndown": "^7.2.4"
   }
 }

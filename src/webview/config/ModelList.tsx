@@ -1,16 +1,18 @@
 import React from 'react';
 import { Config, VscodeApi } from './types';
 import ProviderLogo from '../common/ProviderLogo';
-import { EditIcon, TrashIcon } from './utils/svgIcons';
+import { EditIcon, TrashIcon, PlusIcon } from './utils/svgIcons';
 import { useT } from '../common/i18n/react';
 import './style/section.css';
 
 interface ModelListProps {
     config: Config | null;
     vscode: VscodeApi;
+    /** 点「添加模型」：由 App 切到新增模型页 */
+    onAdd: () => void;
 }
 
-const ModelList: React.FC<ModelListProps> = ({ config, vscode }) => {
+const ModelList: React.FC<ModelListProps> = ({ config, vscode, onAdd }) => {
     const t = useT();
     // 解析模型名称以提取 provider 和 model 信息
     const parseModelName = (modelName: string) => {
@@ -80,6 +82,10 @@ const ModelList: React.FC<ModelListProps> = ({ config, vscode }) => {
         <div className="model-list">
             <div className="section-header">
                 <h2 className="section-title" style={{ marginBottom: 0 }}>{t('config.tab.modelList')}</h2>
+                <button className="section-btn primary small model-add-btn" onClick={onAdd}>
+                    <PlusIcon />
+                    {t('config.modelForm.addModel')}
+                </button>
             </div>
             <table className="model-table">
                 <thead>
