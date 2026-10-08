@@ -226,6 +226,7 @@ const App: React.FC<AppProps> = ({ vscode }) => {
                                     onCancelEdit={exitEditToList}
                                     editModel={editModel}
                                     editNonce={editNonce}
+                                    active={modelTab === 'add'}
                                     vscode={vscode}
                                 />
                             </div>

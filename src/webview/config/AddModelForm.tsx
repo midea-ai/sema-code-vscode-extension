@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { ModelProfile, ThinkingHistoryPolicy, VscodeApi } from './types';
 import ProviderLogo from '../common/ProviderLogo';
 import IconSelect from './IconSelect';
@@ -33,6 +33,8 @@ interface AddModelFormProps {
     editModel: ModelProfile | null;
     /** 每次进入编辑递增，保证连续编辑同一模型也能重新回填 */
     editNonce: number;
+    /** 新增页是否正在显示：表单常驻挂载、靠 display 切换，需要由 App 告知何时可见 */
+    active: boolean;
     vscode: VscodeApi;
 }
 
@@ -76,7 +78,7 @@ const THINKING_HISTORY_POLICY_OPTIONS: { value: ThinkingHistoryPolicy; labelKey:
 /** 预设服务商 key 是否可直接在下拉里选中（custom 走别名分支） */
 const isPresetProvider = (key: string) => key !== 'custom' && PROVIDER_ORDER.includes(key) && !!defaultModelProvider[key];
 
-const AddModelForm: React.FC<AddModelFormProps> = ({ onSuccess, onCancelEdit, editModel, editNonce, vscode }) => {
+const AddModelForm: React.FC<AddModelFormProps> = ({ onSuccess, onCancelEdit, editModel, editNonce, active, vscode }) => {
     const t = useT();
     const isEditing = editModel !== null;
     const [provider, setProvider] = useState(DEFAULT_PROVIDER);
@@ -98,10 +100,45 @@ const AddModelForm: React.FC<AddModelFormProps> = ({ onSuccess, onCancelEdit, ed
     const [message, setMessage] = useState<{ text: string; type: 'success' | 'error' | '' }>({ text: '', type: '' });
     const [isFetchingModels, setIsFetchingModels] = useState(false);
     const [fetchModelsFailed, setFetchModelsFailed] = useState(false);
+    /** 模型列表来源：remote = core 从服务端获取，preset = 应用层内置列表，none = 没有列表 */
+    const [modelListSource, setModelListSource] = useState<'remote' | 'preset' | 'none'>('none');
     const [connectionTested, setConnectionTested] = useState(false);
     const [connectionSuccess, setConnectionSuccess] = useState(false);
     const [lastFetchedConfig, setLastFetchedConfig] = useState({ baseURL: '', apiKey: '' });
     const [isSaving, setIsSaving] = useState(false);
+    const apiKeyInputRef = useRef<HTMLInputElement>(null);
+
+    // 进入新增页（含从编辑态切回新增）时聚焦 API Key：服务商与地址有默认值，第一个要填的就是它；编辑态不抢焦点
+    useEffect(() => {
+        if (active && !editModel) apiKeyInputRef.current?.focus();
+    }, [active, editModel]);
+
+    /** 把模型列表填入下拉并选中默认模型，remote 与 preset 两种来源共用 */
+    const applyModelList = (models: Model[], source: 'remote' | 'preset') => {
+        setModelListSource(source);
+        setFetchModelsFailed(false);
+        setAvailableModels(models);
+
+        const docUrls: Record<string, string> = {};
+        models.forEach((model: Model) => {
+            if (model.key_doc_url) {
+                docUrls[model.id] = model.key_doc_url;
+            }
+        });
+        setModelDocUrls(docUrls);
+
+        // 智能选择默认模型
+        const preferredModelId = defaultModelProvider[provider].defaultModel;
+        const preferredModel = preferredModelId ? models.find((m: Model) => m.id === preferredModelId) : null;
+        const autoSelectedModel = preferredModel ? preferredModel.id : models[0].id;
+        setSelectedModel(autoSelectedModel);
+        const selectedModelData = models.find((m: Model) => m.id === autoSelectedModel);
+        if (selectedModelData?.recommended_max_tokens) {
+            setMaxTokens(String(selectedModelData.recommended_max_tokens));
+        }
+        setSelectedModelMaxTokens(selectedModelData?.max_tokens ?? null);
+        vscode.postMessage({ command: 'getModelAdapter', provider, modelName: autoSelectedModel, baseURL });
+    };
 
     useEffect(() => {
         const handleMessage = (event: MessageEvent) => {
@@ -145,51 +182,28 @@ const AddModelForm: React.FC<AddModelFormProps> = ({ onSuccess, onCancelEdit, ed
                         setLastFetchedConfig({ baseURL, apiKey });
                     }
 
-                    if (msg.success) {
-                        if (msg.models && msg.models.length > 0) {
-                            setFetchModelsFailed(false);
-                            setAvailableModels(msg.models);
-
-                            const docUrls: Record<string, string> = {};
-                            msg.models.forEach((model: Model) => {
-                                if (model.key_doc_url) {
-                                    docUrls[model.id] = model.key_doc_url;
-                                }
-                            });
-                            setModelDocUrls(docUrls);
-
-                            // 智能选择默认模型
-                            const preferredModelId = providerConfig.defaultModel;
-                            const preferredModel = preferredModelId ? msg.models.find((m: Model) => m.id === preferredModelId) : null;
-                            const autoSelectedModel = preferredModel ? preferredModel.id : msg.models[0].id;
-                            setSelectedModel(autoSelectedModel);
-                            const selectedModelData = msg.models.find((m: Model) => m.id === autoSelectedModel);
-                            if (selectedModelData?.recommended_max_tokens) {
-                                setMaxTokens(String(selectedModelData.recommended_max_tokens));
-                            }
-                            setSelectedModelMaxTokens(selectedModelData?.max_tokens ?? null);
-                            vscode.postMessage({ command: 'getModelAdapter', provider, modelName: autoSelectedModel, baseURL });
-
-                            setTestStatus({
-                                message: t('config.modelForm.fetchedModels', { count: msg.models.length }),
-                                type: 'success'
-                            });
-                            setTimeout(() => setTestStatus({ message: '', type: '' }), 3000);
-                        } else {
-                            // 请求成功但没有模型
-                            setFetchModelsFailed(true);
-                            setTestStatus({
-                                message: t('config.modelForm.noModelsReturned'),
-                                type: 'error'
-                            });
-                        }
-                    } else {
-                        // 请求失败
-                        setFetchModelsFailed(true);
+                    if (msg.success && msg.models && msg.models.length > 0) {
+                        applyModelList(msg.models, 'remote');
                         setTestStatus({
-                            message: `✗ ${msg.message || t('config.modelForm.fetchFailed')}`,
+                            message: t('config.modelForm.fetchedModels', { count: msg.models.length }),
+                            type: 'success'
+                        });
+                        setTimeout(() => setTestStatus({ message: '', type: '' }), 3000);
+                    } else {
+                        // 请求失败，或请求成功但没有模型
+                        setTestStatus({
+                            message: msg.success
+                                ? t('config.modelForm.noModelsReturned')
+                                : `✗ ${msg.message || t('config.modelForm.fetchFailed')}`,
                             type: 'error'
                         });
+                        // 远端拿不到时用内置列表兜底，没有内置列表才算没有模型列表
+                        if (providerConfig.presetModels?.length) {
+                            applyModelList(providerConfig.presetModels, 'preset');
+                        } else {
+                            setModelListSource('none');
+                            setFetchModelsFailed(true);
+                        }
                     }
                     break;
             }
@@ -214,6 +228,7 @@ const AddModelForm: React.FC<AddModelFormProps> = ({ onSuccess, onCancelEdit, ed
         setTestStatus({ message: '', type: '' });
         setLastFetchedConfig({ baseURL: '', apiKey: '' });
         setFetchModelsFailed(false);
+        setModelListSource('none');
         setIsManualInput(false);
         setMaxTokens(String(defaults.defaultMaxTokens ?? DEFAULT_MAX_TOKENS));
         setSelectedModelMaxTokens(null);
@@ -254,6 +269,7 @@ const AddModelForm: React.FC<AddModelFormProps> = ({ onSuccess, onCancelEdit, ed
         setMessage({ text: '', type: '' });
         setLastFetchedConfig({ baseURL: '', apiKey: '' });
         setFetchModelsFailed(false);
+        setModelListSource('none');
     }, [editModel, editNonce]);
 
     /** 编辑模式下只有连接相关字段相对回填值有改动才要求重新测试连接；只改 token 数不用重测 */
@@ -273,6 +289,13 @@ const AddModelForm: React.FC<AddModelFormProps> = ({ onSuccess, onCancelEdit, ed
         const requiresApiKey = providerConfig?.requiresApiKeyForModelList !== false;
         if (requiresApiKey && !apiKey) {
             setTestStatus({ message: t('config.modelForm.needApiKey'), type: 'error' });
+            return;
+        }
+
+        // 没有列表接口但有内置列表的服务商，直接使用内置列表，不请求 core
+        if (!providerConfig.modelsUrl && providerConfig.presetModels?.length) {
+            applyModelList(providerConfig.presetModels, 'preset');
+            setTestStatus({ message: '', type: '' });
             return;
         }
 
@@ -446,6 +469,7 @@ const AddModelForm: React.FC<AddModelFormProps> = ({ onSuccess, onCancelEdit, ed
                     </div>
                     <div className="input-group">
                         <input
+                            ref={apiKeyInputRef}
                             type={showPassword ? 'text' : 'password'}
                             id="apiKey"
                             value={apiKey}
@@ -519,6 +543,17 @@ const AddModelForm: React.FC<AddModelFormProps> = ({ onSuccess, onCancelEdit, ed
                             {fetchModelsFailed && availableModels.length === 0 && (
                                 <div className="description" style={{ marginTop: 0 }}>
                                     {t('config.modelForm.fetchHelpBefore')}
+                                    <span
+                                        style={{ color: 'var(--vscode-textLink-foreground)', cursor: 'pointer', textDecoration: 'underline' }}
+                                        onClick={() => setIsManualInput(true)}
+                                    >
+                                        {t('config.modelForm.fetchHelpLink')}
+                                    </span>
+                                </div>
+                            )}
+                            {modelListSource === 'preset' && availableModels.length > 0 && (
+                                <div className="description" style={{ marginTop: 0 }}>
+                                    {t('config.modelForm.presetHelpBefore')}
                                     <span
                                         style={{ color: 'var(--vscode-textLink-foreground)', cursor: 'pointer', textDecoration: 'underline' }}
                                         onClick={() => setIsManualInput(true)}

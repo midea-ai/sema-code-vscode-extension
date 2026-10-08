@@ -15,6 +15,8 @@ export interface ProviderDefaults {
     apiKeyProviderLabel?: string;
     defaultModel?: string;
     modelsUrl?: string;  // 获取模型列表的 URL，默认用baseURL
+    /** 内置模型列表：无 modelsUrl 时直接使用，有 modelsUrl 时作为远端获取失败的兜底 */
+    presetModels?: { id: string; name: string }[];
     apikeyUrl?: string;
     /** 是否需要 API Key 才能获取模型列表，默认 true */
     requiresApiKeyForModelList?: boolean;
@@ -72,6 +74,12 @@ export const defaultModelProvider: Record<string, ProviderDefaults> = {
         baseURLPlaceholder: 'https://api.anthropic.com',
         apiKeyProviderLabel: 'Anthropic',
         defaultAdapt: 'anthropic',
+        presetModels: [
+            { id: 'claude-opus-5-5', name: 'Claude Opus 5.5' },
+            { id: 'claude-fable-5-1', name: 'Claude Fable 5.1' },
+            { id: 'claude-sonnet-5-5', name: 'Claude Sonnet 5.5' },
+            { id: 'claude-haiku-4-5-20251001', name: 'Claude Haiku 4.5' },
+        ],
     },
     'openai': {
         name: 'OpenAI',
@@ -97,6 +105,9 @@ export const defaultModelProvider: Record<string, ProviderDefaults> = {
         defaultModel: 'MiniMax-M3',
         apikeyUrl: 'https://platform.minimaxi.com/user-center/basic-information/interface-key',
         defaultAdapt: 'anthropic',
+        presetModels: [
+            { id: 'MiniMax-M3', name: 'MiniMax-M3' },
+        ],
     },
     'deepseek': {
         name: 'DeepSeek',
