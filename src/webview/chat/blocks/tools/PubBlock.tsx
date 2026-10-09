@@ -96,7 +96,7 @@ const PubBlock: React.FC<PubBlockProps> = React.memo(({ content, messageId, vsco
         }
         switch (toolName) {
             case TOOL_NAME_FETCH_URL:
-                return { icon: <GlobeIcon />, verb: t('tool.fetched'), target: title };
+                return { icon: <GlobeIcon />, verb: isStreaming ? t('tool.fetching') : content.interrupted ? t('tool.fetchInterrupted') : t('tool.fetched'), target: title };
             case TOOL_NAME_STOP_BG_JOB:
                 return { icon: <WrenchIcon />, verb: t('tool.jobStop'), target: title };
             case TOOL_NAME_SKILL:
@@ -168,6 +168,20 @@ const PubBlock: React.FC<PubBlockProps> = React.memo(({ content, messageId, vsco
                     targetTitle={skillFilePath || rowMeta.target}
                     onTargetClick={handleOpenSkill}
                     onClick={handleOpenSkill}
+                />
+            </div>
+        );
+    }
+
+    // 抓网页被用户中断：只显示「抓取已中断 + URL」行头，没有可展开的内容
+    if (toolName === TOOL_NAME_FETCH_URL && content.interrupted) {
+        return (
+            <div className="chat-block chat-block--borderless pub-block">
+                <ToolRowHeader
+                    icon={rowMeta.icon}
+                    verb={rowMeta.verb}
+                    target={rowMeta.target}
+                    targetTitle={rowMeta.target}
                 />
             </div>
         );

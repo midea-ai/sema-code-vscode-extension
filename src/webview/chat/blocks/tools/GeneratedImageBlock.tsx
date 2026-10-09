@@ -100,8 +100,18 @@ const GeneratedImageBlock: React.FC<GeneratedImageBlockProps> = React.memo(({ co
         return out;
     }, [contents]);
 
+    // core 把用户中断按正常结果返回（images 为空、complete 事件带 interrupted），这里显示中断态
+    const interrupted = !running && images.length === 0
+        && contents.some(c => c.completed !== false && c.interrupted);
+
+    // 没在生成、没有成图也不是中断（执行出错）：整行不显示，紧随其后的报错行已说明情况
+    if (!running && images.length === 0 && !interrupted) {
+        return null;
+    }
+
     const verb = running
         ? t('tool.imageGenerating')
+        : interrupted ? t('tool.imageInterrupted')
         : images.length > 1 ? t('tool.imageGeneratedN', { n: images.length }) : t('tool.imageGenerated');
     const expandable = running || images.length > 0;
 

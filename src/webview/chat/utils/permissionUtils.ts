@@ -1,5 +1,5 @@
 import { DiffContent, DiffHunk } from '../types';
-import { TOOL_NAME_EDIT_NOTEBOOK, TOOL_NAME_SKILL, TOOL_NAME_RUN_SHELL, TOOL_NAME_FETCH_URL } from '../../../utils/tool';
+import { TOOL_NAME_EDIT_NOTEBOOK, TOOL_NAME_SKILL, TOOL_NAME_RUN_SHELL, TOOL_NAME_FETCH_URL, TOOL_NAME_VIEW_FILE, TOOL_NAME_WRITE_FILE, TOOL_NAME_PATCH_FILE } from '../../../utils/tool';
 
 /**
  * 判断是否是Notebook类型
@@ -20,6 +20,16 @@ export const isMcpToolType = (toolName: string): boolean => {
  */
 export const isSkillType = (toolName: string): boolean => {
     return toolName === TOOL_NAME_SKILL;
+};
+
+/**
+ * 判断是否是文件类工具（读/写/补丁/notebook）
+ */
+export const isFileToolType = (toolName: string): boolean => {
+    return toolName === TOOL_NAME_VIEW_FILE
+        || toolName === TOOL_NAME_WRITE_FILE
+        || toolName === TOOL_NAME_PATCH_FILE
+        || isNotebookType(toolName);
 };
 
 /**
@@ -52,8 +62,11 @@ export const getPermissionTitle = (toolName: string): string => {
         return 'Skill Permission';
     } else if (isMcpToolType(toolName)) {
         return 'MCP Tool Permission';
-    } else {
+    } else if (isFileToolType(toolName)) {
         return 'File Permission';
+    } else {
+        // 未知工具兜底：不再冒充文件操作
+        return 'Tool Permission';
     }
 };
 

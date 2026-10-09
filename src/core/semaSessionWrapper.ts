@@ -439,9 +439,9 @@ export class SemaSessionWrapper {
                 this.sendCompleteUpdate(msg.id, { content: msg.content, reasoning: msg.reasoning });
             }
             this.streamingAssistantMap.clear();
-            this.streamingToolMap.clear();
+            this.finalizeStreamingTools();
             this.pendingTaskUpdates.clear();
-    
+
             if (this.messageHistory.length === 0) {
                 return;
             }
@@ -760,9 +760,29 @@ export class SemaSessionWrapper {
                 return;
             }
 
+            // 工具出错时 core 不再发 complete，先收尾同一 toolId 的流式消息再追加错误行
+            this.finalizeStreamingTools(data.toolId);
             this.messageHistory.push(errorMessage);
             this.sendAppendMessages([errorMessage]);
         });
+    }
+
+    /**
+     * 收尾仍处于流式中的工具消息：标成已完成并通知 webview。
+     * 流式工具若以 error 收场或会话被中断，core 不会再发 complete，
+     * 不收尾则工具行会一直停在「运行中」。传 toolId 只收尾该条，不传则收尾全部（会话中断）。
+     */
+    private finalizeStreamingTools(toolId?: string): void {
+        const entries = toolId === undefined
+            ? [...this.streamingToolMap.entries()]
+            : this.streamingToolMap.has(toolId) ? [[toolId, this.streamingToolMap.get(toolId)!] as const] : [];
+        for (const [id, msg] of entries) {
+            const updatedContent = { ...msg.content, completed: true };
+            const idx = this.messageHistory.indexOf(msg);
+            if (idx >= 0) this.messageHistory[idx] = { ...msg, content: updatedContent };
+            this.streamingToolMap.delete(id);
+            this.sendUpdateMessage(msg.id, updatedContent);
+        }
     }
 
     private setupMetaListeners(): void {

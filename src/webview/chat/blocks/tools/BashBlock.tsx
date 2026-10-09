@@ -149,7 +149,7 @@ const BashBlock: React.FC<BashBlockProps> = ({ content: toolContent, messageId, 
             <ToolRowHeader
                 icon={<TerminalIcon />}
                 streaming={isStreaming}
-                verb={isStreaming ? t('tool.running') : t('tool.ran')}
+                verb={isStreaming ? t('tool.running') : toolContent.interrupted ? t('tool.ranInterrupted') : t('tool.ran')}
                 target={toolContent.summary || command}
                 targetTitle={command}
                 expandable

@@ -122,7 +122,7 @@ const BackgroundJobBlock: React.FC<BackgroundJobBlockProps> = ({ content: toolCo
             <ToolRowHeader
                 icon={<WrenchIcon />}
                 streaming={isStreaming}
-                verb={isStreaming ? t('tool.jobPeeking') : t('tool.jobPeek')}
+                verb={isStreaming ? t('tool.jobPeeking') : toolContent.interrupted ? t('tool.jobPeekInterrupted') : t('tool.jobPeek')}
                 target={title || undefined}
                 targetTitle={title || undefined}
                 expandable

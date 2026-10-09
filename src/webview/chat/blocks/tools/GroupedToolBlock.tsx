@@ -28,10 +28,12 @@ import {
     getMcpServerName,
     getToolName,
     getToolTitle,
+    isGenImageMessage,
     isMemoryEditMessage,
     isShellRunMessage,
     isToolErrorMessage,
 } from '../../utils/groupMessages';
+import GeneratedImageBlock from './GeneratedImageBlock';
 import { isMcpToolType, parseMcpToolName } from '../../utils/permissionUtils';
 import { langMap } from '../../utils/fileLangTypeMap';
 import { hasTextSelection } from '../../utils/selection';
@@ -74,6 +76,8 @@ interface ReadSummaryItem {
 
 type ExpandedItem =
     | { kind: 'read-summary'; item: ReadSummaryItem }
+    /** 组内相邻的多次 generate_image 调用合并成一行缩略图 */
+    | { kind: 'gen-image'; id: string; messages: Message[] }
     | { kind: 'message'; message: Message };
 
 /** 成功的 Read 消息；Read 的执行报错 content.toolName 也是 view_file，需排除，不并入合并行 */
@@ -151,10 +155,11 @@ export const getReadSummaryItems = (messages: Message[]): ReadSummaryItem[] => {
     return items;
 };
 
-/** 组内展开项：连续 Read 合并为一行，其余（含执行报错）逐条 */
+/** 组内展开项：连续 Read 合并为一行，连续生成图片合并为一行缩略图，其余（含执行报错）逐条 */
 export const getExpandedItems = (messages: Message[]): ExpandedItem[] => {
     const items: ExpandedItem[] = [];
     let readRun: Message[] = [];
+    let genImageRun: Message[] = [];
 
     const flushReadRun = () => {
         if (readRun.length === 0) {
@@ -171,23 +176,39 @@ export const getExpandedItems = (messages: Message[]): ExpandedItem[] => {
         readRun = [];
     };
 
+    const flushGenImageRun = () => {
+        if (genImageRun.length === 0) {
+            return;
+        }
+        items.push({ kind: 'gen-image', id: `gen-image-${genImageRun[0].id}`, messages: genImageRun });
+        genImageRun = [];
+    };
+
     for (const message of messages) {
         if (isReadMessage(message)) {
+            flushGenImageRun();
             readRun.push(message);
+            continue;
+        }
+        if (isGenImageMessage(message)) {
+            flushReadRun();
+            genImageRun.push(message);
             continue;
         }
 
         flushReadRun();
+        flushGenImageRun();
         items.push({ kind: 'message', message });
     }
 
     flushReadRun();
+    flushGenImageRun();
     return items;
 };
 
 // ==================== 类别与组头 ====================
 
-type GroupCategoryKind = 'explore' | 'ran' | 'mcp' | 'fetch' | 'job' | 'cron' | 'memory';
+type GroupCategoryKind = 'explore' | 'ran' | 'mcp' | 'fetch' | 'job' | 'cron' | 'memory' | 'image';
 
 interface GroupCategory {
     key: string;
@@ -197,10 +218,23 @@ interface GroupCategory {
     count: number;
 }
 
-/** 非 MCP 消息的类别：memory 写入、非只读命令、抓网页、后台任务、定时任务，其余（Read/Search/只读命令）为探索 */
+/** 生成图片调用在组头计数里的权重：已完成按成图张数，生成中算 1，出错或中断无成图算 0（不出现在组头） */
+const getGenImageWeight = (message: Message): number => {
+    const content = message.content;
+    if (content?.completed === false) {
+        return 1;
+    }
+    const images = content?.content?.images;
+    return Array.isArray(images) ? images.length : 0;
+};
+
+/** 非 MCP 消息的类别：memory 写入、生成图片、非只读命令、抓网页、后台任务、定时任务，其余（Read/Search/只读命令）为探索 */
 const getCategoryKind = (message: Message): GroupCategoryKind => {
     if (isMemoryEditMessage(message)) {
         return 'memory';
+    }
+    if (isGenImageMessage(message)) {
+        return 'image';
     }
     if (isShellRunMessage(message)) {
         return 'ran';
@@ -218,7 +252,7 @@ const getCategoryKind = (message: Message): GroupCategoryKind => {
     return 'explore';
 };
 
-/** 组内消息按类别计数，类别按首次出现顺序排列；MCP 按服务名分别计数；执行报错不计入 */
+/** 组内消息按类别计数，类别按首次出现顺序排列；MCP 按服务名分别计数；生成图片按张数计；执行报错不计入 */
 export const getGroupCategories = (messages: Message[]): GroupCategory[] => {
     const categories: GroupCategory[] = [];
     const byKey = new Map<string, GroupCategory>();
@@ -230,6 +264,10 @@ export const getGroupCategories = (messages: Message[]): GroupCategory[] => {
         const server = getMcpServerName(message);
         const kind = server ? 'mcp' : getCategoryKind(message);
         const key = server ? `mcp:${server}` : kind;
+        const weight = kind === 'image' ? getGenImageWeight(message) : 1;
+        if (weight === 0) {
+            continue;
+        }
 
         let category = byKey.get(key);
         if (!category) {
@@ -237,7 +275,7 @@ export const getGroupCategories = (messages: Message[]): GroupCategory[] => {
             byKey.set(key, category);
             categories.push(category);
         }
-        category.count += 1;
+        category.count += weight;
     }
 
     return categories;
@@ -262,17 +300,22 @@ const getCategoryText = (category: GroupCategory): { verb: string; subject: stri
             return { verb: 'Managed', subject: '', count: formatCount(category.count, 'cron', 'crons') };
         case 'memory':
             return { verb: 'Wrote', subject: '', count: formatCount(category.count, 'memory', 'memories') };
+        case 'image':
+            return { verb: 'Generated', subject: '', count: formatCount(category.count, 'image', 'images') };
         default:
             return { verb: 'Explored', subject: '', count: formatCount(category.count, 'tool', 'tools') };
     }
 };
 
-/** 组头标题：各类别按首次出现顺序拼接，首个动词大写，其余小写，如 Explored 6 tools, ran 4 commands */
+/** 组内全是不计数的消息（中断/出错无成图的生图调用与报错）时的组头兜底文案 */
+const FALLBACK_GROUP_TITLE = 'Called tools';
+
+/** 组头标题：各类别按首次出现顺序拼接，首个动词大写，其余小写，如 Explored 6 tools, ran 4 commands；无类别时用兜底文案 */
 export const getGroupTitle = (messages: Message[]): string => {
     return getGroupCategories(messages).map((category, index) => {
         const { verb, subject, count } = getCategoryText(category);
         return [index === 0 ? verb : verb.toLowerCase(), subject, count].filter(Boolean).join(' ');
-    }).join(', ');
+    }).join(', ') || FALLBACK_GROUP_TITLE;
 };
 
 /** 组头（无图标）：首个动词加粗，计数与后续类别弱化色，箭头常显 */
@@ -429,7 +472,7 @@ const ShellItemBlock: React.FC<{ message: Message }> = ({ message }) => {
     return (
         <GroupedResultRow
             icon={<TerminalIcon />}
-            verb={t('tool.ran')}
+            verb={message.content?.interrupted ? t('tool.ranInterrupted') : t('tool.ran')}
             target={summary || command}
             full={command}
             content={message.content?.content}
@@ -456,12 +499,12 @@ const McpItemBlock: React.FC<{ message: Message }> = ({ message }) => {
 };
 
 /** 抓网页 / 后台任务 / 定时任务行的图标与动词 */
-const getPubRowMeta = (toolName: string, t: Translate): { icon: React.ReactNode; verb: string } | null => {
+const getPubRowMeta = (toolName: string, t: Translate, interrupted?: boolean): { icon: React.ReactNode; verb: string } | null => {
     if (toolName === TOOL_NAME_FETCH_URL) {
-        return { icon: <GlobeIcon />, verb: t('tool.fetched') };
+        return { icon: <GlobeIcon />, verb: interrupted ? t('tool.fetchInterrupted') : t('tool.fetched') };
     }
     if (toolName === TOOL_NAME_PEEK_BG_JOB) {
-        return { icon: <WrenchIcon />, verb: t('tool.jobPeek') };
+        return { icon: <WrenchIcon />, verb: interrupted ? t('tool.jobPeekInterrupted') : t('tool.jobPeek') };
     }
     if (toolName === TOOL_NAME_STOP_BG_JOB) {
         return { icon: <WrenchIcon />, verb: t('tool.jobStop') };
@@ -480,6 +523,14 @@ const getPubRowMeta = (toolName: string, t: Translate): { icon: React.ReactNode;
 
 const PubItemBlock: React.FC<{ message: Message; meta: { icon: React.ReactNode; verb: string } }> = ({ message, meta }) => {
     const title = getToolTitle(message);
+    // 抓网页被用户中断：只显示「抓取已中断 + URL」行头，没有可展开的内容
+    if (getToolName(message) === TOOL_NAME_FETCH_URL && message.content?.interrupted) {
+        return (
+            <div className="chat-block chat-block--borderless">
+                <ToolRowHeader icon={meta.icon} verb={meta.verb} target={title} targetTitle={title} />
+            </div>
+        );
+    }
     return (
         <GroupedResultRow
             icon={meta.icon}
@@ -601,6 +652,9 @@ const renderExpandedItem = (
     if (item.kind === 'read-summary') {
         return <ReadSummaryRow key={item.item.id} item={item.item} onFileOpen={onFileOpen} />;
     }
+    if (item.kind === 'gen-image') {
+        return <GeneratedImageBlock key={item.id} contents={item.messages.map(m => m.content)} vscode={vscode} />;
+    }
 
     const { message } = item;
     const toolName = getToolName(message);
@@ -626,7 +680,7 @@ const renderExpandedItem = (
     if (toolName === TOOL_NAME_RUN_SHELL) {
         return <ShellItemBlock key={message.id} message={message} />;
     }
-    const pubMeta = getPubRowMeta(toolName, t);
+    const pubMeta = getPubRowMeta(toolName, t, message.content?.interrupted === true);
     if (pubMeta) {
         return <PubItemBlock key={message.id} message={message} meta={pubMeta} />;
     }
@@ -681,6 +735,7 @@ const GroupedToolBlock: React.FC<GroupedToolBlockProps> = ({ messages, vscode, o
     return (
         <div className="chat-block chat-block--borderless grouped-tool-block">
             <GroupHeader titleText={titleText} isExpanded={isExpanded} onToggle={() => setIsExpanded(prev => !prev)}>
+                {categories.length === 0 && <strong>{FALLBACK_GROUP_TITLE}</strong>}
                 {categories.map((category, index) => {
                     const { verb, subject, count } = getCategoryText(category);
                     return (

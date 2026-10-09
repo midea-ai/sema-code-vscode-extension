@@ -177,4 +177,5 @@ export interface ToolContent {
     summary?: string;
     content: string | DiffContent | GeneratedImagesContent;  // 字符串（旧格式）/ DiffContent（编辑）/ GeneratedImagesContent（生图）
     completed?: boolean;  // false 表示流式中间态，undefined/true 表示完成
+    interrupted?: boolean;  // 执行途中被用户中断、以部分/空结果正常结束（core 在 complete 事件上透传）
 }

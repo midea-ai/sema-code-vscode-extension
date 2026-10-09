@@ -12,7 +12,7 @@ import {
     TOOL_NAME_SEARCH_FILES, TOOL_NAME_SEARCH_CONTENT, TOOL_NAME_VIEW_FILE,
     TOOL_NAME_PATCH_FILE, TOOL_NAME_WRITE_FILE, TOOL_NAME_EDIT_NOTEBOOK,
     TOOL_NAME_RUN_SHELL, TOOL_NAME_FETCH_URL, TOOL_NAME_STOP_BG_JOB, TOOL_NAME_PEEK_BG_JOB,
-    TOOL_NAME_PICK_OPTION, TOOL_NAME_SKILL
+    TOOL_NAME_PICK_OPTION, TOOL_NAME_SKILL, TOOL_NAME_GENERATE_IMAGE
 } from '../../../utils/tool';
 
 /** 手动切换预览范围：null = 全部，['xx'] = 指定组件，[] = 关闭 */
@@ -241,6 +241,75 @@ export const mockMessageMap: Record<string, Message[]> = {
                 toolName: TOOL_NAME_PEEK_BG_JOB,
                 title: 'a3f2b1c0',
                 content: '[12:00:01] Starting compilation...\n[12:00:03] Found 0 errors. Watching for file changes.\n[12:00:15] File change detected. Starting incremental compilation...\n[12:00:16] Found 0 errors. Watching for file changes.\n[12:00:15] File change detected. Starting incremental compilation...\n[12:00:16] Found 0 errors. Watching for file changes.',
+            },
+        },
+    ],
+
+    // 运行中被用户中断的流式工具：core 按正常结果返回并在 complete 事件上带 interrupted，
+    // 生成图片行头显示「生成图片已中断」且不可展开；抓网页行头显示「抓取已中断」且默认折叠
+    GenerateImageInterrupted: [
+        {
+            id: nextId(),
+            type: 'tool',
+            toolName: TOOL_NAME_GENERATE_IMAGE,
+            content: {
+                toolId: 'gen-image-interrupted-1',
+                toolName: TOOL_NAME_GENERATE_IMAGE,
+                title: TOOL_NAME_GENERATE_IMAGE,
+                summary: 'Interrupted',
+                content: { model: 'gpt-image-1', prompt: '黄昏海边的灯塔，水彩风格', images: [] },
+                completed: true,
+                interrupted: true,
+            },
+        },
+        {
+            id: nextId(),
+            type: 'system',
+            content: {
+                type: 'interrupted',
+                content: '[Request interrupted by user]',
+            },
+        },
+    ],
+
+    ShellInterrupted: [
+        {
+            id: nextId(),
+            type: 'tool',
+            toolName: TOOL_NAME_RUN_SHELL,
+            content: {
+                toolId: 'bash-interrupted-1',
+                toolName: TOOL_NAME_RUN_SHELL,
+                summary: '循环打印 tick 1 到 tick 60，每秒一次',
+                title: 'for i in $(seq 1 60); do echo "tick $i"; sleep 1; done',
+                content: 'tick 1\ntick 2\ntick 3\nExit code 143',
+                completed: true,
+                interrupted: true,
+            },
+        },
+    ],
+
+    FetchUrlInterrupted: [
+        {
+            id: nextId(),
+            type: 'tool',
+            toolName: TOOL_NAME_FETCH_URL,
+            content: {
+                toolId: 'fetch-interrupted-1',
+                toolName: TOOL_NAME_FETCH_URL,
+                title: 'https://github.com/midea-ai/sema-code-core',
+                summary: '',
+                content: '[Tool use interrupted by user]',
+                completed: true,
+                interrupted: true,
+            },
+        },
+        {
+            id: nextId(),
+            type: 'system',
+            content: {
+                type: 'interrupted',
+                content: '[Request interrupted by user]',
             },
         },
     ],
@@ -1067,6 +1136,41 @@ python3 SKILL_DIR/scripts/xlsx_insert_row.py /tmp/work/ --at 6 ...  # insert row
                 options: {
                     agree: '确认',
                     allow: '确认，本次会话不再询问 `xlsx-pricing` Skill',
+                    refuse: '拒绝'
+                }
+            },
+            isBackground: false,
+        },
+    ],
+    // generate_image 权限：title 为「Generate image with <模型>」，content 是多行文本（Prompt/Output/Transparent background/Reference images），
+    // 第二条无参考图且无 allow 选项
+    GenerateImagePermissionDialog: [
+        {
+            type: 'permission',
+            data: {
+                agentId: 'main',
+                toolId: 'gen-image-perm-1',
+                toolName: TOOL_NAME_GENERATE_IMAGE,
+                title: 'Generate image with gpt-image-1',
+                content: 'Prompt: A flat vector icon of a blue robot\nOutput: /Users/me/project/assets/robot.png\nTransparent background: yes\nReference images:\n  - /Users/me/project/assets/robot-v1.png',
+                options: {
+                    agree: '同意',
+                    allow: '同意，本项目不再询问 generate_image 权限',
+                    refuse: '拒绝'
+                }
+            },
+            isBackground: false,
+        },
+        {
+            type: 'permission',
+            data: {
+                agentId: 'mock-agent-4',
+                toolId: 'gen-image-perm-2',
+                toolName: TOOL_NAME_GENERATE_IMAGE,
+                title: 'Generate image with doubao-seedream-4-0',
+                content: 'Prompt: 一张深色背景的产品海报，中央是一台银色智能音箱，顶部有柔和的环形光晕，整体风格简洁高级，适合电商首页 banner\nOutput: /Users/zhoujie195/midea-code/sema-vscode-extension/assets/poster-speaker.png\nTransparent background: no',
+                options: {
+                    agree: '同意',
                     refuse: '拒绝'
                 }
             },

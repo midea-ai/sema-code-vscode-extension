@@ -365,6 +365,32 @@ const PermissionContent: React.FC<PermissionContentProps> = ({
         );
     };
 
+    // 渲染未知工具的通用内容：动作标签用 title，正文原样折叠展示
+    const renderGenericToolContent = () => {
+        const hasContent = typeof content === 'string'
+            ? content.trim().length > 0
+            : !!content && Object.keys(content).length > 0;
+        return (
+            <div className="file-permission-container">
+                <div className="file-permission-title-wrapper">
+                    <div className="file-permission-title-divider-top" />
+                    <div className="file-permission-title">
+                        <strong className="file-permission-action">{title || toolName}</strong>
+                    </div>
+                    <div className="file-permission-title-divider-bottom" />
+                </div>
+                {hasContent && (
+                    <div className="mcp-tool-content">
+                        <CollapsibleContent>
+                            {typeof content === 'string' ? content : JSON.stringify(content, null, 2)}
+                        </CollapsibleContent>
+                    </div>
+                )}
+                <div className="file-permission-code-divider" />
+            </div>
+        );
+    };
+
     // 根据工具类型渲染对应内容
     if (toolName === TOOL_NAME_RUN_SHELL) {
         return renderBashContent();
@@ -385,7 +411,7 @@ const PermissionContent: React.FC<PermissionContentProps> = ({
         return renderRegularFileContent();
     }
 
-    return null;
+    return renderGenericToolContent();
 };
 
 export default PermissionContent;

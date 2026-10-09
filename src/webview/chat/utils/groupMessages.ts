@@ -19,7 +19,7 @@ import { isMcpToolType, parseMcpToolName } from './permissionUtils';
 export type RenderItem =
     | { kind: 'message'; message: Message; originalIndex: number }
     | { kind: 'group'; id: string; messages: Message[]; originalStartIndex: number }
-    /** 相邻的多次 generate_image 调用合并成一行（对齐 core webui 的 GenImageCard） */
+    /** 组外单独渲染时，相邻的多次 generate_image 调用合并成一行（对齐 core webui 的 GenImageCard） */
     | { kind: 'genImage'; id: string; messages: Message[]; originalStartIndex: number };
 
 interface GroupMessagesOptions {
@@ -193,11 +193,11 @@ export const isMemoryEditMessage = (message: Message): boolean => {
 
 /**
  * 可并入混合工具组的消息：探索类（Read/Search/只读命令）、其余终端命令、MCP 调用，
- * 抓网页、后台任务查看/停止、定时任务管理、memory 写入，以及任何工具的执行报错。
+ * 抓网页、后台任务查看/停止、定时任务管理、memory 写入、生成图片，以及任何工具的执行报错。
  * 相邻的可并入消息不分种类进同一段；文件编辑、Skill、子代理、提问等其它工具与可见正文一样作为段边界。
  */
 export const isGroupableToolMessage = (message: Message): boolean => {
-    if (isToolErrorMessage(message) || isMemoryEditMessage(message)) {
+    if (isToolErrorMessage(message) || isMemoryEditMessage(message) || isGenImageMessage(message)) {
         return true;
     }
 
@@ -251,12 +251,35 @@ const isPendingEmptyAssistantMessage = (
     return !hasVisibleAssistantBody(message, showThinkingText);
 };
 
+const toGenImageItem = (run: RunItem[]): RenderItem => ({
+    kind: 'genImage',
+    id: `gen-image-${run[0].message.id}`,
+    messages: run.map(({ message }) => message),
+    originalStartIndex: run[0].index,
+});
+
+/** 单独渲染的消息：相邻的生成图片调用合并成一个 genImage 项（一行缩略图），其余逐条；id 取首条，追加时组件实例不重建 */
 const toMessageItems = (run: RunItem[]): RenderItem[] => {
-    return run.map(({ message, index }) => ({
-        kind: 'message' as const,
-        message,
-        originalIndex: index,
-    }));
+    const items: RenderItem[] = [];
+    let genImageRun: RunItem[] = [];
+    const flushGenImageRun = () => {
+        if (genImageRun.length > 0) {
+            items.push(toGenImageItem(genImageRun));
+            genImageRun = [];
+        }
+    };
+
+    for (const item of run) {
+        if (isGenImageMessage(item.message)) {
+            genImageRun.push(item);
+            continue;
+        }
+        flushGenImageRun();
+        items.push({ kind: 'message', message: item.message, originalIndex: item.index });
+    }
+
+    flushGenImageRun();
+    return items;
 };
 
 const toGroupItem = (run: RunItem[]): RenderItem => ({
@@ -271,6 +294,7 @@ const toGroupItem = (run: RunItem[]): RenderItem => ({
  * closed 表示段之后是否已有其它渲染内容。未封口（或末条仍在流式）时段尾一条作为「尾巴」原样单独渲染，
  * 便于查看运行中的输出，其余并入组；段一封口尾巴随之并入。并入的部分中非报错消息 ≥2 条才出组头，否则逐条渲染。
  * memory 写入不做尾巴、1 条也折叠、流式中也直接进组，避免先展开 diff 再折叠的闪动。
+ * 尾巴是生成图片时，末尾相邻的几次调用整体作为尾巴，保持合并成一行；成组门槛里合并后的一行也只算 1 条。
  * 组 id 只取首条消息 id，尾巴并入时组件实例不重建，已展开状态得以保留。
  */
 const flushRun = (
@@ -286,17 +310,24 @@ const flushRun = (
     const last = run[run.length - 1];
     const keepTail = (!closed || isStreamingToolMessage(last.message, streamingToolId))
         && !isMemoryEditMessage(last.message);
-    const head = keepTail ? run.slice(0, -1) : run;
+    let tailStart = run.length - 1;
+    if (keepTail && isGenImageMessage(last.message)) {
+        while (tailStart > 0 && isGenImageMessage(run[tailStart - 1].message)) {
+            tailStart -= 1;
+        }
+    }
+    const head = keepTail ? run.slice(0, tailStart) : run;
 
-    const toolCount = head.filter(({ message }) => !isToolErrorMessage(message)).length;
+    const headItems = toMessageItems(head);
+    const toolCount = headItems.filter(item => item.kind === 'genImage' || !isToolErrorMessage(item.message)).length;
     if (toolCount >= 2 || head.some(({ message }) => isMemoryEditMessage(message))) {
         items.push(toGroupItem(head));
     } else {
-        items.push(...toMessageItems(head));
+        items.push(...headItems);
     }
 
     if (keepTail) {
-        items.push(...toMessageItems([last]));
+        items.push(...toMessageItems(run.slice(tailStart)));
     }
 };
 
@@ -306,31 +337,9 @@ export const groupMessages = (
 ): RenderItem[] => {
     const items: RenderItem[] = [];
     let run: RunItem[] = [];
-    // 相邻的生成图片调用（中间只隔无可见内容的 assistant 消息）合并成一行；id 取首条，追加时组件实例不重建
-    let genImageRun: RunItem[] = [];
-    const flushGenImageRun = () => {
-        if (genImageRun.length === 0) {
-            return;
-        }
-        items.push({
-            kind: 'genImage',
-            id: `gen-image-${genImageRun[0].message.id}`,
-            messages: genImageRun.map(({ message }) => message),
-            originalStartIndex: genImageRun[0].index,
-        });
-        genImageRun = [];
-    };
 
     messages.forEach((message, index) => {
-        if (isGenImageMessage(message)) {
-            flushRun(items, run, true, options.streamingToolId);
-            run = [];
-            genImageRun.push({ message, index });
-            return;
-        }
-
         if (isGroupableToolMessage(message)) {
-            flushGenImageRun();
             run.push({ message, index });
             return;
         }
@@ -339,14 +348,12 @@ export const groupMessages = (
             return;
         }
 
-        flushGenImageRun();
         const closed = !isPendingEmptyAssistantMessage(message, options.showThinkingText);
         flushRun(items, run, closed, options.streamingToolId);
         run = [];
         items.push({ kind: 'message', message, originalIndex: index });
     });
 
-    flushGenImageRun();
     flushRun(items, run, !!options.tailClosed, options.streamingToolId);
 
     return items;

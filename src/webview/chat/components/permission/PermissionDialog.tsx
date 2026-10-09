@@ -3,7 +3,7 @@ import PermissionContent from './PermissionContent';
 import PermissionOptions from './PermissionOptions';
 import { ToolContent } from '../../types';
 import { isNotebookType, isMcpToolType, isSkillType, getPermissionTitle } from '../../utils/permissionUtils';
-import { TOOL_NAME_RUN_SHELL, TOOL_NAME_FETCH_URL, TOOL_NAME_PATCH_FILE, TOOL_NAME_VIEW_FILE } from '../../../../utils/tool';
+import { TOOL_NAME_RUN_SHELL, TOOL_NAME_FETCH_URL, TOOL_NAME_PATCH_FILE, TOOL_NAME_VIEW_FILE, TOOL_NAME_WRITE_FILE } from '../../../../utils/tool';
 
 
 interface ToolPermissionRequestData extends ToolContent {
@@ -56,8 +56,11 @@ const PermissionDialog: React.FC<PermissionDialogProps> = ({
             }
         } else if (permissionData.toolName === TOOL_NAME_PATCH_FILE) {
             return 'Do you want to update this file?';
-        } else {
+        } else if (permissionData.toolName === TOOL_NAME_WRITE_FILE) {
             return 'Do you want to create this file?';
+        } else {
+            // 未知工具兜底
+            return 'Do you want to proceed?';
         }
     };
 
