@@ -2,7 +2,21 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "Run Extension",
+      "name": "Run Extension (attach, no inspect-brk)",
+      "type": "node",
+      "request": "attach",
+      "port": 9333,
+      "timeout": 30000,
+      "preLaunchTask": "launch-dev-host",
+      "outFiles": [
+        "${workspaceFolder}/dist/**/*.js"
+      ],
+      "skipFiles": [
+        "<node_internals>/**"
+      ]
+    },
+    {
+      "name": "Run Extension (inspect-brk, may crash on VS Code 1.14x)",
       "type": "extensionHost",
       "request": "launch",
       "args": [

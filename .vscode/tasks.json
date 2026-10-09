@@ -9,6 +9,19 @@
         "reveal": "silent"
       },
       "problemMatcher": "$tsc"
+    },
+    {
+      "label": "launch-dev-host",
+      "type": "process",
+      "command": "${execPath}",
+      "args": [
+        "--extensionDevelopmentPath=${workspaceFolder}",
+        "--inspect-extensions=9333"
+      ],
+      "presentation": {
+        "reveal": "silent"
+      },
+      "problemMatcher": []
     }
   ]
 }
