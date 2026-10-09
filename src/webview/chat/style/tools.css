@@ -3,14 +3,21 @@
 /* ========== Bash Block ========== */
 /* 容器：继承 .chat-block，无额外属性 */
 
-.bash-streaming-dot {
+/* 运行中状态：与工具图标同尺寸的圆环转圈（对齐 webui Spinner），占满 14px 图标槽 */
+.tool-row-spinner {
     display: inline-block;
-    width: 6px;
-    height: 6px;
+    width: 12px;
+    height: 12px;
     border-radius: 50%;
-    background-color: var(--chat-color-success);
+    border: 1.5px solid color-mix(in srgb, currentColor 30%, transparent);
+    border-top-color: currentColor;
     flex-shrink: 0;
-    animation: pulse 1s ease-in-out infinite;
+    box-sizing: border-box;
+    animation: tool-row-spin 0.8s linear infinite;
+}
+
+@keyframes tool-row-spin {
+    to { transform: rotate(360deg); }
 }
 
 .bash-toggle-btn,

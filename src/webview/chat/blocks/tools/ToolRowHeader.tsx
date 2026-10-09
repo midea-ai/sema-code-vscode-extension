@@ -69,7 +69,7 @@ const ToolRowHeader: React.FC<ToolRowHeaderProps> = ({
         <div className={headerClass} onClick={onClick} title={title}>
             <div className="chat-block-title tool-row-title">
                 <span className="tool-row-icon">
-                    {streaming ? <span className="bash-streaming-dot" /> : icon}
+                    {streaming ? <span className="tool-row-spinner" /> : icon}
                 </span>
                 <span className={verbClass}>{verb}</span>
                 {hasTarget && (

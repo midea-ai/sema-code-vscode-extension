@@ -17,13 +17,12 @@
     border-color: var(--chat-border-focus);
 }
 
-/* 顶部区域：图片/长文本粘贴芯片条，仅在有芯片时渲染 */
+/* 顶部区域：图片/长文本粘贴芯片条，仅在有芯片时渲染；高度只取芯片本身（20px），不另撑空白 */
 .input-header {
     display: flex;
     align-items: center;
     gap: 4px;
     margin-bottom: 4px;
-    min-height: 28px;
 }
 
 /* 文件选择器：弹窗、列表、分割线复用 .shortcut-panel-* 样式 */
@@ -1065,7 +1064,7 @@ svg.provider-logo-openrouter {
 
 /* ─── 图片附件缩略图（输入框条 + 气泡行 共用） ───────────────────────── */
 
-/* 输入框：缩略图条占 +按钮 与 TokenProgress 之间的弹性区，始终单行、水平滚动 */
+/* 输入框：缩略图条独占顶部一行，始终单行、水平滚动；不加上下内边距，避免附件条比芯片高出空白 */
 .image-thumb-strip {
     flex: 1;
     min-width: 0;
@@ -1075,7 +1074,6 @@ svg.provider-logo-openrouter {
     gap: 6px;
     overflow-x: auto;
     overflow-y: hidden;
-    padding: 2px 0;
 }
 
 /* 气泡：图片一行、粘贴一行，芯片样式与输入框一致；气泡窄时自动折成多行，不横向滚动 */
