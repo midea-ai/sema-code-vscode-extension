@@ -158,7 +158,7 @@ export const isGenImageMessage = (message: Message): boolean => {
     return message.type === 'tool' && getToolName(message) === TOOL_NAME_GENERATE_IMAGE;
 };
 
-/** 工具执行报错（system/tool_error）：任何工具的报错都可并入混合工具组，但不计入组头文案与成组门槛 */
+/** 工具执行报错（system/tool_error）：任何工具的报错都可并入混合工具组并计入成组门槛，但不计入组头文案 */
 export const isToolErrorMessage = (message: Message): boolean => {
     return message.type === 'system' && message.content?.type === 'tool_error';
 };
@@ -292,7 +292,7 @@ const toGroupItem = (run: RunItem[]): RenderItem => ({
 /**
  * 把一段可并入的工具消息输出为渲染项。
  * closed 表示段之后是否已有其它渲染内容。未封口（或末条仍在流式）时段尾一条作为「尾巴」原样单独渲染，
- * 便于查看运行中的输出，其余并入组；段一封口尾巴随之并入。并入的部分中非报错消息 ≥2 条才出组头，否则逐条渲染。
+ * 便于查看运行中的输出，其余并入组；段一封口尾巴随之并入。并入的部分 ≥2 条（报错也算）才出组头，否则逐条渲染；全是报错时组头走兜底文案。
  * memory 写入不做尾巴、1 条也折叠、流式中也直接进组，避免先展开 diff 再折叠的闪动。
  * 尾巴是生成图片时，末尾相邻的几次调用整体作为尾巴，保持合并成一行；成组门槛里合并后的一行也只算 1 条。
  * 组 id 只取首条消息 id，尾巴并入时组件实例不重建，已展开状态得以保留。
@@ -319,8 +319,7 @@ const flushRun = (
     const head = keepTail ? run.slice(0, tailStart) : run;
 
     const headItems = toMessageItems(head);
-    const toolCount = headItems.filter(item => item.kind === 'genImage' || !isToolErrorMessage(item.message)).length;
-    if (toolCount >= 2 || head.some(({ message }) => isMemoryEditMessage(message))) {
+    if (headItems.length >= 2 || head.some(({ message }) => isMemoryEditMessage(message))) {
         items.push(toGroupItem(head));
     } else {
         items.push(...headItems);
