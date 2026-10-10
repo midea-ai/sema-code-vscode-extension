@@ -77,7 +77,12 @@ export function activate(context: vscode.ExtensionContext) {
         await sidebarProvider.addFilesToChat(files);
     });
 
-    context.subscriptions.push(newSessionCommand, openHistoryCommand, configCommand, addToChatCommand);
+    // 编辑器标题栏图标：聚焦侧边栏视图（折叠/隐藏时会自动展开）
+    const openSidebarCommand = vscode.commands.registerCommand('sema-vscode-extension.openSidebar', () => {
+        vscode.commands.executeCommand('sema-vscode-view.focus');
+    });
+
+    context.subscriptions.push(newSessionCommand, openHistoryCommand, configCommand, addToChatCommand, openSidebarCommand);
 
     // 初始化当前工作区路径
     currentWorkspacePath = getCurrentWorkspacePath();

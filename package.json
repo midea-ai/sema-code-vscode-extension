@@ -65,6 +65,11 @@
       {
         "command": "sema-vscode-extension.addToChat",
         "title": "Add to SemaCode"
+      },
+      {
+        "command": "sema-vscode-extension.openSidebar",
+        "title": "%command.openSidebar.title%",
+        "icon": "imgs/icon.svg"
       }
     ],
     "menus": {
@@ -79,6 +84,12 @@
         {
           "command": "sema-vscode-extension.addToChat",
           "when": "resourceScheme == file",
+          "group": "navigation@0"
+        }
+      ],
+      "editor/title": [
+        {
+          "command": "sema-vscode-extension.openSidebar",
           "group": "navigation@0"
         }
       ],

@@ -1,5 +1,6 @@
 {
     "command.newSession.title": "New Session",
     "command.openHistory.title": "Session History",
-    "command.openConfig.title": "Settings"
+    "command.openConfig.title": "Settings",
+    "command.openSidebar.title": "Open Sema Code"
 }
