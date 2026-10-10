@@ -43,7 +43,6 @@ export const defaultImageProvider: Record<string, ImageProviderDefaults> = {
         apikeyUrl: 'https://console.volcengine.com/ark/region:ark+cn-beijing/apiKey',
         presetModels: [
             { id: 'doubao-seedream-5-0-pro-260628', name: 'Doubao Seedream 5.0 Pro' },
-            { id: 'doubao-seedream-5-0-260128', name: 'Doubao Seedream 5.0' },
             { id: 'doubao-seedream-5-0-flash-260915', name: 'Doubao Seedream 5.0 Flash' },
         ],
     },
