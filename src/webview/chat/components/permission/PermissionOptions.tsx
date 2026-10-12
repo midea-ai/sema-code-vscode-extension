@@ -75,10 +75,9 @@ const PermissionOptions: React.FC<PermissionOptionsProps> = ({
                     return;
                 }
 
-                if (event.key === 'Enter' && customInput.trim()) {
-                    event.preventDefault();
-                    onSelect(customInput.trim() as any);
-                } else if (event.key === 'ArrowUp') {
+                // Enter 提交只由输入框自身的 onKeyDown 负责：这里是原生监听，先于 React 合成事件触发，
+                // 输入框里的 stopPropagation 拦不住，若再处理会导致 onSelect 双触发
+                if (event.key === 'ArrowUp') {
                     event.preventDefault();
                     setIsInputFocused(false);
                     setSelectedIndex(refuseIndex);
@@ -144,16 +143,26 @@ const PermissionOptions: React.FC<PermissionOptionsProps> = ({
         }
     }, [autoFocus]);
 
+    // 拒绝时若输入框已有留言，按钮/回车选中「拒绝」也提交留言，否则 core 只收到纯 refuse、留言丢失
+    const submitAction = (action: ButtonAction) => {
+        const feedback = customInput.trim();
+        if (action === 'refuse' && feedback) {
+            onSelect(feedback as any);
+            return;
+        }
+        onSelect(action);
+    };
+
     const handleSelect = () => {
         if (selectedIndex < buttonList.length) {
-            onSelect(buttonList[selectedIndex].key);
+            submitAction(buttonList[selectedIndex].key);
         }
     };
 
-    const handleClick = (index: number, action: 'agree' | 'allow' | 'refuse') => {
+    const handleClick = (index: number, action: ButtonAction) => {
         setSelectedIndex(index);
         setIsInputFocused(false);
-        onSelect(action);
+        submitAction(action);
     };
 
     const handleInputSubmit = () => {
