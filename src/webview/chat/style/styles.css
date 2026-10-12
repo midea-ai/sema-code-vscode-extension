@@ -120,7 +120,9 @@ code, pre, .code {
     font-size: var(--chat-font-base);
     line-height: 1.6;
     width: 100%;
-    overflow-anchor: none;
+    /* 保留浏览器默认滚动锚定（overflow-anchor: auto）：视口上方的消息从 content-visibility 占位撑到真实高度、
+       图片/iframe 异步撑高时，由浏览器补偿 scrollTop，避免阅读位置被推着跳动。
+       贴底跟随由 ResizeObserver 主动置底，不依赖关闭锚定。 */
 }
 
 /* 内容包裹层：ResizeObserver 观察对象；min-height 撑满滚动区，让空状态欢迎页能按滚动区高度居中 */
@@ -196,6 +198,12 @@ html.jb #output-container {
     /* auto 关键字：浏览器记住每条消息上次渲染的真实高度，再次跳过时用真值而非死值 80px 当占位，
        避免真实高度≠估算值时在视口边缘反复横跳造成的高频抖动（尤其 JCEF）。 */
     contain-intrinsic-size: auto 80px;
+}
+
+/* 历史加载预热（App.tsx 加两帧 is-priming）：所有消息完整布局一次，让 auto 记住真实高度，
+   之后向上滚不再从 80px 占位逐条撑高。 */
+.output-content.is-priming .msg-wrap {
+    content-visibility: visible;
 }
 
 .output-line {

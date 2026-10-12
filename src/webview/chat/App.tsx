@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo } from 'react';
 import { FileChange, TokenInfo, AppProps, SelectedFile, TodoItem, Message, AgentMode, PermissionLevel, SessionMeta, ForkPreview, ImageAttachment, VscodeApi, InputSource } from './types';
 import { streamingStore } from './utils/StreamingStore';
 import InputBox, { InputBoxHandle } from './components/input/InputBox';
@@ -15,7 +15,7 @@ import TodosPanel from './components/panels/TodosPanel';
 import Welcome from './components/panels/Welcome';
 import DesignModeHint from './components/panels/DesignModeHint';
 import PermissionDialog from './components/permission/PermissionDialog';
-import AskFormDialog, { AskFormValues, AskFormStatus, PickOptionRequestData } from './components/ui/AskFormDialog';
+import AskFormDialog, { PickOptionRequestData } from './components/ui/AskFormDialog';
 import PlanExitDialog from './components/ui/PlanExitDialog';
 import QuickChatDialog from './components/ui/QuickChatDialog';
 import ForkDialog from './components/ui/ForkDialog';
@@ -24,6 +24,7 @@ import { useT, setLang, type Language } from '../common/i18n/react';
 import ModelConfigReminder from './components/ui/ModelConfigReminder';
 import { PREVIEW_MODE, getPreviewMessages, mockDialogMap, isPreviewActive } from './utils/mockMessages';
 import { groupMessages, getToolName, getToolTitle } from './utils/groupMessages';
+import { setPathEnv } from './utils/pathDisplay';
 import VizEmbed from './blocks/VizEmbed';
 import { isAttachmentPath, isVizPath } from '../common/viz';
 import { TOOL_NAME_RUN_SHELL, TOOL_NAME_WRITE_FILE, TOOL_NAME_PATCH_FILE } from '../../utils/tool';
@@ -133,6 +134,8 @@ const ChatSession: React.FC<ChatSessionProps> = ({ vscode: rawVscode, sessionId,
     const spinnerStartTimeRef = useRef<number>(0);
     const runningTasksRef = useRef(runningTasks);
     const prevMessagesLenRef = useRef<number>(0);
+    // 历史整体灌入后待预热：让所有消息先完整布局一次，content-visibility:auto 才能记住真实高度
+    const primePendingRef = useRef<boolean>(false);
     const forkReqRef = useRef<string | null>(null);
     const branchReqRef = useRef<string | null>(null);
 
@@ -211,6 +214,7 @@ const ChatSession: React.FC<ChatSessionProps> = ({ vscode: rawVscode, sessionId,
                     setStreamingAssistantId(null);
                     setStreamingToolId(null);
                     messagesRef.current = (message.messages || []).slice();
+                    primePendingRef.current = true;
                     setMessages(message.messages || []);
                     break;
                 case 'appendMessages': {
@@ -612,6 +616,26 @@ const ChatSession: React.FC<ChatSessionProps> = ({ vscode: rawVscode, sessionId,
         return () => ro.disconnect();
     }, []);
 
+    // 历史加载预热：.msg-wrap 是 content-visibility:auto，视口外消息只按 80px 占位，首次滚上去时逐条撑到真实高度造成跳动。
+    // 整体灌入后临时让所有消息完整布局（is-priming），contain-intrinsic-size:auto 记住真实高度后再切回跳过。
+    // useLayoutEffect 保证首帧布局就带着 class；保留两帧，折叠块 ResizeObserver 测量后补的“展开”行也计入记住的高度。
+    // 会话非 active 时 display:none 不布局，推迟到切回时再预热。
+    // 预热窗口不随 messages 变化中断（恢复会话后紧接着的 chunkUpdate 不应截断），只在卸载时清理。
+    const primeRafRef = useRef<number>(0);
+    useLayoutEffect(() => {
+        const content = outputContentRef.current;
+        if (!primePendingRef.current || !active || !content) return;
+        primePendingRef.current = false;
+        cancelAnimationFrame(primeRafRef.current);
+        content.classList.add('is-priming');
+        primeRafRef.current = requestAnimationFrame(() => {
+            primeRafRef.current = requestAnimationFrame(() => {
+                primeRafRef.current = requestAnimationFrame(() => content.classList.remove('is-priming'));
+            });
+        });
+    }, [messages, active]);
+    useEffect(() => () => cancelAnimationFrame(primeRafRef.current), []);
+
     // 贴底判定按滚动方向：向上滚立即离底，不设距离阈值（流式高频置底时小步上滑会被反复拽回）；
     // 向下滚到底部附近恢复贴底。dist>1 排除 macOS 橡皮筋回弹与内容缩短时的 scrollTop 钳位被误判为上滑。
     useEffect(() => {
@@ -767,20 +791,10 @@ const ChatSession: React.FC<ChatSessionProps> = ({ vscode: rawVscode, sessionId,
         });
     };
 
-    const sealAskForm = (status: AskFormStatus, answers: string, values: AskFormValues) => {
+    // 提交 / 跳过后表单即消失，不回插面板：回答文本由 ask_form 工具记录（「用户已回应」行）承载
+    const sealAskForm = (answers: string) => {
         if (!activeDialog || activeDialog.type !== 'askForm') return;
         const askData = activeDialog.data;
-
-        vscode.postMessage({
-            type: 'insertAskFormRequest',
-            sessionId,
-            askFormData: {
-                agentId: askData.agentId || '',
-                data: askData,
-                status,
-                values,
-            }
-        });
 
         setDialogQueue(prev => prev.slice(1));
 
@@ -794,12 +808,12 @@ const ChatSession: React.FC<ChatSessionProps> = ({ vscode: rawVscode, sessionId,
         });
     };
 
-    const handleAskFormSubmit = (answers: string, values: AskFormValues) => {
-        sealAskForm('submitted', answers, values);
+    const handleAskFormSubmit = (answers: string) => {
+        sealAskForm(answers);
     };
 
-    const handleAskFormSkip = (answers: string, values: AskFormValues) => {
-        sealAskForm('skipped', answers, values);
+    const handleAskFormSkip = (answers: string) => {
+        sealAskForm(answers);
     };
 
     const handlePlanExitSubmit = (selected: 'startEditing' | 'clearContextAndStart') => {
@@ -1185,6 +1199,10 @@ const App: React.FC<AppProps> = ({ vscode }) => {
         const handleMessage = (event: MessageEvent) => {
             const message = event.data;
             switch (message.type) {
+                // 宿主下发的路径展示环境（home / 项目根 / 平台），工具行与权限卡据此缩写 ~、判定项目外
+                case 'envInfo':
+                    setPathEnv(message);
+                    break;
                 case 'sessionOpened':
                     setSessions(prev => {
                         if (prev.some(s => s.id === message.sessionId)) {
