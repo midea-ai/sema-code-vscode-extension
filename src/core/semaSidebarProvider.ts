@@ -554,7 +554,8 @@ export class SemaSidebarProvider implements vscode.WebviewViewProvider {
 
     private handleToolExecutionComplete = (sessionId: string, data: any): void => {
         if (data.toolName === TOOL_NAME_VIEW_FILE) {
-            this.fileStateDiffManager.addFileToSnapshotIfNew(sessionId, data.title);
+            // 部分读取的 title 带 `:起始-结束` 行号后缀，去掉才是路径
+            this.fileStateDiffManager.addFileToSnapshotIfNew(sessionId, String(data.title || '').replace(/:\d+-\d+$/, ''));
         } else if (
             (data.toolName === TOOL_NAME_WRITE_FILE || data.toolName === TOOL_NAME_PATCH_FILE) &&
             data.content && typeof data.content === 'object' && (data.content as any).type === 'new'

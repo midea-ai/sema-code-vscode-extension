@@ -121,7 +121,8 @@ export class Controller {
             // 新建文件（write/patch 且 type==='new'）钉空基线，避免 fork 后重读把已改内容误当基线。
             onToolExecutionComplete: (sid, data: any) => {
                 if (data?.toolName === TOOL_NAME_VIEW_FILE) {
-                    this.addFileToSnapshotIfNew(sid, data.title);
+                    // 部分读取的 title 带 `:起始-结束` 行号后缀，去掉才是路径
+                    this.addFileToSnapshotIfNew(sid, String(data.title || '').replace(/:\d+-\d+$/, ''));
                 } else if (
                     (data?.toolName === TOOL_NAME_WRITE_FILE || data?.toolName === TOOL_NAME_PATCH_FILE) &&
                     data?.content && typeof data.content === 'object' && data.content.type === 'new'
@@ -146,6 +147,7 @@ export class Controller {
         switch (msg.type) {
             case 'frontendReady':
                 await this.ensureInit();
+                await this.postEnvInfo();
                 await this.createSession({ agentMode: msg.mode, permissionLevel: msg.permissionLevel });
                 break;
             case 'createSession': await this.createSession({ agentMode: msg.mode, permissionLevel: msg.permissionLevel }); break;
@@ -167,9 +169,8 @@ export class Controller {
             case 'toolPermissionResponse': this.sessions.get(sid ?? '')?.wrapper.respondToToolPermission(msg.response); break;
             case 'askFormResponse': this.sessions.get(sid ?? '')?.wrapper.respondToPickOption(msg.response); break;
             case 'planExitResponse': this.handlePlanExit(sid, msg.response); break;
-            // Stop 时把挂起的权限/表单请求标记为中断态回插历史（对齐 VSCode insert*RequestMessage）
+            // 拒绝 / Stop 时把挂起的权限请求回插历史（对齐 VSCode insertPermissionRequestMessage）
             case 'insertPermissionRequest': this.sessions.get(sid ?? '')?.wrapper.insertPermissionRequestMessage(msg.permissionData); break;
-            case 'insertAskFormRequest': this.sessions.get(sid ?? '')?.wrapper.insertAskFormRequestMessage(msg.askFormData); break;
             case 'updateAgentMode': this.sessions.get(sid ?? '')?.wrapper.updateAgentMode(msg.mode); break;
             case 'updatePermissionLevel': this.sessions.get(sid ?? '')?.wrapper.updatePermissionLevel(msg.level); break;
 
@@ -224,6 +225,21 @@ export class Controller {
 
             default: break;
         }
+    }
+
+    /**
+     * 路径展示环境（对齐 VSCode onFrontendReady 的 envInfo）：home / 分隔符由 Kotlin fileOps roots 给出，
+     * 前端据此把绝对路径的 home 缩写为 ~。失败不影响启动，前端退化为原样显示。
+     */
+    private async postEnvInfo(): Promise<void> {
+        try {
+            const r = await this.t.callEditor('fileOps', { op: 'roots' });
+            this.postToApp({
+                type: 'envInfo',
+                homeDir: String(r?.home || ''),
+                platform: r?.sep === '\\' ? 'win32' : 'posix',
+            });
+        } catch { /* ignore */ }
     }
 
     private async ensureInit(): Promise<void> {
