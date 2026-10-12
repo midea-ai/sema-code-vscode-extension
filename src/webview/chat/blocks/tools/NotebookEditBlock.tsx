@@ -8,6 +8,7 @@ import CollapsibleDiff from '../../components/ui/CollapsibleDiff';
 import { countDiffChanges } from '../../utils/diffParser';
 import { hasTextSelection } from '../../utils/selection';
 import { useT } from '../../../common/i18n/react';
+import { baseName, displayPath } from '../../utils/pathDisplay';
 
 interface NotebookEditBlockProps {
     content: ToolContent;
@@ -89,9 +90,7 @@ const NotebookEditBlock: React.FC<NotebookEditBlockProps> = React.memo(({
 
     const { fileName, cellNum, diffContent, additions, removals } = parsedContent;
 
-    const displayFileName = useMemo(() => {
-        return fileName.split('/').pop() || fileName;
-    }, [fileName]);
+    const displayFileName = useMemo(() => baseName(fileName), [fileName]);
 
     // 文件类型图标（SVG 来自内置常量，可直接 innerHTML），与 EditBlock 同色同规格
     const fileIcon = useMemo(() => getFileIconHtml(displayFileName), [displayFileName]);
@@ -169,7 +168,7 @@ const NotebookEditBlock: React.FC<NotebookEditBlockProps> = React.memo(({
                 target={(
                     <>
                         <span className="edit-file-icon" style={{ color: fileIcon.color }} dangerouslySetInnerHTML={{ __html: fileIcon.svg }} />
-                        <span className="edit-file-path">{String.fromCharCode(0x200e) + fileName}</span>
+                        <span className="edit-file-path">{String.fromCharCode(0x200e) + displayPath(fileName)}</span>
                     </>
                 )}
                 targetTitle={fileName}

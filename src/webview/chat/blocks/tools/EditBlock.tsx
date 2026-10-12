@@ -10,6 +10,7 @@ import { countDiffChanges } from '../../utils/diffParser';
 import { TOOL_NAME_WRITE_FILE } from '../../../../utils/tool';
 import { hasTextSelection } from '../../utils/selection';
 import { useT } from '../../../common/i18n/react';
+import { baseName, displayPath } from '../../utils/pathDisplay';
 
 interface EditBlockProps {
     content: ToolContent;
@@ -75,9 +76,7 @@ const EditBlock: React.FC<EditBlockProps> = React.memo(({
 
     const { fileName, additions, removals, diffContent, language, minLine } = parsedContent;
 
-    const displayFileName = useMemo(() => {
-        return fileName.split('/').pop() || fileName;
-    }, [fileName]);
+    const displayFileName = useMemo(() => baseName(fileName), [fileName]);
 
     // 文件类型图标（SVG 来自内置常量，可直接 innerHTML），与正文文件链接同色同规格
     const fileIcon = useMemo(() => getFileIconHtml(displayFileName), [displayFileName]);
@@ -157,7 +156,8 @@ const EditBlock: React.FC<EditBlockProps> = React.memo(({
                 target={(
                     <>
                         <span className="edit-file-icon" style={{ color: fileIcon.color }} dangerouslySetInnerHTML={{ __html: fileIcon.svg }} />
-                        <span className="edit-file-path">{String.fromCharCode(0x200e) + fileName}</span>
+                        {/* 项目内相对路径原样；项目外绝对路径把 home 缩写为 ~（hover 仍是真实路径） */}
+                        <span className="edit-file-path">{String.fromCharCode(0x200e) + displayPath(fileName)}</span>
                     </>
                 )}
                 targetTitle={fileName}

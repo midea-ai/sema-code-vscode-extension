@@ -15,6 +15,7 @@ import {
 import { countDiffChanges } from '../../utils/diffParser';
 import { hasTextSelection } from '../../utils/selection';
 import { TOOL_NAME_PATCH_FILE, TOOL_NAME_WRITE_FILE, TOOL_NAME_RUN_SHELL, TOOL_NAME_FETCH_URL, TOOL_NAME_VIEW_FILE } from '../../../../utils/tool';
+import { baseName, displayPath } from '../../utils/pathDisplay';
 
 interface PermissionContentProps {
     toolName: string;
@@ -87,7 +88,7 @@ const PermissionContent: React.FC<PermissionContentProps> = ({
         const cellMatch = filePart.match(/^(.*?)\s+cell:(\d+)$/);
         const filePath = cellMatch ? cellMatch[1] : filePart;
         const cellNumber = cellMatch ? cellMatch[2] : null;
-        const displayFileName = filePath.split('/').pop() || filePath;
+        const displayFileName = baseName(filePath);
         const language = 'python';
 
         const diffContent = typeof content === 'string'
@@ -118,7 +119,8 @@ const PermissionContent: React.FC<PermissionContentProps> = ({
                             onClick={vscode ? handleFileClick : undefined}
                         >
                             <FileIcon fileName={displayFileName} isDirectory={false} size={18} />
-                            <span className="file-permission-filename">{displayFileName}</span>
+                            {/* title 前加 LRM：原生 tooltip 沿用元素的 direction:rtl，否则开头的 "/" 会被排到末尾 */}
+                            <span className="file-permission-filename" title={String.fromCharCode(0x200e) + displayPath(filePath)}>{displayFileName}</span>
                             {cellNumber && <span className="file-permission-cell-label">cell:{cellNumber}</span>}
                         </div>
                     </div>
@@ -192,7 +194,7 @@ const PermissionContent: React.FC<PermissionContentProps> = ({
     // 渲染常规文件内容
     const renderRegularFileContent = () => {
         const fileName = title;
-        const displayFileName = fileName.split('/').pop() || fileName;
+        const displayFileName = baseName(fileName);
 
         // 检测语言类型
         let language = 'plaintext';
@@ -230,8 +232,10 @@ const PermissionContent: React.FC<PermissionContentProps> = ({
                         <strong className="file-permission-action">{actionLabel}</strong>
                         <div className="file-permission-file-left">
                             <FileIcon fileName={displayFileName} isDirectory={false} size={18} />
-                            {/* 开头加 LRM(U+200E) 强制路径按 LTR 排版，避免 direction:rtl 把开头的 "." 排到末尾 */}
-                            <span className="file-permission-filename">{String.fromCharCode(0x200e) + fileName}</span>
+                            {/* 开头加 LRM(U+200E) 强制路径按 LTR 排版，避免 direction:rtl 把开头的 "." 排到末尾；
+                                title 同样要加，原生 tooltip 沿用元素的 direction，否则开头的 "/" 会跑到末尾；
+                                项目内相对路径原样，项目外绝对路径 home 缩写为 ~（hover 为真实路径） */}
+                            <span className="file-permission-filename" title={String.fromCharCode(0x200e) + fileName}>{String.fromCharCode(0x200e) + displayPath(fileName)}</span>
                             {renderDiffStats()}
                         </div>
                     </div>
@@ -249,7 +253,7 @@ const PermissionContent: React.FC<PermissionContentProps> = ({
     // 渲染读取文件内容（view_file，常用于读取项目外文件的授权）
     const renderViewFileContent = () => {
         const fileName = title;
-        const displayFileName = fileName.split('/').pop() || fileName;
+        const displayFileName = baseName(fileName);
 
         const handleFileClick = () => {
             if (hasTextSelection()) {
@@ -275,7 +279,7 @@ const PermissionContent: React.FC<PermissionContentProps> = ({
                         <strong className="file-permission-action">Read File</strong>
                         <div className="file-permission-file-left">
                             <FileIcon fileName={displayFileName} isDirectory={false} size={18} />
-                            <span className="file-permission-filename">{displayFileName}</span>
+                            <span className="file-permission-filename" title={String.fromCharCode(0x200e) + fileName}>{displayFileName}</span>
                         </div>
                     </div>
                     <div className="file-permission-title-divider-bottom" />
@@ -283,7 +287,7 @@ const PermissionContent: React.FC<PermissionContentProps> = ({
                 <div className="mcp-tool-content">
                     <CollapsibleContent>
                         {/* 开头加 LRM(U+200E) 强制路径按 LTR 排版，避免 direction:rtl 把开头的 "." 排到末尾 */}
-                        {`Read(${String.fromCharCode(0x200e)}${fileName})`}
+                        {`Read(${String.fromCharCode(0x200e)}${displayPath(fileName)})`}
                     </CollapsibleContent>
                 </div>
                 <div className="file-permission-code-divider" />

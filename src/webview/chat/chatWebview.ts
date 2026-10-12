@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import * as crypto from 'crypto';
+import * as os from 'os';
 import { FileStateDiffManager } from '../../managers/FileStateDiffManager';
 import { FileOperationManager } from '../../managers/FileOperationManager';
 import { SemaProcessWrapper } from '../../core/semaProcessWrapper';
@@ -93,7 +94,6 @@ export class ChatWebviewProvider {
                 askFormResponse: () => this.sessionController.getSessionWrapper(sid!)?.respondToPickOption(msg.response),
                 planExitResponse: () => this.handlePlanExitResponse(sid, msg.response),
                 insertPermissionRequest: () => this.sessionController.getSessionWrapper(sid!)?.insertPermissionRequestMessage(msg.permissionData),
-                insertAskFormRequest: () => this.sessionController.getSessionWrapper(sid!)?.insertAskFormRequestMessage(msg.askFormData),
                 updateAgentMode: () => this.sessionController.getSessionWrapper(sid!)?.updateAgentMode(msg.mode),
                 updatePermissionLevel: () => this.sessionController.getSessionWrapper(sid!)?.updatePermissionLevel(msg.level),
                 transferAgentToBackground: () => { this.sessionController.getSessionWrapper(sid!)?.transferAgentToBackground(msg.taskId); },
@@ -166,6 +166,12 @@ export class ChatWebviewProvider {
     // ─── 消息 handlers ────────────────────────────────────────────────────────
 
     private async onFrontendReady(): Promise<void> {
+        // 路径展示环境（home 缩写 ~）先于任何会话消息下发，保证历史消息首次渲染就有真值
+        this.postMessage({
+            type: 'envInfo',
+            homeDir: os.homedir(),
+            platform: process.platform,
+        });
         // 模型未配置横幅不在此一次性判断：前端按 updateModelInfo / modelUpdate 的模型列表实时派生
         await this.sessionController.createSession();
     }

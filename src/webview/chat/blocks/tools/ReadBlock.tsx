@@ -5,6 +5,7 @@ import { hasTextSelection } from '../../utils/selection';
 import { FileTextIcon } from '../../components/ui/IconButton';
 import ToolRowHeader from './ToolRowHeader';
 import { useT } from '../../../common/i18n/react';
+import { baseName, displayPath } from '../../utils/pathDisplay';
 
 interface ReadBlockProps {
     content: ToolContent;
@@ -46,7 +47,7 @@ const ReadBlock: React.FC<ReadBlockProps> = React.memo(({ content, vscode }) => 
         return null;
     }
 
-    const displayFileName = finalFileName.split('/').pop() || finalFileName;
+    const displayFileName = baseName(finalFileName);
 
     const handleOpenFile = () => {
         if (hasTextSelection()) {
@@ -80,7 +81,7 @@ const ReadBlock: React.FC<ReadBlockProps> = React.memo(({ content, vscode }) => 
                 icon={<FileTextIcon />}
                 verb={t('tool.read')}
                 target={`${displayFileName}${lineRange}`}
-                targetTitle={finalFileName + lineRange}
+                targetTitle={displayPath(finalFileName) + lineRange}
                 onTargetClick={handleOpenFile}
                 onClick={handleOpenFile}
             />
