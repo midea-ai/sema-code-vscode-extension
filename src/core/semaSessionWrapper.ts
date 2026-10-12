@@ -359,26 +359,6 @@ export class SemaSessionWrapper {
         this.sendAppendMessages([message]);
     }
 
-    public insertAskFormRequestMessage(askFormData: any): void {
-        const message: Message = {
-            id: this.generateId(),
-            type: 'askForm',
-            content: {
-                data: askFormData.data,
-                status: askFormData.status,
-                values: askFormData.values,
-            },
-        };
-
-        if (this.isSubAgent(askFormData.agentId)) {
-            this.addMessageToTaskAgent(askFormData.agentId, message);
-            return;
-        }
-
-        this.messageHistory.push(message);
-        this.sendAppendMessages([message]);
-    }
-
     // ─── 事件订阅 ─────────────────────────────────────────────────────────────
 
     private setupEventListeners(): void {

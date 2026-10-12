@@ -11,8 +11,7 @@ import ToolErrorBlock from './blocks/ToolErrorBlock';
 import UserInputBlock from './blocks/UserInputBlock';
 import AiResponseBlock from './blocks/AiResponseBlock';
 import ThoughtBlock from './blocks/ThoughtBlock';
-import PermissionRequestBlock from './components/permission/PermissionRequestBlock';
-import AskFormDialog from './components/ui/AskFormDialog';
+import { AskFormPanelRow, PermissionPanelRow } from './blocks/tools/GroupedToolBlock';
 import SupplementaryInfo from './components/ui/SupplementaryInfo';
 import PlanImplementPanel from './components/ui/PlanImplementPanel';
 import TaskEndBlock from './blocks/TaskEndBlock';
@@ -154,25 +153,12 @@ const MessageItem: React.FC<MessageItemProps> = React.memo(({
         case 'tool':
             return renderToolContent();
 
+        // 权限拒绝/中断面板与用户回应后的表单面板：落单时与组内同一行样式，避免卡片在 chat 里过于突出
         case 'permission_request':
-            return (
-                <PermissionRequestBlock
-                    permissionData={message.content}
-                    vscode={vscode}
-                />
-            );
+            return <PermissionPanelRow message={message} vscode={vscode} />;
 
         case 'askForm':
-            return (
-                <AskFormDialog
-                    data={message.content.data}
-                    onSubmit={() => {}}
-                    onSkip={() => {}}
-                    readonly
-                    initialValues={message.content.values}
-                    status={message.content.status}
-                />
-            );
+            return <AskFormPanelRow message={message} />;
 
         case 'system':
             if (message.content.type === 'interrupted') {

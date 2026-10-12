@@ -91,6 +91,8 @@ export const en: Record<keyof typeof zh, string> = {
     'tool.edited': 'Edited',
     'tool.skill': 'Used skill',
     'tool.ask': 'User responded',
+    'tool.permissionRefused': 'Refused permission',
+    'tool.permissionInterrupted': 'Permission interrupted',
     'tool.noOutput': '(no output)',
     // failed tool row verbs (by tool kind)
     'tool.failed.shell': 'Run failed',

@@ -24,8 +24,6 @@ export interface PickOptionRequestData {
     intro?: string;
 }
 
-export type AskFormStatus = 'submitted' | 'skipped';
-
 export type AskFormValues = Record<string, string | string[]>;
 
 interface AskFormDialogProps {
@@ -33,9 +31,6 @@ interface AskFormDialogProps {
     onSubmit: (answers: string, values: AskFormValues) => void;
     onSkip: (answers: string, values: AskFormValues) => void;
     onCancel?: () => void;
-    readonly?: boolean;
-    initialValues?: AskFormValues;
-    status?: AskFormStatus;
 }
 
 const MULTI_SEPARATOR = '; ';
@@ -44,14 +39,6 @@ type ChoiceQuestion = Extract<PickOptionQuestion, { type: 'radio' | 'checkbox' |
 
 function isChoiceQuestion(q: PickOptionQuestion): q is ChoiceQuestion {
     return q.type === 'radio' || q.type === 'checkbox' || q.type === 'select';
-}
-
-function buildInitialValues(questions: PickOptionQuestion[]): AskFormValues {
-    const v: AskFormValues = {};
-    for (const q of questions) {
-        v[q.id] = q.type === 'checkbox' ? [] : '';
-    }
-    return v;
 }
 
 interface AskFormState {
@@ -63,43 +50,19 @@ interface AskFormState {
     otherText: Record<string, string>;
 }
 
-/**
- * 把外部传入的 values 拆成「真实选项」与「Other 状态」。
- * 凡是不在 q.options 中的值，都识别为 Other 答案（用于回显已回答的表单）。
- */
-function buildInitialState(questions: PickOptionQuestion[], initialValues?: AskFormValues): AskFormState {
+/** 初始状态：checkbox 为空数组，text / textarea 取 defaultValue 预填，其余空串；Other 均未选中 */
+function buildInitialState(questions: PickOptionQuestion[]): AskFormState {
     const values: AskFormValues = {};
-    const otherActive: Record<string, boolean> = {};
-    const otherText: Record<string, string> = {};
-
     for (const q of questions) {
-        const raw = initialValues ? initialValues[q.id] : undefined;
-
         if (q.type === 'checkbox') {
-            const arr = Array.isArray(raw) ? raw : [];
-            const real = arr.filter(x => q.options.includes(x));
-            const others = arr.filter(x => !q.options.includes(x));
-            values[q.id] = real;
-            if (others.length > 0) {
-                otherActive[q.id] = true;
-                otherText[q.id] = others.join(MULTI_SEPARATOR);
-            }
-        } else if (q.type === 'radio' || q.type === 'select') {
-            const s = typeof raw === 'string' ? raw : '';
-            if (s && !q.options.includes(s)) {
-                values[q.id] = '';
-                otherActive[q.id] = true;
-                otherText[q.id] = s;
-            } else {
-                values[q.id] = s;
-            }
+            values[q.id] = [];
+        } else if (q.type === 'text' || q.type === 'textarea') {
+            values[q.id] = q.defaultValue ?? '';
         } else {
-            // text / textarea：有回显值优先回显，否则退回 defaultValue 预填（兜底空串）
-            values[q.id] = typeof raw === 'string' ? raw : (q.defaultValue ?? '');
+            values[q.id] = '';
         }
     }
-
-    return { values, otherActive, otherText };
+    return { values, otherActive: {}, otherText: {} };
 }
 
 function isAnswered(q: PickOptionQuestion, value: string | string[] | undefined): boolean {
@@ -126,30 +89,23 @@ const AskFormDialog: React.FC<AskFormDialogProps> = ({
     onSubmit,
     onSkip,
     onCancel,
-    readonly = false,
-    initialValues,
-    status,
 }) => {
     const t = useT();
     const [{ values: initValues, otherActive: initActive, otherText: initText }] = useState<AskFormState>(() =>
-        buildInitialState(data.questions, initialValues)
+        buildInitialState(data.questions)
     );
     const [values, setValues] = useState<AskFormValues>(initValues);
     const [otherActive, setOtherActive] = useState<Record<string, boolean>>(initActive);
     const [otherText, setOtherText] = useState<Record<string, string>>(initText);
     const [errors, setErrors] = useState<Record<string, string>>({});
-    // 历史消息（readonly）默认收起，仅保留标题和状态徽标；待回答的保持展开
-    const [isExpanded, setIsExpanded] = useState<boolean>(!readonly);
+    const [isExpanded, setIsExpanded] = useState<boolean>(true);
     const containerRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
-        if (!readonly && containerRef.current) {
-            containerRef.current.focus();
-        }
-    }, [readonly]);
+        containerRef.current?.focus();
+    }, []);
 
     useEffect(() => {
-        if (readonly) return;
         const node = containerRef.current;
         if (!node) return;
         const onKey = (e: KeyboardEvent) => {
@@ -160,7 +116,7 @@ const AskFormDialog: React.FC<AskFormDialogProps> = ({
         };
         node.addEventListener('keydown', onKey);
         return () => node.removeEventListener('keydown', onKey);
-    }, [readonly, onCancel]);
+    }, [onCancel]);
 
     const clearError = (id: string) => {
         setErrors(prev => {
@@ -232,7 +188,6 @@ const AskFormDialog: React.FC<AskFormDialogProps> = ({
                 className="ask-form-text"
                 value={otherText[q.id] || ''}
                 placeholder={t('chat.askForm.otherPlaceholder')}
-                disabled={readonly}
                 maxLength={OTHER_INPUT_MAX_LENGTH}
                 onChange={(e) => setOtherTextFor(q.id, e.target.value.slice(0, OTHER_INPUT_MAX_LENGTH))}
             />
@@ -242,7 +197,6 @@ const AskFormDialog: React.FC<AskFormDialogProps> = ({
     const renderQuestion = (q: PickOptionQuestion) => {
         const value = values[q.id];
         const err = errors[q.id];
-        const disabled = readonly;
         const otherSelected = !!otherActive[q.id];
 
         let body: React.ReactNode;
@@ -257,10 +211,8 @@ const AskFormDialog: React.FC<AskFormDialogProps> = ({
                                     <button
                                         key={i}
                                         type="button"
-                                        className={`ask-form-chip ${checked ? 'selected' : ''} ${disabled ? 'disabled' : ''}`}
-                                        disabled={disabled}
+                                        className={`ask-form-chip ${checked ? 'selected' : ''}`}
                                         onClick={() => {
-                                            if (disabled) return;
                                             setOtherActiveFor(q.id, false);
                                             updateValue(q.id, checked ? '' : opt);
                                         }}
@@ -271,10 +223,8 @@ const AskFormDialog: React.FC<AskFormDialogProps> = ({
                             })}
                             <button
                                 type="button"
-                                className={`ask-form-chip ${otherSelected ? 'selected' : ''} ${disabled ? 'disabled' : ''}`}
-                                disabled={disabled}
+                                className={`ask-form-chip ${otherSelected ? 'selected' : ''}`}
                                 onClick={() => {
-                                    if (disabled) return;
                                     setOtherActiveFor(q.id, true);
                                     setValues(prev => ({ ...prev, [q.id]: '' }));
                                 }}
@@ -291,13 +241,13 @@ const AskFormDialog: React.FC<AskFormDialogProps> = ({
                 const max = q.maxSelections;
                 const count = arr.length + (otherSelected ? 1 : 0);
                 const reachedMax = !!max && count >= max;
-                const otherItemDisabled = disabled || (reachedMax && !otherSelected);
+                const otherItemDisabled = reachedMax && !otherSelected;
                 body = (
                     <>
                         <div className="ask-form-options ask-form-options-inline">
                             {q.options.map((opt, i) => {
                                 const checked = arr.includes(opt);
-                                const itemDisabled = disabled || (reachedMax && !checked);
+                                const itemDisabled = reachedMax && !checked;
                                 return (
                                     <button
                                         key={i}
@@ -342,7 +292,6 @@ const AskFormDialog: React.FC<AskFormDialogProps> = ({
                         <select
                             className="ask-form-select"
                             value={otherSelected ? OTHER_SELECT_SENTINEL : ((value as string) || '')}
-                            disabled={disabled}
                             onChange={(e) => {
                                 const v = e.target.value;
                                 if (v === OTHER_SELECT_SENTINEL) {
@@ -374,7 +323,6 @@ const AskFormDialog: React.FC<AskFormDialogProps> = ({
                             className="ask-form-text"
                             value={text}
                             placeholder={q.placeholder}
-                            disabled={disabled}
                             maxLength={max}
                             onChange={(e) => updateValue(q.id, e.target.value.slice(0, max))}
                         />
@@ -392,7 +340,6 @@ const AskFormDialog: React.FC<AskFormDialogProps> = ({
                             className="ask-form-textarea"
                             value={text}
                             placeholder={q.placeholder}
-                            disabled={disabled}
                             rows={3}
                             maxLength={max}
                             onChange={(e) => updateValue(q.id, e.target.value.slice(0, max))}
@@ -418,14 +365,13 @@ const AskFormDialog: React.FC<AskFormDialogProps> = ({
         );
     };
 
-    const answered = !!status;
     const mainTitle = data.estimatedTime ? t('chat.askForm.titleWithTime', { time: data.estimatedTime }) : t('chat.askForm.title');
 
     return (
         <div
-            className={`chat-block bash-permission-block ask-form-dialog ${readonly ? 'readonly' : ''}`}
+            className="chat-block bash-permission-block ask-form-dialog"
             ref={containerRef}
-            tabIndex={readonly ? -1 : 0}
+            tabIndex={0}
         >
             <div
                 className="ask-form-header"
@@ -439,31 +385,27 @@ const AskFormDialog: React.FC<AskFormDialogProps> = ({
                     <div className="ask-form-header-title">{mainTitle}</div>
                     {data.intro ? <div className="ask-form-header-intro">{data.intro}</div> : null}
                 </div>
-                <div className={`ask-form-status-badge ${answered ? 'answered' : 'pending'}`}>
-                    {answered ? 'Answered' : 'Pending'}
-                </div>
+                <div className="ask-form-status-badge pending">Pending</div>
             </div>
             {isExpanded ? (
                 <div className="ask-form-content">
                     {data.questions.map(renderQuestion)}
-                    {!readonly ? (
-                        <div className="ask-form-buttons">
-                            <button
-                                type="button"
-                                className="ask-form-submit-btn"
-                                onClick={handleSubmit}
-                            >
-                                Submit Answers
-                            </button>
-                            <button
-                                type="button"
-                                className="ask-form-skip-btn"
-                                onClick={handleSkip}
-                            >
-                                Continue
-                            </button>
-                        </div>
-                    ) : null}
+                    <div className="ask-form-buttons">
+                        <button
+                            type="button"
+                            className="ask-form-submit-btn"
+                            onClick={handleSubmit}
+                        >
+                            Submit Answers
+                        </button>
+                        <button
+                            type="button"
+                            className="ask-form-skip-btn"
+                            onClick={handleSkip}
+                        >
+                            Continue
+                        </button>
+                    </div>
                 </div>
             ) : null}
         </div>

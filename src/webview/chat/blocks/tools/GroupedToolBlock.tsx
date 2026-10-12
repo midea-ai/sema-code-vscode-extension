@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
-import { BrainIcon, ClockIcon, FileTextIcon, GlobeIcon, PlugIcon, TerminalIcon, ToggleIcon, WrenchIcon, XIcon } from '../../components/ui/IconButton';
+import { BrainIcon, ClockIcon, FileTextIcon, GlobeIcon, PlugIcon, QuestionBubbleIcon, TerminalIcon, ToggleIcon, WrenchIcon, XIcon } from '../../components/ui/IconButton';
 import { FileChange, Message } from '../../types';
 import { CONTINUATION_SYMBOL } from '../../utils/symbols';
 import { countDiffChanges } from '../../utils/diffParser';
@@ -28,16 +28,23 @@ import {
     getMcpServerName,
     getToolName,
     getToolTitle,
+    isAskFormPanelMessage,
+    isAskToolMessage,
     isGenImageMessage,
     isMemoryEditMessage,
+    isPermissionPanelMessage,
     isShellRunMessage,
+    isSkillMessage,
     isToolErrorMessage,
 } from '../../utils/groupMessages';
 import GeneratedImageBlock from './GeneratedImageBlock';
+import PermissionContent from '../../components/permission/PermissionContent';
+import { AskFormValues, PickOptionRequestData, formatAskFormAnswers } from '../../components/ui/AskFormDialog';
 import { isMcpToolType, parseMcpToolName } from '../../utils/permissionUtils';
 import { langMap } from '../../utils/fileLangTypeMap';
 import { hasTextSelection } from '../../utils/selection';
-import { getSearchRowMeta } from './utils';
+import { getSearchRowMeta, resolveSkillFilePath } from './utils';
+import { baseName, displayPath } from '../../utils/pathDisplay';
 import { processTerminalOutput } from './BashBlock';
 import ToolRowHeader, { SearchRowHeader } from './ToolRowHeader';
 import CollapsibleDiff from '../../components/ui/CollapsibleDiff';
@@ -80,9 +87,9 @@ type ExpandedItem =
     | { kind: 'gen-image'; id: string; messages: Message[] }
     | { kind: 'message'; message: Message };
 
-/** 成功的 Read 消息；Read 的执行报错 content.toolName 也是 view_file，需排除，不并入合并行 */
+/** 成功的 Read 消息；Read 的执行报错与读文件的权限面板 content.toolName 也是 view_file，需排除，不并入合并行 */
 const isReadMessage = (message: Message): boolean => {
-    return !isToolErrorMessage(message) && getToolName(message) === TOOL_NAME_VIEW_FILE;
+    return message.type === 'tool' && getToolName(message) === TOOL_NAME_VIEW_FILE;
 };
 
 const getReadFileInfo = (message: Message): ReadSummaryFile | null => {
@@ -112,12 +119,12 @@ const getReadFileInfo = (message: Message): ReadSummaryFile | null => {
         }
     }
 
-    const displayFileName = filePath.split(/[/\\]/).pop() || filePath;
+    const displayFileName = baseName(filePath);
     return {
         display: `${displayFileName}${lineRange}`,
         filePath,
         line: offset !== null ? offset + 1 : 1,
-        title,
+        title: displayPath(filePath) + lineRange,
     };
 };
 
@@ -208,7 +215,9 @@ export const getExpandedItems = (messages: Message[]): ExpandedItem[] => {
 
 // ==================== 类别与组头 ====================
 
-type GroupCategoryKind = 'explore' | 'ran' | 'mcp' | 'fetch' | 'job' | 'cron' | 'memory' | 'image';
+type GroupCategoryKind =
+    | 'explore' | 'ran' | 'mcp' | 'fetch' | 'job' | 'cron' | 'memory' | 'image'
+    | 'skill' | 'ask';
 
 interface GroupCategory {
     key: string;
@@ -228,8 +237,17 @@ const getGenImageWeight = (message: Message): number => {
     return Array.isArray(images) ? images.length : 0;
 };
 
-/** 非 MCP 消息的类别：memory 写入、生成图片、非只读命令、抓网页、后台任务、定时任务，其余（Read/Search/只读命令）为探索 */
+/**
+ * 非 MCP 消息的类别：提问（面板或记录）、技能、memory 写入、生成图片、非只读命令、
+ * 抓网页、后台任务、定时任务，其余（Read/Search/只读命令）为探索
+ */
 const getCategoryKind = (message: Message): GroupCategoryKind => {
+    if (isAskFormPanelMessage(message) || isAskToolMessage(message)) {
+        return 'ask';
+    }
+    if (isSkillMessage(message)) {
+        return 'skill';
+    }
     if (isMemoryEditMessage(message)) {
         return 'memory';
     }
@@ -252,13 +270,16 @@ const getCategoryKind = (message: Message): GroupCategoryKind => {
     return 'explore';
 };
 
-/** 组内消息按类别计数，类别按首次出现顺序排列；MCP 按服务名分别计数；生成图片按张数计；执行报错不计入 */
+/**
+ * 组内消息按类别计数，类别按首次出现顺序排列；MCP 按服务名分别计数；生成图片按张数计；
+ * 执行报错与权限面板（拒绝/中断）都不计入，只在组内展示
+ */
 export const getGroupCategories = (messages: Message[]): GroupCategory[] => {
     const categories: GroupCategory[] = [];
     const byKey = new Map<string, GroupCategory>();
 
     for (const message of messages) {
-        if (isToolErrorMessage(message)) {
+        if (isToolErrorMessage(message) || isPermissionPanelMessage(message)) {
             continue;
         }
         const server = getMcpServerName(message);
@@ -302,12 +323,16 @@ const getCategoryText = (category: GroupCategory): { verb: string; subject: stri
             return { verb: 'Wrote', subject: '', count: formatCount(category.count, 'memory', 'memories') };
         case 'image':
             return { verb: 'Generated', subject: '', count: formatCount(category.count, 'image', 'images') };
+        case 'skill':
+            return { verb: 'Used', subject: '', count: formatCount(category.count, 'skill', 'skills') };
+        case 'ask':
+            return { verb: 'Asked', subject: 'user', count: formatCount(category.count, 'time', 'times') };
         default:
             return { verb: 'Explored', subject: '', count: formatCount(category.count, 'tool', 'tools') };
     }
 };
 
-/** 组内全是不计数的消息（中断/出错无成图的生图调用与报错）时的组头兜底文案 */
+/** 组内全是不计数的消息（中断/出错无成图的生图调用、报错、权限面板）时的组头兜底文案 */
 const FALLBACK_GROUP_TITLE = 'Called tools';
 
 /** 组头标题：各类别按首次出现顺序拼接，首个动词大写，其余小写，如 Explored 6 tools, ran 4 commands；无类别时用兜底文案 */
@@ -643,6 +668,97 @@ const MemoryItemBlock: React.FC<{ message: Message; vscode?: any }> = ({ message
     );
 };
 
+// ==================== 技能 / 提问 / 权限面板行 ====================
+
+/** 技能行：只有行头不展开，标题与整行可点直接打开 SKILL.md（与单条 PubBlock 一致） */
+const SkillItemBlock: React.FC<{ message: Message; vscode?: any }> = ({ message, vscode }) => {
+    const t = useT();
+    const title = getToolTitle(message);
+    const skillFilePath = resolveSkillFilePath(title, message.content?.summary);
+    const handleOpenSkill = skillFilePath
+        ? () => {
+            if (hasTextSelection() || !vscode) return;
+            vscode.postMessage({ type: 'openFile', filePath: skillFilePath, line: 1 });
+        }
+        : undefined;
+
+    return (
+        <div className="chat-block chat-block--borderless">
+            <ToolRowHeader
+                icon={<WrenchIcon />}
+                verb={t('tool.skill')}
+                target={title}
+                targetTitle={skillFilePath || title}
+                onTargetClick={handleOpenSkill}
+                onClick={handleOpenSkill}
+            />
+        </div>
+    );
+};
+
+/** ask_form 调用记录行「用户已回应」：展开为工具返回的回答文本（即用户提交的「- 题目: 回答」列表） */
+const AskToolItemBlock: React.FC<{ message: Message }> = ({ message }) => {
+    const t = useT();
+    return (
+        <GroupedResultRow
+            icon={<QuestionBubbleIcon />}
+            verb={t('tool.ask')}
+            content={message.content?.content}
+            summary={message.content?.summary}
+        />
+    );
+};
+
+/**
+ * 旧会话里已落盘的用户回应表单面板行（组内与落单单条共用；新会话提交后不再回插面板）：
+ * 只有动词不带目标，展开为「- 题目: 回答」列表，未答的题标 (skipped)
+ */
+export const AskFormPanelRow: React.FC<{ message: Message }> = ({ message }) => {
+    const t = useT();
+    const data = message.content?.data as PickOptionRequestData | undefined;
+    const questions = data?.questions || [];
+    const values = (message.content?.values || {}) as AskFormValues;
+    return (
+        <GroupedResultRow
+            icon={<QuestionBubbleIcon />}
+            verb={t('tool.ask')}
+            content={formatAskFormAnswers(questions, values)}
+        />
+    );
+};
+
+/** 权限拒绝 / 中断面板行（组内与落单单条共用）：只有动词不带目标，展开复用权限弹窗的内容区（命令 / 文件 diff，含用户拒绝时的留言） */
+export const PermissionPanelRow: React.FC<{ message: Message; vscode?: any }> = ({ message, vscode }) => {
+    const t = useT();
+    const [isExpanded, setIsExpanded] = useState(false);
+    const { toolName = '', title = '', content = '', action, refuseMessage } = message.content || {};
+    const interrupted = action === 'interrupted';
+
+    return (
+        <div className="chat-block chat-block--borderless">
+            <ToolRowHeader
+                icon={<XIcon />}
+                verb={interrupted ? t('tool.permissionInterrupted') : t('tool.permissionRefused')}
+                expandable
+                isExpanded={isExpanded}
+                onClick={() => setIsExpanded(prev => !prev)}
+            />
+            {isExpanded && (
+                <div className="chat-block-content grouped-result-body">
+                    <div className="bash-permission-content permission-content-dimmed">
+                        <PermissionContent toolName={toolName} title={title} content={content} vscode={vscode} />
+                        {refuseMessage && (
+                            <div className="bash-permission-refuse-message">
+                                <strong>User said：</strong>{refuseMessage}
+                            </div>
+                        )}
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+};
+
 const renderExpandedItem = (
     item: ExpandedItem,
     onFileOpen: (filePath: string, line: number) => void,
@@ -657,7 +773,21 @@ const renderExpandedItem = (
     }
 
     const { message } = item;
+    // 面板不是工具消息，content.toolName 是被拒 / 被问的工具名，须先于按工具名的分派
+    if (isPermissionPanelMessage(message)) {
+        return <PermissionPanelRow key={message.id} message={message} vscode={vscode} />;
+    }
+    if (isAskFormPanelMessage(message)) {
+        return <AskFormPanelRow key={message.id} message={message} />;
+    }
+
     const toolName = getToolName(message);
+    if (isSkillMessage(message)) {
+        return <SkillItemBlock key={message.id} message={message} vscode={vscode} />;
+    }
+    if (isAskToolMessage(message)) {
+        return <AskToolItemBlock key={message.id} message={message} />;
+    }
     if (isMemoryEditMessage(message)) {
         return <MemoryItemBlock key={message.id} message={message} vscode={vscode} />;
     }

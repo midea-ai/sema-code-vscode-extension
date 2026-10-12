@@ -92,6 +92,8 @@ export const zh = {
     'tool.edited': '已编辑',
     'tool.skill': '已使用技能',
     'tool.ask': '用户已回应',
+    'tool.permissionRefused': '已拒绝授权',
+    'tool.permissionInterrupted': '授权已中断',
     'tool.noOutput': '(无输出)',
     // 工具执行失败行动词（按工具种类）
     'tool.failed.shell': '运行失败',

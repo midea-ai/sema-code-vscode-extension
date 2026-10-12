@@ -151,12 +151,6 @@ body.vscode-light .bash-permission-content {
     color: var(--chat-color-muted);
 }
 
-.bash-permission-status.refused,
-.bash-permission-status.interrupted {
-    color: var(--chat-color-error);
-    background-color: var(--chat-color-error-bg);
-}
-
 .permission-content-dimmed {
     opacity: 0.65;
     filter: grayscale(0.2);
@@ -304,10 +298,6 @@ body.vscode-light .ask-form-dialog {
     border-color: var(--chat-border);
 }
 
-.ask-form-dialog.readonly {
-    opacity: 0.85;
-}
-
 .ask-form-header {
     display: flex;
     align-items: flex-start;
@@ -380,11 +370,6 @@ body.vscode-light .ask-form-dialog {
 .ask-form-status-badge.pending {
     color: var(--chat-color-warning);
     background-color: var(--chat-color-warning-bg);
-}
-
-.ask-form-status-badge.answered {
-    color: var(--chat-color-success);
-    background-color: var(--chat-color-success-bg);
 }
 
 .ask-form-content {

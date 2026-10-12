@@ -15,10 +15,9 @@ import {
     TOOL_NAME_SKILL,
     TOOL_NAME_STOP_BG_JOB,
 } from '../../../../utils/tool';
-import { getSearchRowMeta } from './utils';
+import { getSearchRowMeta, resolveSkillFilePath } from './utils';
 import ToolRowHeader, { SearchRowHeader } from './ToolRowHeader';
 import { useT } from '../../../common/i18n/react';
-import { getSkillFilePath } from '../../components/input/utils/commandUtils';
 import { hasTextSelection } from '../../utils/selection';
 import CollapsibleContent from '../../components/ui/CollapsibleContent';
 
@@ -75,7 +74,7 @@ const PubBlock: React.FC<PubBlockProps> = React.memo(({ content, messageId, vsco
             .join('');
     };
 
-    const toolValue = toolName === TOOL_NAME_PICK_OPTION ? 'User Response' : formatToolName(toolName);
+    const toolValue = formatToolName(toolName);
     const isStreaming = content.completed === false;
 
     // 搜索行：只显示行头，不展开结果，与组内搜索行一致
@@ -146,12 +145,9 @@ const PubBlock: React.FC<PubBlockProps> = React.memo(({ content, messageId, vsco
         );
     }
 
-    // 技能行：不展开内容，标题可点直接打开 SKILL.md。
-    // 路径优先取工具结果 summary（core 直接给 SKILL.md 路径），其次查技能列表映射
-    // （映射只在打开过 / 面板后才有，新开页面通常为空）；都没有时仅展示
+    // 技能行：不展开内容，标题可点直接打开 SKILL.md；路径解析见 resolveSkillFilePath，与组内技能行一致
     if (toolName === TOOL_NAME_SKILL) {
-        const summaryPath = summary && /SKILL\.md$/i.test(summary.trim()) ? summary.trim() : undefined;
-        const skillFilePath = summaryPath || getSkillFilePath(title) || getSkillFilePath(title.split(/\s/)[0]);
+        const skillFilePath = resolveSkillFilePath(title, summary);
         const handleOpenSkill = skillFilePath
             ? () => {
                 if (hasTextSelection() || !vscode) return;

@@ -798,35 +798,6 @@ print()
         },
     ],
 
-    AskFormHistory: [
-        {
-            id: nextId(),
-            type: 'askForm',
-            content: {
-                status: 'submitted',
-                values: {
-                    visual_style: '极简高级 / Apple 风格',
-                    core_modules: ['游戏核心逻辑', 'UI界面渲染'],
-                    page_count: '4-6 页',
-                    project_name: 'sema-demo',
-                    extra_notes: '希望首屏加载在 2s 内',
-                },
-                data: {
-                    agentId: 'mock-agent-history',
-                    estimatedTime: '30 秒',
-                    intro: '回答后我会基于这些选择直接生成首屏方案',
-                    questions: [
-                        { type: 'radio', id: 'visual_style', label: '视觉气质', required: true, options: ['极简高级 / Apple 风格', '科技未来感', '商务稳重', '活泼年轻'] },
-                        { type: 'checkbox', id: 'core_modules', label: '核心模块', required: true, options: ['游戏核心逻辑', 'UI界面渲染', '输入控制系统', '动画效果', '数据存储'], maxSelections: 3 },
-                        { type: 'select', id: 'page_count', label: '大概多少页面？', options: ['1-3 页', '4-6 页', '7-10 页', '10 页以上'] },
-                        { type: 'text', id: 'project_name', label: '项目名称', placeholder: '请输入项目名称' },
-                        { type: 'textarea', id: 'extra_notes', label: '其他备注', placeholder: '可选：补充任何需要特别说明的内容' },
-                    ],
-                },
-            },
-        },
-    ],
-
     Interrupted: [
         {
             id: nextId(),

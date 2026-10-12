@@ -1,5 +1,15 @@
 import { t as translate } from '../../../common/i18n/core';
 import { TOOL_NAME_SEARCH_FILES } from '../../../../utils/tool';
+import { getSkillFilePath } from '../../components/input/utils/commandUtils';
+
+/**
+ * 技能行可打开的 SKILL.md 路径：优先取工具结果 summary（core 直接给 SKILL.md 路径），
+ * 其次查技能列表映射（只在打开过 / 面板后才有，新开页面通常为空）；都没有返回 undefined，行不可点
+ */
+export const resolveSkillFilePath = (title: string, summary?: string): string | undefined => {
+    const summaryPath = summary && /SKILL\.md$/i.test(summary.trim()) ? summary.trim() : undefined;
+    return summaryPath || getSkillFilePath(title) || getSkillFilePath(title.split(/\s/)[0]);
+};
 
 /** title 里的 key: "value" 键值对，顺序、数量不限（pattern / path / glob / 其它） */
 const SEARCH_FIELD_RE = /(\w+):\s*"((?:[^"\\]|\\.)*)"/g;

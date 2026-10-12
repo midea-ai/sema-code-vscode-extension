@@ -7,9 +7,11 @@ import {
     TOOL_NAME_LIST_CRONS,
     TOOL_NAME_PATCH_FILE,
     TOOL_NAME_PEEK_BG_JOB,
+    TOOL_NAME_PICK_OPTION,
     TOOL_NAME_RUN_SHELL,
     TOOL_NAME_SEARCH_CONTENT,
     TOOL_NAME_SEARCH_FILES,
+    TOOL_NAME_SKILL,
     TOOL_NAME_STOP_BG_JOB,
     TOOL_NAME_VIEW_FILE,
     TOOL_NAME_WRITE_FILE,
@@ -44,8 +46,10 @@ export const FETCH_TOOL_NAMES = new Set([TOOL_NAME_FETCH_URL]);
 export const JOB_TOOL_NAMES = new Set([TOOL_NAME_PEEK_BG_JOB, TOOL_NAME_STOP_BG_JOB]);
 export const CRON_TOOL_NAMES = new Set([TOOL_NAME_CREATE_CRON, TOOL_NAME_DEL_CRON, TOOL_NAME_LIST_CRONS]);
 
-/** 走默认 PubBlock 渲染但可并入组的工具：抓网页、后台任务查看/停止、定时任务管理 */
-const PUB_GROUPABLE_TOOL_NAMES = new Set([...FETCH_TOOL_NAMES, ...JOB_TOOL_NAMES, ...CRON_TOOL_NAMES]);
+/** 走默认 PubBlock 渲染但可并入组的工具：抓网页、后台任务查看/停止、定时任务管理、技能、提问 */
+const PUB_GROUPABLE_TOOL_NAMES = new Set([
+    ...FETCH_TOOL_NAMES, ...JOB_TOOL_NAMES, ...CRON_TOOL_NAMES, TOOL_NAME_SKILL, TOOL_NAME_PICK_OPTION,
+]);
 
 export const getToolName = (message: Message): string => {
     return message.toolName || message.content?.toolName || '';
@@ -163,6 +167,25 @@ export const isToolErrorMessage = (message: Message): boolean => {
     return message.type === 'system' && message.content?.type === 'tool_error';
 };
 
+/** 权限被用户拒绝 / 被 Stop 中断后回插历史的面板（permission_request） */
+export const isPermissionPanelMessage = (message: Message): boolean => {
+    return message.type === 'permission_request';
+};
+
+/** 旧版本回插历史的用户回应表单面板（askForm）；现在提交后不再回插，仅为兼容已落盘的旧会话保留渲染 */
+export const isAskFormPanelMessage = (message: Message): boolean => {
+    return message.type === 'askForm';
+};
+
+/** 提问工具（ask_form）的调用记录：「用户已回应」行，展开为回答文本 */
+export const isAskToolMessage = (message: Message): boolean => {
+    return message.type === 'tool' && getToolName(message) === TOOL_NAME_PICK_OPTION;
+};
+
+export const isSkillMessage = (message: Message): boolean => {
+    return message.type === 'tool' && getToolName(message) === TOOL_NAME_SKILL;
+};
+
 /** 非探索类的终端命令（ls/find/pwd 等归探索组，不算在内） */
 export const isShellRunMessage = (message: Message): boolean => {
     return message.type === 'tool'
@@ -193,11 +216,13 @@ export const isMemoryEditMessage = (message: Message): boolean => {
 
 /**
  * 可并入混合工具组的消息：探索类（Read/Search/只读命令）、其余终端命令、MCP 调用，
- * 抓网页、后台任务查看/停止、定时任务管理、memory 写入、生成图片，以及任何工具的执行报错。
- * 相邻的可并入消息不分种类进同一段；文件编辑、Skill、子代理、提问等其它工具与可见正文一样作为段边界。
+ * 抓网页、后台任务查看/停止、定时任务管理、memory 写入、生成图片、技能、提问记录，任何工具的执行报错，
+ * 以及权限拒绝/中断面板与旧会话里的用户回应表单面板。
+ * 相邻的可并入消息不分种类进同一段；文件编辑、子代理等其它工具与可见正文一样作为段边界。
  */
 export const isGroupableToolMessage = (message: Message): boolean => {
-    if (isToolErrorMessage(message) || isMemoryEditMessage(message) || isGenImageMessage(message)) {
+    if (isToolErrorMessage(message) || isMemoryEditMessage(message) || isGenImageMessage(message)
+        || isPermissionPanelMessage(message) || isAskFormPanelMessage(message)) {
         return true;
     }
 
