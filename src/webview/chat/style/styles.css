@@ -294,7 +294,7 @@ html.jb #output-container {
     color: var(--chat-text-primary);
     font-weight: 400;
     font-size: var(--chat-font-base);
-    line-height: 1.5;
+    line-height: var(--chat-line-height);
     white-space: pre-wrap;
     word-wrap: break-word;
 }
@@ -330,15 +330,20 @@ html.jb #output-container {
 /* 右下角复制按钮：悬浮输入块时淡入显示 */
 .user-input-copy {
     position: absolute;
-    right: 30px;
+    /* fork 按钮 24px 靠右 6px，再留 2px 间距 */
+    right: 32px;
     bottom: 6px;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    padding: 3px;
-    border: none;
-    border-radius: var(--chat-radius-sm);
-    background: var(--chat-bg-active);
+    width: 24px;
+    height: 24px;
+    padding: 0;
+    box-sizing: border-box;
+    /* 对齐 webui 代码块按钮：圆角 + 细边框，底色与输入块一致（hover 灰 + 面板色）盖住下方文字 */
+    border: 1px solid var(--chat-border-input);
+    border-radius: 5px;
+    background: linear-gradient(var(--chat-bg-hover), var(--chat-bg-hover)), var(--chat-bg-primary);
     color: var(--chat-color-muted);
     cursor: pointer;
     opacity: 0;
@@ -372,10 +377,13 @@ html.jb #output-container {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    padding: 3px;
-    border: none;
-    border-radius: var(--chat-radius-sm);
-    background: var(--chat-bg-active);
+    width: 24px;
+    height: 24px;
+    padding: 0;
+    box-sizing: border-box;
+    border: 1px solid var(--chat-border-input);
+    border-radius: 5px;
+    background: linear-gradient(var(--chat-bg-hover), var(--chat-bg-hover)), var(--chat-bg-primary);
     color: var(--chat-color-muted);
     cursor: pointer;
     opacity: 0;
@@ -843,6 +851,8 @@ html.jb #output-container {
 }
 
 
+/* 行高取正文行高：面板在 #output-container 之外，否则继承 body 的 normal，
+   文件芯片（1lh）会比旧的 18px 图标矮，悬浮出现的中文「放弃」走 CJK 回退字体行框更高，会把整行撑高 */
 .file-change-item {
     display: flex;
     align-items: center;
@@ -852,6 +862,7 @@ html.jb #output-container {
     transition: background-color 0.15s;
     cursor: pointer;
     width: 100%;
+    line-height: var(--chat-line-height);
 }
 
 .file-change-item:hover {
@@ -906,17 +917,11 @@ html.jb #output-container {
     color: var(--chat-text-primary);
 }
 
+/* 文件名是统一的文件高亮外形 .file-ref-chip（plain，尺寸/省略见 input.css），这里只给颜色与最大宽度 */
 .file-change-name {
     font-size: var(--chat-font-base);
     color: var(--chat-text-primary);
-    white-space: nowrap;
-    /* 添加这行防止折行 */
-    overflow: hidden;
-    /* 添加这行隐藏溢出内容 */
-    text-overflow: ellipsis;
-    /* 添加这行显示省略号 */
     max-width: 150px;
-    /* 可选：设置最大宽度 */
 }
 
 .file-change-stats {

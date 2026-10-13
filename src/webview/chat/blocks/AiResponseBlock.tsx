@@ -6,7 +6,7 @@ import { streamingStore } from '../utils/StreamingStore';
 import { hasTextSelection } from '../utils/selection';
 import { SessionContext } from '../SessionContext';
 import { CopyIcon, CheckIcon, BranchIcon } from '../components/ui/IconButton';
-import { getFileIconHtml } from '../components/ui/FileIcon';
+import { buildFileLabelHtml } from '../utils/fileRefDisplay';
 import { useT } from '../../common/i18n/react';
 import '../style/markdown.css';
 
@@ -55,14 +55,9 @@ const AiResponseBlock: React.FC<AiResponseBlockProps> = React.memo(({
                         if (lineInfo) {
                             element.setAttribute('data-line-info', lineInfo);
                         }
-                        // 前置文件类型图标（SVG 来自内置常量，非用户内容，可直接 innerHTML），按文件类型上色
-                        if (!element.querySelector('.md-file-icon')) {
-                            const { svg, color } = getFileIconHtml(String(filePath).split(/[\\/]/).pop() || String(filePath));
-                            const icon = document.createElement('span');
-                            icon.className = 'md-file-icon';
-                            icon.style.color = color;
-                            icon.innerHTML = svg;
-                            element.prepend(icon);
+                        // 内容换成统一的文件高亮结构（图标 + 原文名字，图标按文件类型上色；SVG 来自内置常量，名字已转义）
+                        if (!element.querySelector('.file-ref-chip')) {
+                            element.innerHTML = buildFileLabelHtml(String(filePath), false, element.textContent || '', true);
                         }
                     } else {
                         // 本地路径链接（带 data-md-original）不存在时回退为原始 markdown 文本；
@@ -83,8 +78,8 @@ const AiResponseBlock: React.FC<AiResponseBlockProps> = React.memo(({
                         element.removeAttribute('data-img-temp-id');
                     } else {
                         // 本地图片不存在：退回展示原始 markdown 文本（保留 alt 与 path 信息）。
-                        // 图片前后的 <br> 在渲染时已被移除（间距靠 .md-image 的 margin），
-                        // 回退文本用块级 span 独占一行，避免与前后文字挤在同一行。
+                        // 独占一行的图片在段落组装时是块级兄弟节点（间距靠 .md-image 的 margin），
+                        // 回退文本用块级 span 独占一行，夹在段落里的图片回退后也不与前后文字挤在同一行。
                         const original = element.getAttribute('data-md-original') || '';
                         const fallback = document.createElement('span');
                         fallback.style.display = 'block';
@@ -277,7 +272,13 @@ const AiResponseBlock: React.FC<AiResponseBlockProps> = React.memo(({
                         dangerouslySetInnerHTML={{ __html: htmlContent! }}
                     />
                 ) : (
-                    <span style={{ whiteSpace: 'pre-wrap' }}>{trimmedContent}</span>
+                    // 无 markdown 标记的纯文本同样按空行分段：段落间距走 .markdown-content p 的 margin，
+                    // 段内保留原始换行与空格；空行不再渲染成整行空白，与 markdown 分支观感一致
+                    <div className="markdown-content">
+                        {trimmedContent.split(/\n[ \t]*\n+/).filter(p => p.trim()).map((para, i) => (
+                            <p key={i} style={{ whiteSpace: 'pre-wrap' }}>{para}</p>
+                        ))}
+                    </div>
                 )}
             </div>
             {canShowActions && (

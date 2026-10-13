@@ -24,31 +24,21 @@ export function renderMarkdownToHtml(content: string, vscode?: any): string {
   // 同时避免和用户原文里的字符串碰撞。\x00 那一套占位走的是 sanitize 之前恢复，公式不行。
   const mathSalt = Math.random().toString(36).slice(2, 10);
   const mathToken = (i: number) => `__KATEX_${mathSalt}_${i}__`;
+  // 块级公式的序号：段落组装时要把它识别为块级节点，不包进 <p>
+  const blockMathIdx = new Set<number>();
 
   // 步骤1: 提取代码块
-  processedContent = processedContent.replace(/```([\s\S]*?)```/g, (match, code) => {
-    let processedCode = code.trim();
-
-    // 定义支持的语言标识符列表
-    const languageIdentifiers = [
-      'python', 'javascript', 'typescript', 'java', 'cpp', 'c', 'csharp', 'go', 'rust',
-      'ruby', 'php', 'swift', 'kotlin', 'scala', 'html', 'css', 'scss', 'json', 'xml',
-      'yaml', 'yml', 'markdown', 'bash', 'sh', 'sql', 'r', 'vue', 'dart'
-    ];
-
-    // 如果第一行是语言标识符，去掉它并记录语言
-    let langClass = '';
-    const lines = processedCode.split('\n');
-    if (lines.length > 0 && lines[0].trim()) {
-      const firstLine = lines[0].trim().toLowerCase();
-      if (languageIdentifiers.includes(firstLine)) {
-        langClass = ` class="language-${firstLine}"`;
-        processedCode = lines.slice(1).join('\n');
-      }
-    }
+  // 按 CommonMark 取开栏符同一行的 info string 作语言标记（取首个空白前的词，如 ```ts / ```bash title=x），
+  // 不维护语言白名单：任何简写（ts/js/py/zsh/diff...）都能识别，不会漏到代码内容里。
+  // info 行必须以换行结束才算语言标记，单行 ```code``` 写法整体视为代码内容
+  processedContent = processedContent.replace(/```(?:([^\n`\s]*)[^\n`]*\n)?([\s\S]*?)```/g, (match, info, code) => {
+    const processedCode = String(code).replace(/^\n+/, '').replace(/\s+$/, '');
+    const lang = String(info ?? '').toLowerCase();
+    const langClass = /^[\w+#.-]+$/.test(lang) ? ` class="language-${escapeHtml(lang)}"` : '';
 
     const escapedCode = escapeHtml(processedCode);
-    const placeholder = `\x00CODE_BLOCK_${codeBlockPlaceholders.length}\x00`;
+    // 占位符前后补换行，保证代码块独占一行：段落组装时按块级节点处理，不会被包进 <p>（div 不能嵌在 p 里）
+    const placeholder = `\n\x00CODE_BLOCK_${codeBlockPlaceholders.length}\x00\n`;
     // 外层 .code-block-wrap 承载右上角悬浮工具栏（自动换行开关 / 复制），按钮用 data-action 标记，
     // 点击由 AiResponseBlock 事件委托处理；图标走 CSS mask，不必给 DOMPurify 放行 svg
     codeBlockPlaceholders.push(
@@ -84,8 +74,10 @@ export function renderMarkdownToHtml(content: string, vscode?: any): string {
   });
 
   // 步骤3.3: 提取块级公式 $$...$$（必须早于行内 $...$，否则会被抢吃成 ""）
+  // 占位符前后补换行，与代码块同理：块级公式独占一行，不包进 <p>
   processedContent = processedContent.replace(/\$\$([\s\S]+?)\$\$/g, (_match, expr) => {
     const i = mathPlaceholders.length;
+    blockMathIdx.add(i);
     mathPlaceholders.push(
       `<div class="md-math-block">${katex.renderToString(expr.trim(), {
         displayMode: true,
@@ -94,7 +86,7 @@ export function renderMarkdownToHtml(content: string, vscode?: any): string {
         trust: false,
       })}</div>`
     );
-    return mathToken(i);
+    return `\n${mathToken(i)}\n`;
   });
 
   // 步骤3.4: 提取行内公式 $...$
@@ -213,21 +205,21 @@ export function renderMarkdownToHtml(content: string, vscode?: any): string {
   // 步骤4: 表格处理
   processedContent = processTableMarkdown(processedContent);
 
-  // 步骤5: 标题处理
+  // 步骤5: 标题处理 - 渲染为块级的 .md-heading，上下间距交给 CSS margin，不再用空行撑
   processedContent = processedContent.replace(/^#{1,6}\s+(.*)$/gm, (match, title) => {
-    return `\n\n<strong>${title}</strong>\n\n`;
+    return `<strong class="md-heading">${title}</strong>`;
   });
-
-  // 清理多余的换行符
-  processedContent = processedContent.replace(/\n{3,}/g, '\n\n');
-  processedContent = processedContent.replace(/^\n+/, '');
-  processedContent = processedContent.replace(/\n+$/, '');
 
   // 步骤6: 粗体处理
   processedContent = processedContent.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
 
-  // 步骤7: 换行处理
-  processedContent = processedContent.replace(/\n/g, '<br>');
+  // 步骤7: 段落组装 - 按空行分段包成 <p>，段内单个换行保留为 <br>；
+  // 列表/表格/引用/标题/代码块/图片/块级公式这些独占一行的块级节点不进 <p>，直接作为兄弟节点输出。
+  // 空行只决定分段、不再渲染成整行空白，块与段落的间距统一由 CSS margin 给（与 webui 的 Markdown 块模型一致）
+  const blockMathLineRe = new RegExp(`^__KATEX_${mathSalt}_(\\d+)__$`);
+  processedContent = buildParagraphs(processedContent, line =>
+    BLOCK_LINE_RE.test(line) || blockMathIdx.has(Number(line.match(blockMathLineRe)?.[1] ?? -1))
+  );
 
   // 步骤8: 恢复内联代码
   inlineCodePlaceholders.forEach((inlineCode, index) => {
@@ -253,31 +245,9 @@ export function renderMarkdownToHtml(content: string, vscode?: any): string {
     processedContent = processedContent.split(placeholder).join(codeBlock);
   });
 
-  // 步骤10: 清理多余的<br>标签
-  processedContent = processedContent.replace(/(<br>){3,}/g, '<br><br>');
-  processedContent = processedContent.replace(/<\/code><\/pre><\/div><\/div>(<br>)+/g, '</code></pre></div></div><br>');
-  // 表格是块级元素：</table> 后的 <br> 会完整生效，<br><br> 会渲染成 2 个空行，
-  // 而 <table> 前的 <br> 会被块级开头吸收一次（<br><br> 只显示 1 个空行，属正常）。
-  // 因此只收敛表格"后面"的连续 <br>，前面保持不动，避免标题/文字与表格之间的空行被吃掉。
-  processedContent = processedContent.replace(/<\/table>(<br>)+/g, '</table><br>');
-  // 引用块同表格：块级元素后的连续 <br> 收敛为 1 个，避免渲染出 2 个空行
-  processedContent = processedContent.replace(/<\/blockquote>(<br>)+/g, '</blockquote><br>');
-  // 列表：块级元素自带换行，紧跟的第一个 <br>（源文本的行尾换行）不应再占一行，
-  // 否则"列表后直接接文字"会多出一个空行；源文本有空行（≥2 个 <br>）时保留 1 个空行
-  processedContent = processedContent.replace(/<\/ul>((?:<br>)+)/g, (_match, brs: string) =>
-    brs.length > '<br>'.length ? '</ul><br>' : '</ul>'
-  );
-  // 图片（.md-image 为 display:block）与表格不同：自带上下 margin，段落间距交给 margin，
-  // 前后的连续 <br> 全部移除，避免 margin + 空行叠加出双重间距。
-  // 图片不存在回退为原始文本时的换行由 AiResponseBlock 用块级 span 兜底。
-  processedContent = processedContent.replace(/(<br>)+(?=<img\b)/gi, '');
-  processedContent = processedContent.replace(/(<img\b[^>]*>)(<br>)+/gi, '$1');
-
-  // console.log(JSON.stringify(processedContent));
-
-  // 步骤11: DOMPurify最终消毒，防止XSS
+  // 步骤10: DOMPurify最终消毒，防止XSS
   processedContent = DOMPurify.sanitize(processedContent, {
-    ALLOWED_TAGS: ['strong', 'br', 'pre', 'code', 'table', 'thead', 'tbody', 'tr', 'th', 'td', 'img', 'a', 'blockquote', 'div', 'span', 'ul', 'li'],
+    ALLOWED_TAGS: ['p', 'strong', 'br', 'pre', 'code', 'table', 'thead', 'tbody', 'tr', 'th', 'td', 'img', 'a', 'blockquote', 'div', 'span', 'ul', 'li'],
     ALLOWED_ATTR: [
       'class', 'data-temp-id', 'data-file-path', 'data-line-info', 'data-action',
       'src', 'alt', 'data-img-path', 'data-img-url', 'data-img-temp-id', 'data-md-original',
@@ -285,19 +255,46 @@ export function renderMarkdownToHtml(content: string, vscode?: any): string {
     ],
   });
 
-  // 步骤12: 恢复公式占位
+  // 步骤11: 恢复公式占位
   // KaTeX 输出含大量 span/style 和 MathML，加进 DOMPurify 白名单会显著扩大攻击面，
   // 因此让 KaTeX HTML 绕过 sanitize 直接注入。KaTeX 自身已用 trust:false 关掉 \href 等危险命令。
   mathPlaceholders.forEach((html, i) => {
     processedContent = processedContent.split(mathToken(i)).join(html);
   });
 
-  // 块级公式 <div class="md-math-block"> 在 sanitize 之后才注入，赶不上步骤10 的 <br> 收敛，
-  // 这里补一刀：收敛块级公式后面的多余 <br>（同表格/代码块，避免渲染出 2 个空行）。
-  // 行内公式是 <span class="md-math-inline">，不受影响；</div> 只会是块级公式外壳。
-  processedContent = processedContent.replace(/<\/div>(<br>)+/g, '</div><br>');
-
   return processedContent;
+}
+
+/** 独占一行的块级节点：列表 / 表格 / 引用 / 标题 / 代码块占位 / 图片占位（块级公式占位带随机盐，单独判断） */
+const BLOCK_LINE_RE = /^(?:<(ul|table|blockquote)\b[\s\S]*<\/\1>|<strong class="md-heading">[\s\S]*<\/strong>|\x00CODE_BLOCK_\d+\x00|\x00IMG_\d+\x00)$/;
+
+/**
+ * 段落组装：按空行切段，每段包成 <p>，段内单个换行渲染为 <br>；
+ * isBlockLine 判定为块级节点的行不进 <p>，原样作为兄弟节点输出。
+ * 图片占位只有独占一行时才按块级处理，夹在文字或列表项中的图片保留在原位（img 可合法嵌在 p / li 里）
+ */
+function buildParagraphs(content: string, isBlockLine: (line: string) => boolean): string {
+  const out: string[] = [];
+  let para: string[] = [];
+  const flush = () => {
+    if (para.length > 0) {
+      out.push(`<p>${para.join('<br>')}</p>`);
+      para = [];
+    }
+  };
+  for (const raw of content.split('\n')) {
+    const line = raw.trim();
+    if (!line) {
+      flush();
+    } else if (isBlockLine(line)) {
+      flush();
+      out.push(line);
+    } else {
+      para.push(raw);
+    }
+  }
+  flush();
+  return out.join('');
 }
 
 /**
@@ -528,13 +525,13 @@ function escapeHtml(text: string): string {
  * 创建内联代码HTML，如果是文件路径格式则添加点击事件；反引号内的 http(s) 地址渲染为可点链接
  */
 function createInlineCodeHtml(originalCode: string, escapedCode: string, vscode?: any): string {
-  // 反引号内的 URL（模型常写成 `http://localhost:3000`，也含 `www.x.com` 写法）：与裸 URL 同一套 md-url-link 点击/跳转逻辑，
-  // 附加 md-url-code 保留代码底色。内联代码在步骤 2/3 已整体抽走，步骤 3.6 的裸 URL 识别看不到它，需在此单独处理。
+  // 反引号内的 URL（模型常写成 `http://localhost:3000`，也含 `www.x.com` 写法）：与裸 URL 同一套 md-url-link 渲染与点击/跳转逻辑，
+  // 样式完全一致不再保留代码底色。内联代码在步骤 2/3 已整体抽走，步骤 3.6 的裸 URL 识别看不到它，需在此单独处理。
   // 与裸 URL 一样仅在非流式（vscode 已传入）阶段生效，流式阶段保持纯内联代码
   if (vscode && /^(?:https?:\/\/|www\.)\S+$/i.test(originalCode)) {
     const url = toHttpUrl(originalCode);
     const safeUrl = escapeHtml(url);
-    return `<a class="md-url-link md-url-code" data-url="${safeUrl}" title="${safeUrl}">${createLinkIconHtml(url)}${escapedCode}</a>`;
+    return `<a class="md-url-link" data-url="${safeUrl}" title="${safeUrl}">${createLinkIconHtml(url)}${escapedCode}</a>`;
   }
 
   // 仅在 vscode 可用（非流式）时检测并发起文件路径校验；流式阶段一律按纯内联代码渲染，等结束后再走完整逻辑

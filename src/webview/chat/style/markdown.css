@@ -1,18 +1,39 @@
 /* ===== Markdown 内容样式 ===== */
-/* 正文沿用 body 的界面字体（与用户气泡、文件面板、输入框一致）；
-   代码块 / 内联代码由全局 `code, pre` 规则保持编辑器等宽字体 */
+/* 正文沿用 body 的界面字体（与用户气泡、文件面板、输入框一致），行高同 webui；
+   代码块由全局 `code, pre` 规则保持编辑器等宽字体，内联代码改用正文字体 */
 .markdown-content {
-  line-height: 1.4;
+  line-height: var(--chat-line-height);
   color: var(--chat-text-editor);
   width: 100%;
   max-width: 100%;
   box-sizing: border-box;
 }
 
+/* 块级间距体系（对齐 webui .md）：正文全部包在 <p> 里，段落与列表/表格/代码块之间只靠 margin，
+   相邻 margin 垂直折叠；首尾子元素的外边距归零，避免气泡上下多出一截空白 */
+.markdown-content > :first-child {
+  margin-top: 0;
+}
+
+.markdown-content > :last-child {
+  margin-bottom: 0;
+}
+
+.markdown-content p {
+  margin: 0.5em 0;
+}
+
 /* 粗体样式 - 用于标题和 **加粗** 文本 */
 .markdown-content strong {
   font-weight: 700;
   color: var(--chat-text-editor);
+}
+
+/* 标题（# 行）：块级，上下间距与 webui h 标签一致 */
+.markdown-content .md-heading {
+  display: block;
+  margin: 1em 0 0.5em;
+  line-height: 1.3;
 }
 
 /* 数学公式样式 */
@@ -32,18 +53,21 @@
   vertical-align: baseline;
 }
 
-/* 内联代码样式 - `代码` 正文色 + 淡背景；高亮色只留给可点的文件路径 / 链接，避免三者混淆 */
+/* 内联代码样式 - `代码` 正文色 + 淡背景；高亮色只留给可点的文件路径 / 链接，避免三者混淆
+   字体与正文一致（覆盖全局 code 等宽规则，与 webui 对齐），等宽只留给代码块 */
 .markdown-content .inline-code {
   color: inherit;
+  font-family: inherit;
   background: var(--chat-bg-hover);
   padding: 0.1em 0.35em;
   border-radius: var(--chat-radius-sm);
 }
 
-/* 文件路径内联代码样式 - 可点击的文件路径：前置文件类型图标，悬停下划线 */
-/* 规格同 webui md-file：字号继承正文（与文件芯片一致），界面字体；文件名用 VS Code 链接高亮色，图标保持文件类型色 */
+/* 文件路径内联代码 / 本地路径链接：verifyFilePath 确认后由 AiResponseBlock 把内容换成统一的文件高亮结构
+   （.file-ref-chip，尺寸/间距/对齐见 input.css），名字仍是原文。这里只管去掉代码底色、界面字体与光标；
+   文件名用 VS Code 链接高亮色（.file-ref-chip 自带），图标保持文件类型色（内联 style）。
+   悬停下划线要打在 .file-ref-name 上：外层 code 的 text-decoration 不会传进 inline-flex 芯片里 */
 .markdown-content .file-path-code {
-  color: var(--chat-text-link);
   background: none;
   padding: 0;
   font-family: var(--vscode-font-family);
@@ -52,27 +76,9 @@
   text-decoration: none;
 }
 
-.markdown-content .file-path-code:hover {
+.markdown-content .file-path-code:hover .file-ref-name {
   text-decoration: underline;
-}
-
-/* 文件类型图标（verifyFilePath 确认后由 AiResponseBlock 动态插入，SVG 走 currentColor）
-   规格同 webui：13px 盒 + scale 1.35（Seti 图形留白大）、不加滤镜，inline-block 按 -0.15em 基线偏移与文字对齐。
-   不能用 inline-flex 包住整个链接：inline-flex 的对外基线取第一个 flex 子项，
-   而图标 span 无文字、基线即底边，会把文件名整体抬高，与前后正文错位 */
-.markdown-content .md-file-icon {
-  display: inline-block;
-  width: 13px;
-  height: 13px;
-  vertical-align: -0.15em;
-  margin-right: 0.3em;
-  transform: scale(1.35);
-}
-
-.markdown-content .md-file-icon svg {
-  display: block;
-  width: 100%;
-  height: 100%;
+  text-underline-offset: 2px;
 }
 
 /* 链接前的站点图标：外网 https 为 favicon <img>，其余为 CSS mask 地球
@@ -95,10 +101,10 @@
   --md-globe-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='10'/%3E%3Cpath d='M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20'/%3E%3Cpath d='M2 12h20'/%3E%3C/svg%3E");
 }
 
-/* 代码块容器 - 承载右上角悬浮工具栏（自动换行开关 / 复制） */
+/* 代码块容器 - 承载右上角悬浮工具栏（自动换行开关 / 复制），与正文的间距同 webui 用 margin 给 */
 .markdown-content .code-block-wrap {
   position: relative;
-  margin: 0;
+  margin: 0.6em 0;
 }
 
 .markdown-content .code-block-toolbar {
@@ -121,18 +127,21 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 22px;
-  height: 22px;
-  border-radius: 2px;
+  width: 24px;
+  height: 24px;
+  box-sizing: border-box;
+  /* 对齐 webui .md-code-btn：圆角 + 细边框，底色与代码块一致（hover 灰 + 面板色）盖住下方代码 */
+  border: 1px solid var(--chat-border-input);
+  border-radius: 5px;
   color: var(--chat-color-muted);
-  background: var(--chat-bg-hover);
+  background: linear-gradient(var(--chat-bg-hover), var(--chat-bg-hover)), var(--chat-bg-primary);
   cursor: pointer;
-  transition: background-color 0.15s, color 0.15s;
+  transition: color 0.15s;
 }
 
+/* 悬浮加重：与输入气泡按钮一致用主题前景色（muted-hover 是更浅的灰，亮色主题下会反过来变淡） */
 .markdown-content .code-block-btn:hover {
-  color: var(--chat-color-muted-hover);
-  background: var(--chat-bg-active);
+  color: var(--chat-text-primary);
 }
 
 /* 图标走 mask-image + currentColor：复用 IconButton 里的 SVG 线稿，无需给 DOMPurify 放行 svg */
@@ -149,9 +158,9 @@
   --code-btn-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='black' stroke-width='1.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M2 4h12M2 8h9a2.5 2.5 0 0 1 0 5H9M2 12h4'/%3E%3Cpath d='M10.5 11.5 9 13l1.5 1.5'/%3E%3C/svg%3E");
 }
 
-/* 自动换行开启中（默认）：按钮高亮提示当前为开启状态 */
+/* 自动换行开启中（默认）：对齐 webui is-on 用强调色，与关闭态的 muted 灰明显区分 */
 .markdown-content .code-block-wrap:not(.is-nowrap) .code-block-btn-wrap {
-  color: var(--chat-color-muted-hover);
+  color: var(--chat-text-link);
 }
 
 .markdown-content .code-block-btn-copy {
@@ -185,7 +194,7 @@
   margin: 0;
   overflow-x: auto;
   overflow-y: hidden;
-  line-height: 1.4;
+  line-height: 1.5;
   width: 100%;
   max-width: 100%;
   min-width: 0;
@@ -273,13 +282,6 @@
   text-decoration: underline;
 }
 
-/* 反引号内的 URL - 在链接样式之上保留内联代码底色与内边距，提示它来自 `...` 写法 */
-.markdown-content .md-url-code {
-  background: var(--chat-bg-hover);
-  padding: 0.1em 0.35em;
-  border-radius: var(--chat-radius-sm);
-}
-
 /* 本地路径链接 - [text](wiki/foo.md) 无 scheme 路径
    待验证阶段与正文同色、不可点（title 悬停可看真实路径）；
    verifyFilePath 确认存在后加 file-path-code，需覆盖此规则恢复可点样式 */
@@ -294,10 +296,10 @@
   cursor: pointer;
 }
 
-/* 无序列表：收紧默认间距，与引用块/表格的块级节奏一致 */
+/* 无序列表：与段落同用 0.5em 外边距（对齐 webui），相邻折叠后列表与前后文字间距等于一个段落间距 */
 /* 标记沿用原文的 "- " 而非圆点；2ch 缩进让标记贴左，视觉等同原始文本，折行仍有悬挂缩进 */
 .markdown-content .md-list {
-  margin: 2px 0;
+  margin: 0.5em 0;
   padding-left: 2ch;
   list-style-type: '- ';
 }
@@ -308,5 +310,5 @@
 }
 
 .markdown-content .md-list li {
-  margin: 1px 0;
+  margin: 0.2em 0;
 }
