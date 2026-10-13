@@ -6,6 +6,7 @@
  *   PREVIEW_COMPONENTS = null          → 显示所有组件
  *   PREVIEW_COMPONENTS = ['Edit','Write'] → 只显示指定组件
  *   PREVIEW_COMPONENTS = []            → 关闭预览（正常模式）
+ *   PREVIEW_EXCLUDE = ['QuickChatDialog'] → 在上述范围内再排除指定组件
  */
 import { Message } from '../types';
 import {
@@ -17,6 +18,13 @@ import {
 
 /** 手动切换预览范围：null = 全部，['xx'] = 指定组件，[] = 关闭 */
 export const PREVIEW_COMPONENTS: string[] | null = [];
+
+/** 预览时排除的组件 key（在 PREVIEW_COMPONENTS 范围内再剔除），如 ['QuickChatDialog'] */
+export const PREVIEW_EXCLUDE: string[] = ['QuickChatDialog', 'ForkDialog'];
+
+/** key 是否在预览范围内（不含 PREVIEW_MODE 判断） */
+const isKeyIncluded = (key: string): boolean =>
+    (PREVIEW_COMPONENTS === null || PREVIEW_COMPONENTS.includes(key)) && !PREVIEW_EXCLUDE.includes(key);
 
 let id = 0;
 const nextId = () => `mock-${++id}`;
@@ -950,7 +958,7 @@ export function getPreviewMessages(): Message[] {
     if (PREVIEW_COMPONENTS !== null && PREVIEW_COMPONENTS.length === 0) {
         return [];
     }
-    const keys = PREVIEW_COMPONENTS ?? Object.keys(mockMessageMap);
+    const keys = (PREVIEW_COMPONENTS ?? Object.keys(mockMessageMap)).filter(isKeyIncluded);
     return keys.flatMap((k) => mockMessageMap[k] ?? []);
 }
 
@@ -1261,12 +1269,12 @@ python3 SKILL_DIR/scripts/xlsx_insert_row.py /tmp/work/ --at 6 ...  # insert row
 export function getPreviewDialogKeys(): string[] {
     if (PREVIEW_COMPONENTS !== null && PREVIEW_COMPONENTS.length === 0) return [];
     const allKeys = Object.keys(mockDialogMap);
-    return PREVIEW_COMPONENTS ? PREVIEW_COMPONENTS.filter(k => allKeys.includes(k)) : allKeys;
+    return (PREVIEW_COMPONENTS ?? allKeys).filter(k => allKeys.includes(k) && isKeyIncluded(k));
 }
 
 /** 指定 key 是否在预览范围内 */
 export function isPreviewActive(key: string): boolean {
-    return PREVIEW_MODE && (PREVIEW_COMPONENTS === null || PREVIEW_COMPONENTS.includes(key));
+    return PREVIEW_MODE && isKeyIncluded(key);
 }
 
 /** 是否开启预览 */
