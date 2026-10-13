@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import FileIcon from '../../ui/FileIcon';
+import { FileLabel } from '../../../utils/fileRefDisplay';
 import { FileItem } from '../../../types';
 import { useT } from '../../../../common/i18n/react';
 
@@ -66,17 +66,9 @@ const FilePicker: React.FC<FilePickerProps> = ({
                                 onClick={() => onFileSelect(fileItem)}
                                 title={fileItem.path}
                             >
-                                <span className="file-icon">
-                                    <FileIcon
-                                        fileName={fileName}
-                                        isDirectory={fileItem.isDirectory}
-                                        size={18}
-                                    />
-                                </span>
                                 <div className="file-info">
-                                    <span className="file-name shortcut-command">
-                                        {displayName}
-                                    </span>
+                                    {/* 统一的文件高亮外形（plain：列表里不加粗、不用链接色），父路径紧跟其后 */}
+                                    <FileLabel path={fileName} isDirectory={fileItem.isDirectory} label={displayName} plain className="file-name" />
                                     {showPath && (
                                         <span className="file-full-path shortcut-desc">
                                             {parentPath}

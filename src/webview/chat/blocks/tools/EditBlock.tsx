@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { VscodeApi, FileChange } from '../../types';
 import { PencilIcon } from '../../components/ui/IconButton';
-import { getFileIconHtml } from '../../components/ui/FileIcon';
+import { FileLabel } from '../../utils/fileRefDisplay';
 import ToolRowHeader from './ToolRowHeader';
 import { ToolContent } from '../../types';
 import CollapsibleDiff from '../../components/ui/CollapsibleDiff';
@@ -78,9 +78,6 @@ const EditBlock: React.FC<EditBlockProps> = React.memo(({
 
     const displayFileName = useMemo(() => baseName(fileName), [fileName]);
 
-    // 文件类型图标（SVG 来自内置常量，可直接 innerHTML），与正文文件链接同色同规格
-    const fileIcon = useMemo(() => getFileIconHtml(displayFileName), [displayFileName]);
-
     const reportFileChange = useCallback(() => {
         if (onFileChange && fileName) {
             onFileChange({
@@ -149,17 +146,13 @@ const EditBlock: React.FC<EditBlockProps> = React.memo(({
     return (
         <div className="chat-block chat-block--borderless edit-block">
             {/* 行头与 Read / Shell 同规格：[铅笔] 已编辑 [文件类型图标] 路径 +n -m；路径可点打开 diff，整行点击折叠。
+                文件图标 + 路径是统一的文件高亮外形（plain：跟随工具行灰色、正常字重）；
+                项目内相对路径原样，项目外绝对路径把 home 缩写为 ~（hover 仍是真实路径）；
                 路径开头加 LRM(U+200E) 强制按 LTR 排版，配合 CSS 的 direction:rtl 实现省略前段、保留文件名尾部 */}
             <ToolRowHeader
                 icon={<PencilIcon />}
                 verb={toolName === TOOL_NAME_WRITE_FILE ? t('tool.wrote') : t('tool.edited')}
-                target={(
-                    <>
-                        <span className="edit-file-icon" style={{ color: fileIcon.color }} dangerouslySetInnerHTML={{ __html: fileIcon.svg }} />
-                        {/* 项目内相对路径原样；项目外绝对路径把 home 缩写为 ~（hover 仍是真实路径） */}
-                        <span className="edit-file-path">{String.fromCharCode(0x200e) + displayPath(fileName)}</span>
-                    </>
-                )}
+                target={<FileLabel path={fileName} label={String.fromCharCode(0x200e) + displayPath(fileName)} plain />}
                 targetTitle={fileName}
                 onTargetClick={handleShowDiff}
                 extra={(additions > 0 || removals > 0) ? (

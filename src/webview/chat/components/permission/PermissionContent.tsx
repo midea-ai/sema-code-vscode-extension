@@ -2,7 +2,7 @@ import React from 'react';
 import BaseBashContent from '../ui/BaseBashContent';
 import CollapsibleDiff from '../ui/CollapsibleDiff';
 import CollapsibleContent from '../ui/CollapsibleContent';
-import FileIcon from '../ui/FileIcon';
+import { FileLabel } from '../../utils/fileRefDisplay';
 import { langMap } from '../../utils/fileLangTypeMap';
 import { DiffContent } from '../../types';
 import {
@@ -118,9 +118,9 @@ const PermissionContent: React.FC<PermissionContentProps> = ({
                             className={`file-permission-file-left${vscode ? ' file-permission-file-left-clickable' : ''}`}
                             onClick={vscode ? handleFileClick : undefined}
                         >
-                            <FileIcon fileName={displayFileName} isDirectory={false} size={18} />
-                            {/* title 前加 LRM：原生 tooltip 沿用元素的 direction:rtl，否则开头的 "/" 会被排到末尾 */}
-                            <span className="file-permission-filename" title={String.fromCharCode(0x200e) + displayPath(filePath)}>{displayFileName}</span>
+                            {/* 统一的文件高亮外形（plain：正常字重、颜色由 .file-permission-filename 给）；
+                                title 前加 LRM：原生 tooltip 沿用元素的 direction:rtl，否则开头的 "/" 会被排到末尾 */}
+                            <FileLabel path={displayFileName} label={displayFileName} plain className="file-permission-filename" title={String.fromCharCode(0x200e) + displayPath(filePath)} />
                             {cellNumber && <span className="file-permission-cell-label">cell:{cellNumber}</span>}
                         </div>
                     </div>
@@ -231,11 +231,10 @@ const PermissionContent: React.FC<PermissionContentProps> = ({
                     >
                         <strong className="file-permission-action">{actionLabel}</strong>
                         <div className="file-permission-file-left">
-                            <FileIcon fileName={displayFileName} isDirectory={false} size={18} />
-                            {/* 开头加 LRM(U+200E) 强制路径按 LTR 排版，避免 direction:rtl 把开头的 "." 排到末尾；
+                            {/* 统一的文件高亮外形（plain）。开头加 LRM(U+200E) 强制路径按 LTR 排版，避免 direction:rtl 把开头的 "." 排到末尾；
                                 title 同样要加，原生 tooltip 沿用元素的 direction，否则开头的 "/" 会跑到末尾；
                                 项目内相对路径原样，项目外绝对路径 home 缩写为 ~（hover 为真实路径） */}
-                            <span className="file-permission-filename" title={String.fromCharCode(0x200e) + fileName}>{String.fromCharCode(0x200e) + displayPath(fileName)}</span>
+                            <FileLabel path={displayFileName} label={String.fromCharCode(0x200e) + displayPath(fileName)} plain className="file-permission-filename" title={String.fromCharCode(0x200e) + fileName} />
                             {renderDiffStats()}
                         </div>
                     </div>
@@ -278,8 +277,7 @@ const PermissionContent: React.FC<PermissionContentProps> = ({
                     >
                         <strong className="file-permission-action">Read File</strong>
                         <div className="file-permission-file-left">
-                            <FileIcon fileName={displayFileName} isDirectory={false} size={18} />
-                            <span className="file-permission-filename" title={String.fromCharCode(0x200e) + fileName}>{displayFileName}</span>
+                            <FileLabel path={displayFileName} label={displayFileName} plain className="file-permission-filename" title={String.fromCharCode(0x200e) + fileName} />
                         </div>
                     </div>
                     <div className="file-permission-title-divider-bottom" />

@@ -1,15 +1,9 @@
-import React from 'react';
+/**
+ * 文件类型图标的 SVG 与颜色来源。界面上所有「文件图标 + 文件名」统一走 utils/fileRefDisplay 的 FileLabel / buildFileLabelHtml，
+ * 这里不再提供 React 组件。
+ */
 import { getFileIconName } from '../../utils/fileIconUtils';
 import { fileIconSvgs } from './fileIconSvgs';
-
-interface FileIconProps {
-    fileName: string;
-    isDirectory: boolean;
-    className?: string;
-    size?: number;
-    /** 覆盖类型色（如传 currentColor 跟随文字色） */
-    color?: string;
-}
 
 // 颜色常量定义
 const colors = {
@@ -164,45 +158,8 @@ const iconColors: { [key: string]: string } = {
     default: colors.white
 };
 
-/** 文件图标的 SVG 与颜色（给非 React 场景使用，如 markdown 渲染后按文件名动态插入图标、输入框 mention 芯片） */
+/** 文件图标的 SVG 与颜色（SVG 尺寸随容器、颜色走 currentColor，由调用方的盒子决定大小与上色） */
 export function getFileIconHtml(fileName: string, isDirectory = false): { svg: string; color: string } {
     const iconName = getFileIconName(fileName, isDirectory);
     return { svg: fileIconSvgs[iconName] || fileIconSvgs.default, color: iconColors[iconName] || colors.white };
 }
-
-/**
- * 文件图标组件
- * 根据文件名和类型动态显示对应的SVG图标；
- * SVG 尺寸随容器（width/height=100%）、颜色走 currentColor
- */
-const FileIcon: React.FC<FileIconProps> = ({
-    fileName,
-    isDirectory,
-    className = '',
-    size = 16,
-    color
-}) => {
-    const iconName = getFileIconName(fileName, isDirectory);
-    const svgContent = fileIconSvgs[iconName] || fileIconSvgs.default;
-    const finalSize = iconName === 'folder' ? 14 : size;
-
-    return (
-        <div
-            className={`file-icon ${className}`}
-            style={{
-                width: finalSize,
-                height: finalSize,
-                color: color || iconColors[iconName] || colors.white,
-                flexShrink: 0,
-                display: 'inline-flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                filter: 'contrast(1.2) saturate(1.1)',
-                transform: 'scale(1.1)'
-            }}
-            dangerouslySetInnerHTML={{ __html: svgContent }}
-        />
-    );
-};
-
-export default React.memo(FileIcon);

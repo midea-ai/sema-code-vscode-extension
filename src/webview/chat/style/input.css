@@ -25,25 +25,8 @@
     margin-bottom: 4px;
 }
 
-/* 文件选择器：弹窗、列表、分割线复用 .shortcut-panel-* 样式 */
-.file-picker-item .file-icon {
-    flex-shrink: 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 20px;
-    height: 20px;
-    line-height: 1;
-    margin-right: 4px;
-}
-
-.file-picker-item .file-icon svg {
-    display: block;
-    width: 18px;
-    height: 18px;
-}
-
-/* 文件信息容器：文件名/路径复用 .shortcut-command / .shortcut-desc 样式，路径紧跟文件名（同命令面板的描述） */
+/* 文件选择器：弹窗、列表、分割线复用 .shortcut-panel-* 样式；行里的「图标 + 文件名」是统一的 .file-ref-chip（plain） */
+/* 文件信息容器：路径复用 .shortcut-desc 样式，紧跟文件名（同命令面板的描述） */
 .file-picker-item .file-info {
     flex: 1;
     display: flex;
@@ -52,12 +35,11 @@
     /* 允许子元素缩小 */
 }
 
-/* 文件名特有：限制最大宽度、超出省略，间距由 .shortcut-command 提供 */
+/* 文件名特有：限制最大宽度（超出省略由 .file-ref-name 提供），与路径的间距同命令面板的命令名 */
 .file-picker-item .file-name {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    flex-shrink: 0;
     max-width: 40%;
+    margin-right: 8px;
 }
 
 /* 完整路径：颜色与命令面板描述一致（继承 .shortcut-desc，不再额外降透明度） */
@@ -89,13 +71,15 @@
     padding: 0;
 }
 
+/* 面板行：字号与行高同聊天正文（文件高亮 / 技能标签按 1lh 取高，与输入框芯片等高），上下 2px 内边距同 webui */
 .shortcut-panel-item {
     display: flex;
     align-items: center;
     gap: 6px;
-    padding: 6px 12px;
+    padding: 2px 12px;
     cursor: pointer;
-    font-size: var(--chat-font-md);
+    font-size: var(--chat-font-base);
+    line-height: var(--chat-line-height);
     border-radius: 0;
     transition: background-color 0.15s;
     color: var(--chat-text-primary);
@@ -109,7 +93,7 @@
     display: flex;
     align-items: center;
     padding: 8px 12px;
-    font-size: var(--chat-font-md);
+    font-size: var(--chat-font-base);
     color: var(--chat-text-secondary);
     user-select: none;
     cursor: default;
@@ -145,7 +129,7 @@
 /* / 符号：浅色不加粗，与命令名留间距 */
 .shortcut-slash {
     flex-shrink: 0;
-    font-size: var(--chat-font-md);
+    font-size: var(--chat-font-base);
     color: var(--chat-text-secondary);
     margin-right: 6px;
 }
@@ -153,7 +137,7 @@
 /* 命令名称正常颜色 */
 .shortcut-command {
     flex-shrink: 0;
-    font-size: var(--chat-font-md);
+    font-size: var(--chat-font-base);
     /* font-weight: bold; */
     color: var(--chat-text-primary);
     margin-right: 40px;
@@ -197,7 +181,7 @@
 }
 
 .shortcut-panel-item .shortcut-desc {
-    font-size: var(--chat-font-md);
+    font-size: var(--chat-font-base);
     text-align: left;
 }
 
@@ -213,10 +197,10 @@
     color: var(--chat-text-input);
     border: none;
     font-size: var(--chat-font-base);
-    /* 约 2.5 行：12px 上下内边距 + 16.8px 行高 × 2.5，空态也留出一定书写空间 */
+    /* 约 2 行：12px 上下内边距 + 19.8px 行高 × 2，空态也留出一定书写空间 */
     min-height: 54px;
     max-height: 300px;
-    line-height: 1.4;
+    line-height: var(--chat-line-height);
     transition: max-height 0.3s ease;
     overflow-y: auto;
     white-space: pre-wrap;
@@ -255,7 +239,7 @@
     right: 8px;
     display: flex;
     align-items: center;
-    line-height: 1.4;
+    line-height: var(--chat-line-height);
     font-size: var(--chat-font-base);
     color: var(--chat-text-placeholder);
     pointer-events: none;
@@ -294,20 +278,30 @@
     cursor: pointer;
 }
 
-/* 文件引用芯片（输入框 mention + 用户气泡共用）：图标与文字同用链接强调色、无底色。
-   规格与对齐方式同 webui FileRefChip：字号/字体继承正文、名字 500 字重；
+/* 文件高亮统一外形（所有「文件图标 + 文件名」处共用：输入框 mention、用户气泡、@ 文件面板、Markdown 文件引用、
+   编辑工具行、文件权限卡、文件改动面板，由 fileRefDisplay 的 FileLabel / buildFileLabelHtml 生成）：
+   图标 + 名字、无底色，默认文字链接强调色、名字 500 字重。
+   规格与对齐方式同 webui FileLabel：字号/字体继承正文；
    高度取整行行高（1lh）并 vertical-align: top 贴满行框，图标与文字在行框内 flex 居中，
-   与父级文字的垂直位置一致（middle 按 x-height 算会偏高；字号不继承则 1lh 与正文行高不等） */
+   与父级文字的垂直位置一致（middle 按 x-height 算会偏高；字号不继承则 1lh 与正文行高不等）；
+   min-width: 0 让它作为 flex 子项（工具行、权限卡、改动面板）时能收缩，省略号才会生效 */
 .file-ref-chip {
     display: inline-flex;
     align-items: center;
     gap: 4px;
     height: 1lh;
     max-width: 100%;
+    min-width: 0;
     vertical-align: top;
     color: var(--chat-text-link);
     font-weight: 500;
     white-space: nowrap;
+}
+
+/* 列表行里的文件（@ 文件面板）：正常字重、跟随行文字色，不当作高亮 */
+.file-ref-chip.plain {
+    font-weight: 400;
+    color: inherit;
 }
 
 .file-ref-chip.clickable {
@@ -320,8 +314,8 @@
 }
 
 /* 图标盒 15px，同 webui FileIcon：Seti 文件图形在 viewBox 里留白大，文件放大 1.35 补偿、不加对比度滤镜；
-   folder 图形本身占满，不放大、内缩 1px。color: inherit 只对输入框芯片生效（随文字用链接高亮色）；
-   气泡里的芯片图标带内联文件类型色，优先级更高 */
+   folder 图形本身占满，不放大、内缩 1px。color: inherit 让输入框 mention 与气泡芯片的图标随文字用链接高亮色；
+   @ 面板与 Markdown 引用的图标带内联文件类型色，优先级更高 */
 .file-ref-icon {
     display: inline-flex;
     align-items: center;
@@ -370,14 +364,12 @@
     white-space: nowrap;
 }
 
-/* 面板 / 输入框 / 气泡三处统一按面板规格：名字固定 13px、行高 normal（外框仍取所在行 1lh，不撑高行），图标 14px */
+/* 面板 / 输入框 / 气泡三处：名字字号继承所在正文（面板行已统一为正文字号），500 字重，同文件高亮 */
 .skill-label-name {
-    font-size: var(--chat-font-md);
-    line-height: normal;
     font-weight: 500;
 }
 
-/* 图标盒子尺寸由 SkillLabel / buildSkillLabelHtml 内联指定，三处统一 14 */
+/* 图标盒子尺寸由 SkillLabel / buildSkillLabelHtml 内联指定，三处统一取 FILE_LABEL_ICON（15） */
 .skill-label-icon {
     display: inline-flex;
     align-items: center;

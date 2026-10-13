@@ -7,6 +7,8 @@
     --chat-font-md: 13px;
     --chat-font-lg: 14px;
     --chat-font-xl: 16px;
+    /* 聊天正文行高：Markdown 回复、用户气泡、输入框、@ 文件/命令面板共用，文件高亮（.file-ref-chip 按 1lh 取高）在各处才能一致 */
+    --chat-line-height: 1.65;
 
     /* -------- 间距 -------- */
     --chat-spacing-xs: 4px;

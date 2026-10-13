@@ -63,6 +63,9 @@ export function refLabel(path: string, isDirectory: boolean, line?: number, endL
     return line ? `${name}:${line}${endLine ? `-${endLine}` : ''}` : name;
 }
 
+/** 文件高亮统一图标尺寸（px）：.file-ref-icon 的盒子大小，SkillLabel 的图标也取这个值 */
+export const FILE_LABEL_ICON = 15;
+
 /** 芯片图标的 svg 与类名（尺寸 / 放大规则由 .file-ref-icon-file / -folder 给出，同 webui FileIcon：文件放大 1.35，目录不放大） */
 function refIcon(path: string, isDirectory: boolean) {
     const { svg, color } = getFileIconHtml(path.split(/[\\/]/).pop() || path, isDirectory);
@@ -70,31 +73,53 @@ function refIcon(path: string, isDirectory: boolean) {
 }
 
 /**
- * 图标 + 文件名，内联在文字中（无底色）；有 onOpen 时可点击。
- * 用户气泡里用：文件名走链接高亮色，图标保持文件类型色（与 chat 正文文件链接一致）；
- * 只有输入框芯片（buildMentionChipHtml）把图标与文字统一成链接高亮色。
- * 不用 FileIcon 组件是为了避开其内联的 scale(1.1)+contrast 滤镜，与输入框 HTML 路径结构完全一致。
+ * 文件高亮的统一外形（React 版）：图标 + 名字（无底色），类名 .file-ref-chip / .file-ref-icon / .file-ref-name，
+ * 尺寸、间距、对齐全部由 input.css 的这组规则给出；四处（输入框 mention、用户气泡、@ 文件面板、Markdown 引用）都走这里，
+ * 只有名字内容与颜色由调用方决定。
+ * typeColor：图标按文件类型上色（@ 面板、Markdown 引用）；否则跟随文字色（输入框 mention、用户气泡芯片）。
+ * plain：名字用正常字重（面板列表里每行都是文件，加粗反而突兀）。
+ * 不用 FileIcon 组件是为了避开其内联的 scale(1.1)+contrast 滤镜，与 HTML 字符串版结构完全一致。
+ */
+export function FileLabel({ path, isDirectory = false, label, typeColor = true, plain, className, title, onMouseDown, onClick }: {
+    path: string; isDirectory?: boolean; label: React.ReactNode; typeColor?: boolean; plain?: boolean; className?: string; title?: string;
+    onMouseDown?: React.MouseEventHandler; onClick?: React.MouseEventHandler;
+}) {
+    const icon = refIcon(path, isDirectory);
+    return (
+        <span className={`file-ref-chip${plain ? ' plain' : ''}${className ? ' ' + className : ''}`} title={title} onMouseDown={onMouseDown} onClick={onClick}>
+            <span className={icon.className} style={typeColor ? { color: icon.color } : undefined} dangerouslySetInnerHTML={{ __html: icon.svg }} />
+            <span className="file-ref-name">{label}</span>
+        </span>
+    );
+}
+
+/**
+ * @ 引用芯片（用户气泡用）：名字只显示 basename；有 onOpen 时可点击。
+ * 图标与文字统一用链接高亮色（同 webui FileRefChip 与输入框 mention），不按文件类型上色；
+ * 正文 Markdown 引用与 @ 面板的图标仍保持文件类型色。
  */
 export function FileRefChip({ seg, onOpen }: { seg: RefSegment; onOpen?: (seg: RefSegment) => void }) {
-    const icon = refIcon(seg.path, seg.isDirectory);
     return (
-        <span
-            className={`file-ref-chip${onOpen ? ' clickable' : ''}`}
-            title={seg.path}
+        <FileLabel path={seg.path} isDirectory={seg.isDirectory} label={refLabel(seg.path, seg.isDirectory, seg.line, seg.endLine)}
+            typeColor={false} title={seg.path} className={onOpen ? 'clickable' : undefined}
             onMouseDown={onOpen ? e => { e.preventDefault(); e.stopPropagation(); } : undefined}
-            onClick={onOpen ? e => { e.stopPropagation(); onOpen(seg); } : undefined}
-        >
-            <span className={icon.className} style={{ color: icon.color }} dangerouslySetInnerHTML={{ __html: icon.svg }} />
-            <span className="file-ref-name">{refLabel(seg.path, seg.isDirectory, seg.line, seg.endLine)}</span>
-        </span>
+            onClick={onOpen ? e => { e.stopPropagation(); onOpen(seg); } : undefined} />
     );
 }
 
 const escapeHtml = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
-/** 输入框 mention span 的内部 HTML（非 React DOM）：与 FileRefChip 同一套结构与类名，图标不设类型色、随文字用链接色 */
+/**
+ * 文件高亮的统一外形（HTML 字符串版，给非 React DOM 用：输入框 mention span、Markdown 验证后的文件链接）。
+ * 结构与类名与 FileLabel 完全一致；label 已转义。
+ */
+export function buildFileLabelHtml(path: string, isDirectory: boolean, label: string, typeColor: boolean): string {
+    const icon = refIcon(path, isDirectory);
+    const style = typeColor ? ` style="color:${icon.color}"` : '';
+    return `<span class="file-ref-chip"><span class="${icon.className}"${style}>${icon.svg}</span><span class="file-ref-name">${escapeHtml(label)}</span></span>`;
+}
+
+/** 输入框 mention span 的内部 HTML：图标不设类型色、随文字用链接色 */
 export function buildMentionChipHtml(m: { path: string; isDirectory?: boolean; startLine?: number; endLine?: number }): string {
-    const icon = refIcon(m.path, !!m.isDirectory);
-    const label = refLabel(m.path, !!m.isDirectory, m.startLine, m.endLine);
-    return `<span class="file-ref-chip"><span class="${icon.className}">${icon.svg}</span><span class="file-ref-name">${escapeHtml(label)}</span></span>`;
+    return buildFileLabelHtml(m.path, !!m.isDirectory, refLabel(m.path, !!m.isDirectory, m.startLine, m.endLine), false);
 }

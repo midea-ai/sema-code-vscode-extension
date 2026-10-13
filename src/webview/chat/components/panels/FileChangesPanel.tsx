@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { VscodeApi, FileChange } from '../../types';
 import { CheckIcon, ToggleIcon, CancelCircleIcon } from '../ui/IconButton';
-import FileIcon from '../ui/FileIcon';
+import { FileLabel } from '../../utils/fileRefDisplay';
 import { hasTextSelection } from '../../utils/selection';
 import { useT } from '../../../common/i18n/react';
 
@@ -116,14 +116,8 @@ const FileChangesPanel: React.FC<FileChangesPanelProps> = ({ changes, vscode, on
                             onClick={() => handleFileClick(change.fullPath, change.minLine)}
                         >
                             <div className="file-change-left">
-                                <FileIcon
-                                    fileName={change.fileName}
-                                    isDirectory={false}
-                                    size={18}
-                                />
-                                <span className="file-change-name">
-                                    {change.fileName}
-                                </span>
+                                {/* 统一的文件高亮外形（plain：正常字重，颜色与最大宽度由 .file-change-name 给） */}
+                                <FileLabel path={change.fileName} label={change.fileName} plain className="file-change-name" />
                                 {(() => {
                                     // 路径只保留目录部分（去掉结尾重复的文件名）；目录为空则不显示
                                     const dir = change.fullPath.endsWith(change.fileName)

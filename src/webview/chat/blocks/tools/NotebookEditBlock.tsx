@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { VscodeApi, FileChange, DiffContent } from '../../types';
 import { PencilIcon } from '../../components/ui/IconButton';
-import { getFileIconHtml } from '../../components/ui/FileIcon';
+import { FileLabel } from '../../utils/fileRefDisplay';
 import ToolRowHeader from './ToolRowHeader';
 import { ToolContent } from '../../types';
 import CollapsibleDiff from '../../components/ui/CollapsibleDiff';
@@ -92,9 +92,6 @@ const NotebookEditBlock: React.FC<NotebookEditBlockProps> = React.memo(({
 
     const displayFileName = useMemo(() => baseName(fileName), [fileName]);
 
-    // 文件类型图标（SVG 来自内置常量，可直接 innerHTML），与 EditBlock 同色同规格
-    const fileIcon = useMemo(() => getFileIconHtml(displayFileName), [displayFileName]);
-
     const reportFileChange = useCallback(() => {
         if (onFileChange && fileName) {
             onFileChange({
@@ -161,16 +158,12 @@ const NotebookEditBlock: React.FC<NotebookEditBlockProps> = React.memo(({
 
     return (
         <div className="chat-block chat-block--borderless edit-block">
-            {/* 行头与 EditBlock 同规格：[铅笔] 已编辑 [文件类型图标] 路径 cell:n +a -b；仅路径可点打开 diff，整行点击折叠 */}
+            {/* 行头与 EditBlock 同规格：[铅笔] 已编辑 [文件类型图标] 路径 cell:n +a -b；仅路径可点打开 diff，整行点击折叠。
+                文件图标 + 路径是统一的文件高亮外形（plain），路径开头加 LRM 配合 CSS 的 rtl 截断 */}
             <ToolRowHeader
                 icon={<PencilIcon />}
                 verb={t('tool.edited')}
-                target={(
-                    <>
-                        <span className="edit-file-icon" style={{ color: fileIcon.color }} dangerouslySetInnerHTML={{ __html: fileIcon.svg }} />
-                        <span className="edit-file-path">{String.fromCharCode(0x200e) + displayPath(fileName)}</span>
-                    </>
-                )}
+                target={<FileLabel path={fileName} label={String.fromCharCode(0x200e) + displayPath(fileName)} plain />}
                 targetTitle={fileName}
                 onTargetClick={handleShowDiff}
                 extra={(

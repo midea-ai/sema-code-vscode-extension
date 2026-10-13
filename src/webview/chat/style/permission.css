@@ -213,16 +213,13 @@ body.vscode-light .bash-permission-content {
     opacity: 0.8;
 }
 
+/* 文件名是统一的文件高亮外形 .file-ref-chip（plain，尺寸/省略见 input.css），这里只给颜色 */
 .file-permission-filename {
     color: var(--chat-text-primary);
-    font-weight: normal;
-    font-size: var(--chat-font-base);
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    flex-shrink: 1;
-    min-width: 0;
-    /* 路径过长时省略前面部分，保留靠近文件名的尾部 */
+}
+
+/* 路径过长时省略前面部分，保留靠近文件名的尾部（rtl 截断，开头 LRM 保证 "." 不被排到末尾） */
+.file-permission-filename .file-ref-name {
     direction: rtl;
     text-align: left;
 }

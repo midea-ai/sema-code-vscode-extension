@@ -5,6 +5,7 @@
  */
 import React from 'react';
 import { getFileIconHtml } from '../components/ui/FileIcon';
+import { FILE_LABEL_ICON } from './fileRefDisplay';
 
 export type SkillIconName = 'chart' | 'chrome' | 'puzzle';
 
@@ -60,7 +61,7 @@ export function matchSkillPrefix(text: string, requireSpace = false): { name: st
  * 文件图标走 .skill-label-file 的 scale(1.35)、不加对比度滤镜；线稿图标原尺寸 stroke 2。
  * 不用 FileIcon 组件是为了避开其内联的 scale(1.1)+contrast 滤镜，React 与 HTML 两条路径结构完全一致。
  */
-export function SkillLabel({ display, className, size = 14 }: { display: SkillDisplay; className?: string; size?: number }) {
+export function SkillLabel({ display, className, size = FILE_LABEL_ICON }: { display: SkillDisplay; className?: string; size?: number }) {
     let icon: React.ReactNode = null;
     if (display.file) {
         const { svg, color } = getFileIconHtml(display.file);
@@ -77,7 +78,7 @@ export function SkillLabel({ display, className, size = 14 }: { display: SkillDi
 }
 
 /** 输入框技能标签的内部 HTML（非 React DOM）：与 SkillLabel 同一套结构与类名 */
-export function buildSkillLabelHtml(display: SkillDisplay, size = 14): string {
+export function buildSkillLabelHtml(display: SkillDisplay, size = FILE_LABEL_ICON): string {
     let icon = '';
     if (display.file) {
         const { svg, color } = getFileIconHtml(display.file);
