@@ -200,7 +200,6 @@ export const en: Record<keyof typeof zh, string> = {
     'config.system.integrations': 'Integrations',
     'config.system.browserControl': 'Browser control',
     'config.system.browserControlTip': 'Let the AI open, read and operate web pages in your own Chrome with your logged-in accounts; every action is visible and you can take over at any time. Enabling writes a user-level chrome-use skill and chrome MCP server; disabling removes both.',
-    'config.system.browserControlUnsupportedSuffix': ' (Windows not supported yet)',
     'config.system.browserControlExperimentalSuffix': ' (experimental)',
     'config.system.browserControlInstallPrefix': 'Install the ',
     'config.system.browserControlInstallLink': 'Chrome extension',

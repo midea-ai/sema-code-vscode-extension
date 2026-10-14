@@ -55,8 +55,7 @@ const SystemConfig: React.FC<SystemConfigProps> = ({ vscode }) => {
     const petSupported = platform === 'darwin' || platform === 'win32' || platform === 'linux';
     const thinkingEnabled = config.thinking || false;
     const showThinkingText = config.showThinkingText ?? true;
-    // 浏览器控制：win32 不支持（disabled），linux 实验性；执行中禁用开关等宿主回结果
-    const browserControlSupported = platform !== 'win32';
+    // 浏览器控制：linux 实验性；执行中禁用开关等宿主回结果
     const [browserControlBusy, setBrowserControlBusy] = useState<false | 'enabling' | 'disabling'>(false);
 
     // 字符计数状态
@@ -221,7 +220,7 @@ const SystemConfig: React.FC<SystemConfigProps> = ({ vscode }) => {
 
     /** 浏览器控制开关：不走 saveSystemConfigByKey，发「执行动作」消息，配置键由宿主在动作成功后写入 */
     const handleBrowserControlChange = (enabled: boolean) => {
-        if (browserControlBusy || !browserControlSupported) return;
+        if (browserControlBusy) return;
         setBrowserControlBusy(enabled ? 'enabling' : 'disabling');
         vscode.postMessage({ command: 'setBrowserControl', enabled });
     };
@@ -384,19 +383,18 @@ const SystemConfig: React.FC<SystemConfigProps> = ({ vscode }) => {
                 <div className="form-row">
                     <div className="form-group">
                         <label
-                            className={`checkbox-label${browserControlSupported ? '' : ' disabled'}`}
+                            className="checkbox-label"
                             title={t('config.system.browserControlTip')}
                             style={browserControlBusy ? { cursor: 'progress' } : undefined}
                         >
                             <input
                                 type="checkbox"
-                                checked={browserControlSupported && (config.enableBrowserControl || false)}
-                                disabled={!browserControlSupported || !!browserControlBusy}
+                                checked={config.enableBrowserControl || false}
+                                disabled={!!browserControlBusy}
                                 onChange={(e) => handleBrowserControlChange(e.target.checked)}
                             />
                             <span className="checkmark"></span>
                             {t('config.system.browserControl')}
-                            {!browserControlSupported && t('config.system.browserControlUnsupportedSuffix')}
                             {platform === 'linux' && t('config.system.browserControlExperimentalSuffix')}
                         </label>
                         {browserControlBusy && (
@@ -406,7 +404,7 @@ const SystemConfig: React.FC<SystemConfigProps> = ({ vscode }) => {
                                     : t('config.system.browserControlDisabling')}
                             </div>
                         )}
-                        {!browserControlBusy && browserControlSupported && config.enableBrowserControl && (
+                        {!browserControlBusy && config.enableBrowserControl && (
                             <div className="browser-control-hint">
                                 {t('config.system.browserControlInstallPrefix')}
                                 <a

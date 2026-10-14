@@ -143,7 +143,6 @@ export const fr: Partial<Record<keyof typeof zh, string>> = {
     'config.system.integrations': 'Intégrations',
     'config.system.browserControl': 'Contrôle du navigateur',
     'config.system.browserControlTip': "Permet à l'IA d'ouvrir, lire et manipuler des pages web dans votre propre Chrome avec vos comptes connectés ; chaque action est visible et vous pouvez reprendre la main à tout moment. L'activation écrit un skill chrome-use et un serveur MCP chrome au niveau utilisateur ; la désactivation supprime les deux.",
-    'config.system.browserControlUnsupportedSuffix': ' (Windows pas encore pris en charge)',
     'config.system.browserControlExperimentalSuffix': ' (expérimental)',
     'config.system.browserControlInstallPrefix': "Installez l'",
     'config.system.browserControlInstallLink': 'extension Chrome',

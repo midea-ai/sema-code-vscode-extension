@@ -201,7 +201,6 @@ export const zh = {
     'config.system.integrations': '集成',
     'config.system.browserControl': '浏览器控制',
     'config.system.browserControlTip': '让 AI 在你自己的 Chrome 里打开、阅读和操作网页，使用你已登录的账号，操作全程可见可接管。开启后会写入用户级 chrome-use skill 与 chrome MCP，关闭时删除。',
-    'config.system.browserControlUnsupportedSuffix': '（暂不支持 Windows）',
     'config.system.browserControlExperimentalSuffix': '（实验性）',
     'config.system.browserControlInstallPrefix': '需安装 ',
     'config.system.browserControlInstallLink': 'Chrome 扩展',

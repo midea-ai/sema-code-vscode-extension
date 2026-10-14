@@ -143,7 +143,6 @@ export const de: Partial<Record<keyof typeof zh, string>> = {
     'config.system.integrations': 'Integrationen',
     'config.system.browserControl': 'Browsersteuerung',
     'config.system.browserControlTip': 'Lässt die KI Webseiten in deinem eigenen Chrome mit deinen angemeldeten Konten öffnen, lesen und bedienen; jede Aktion ist sichtbar und du kannst jederzeit übernehmen. Beim Aktivieren werden ein chrome-use-Skill und ein chrome-MCP-Server auf Benutzerebene angelegt, beim Deaktivieren beide entfernt.',
-    'config.system.browserControlUnsupportedSuffix': ' (Windows noch nicht unterstützt)',
     'config.system.browserControlExperimentalSuffix': ' (experimentell)',
     'config.system.browserControlInstallPrefix': 'Installieren Sie die ',
     'config.system.browserControlInstallLink': 'Chrome-Erweiterung',
