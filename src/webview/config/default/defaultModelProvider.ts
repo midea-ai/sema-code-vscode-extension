@@ -110,7 +110,7 @@ export const defaultModelProvider: Record<string, ProviderDefaults> = {
         modelsUrl: 'https://api.deepseek.com/v1/models',
         baseURLPlaceholder: 'https://api.deepseek.com/anthropic',
         apiKeyProviderLabel: 'DeepSeek',
-        defaultModel: 'deepseek-v4-pro',
+        defaultModel: 'deepseek-flash',
         apikeyUrl: 'https://platform.deepseek.com/api_keys',
         defaultAdapt: 'anthropic',
     },
