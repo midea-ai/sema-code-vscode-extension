@@ -41,9 +41,10 @@ const LOCATE_PATHS: Record<SkillScope, string> = {
 };
 
 /** 市场分类展示顺序；不在列表里的归入「其他」 */
-const CATEGORY_ORDER = ['doc', 'office', 'writing', 'dev', 'web', 'mobile', 'design', 'media', 'other'];
+const CATEGORY_ORDER = ['doc', 'insight', 'office', 'writing', 'dev', 'web', 'mobile', 'design', 'media', 'other'];
 const CATEGORY_TITLE_KEYS: Record<string, I18nKey> = {
     doc: 'config.skill.cat.doc',
+    insight: 'config.skill.cat.insight',
     office: 'config.skill.cat.office',
     writing: 'config.skill.cat.writing',
     dev: 'config.skill.cat.dev',
