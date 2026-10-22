@@ -698,6 +698,119 @@ html.jb #output-container {
 
 
 
+/* 长期目标状态条：输入框上方面板栏，单行；图标与状态文字用链接色，不随状态变色，状态只靠文字区分 */
+.goal-bar {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    padding: 4px var(--chat-spacing-md) 4px calc(var(--chat-spacing-md) - 4px);
+    border-top: 1px solid var(--chat-border);
+    background-color: var(--chat-bg-primary);
+    font-size: var(--chat-font-base);
+}
+
+.goal-bar-main {
+    flex: 1;
+    min-width: 0;
+    height: 22px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 0 4px;
+    background: transparent;
+    border: none;
+    border-radius: var(--chat-radius-sm);
+    color: inherit;
+    font-size: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+
+.goal-bar-main:hover {
+    background-color: var(--chat-bg-hover);
+}
+
+.goal-bar-icon {
+    display: inline-flex;
+    flex-shrink: 0;
+    color: var(--chat-text-link);
+}
+
+.goal-bar-status {
+    flex-shrink: 0;
+    font-weight: 500;
+    color: var(--chat-text-link);
+}
+
+.goal-bar-text {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--chat-color-muted);
+}
+
+.goal-bar-actions {
+    display: flex;
+    align-items: center;
+    flex-shrink: 0;
+}
+
+.goal-bar-btn {
+    width: 22px;
+    height: 22px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    border: none;
+    border-radius: var(--chat-radius-sm);
+    color: var(--chat-color-muted);
+    cursor: pointer;
+}
+
+.goal-bar-btn:hover {
+    background-color: var(--chat-bg-hover);
+    color: var(--chat-text-primary);
+}
+
+/* 目标自动续轮：无气泡本体，只有一行右对齐标签 */
+.user-input-goal-round {
+    padding: 6px 0 2px;
+}
+
+.user-input-goal-round .user-input-source {
+    margin-bottom: 0;
+}
+
+/* 目标达成块：轮末独立块，标题行 + summary 正文 */
+.goal-achieved-block {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin: var(--chat-block-margin);
+    padding: 6px 0 6px 8px;
+    border-left: 2px solid var(--chat-color-success);
+}
+
+.goal-achieved-head {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: var(--chat-font-base);
+    font-weight: 600;
+    color: var(--chat-color-success);
+}
+
+.goal-achieved-summary {
+    font-size: var(--chat-font-base);
+    line-height: 1.5;
+    color: var(--chat-text-primary);
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
 /* Todos Panel 样式 */
 .todos-panel {
     border-top: 1px solid var(--chat-border);

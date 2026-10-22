@@ -1,12 +1,13 @@
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { CopyIcon, CheckIcon, ForkIcon, ClockIcon } from '../components/ui/IconButton';
-import { ImageAttachment, InputSource, VscodeApi } from '../types';
+import { GoalInputMark, ImageAttachment, InputSource, VscodeApi } from '../types';
 import { PasteAttachment } from '../../common/paste';
 import ImageThumbnail from '../components/ImageThumbnail';
 import ImagePreviewModal from '../components/ImagePreviewModal';
 import { FileRefChip, refPaths, refStatPath, splitFileRefs } from '../utils/fileRefDisplay';
 import { usePathExists } from '../utils/usePathExists';
 import { SkillLabel, matchSkillPrefix } from '../utils/skillDisplay';
+import { TargetIcon } from '../components/panels/GoalBar';
 import { useT, I18nKey } from '../../common/i18n/react';
 
 interface UserInputBlockProps {
@@ -14,6 +15,7 @@ interface UserInputBlockProps {
     attachments?: ImageAttachment[];    // 用户发送时携带的图片（core 回吐）
     pastes?: PasteAttachment[];         // 超长粘贴转存的附件文件（从 input 模板解析）
     source?: InputSource;               // 输入来源；非 user 时气泡上方渲染来源标签
+    goal?: GoalInputMark;               // 长期目标标记：设定 / 更新加标签；自动续轮（round）不渲染气泡只留标签行
     uuid?: string;                      // 有值才可 fork（旧历史消息无锚点）
     canFork?: boolean;                  // = 会话处于 idle
     onFork?: (uuid: string) => void;
@@ -27,9 +29,24 @@ const SOURCE_LABEL_KEY: Partial<Record<InputSource, I18nKey>> = {
     cron: 'chat.source.cron',
 };
 
-// 气泡上方右对齐的来源小标签（pending 气泡和正式气泡共用）
-export const UserInputSourceTag: React.FC<{ source?: InputSource }> = ({ source }) => {
+/** 长期目标标记文案：设定 / 更新 / 第 n/m 轮 */
+const goalMarkLabel = (t: ReturnType<typeof useT>, mark: GoalInputMark): string => {
+    if (mark.action === 'set') return t('chat.source.goalSet');
+    if (mark.action === 'update') return t('chat.source.goalUpdate');
+    return t('chat.source.goalRound', { n: mark.round, max: mark.maxRounds });
+};
+
+// 气泡上方右对齐的来源小标签（pending 气泡和正式气泡共用）；目标标记优先于来源标签（续轮输入 source=goal 只显示目标标签）
+export const UserInputSourceTag: React.FC<{ source?: InputSource; goal?: GoalInputMark }> = ({ source, goal }) => {
     const t = useT();
+    if (goal) {
+        return (
+            <div className="user-input-source">
+                <TargetIcon size={12} />
+                <span>{goalMarkLabel(t, goal)}</span>
+            </div>
+        );
+    }
     const labelKey = source ? SOURCE_LABEL_KEY[source] : undefined;
     const label = labelKey ? t(labelKey) : undefined;
     if (!label) {
@@ -84,7 +101,7 @@ const PastePill: React.FC<{ preview: string; onOpen: () => void }> = ({ preview,
 // 当前为 line-height 1.5 * 字号 12px * 3 行 = 54px
 const COLLAPSED_MAX_PX = 54;
 
-const UserInputBlock: React.FC<UserInputBlockProps> = React.memo(({ content, attachments, pastes, source, uuid, canFork, onFork, pending, vscode }) => {
+const UserInputBlock: React.FC<UserInputBlockProps> = React.memo(({ content, attachments, pastes, source, goal, uuid, canFork, onFork, pending, vscode }) => {
     const t = useT();
 
     const [isExpanded, setIsExpanded] = useState<boolean>(false);
@@ -213,13 +230,22 @@ const UserInputBlock: React.FC<UserInputBlockProps> = React.memo(({ content, att
         </div>
     );
 
+    // 目标自动续轮：文本是固定触发语，不渲染气泡本体，只留「目标第 n/m 轮」标签行（排队中同样处理）
+    if (source === 'goal' && goal?.action === 'round') {
+        return (
+            <div className="user-input-wrap user-input-goal-round">
+                <UserInputSourceTag source={source} goal={goal} />
+            </div>
+        );
+    }
+
     // 无来源标签时不额外包裹，保持原 DOM 结构
-    if (!source || !SOURCE_LABEL_KEY[source]) {
+    if (!goal && (!source || !SOURCE_LABEL_KEY[source])) {
         return bubble;
     }
     return (
         <div className="user-input-wrap">
-            <UserInputSourceTag source={source} />
+            <UserInputSourceTag source={source} goal={goal} />
             {bubble}
         </div>
     );

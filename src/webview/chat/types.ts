@@ -101,8 +101,29 @@ export interface FileReferenceInfo {
     content: string;
 }
 
-// 用户输入来源（与 sema-core InputSource 镜像）
-export type InputSource = 'user' | 'cron';
+// 用户输入来源（与 sema-core InputSource 镜像）：cron=定时任务自动发送，goal=长期目标自动续轮
+export type InputSource = 'user' | 'cron' | 'goal';
+
+// ─── 长期目标 /goal（与 sema-core types/goal 镜像，前端独立定义） ─────────────────
+export type GoalStatus = 'running' | 'paused' | 'completed' | 'blocked';
+
+export interface GoalState {
+    text: string;
+    status: GoalStatus;
+    round: number;
+    maxRounds: number;
+    idleRounds: number;
+    summary?: string;
+    createdAt: number;
+    updatedAt: number;
+}
+
+/** 与目标相关的用户输入标记：/goal <文本>（set / update）与自动续轮（round） */
+export interface GoalInputMark {
+    action: 'set' | 'update' | 'round';
+    round: number;
+    maxRounds: number;
+}
 
 export interface Message {
     id: string;
@@ -117,6 +138,7 @@ export interface Message {
     /** 超长粘贴转存的附件文件（宿主从 input 的粘贴模板解析；path 绝对路径，preview 单行预览） */
     pastes?: { path: string; preview: string }[];
     source?: InputSource;             // 输入来源；'cron' 等非 user 来源在气泡上方显示标签
+    goal?: GoalInputMark;             // 长期目标标记；设定 / 更新加标签，自动续轮不渲染气泡只留标签行
 }
 
 // ─── Fork / 撤销（与 sema-core types/fork 镜像，前端独立定义） ──────────────────

@@ -15,6 +15,7 @@ import { AskFormPanelRow, PermissionPanelRow } from './blocks/tools/GroupedToolB
 import SupplementaryInfo from './components/ui/SupplementaryInfo';
 import PlanImplementPanel from './components/ui/PlanImplementPanel';
 import TaskEndBlock from './blocks/TaskEndBlock';
+import GoalAchievedBlock from './blocks/GoalAchievedBlock';
 import GeneratedImageBlock from './blocks/tools/GeneratedImageBlock';
 import { TOOL_NAME_WRITE_FILE, TOOL_NAME_PATCH_FILE, TOOL_NAME_EDIT_NOTEBOOK, TOOL_NAME_VIEW_FILE, TOOL_NAME_RUN_SHELL, TOOL_NAME_PEEK_BG_JOB, TOOL_NAME_GENERATE_IMAGE } from '../../utils/tool';
 
@@ -109,6 +110,7 @@ const MessageItem: React.FC<MessageItemProps> = React.memo(({
                     attachments={message.attachments}
                     pastes={message.pastes}
                     source={message.source}
+                    goal={message.goal}
                     vscode={vscode}
                     uuid={message.uuid}
                     canFork={processingState === 'idle'}
@@ -194,6 +196,8 @@ const MessageItem: React.FC<MessageItemProps> = React.memo(({
                         summary={message.content.summary}
                     />
                 );
+            } else if (message.content.type === 'goal_achieved') {
+                return <GoalAchievedBlock summary={message.content.summary || ''} />;
             }
             return null;
 

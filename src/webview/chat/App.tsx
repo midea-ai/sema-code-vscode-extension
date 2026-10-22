@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo } from 'react';
-import { FileChange, TokenInfo, AppProps, SelectedFile, TodoItem, Message, AgentMode, PermissionLevel, SessionMeta, ForkPreview, ImageAttachment, VscodeApi, InputSource } from './types';
+import { FileChange, TokenInfo, AppProps, SelectedFile, TodoItem, Message, AgentMode, PermissionLevel, SessionMeta, ForkPreview, ImageAttachment, VscodeApi, InputSource, GoalState, GoalInputMark } from './types';
 import { streamingStore } from './utils/StreamingStore';
 import InputBox, { InputBoxHandle } from './components/input/InputBox';
 import MessageItem from './MessageItem';
@@ -12,6 +12,8 @@ import { SessionActiveContext, SessionContext } from './SessionContext';
 
 import FileChangesPanel from './components/panels/FileChangesPanel';
 import TodosPanel from './components/panels/TodosPanel';
+import GoalBar, { GoalBarAction } from './components/panels/GoalBar';
+import GoalEditDialog from './components/ui/GoalEditDialog';
 import Welcome from './components/panels/Welcome';
 import DesignModeHint from './components/panels/DesignModeHint';
 import PermissionDialog from './components/permission/PermissionDialog';
@@ -84,6 +86,9 @@ const ChatSession: React.FC<ChatSessionProps> = ({ vscode: rawVscode, sessionId,
     const [dialogQueue, setDialogQueue] = useState<DialogQueueItem[]>([]);
     const activeDialog = dialogQueue[0] ?? null;
     const [forkDialog, setForkDialog] = useState<{ uuid: string; preview: ForkPreview } | null>(null);
+    // 长期目标（/goal）：宿主 goalUpdate 同步（session:ready 回填 / goal:update 推送）；null = 无目标
+    const [goal, setGoal] = useState<GoalState | null>(null);
+    const [goalEditing, setGoalEditing] = useState<boolean>(false);
 
     // 队列中存在权限/表单/计划弹窗时，向 App 上报本会话处于「等待用户响应」状态
     useEffect(() => {
@@ -115,7 +120,7 @@ const ChatSession: React.FC<ChatSessionProps> = ({ vscode: rawVscode, sessionId,
     const [thinkingEnabled, setThinkingEnabled] = useState<boolean>(true);
     const [showThinkingText, setShowThinkingText] = useState<boolean>(false);
     // 排队中的用户输入：content 为用户实际打的正文（originalInput），附件随 input:received 一并回显
-    const [pendingInputs, setPendingInputs] = useState<Array<{ inputId: string; content: string; source?: InputSource; attachments?: ImageAttachment[]; pastes?: PasteAttachment[] }>>([]);
+    const [pendingInputs, setPendingInputs] = useState<Array<{ inputId: string; content: string; source?: InputSource; goal?: GoalInputMark; attachments?: ImageAttachment[]; pastes?: PasteAttachment[] }>>([]);
     // 用户输入预测（core input:predict 事件；空串 = 预计不会回复，清除提示）
     const [inputPrediction, setInputPrediction] = useState<string>('');
     const [runningTasks, setRunningTasks] = useState<Map<string, { taskId: string; filepath: string; type: string; startTime: number }>>(new Map());
@@ -321,6 +326,11 @@ const ChatSession: React.FC<ChatSessionProps> = ({ vscode: rawVscode, sessionId,
                 case 'clearTodos':
                     setTodos([]);
                     break;
+                case 'goalUpdate':
+                    setGoal(message.goal ?? null);
+                    // 目标被清除 / 完成后编辑弹窗没有对象，直接关掉
+                    if (!message.goal || message.goal.status === 'completed') setGoalEditing(false);
+                    break;
                 case 'updateModelInfo':
                     applyModelInfo(message.modelName, message.availableModels);
                     break;
@@ -391,6 +401,7 @@ const ChatSession: React.FC<ChatSessionProps> = ({ vscode: rawVscode, sessionId,
                             // originalInput 存在就用它（空串 = 只有粘贴附件没打字），缺省才退回完整 input
                             content: message.data.originalInput ?? message.data.input ?? '',
                             source: message.data.source,
+                            goal: message.data.goal,
                             attachments: Array.isArray(message.data.attachments) && message.data.attachments.length > 0 ? message.data.attachments : undefined,
                             pastes: parsePasteInput(message.data.input),
                         }]);
@@ -921,9 +932,11 @@ const ChatSession: React.FC<ChatSessionProps> = ({ vscode: rawVscode, sessionId,
 
         // 按「轮次」分组：每条用户输入开启一组，后续消息归入同组。
         // 用户输入在组内 position:sticky 吸顶，被下一组顶替。
+        // 目标自动续轮没有气泡本体，不单开一轮：并入上一组，上一条用户 / 定时任务输入的吸顶在续轮期间继续有效
+        const isGoalRound = (m: Message) => m.type === 'user' && m.source === 'goal' && m.goal?.action === 'round';
         const groups: Array<{ key: string; items: Array<{ message: Message; index: number }> }> = [];
         messages.forEach((message, index) => {
-            if (message.type === 'user' || groups.length === 0) {
+            if ((message.type === 'user' && !isGoalRound(message)) || groups.length === 0) {
                 groups.push({ key: message.id, items: [] });
             }
             groups[groups.length - 1].items.push({ message, index });
@@ -991,10 +1004,11 @@ const ChatSession: React.FC<ChatSessionProps> = ({ vscode: rawVscode, sessionId,
                         if (!hasReasoning && !hasContent) return null;
                     }
 
+                    // 目标自动续轮只有「目标第 n/m 轮」标签行，不吸顶；用户 / 定时任务输入照常吸顶
                     return (
                         <div
                             key={message.id}
-                            className={`msg-wrap${message.type === 'user' ? ' msg-wrap--sticky-user' : ''}`}
+                            className={`msg-wrap${message.type === 'user' && !isGoalRound(message) ? ' msg-wrap--sticky-user' : ''}`}
                         >
                             <MessageItem
                                 message={message}
@@ -1075,6 +1089,7 @@ const ChatSession: React.FC<ChatSessionProps> = ({ vscode: rawVscode, sessionId,
                             attachments={p.attachments}
                             pastes={p.pastes}
                             source={p.source}
+                            goal={p.goal}
                             vscode={vscode}
                         />
                     ))}
@@ -1082,6 +1097,16 @@ const ChatSession: React.FC<ChatSessionProps> = ({ vscode: rawVscode, sessionId,
                         <QuickChatDialog
                             data={activeDialog.data}
                             onClose={() => setDialogQueue(prev => prev.slice(1))}
+                        />
+                    )}
+                    {goalEditing && goal && (
+                        <GoalEditDialog
+                            goal={goal}
+                            onSave={(text) => {
+                                vscode.postMessage({ type: 'updateGoal', text });
+                                setGoalEditing(false);
+                            }}
+                            onCancel={() => setGoalEditing(false)}
                         />
                     )}
                     {forkDialog && (
@@ -1153,6 +1178,14 @@ const ChatSession: React.FC<ChatSessionProps> = ({ vscode: rawVscode, sessionId,
                 </div>
                 <TodosPanel todos={todos} onScrollToBottom={scrollToBottom} />
                 <FileChangesPanel changes={fileChanges} vscode={vscode} onScrollToBottom={scrollToBottom} />
+                {/* 长期目标状态条：紧贴输入框上方（文件面板之下）；有目标即显示（含暂停 / 受阻，便于恢复或清除），完成后不再展示，记录留在轮末达成块 */}
+                {goal && goal.status !== 'completed' && (
+                    <GoalBar
+                        goal={goal}
+                        onAction={(action: GoalBarAction) => vscode.postMessage({ type: 'goalAction', action })}
+                        onEdit={() => setGoalEditing(true)}
+                    />
+                )}
                 <InputBox
                     ref={inputBoxRef}
                     vscode={vscode}

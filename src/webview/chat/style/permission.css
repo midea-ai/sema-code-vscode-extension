@@ -740,6 +740,116 @@ body.vscode-light .ask-form-dialog {
     cursor: default;
 }
 
+/* ==================== 目标编辑弹窗 — 居中模态浮层（与 Fork 弹窗同款） ==================== */
+.goal-dialog-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: var(--chat-overlay);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    padding: 16px;
+}
+
+.goal-dialog-modal {
+    width: 100%;
+    max-width: 720px;
+    max-height: 80vh;
+    background-color: var(--chat-bg-editor);
+    border: 1px solid var(--chat-border);
+    border-radius: var(--chat-radius-md);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    box-shadow: var(--chat-shadow-lg);
+}
+
+.goal-dialog-header {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--chat-border);
+    flex-shrink: 0;
+}
+
+.goal-dialog-icon {
+    display: inline-flex;
+    color: var(--chat-text-link);
+}
+
+.goal-dialog-title {
+    flex: 1;
+    font-size: var(--chat-font-md);
+    font-weight: 600;
+    color: var(--chat-text-primary);
+}
+
+.goal-dialog-body {
+    padding: 12px;
+    flex: 1;
+    min-height: 0;
+    display: flex;
+}
+
+.goal-dialog-textarea {
+    width: 100%;
+    min-height: 160px;
+    max-height: 50vh;
+    box-sizing: border-box;
+    resize: vertical;
+    background-color: var(--chat-bg-input, var(--chat-bg-list-hover));
+    color: var(--chat-text-primary);
+    border: 1px solid var(--chat-border);
+    border-radius: 3px;
+    padding: 8px;
+    font-size: var(--chat-font-base);
+    font-family: inherit;
+    line-height: 1.5;
+    outline: none;
+}
+
+.goal-dialog-textarea:focus {
+    border-color: var(--chat-bg-button);
+}
+
+.goal-dialog-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 8px 12px 12px;
+    border-top: 1px solid var(--chat-border);
+    flex-shrink: 0;
+}
+
+.goal-dialog-updated {
+    font-size: var(--chat-font-sm);
+    color: var(--chat-text-secondary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.goal-dialog-buttons {
+    display: flex;
+    gap: 8px;
+    flex-shrink: 0;
+}
+
+.goal-dialog-buttons .ask-form-submit-btn {
+    flex: none;
+}
+
+.goal-dialog-save:disabled {
+    opacity: 0.5;
+    cursor: default;
+}
+
 /* ==================== 计划实施面板样式 ==================== */
 .plan-implement-content {
     padding: 12px;

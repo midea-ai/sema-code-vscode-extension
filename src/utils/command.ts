@@ -25,5 +25,9 @@ export const getBuiltinShortcutCommands = (): ShortcutCommand[] => [
     {
         text: "quickchat",
         desc: t('chat.cmd.quickchat')
+    },
+    {
+        text: "goal",
+        desc: t('chat.cmd.goal')
     }
 ];

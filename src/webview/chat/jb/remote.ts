@@ -39,6 +39,13 @@ export class RemoteSession {
     respondToPlanExit(r: any): void { void this.t.call('respondToPlanExit', r, this.sessionId); }
     updateAgentMode(mode: any): void { void this.t.call('updateAgentMode', { mode }, this.sessionId); }
     updatePermissionLevel(level: any): void { void this.t.call('updatePermissionLevel', { level }, this.sessionId); }
+    // 长期目标（/goal）：会话级接口，不排队立即生效；状态经 goal:update 事件回前端，返回值丢弃。
+    // getGoal 在 session:ready 回填用，过界后变异步（wrapper 用 Promise.resolve 兼容）。
+    getGoal(): Promise<any> { return this.t.call('getGoal', undefined, this.sessionId); }
+    pauseGoal(): void { void this.t.call('pauseGoal', undefined, this.sessionId); }
+    resumeGoal(): void { void this.t.call('resumeGoal', undefined, this.sessionId); }
+    clearGoal(): void { void this.t.call('clearGoal', undefined, this.sessionId); }
+    updateGoal(text: string): void { void this.t.call('updateGoal', { text }, this.sessionId); }
 
     // ── 会话级任务/fork 能力（走 gRPC；异步返回，调用方需 await）──
     // fork/撤销回退（D1）：同步语义在过界后变异步往返（A1），调用方 await。

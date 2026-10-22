@@ -29,10 +29,11 @@ import {
     ConversationUsageData,
     PermissionLevelUpdateData,
     HookNoticeData,
+    GoalUpdateData,
     Usage
 } from 'sema-core/event';
 import { MAIN_AGENT_ID } from 'sema-core/types';
-import type { TaskListItem, AgentMode, PermissionLevel, ModelUpdateData } from 'sema-core/types';
+import type { TaskListItem, AgentMode, PermissionLevel, ModelUpdateData, GoalState, GoalInputMark } from 'sema-core/types';
 import type { InputImageAttachment } from 'sema-core';
 
 // core 未顶层导出 InputSource，从事件数据类型推导
@@ -52,7 +53,8 @@ export interface Message {
     content: any;
     attachments?: InputImageAttachment[];  // 用户消息携带的图片（core input:processing 回吐）
     pastes?: PasteAttachment[];            // 超长粘贴转存的附件文件（从 input 粘贴模板解析），随历史持久化
-    source?: InputSource;                  // 输入来源；非 user（如 cron）时气泡上方渲染来源标签，随历史持久化
+    source?: InputSource;                  // 输入来源；非 user（如 cron / goal）时气泡上方渲染来源标签，随历史持久化
+    goal?: GoalInputMark;                  // 长期目标标记：/goal 设定 / 更新与自动续轮，气泡据此加标签，随历史持久化
     toolName?: string;
     toolArgs?: any;
     reasoning?: string;
@@ -116,6 +118,8 @@ export class SemaSessionWrapper {
     private _modelName: string = '';
     private lastUsage: Usage | null = null;
     private lastTodos: any[] = [];
+    /** 长期目标最新状态（goal:update 同步，session:ready 回填）；null = 无目标 */
+    private lastGoal: GoalState | null = null;
 
     constructor(
         session: SemaSession,
@@ -214,6 +218,21 @@ export class SemaSessionWrapper {
         this.session.updatePermissionLevel(level);
     }
 
+    // ─── 长期目标（/goal）────────────────────────────────────────────────────────
+    // 设定走普通输入 `/goal <文本>`；以下会话级接口不排队、立即生效，状态由 core 的 goal:update 事件回到前端。
+
+    /** 暂停 / 恢复 / 清除；暂停只让循环到本轮结束不再续，不打断当前轮 */
+    public goalAction(action: 'pause' | 'resume' | 'clear'): void {
+        if (action === 'pause') this.session.pauseGoal();
+        else if (action === 'resume') this.session.resumeGoal();
+        else this.session.clearGoal();
+    }
+
+    /** 覆盖目标文字，下一轮按新目标推进 */
+    public updateGoal(text: string): void {
+        this.session.updateGoal(text);
+    }
+
     // ─── 模型（会话级）──────────────────────────────────────────────────────────
     // 会话在 core 创建时钉住当时的全局主模型，之后只受本会话 switchModel 影响（全局指针再变也不跟）。
     // 这里只发命令、不改显示：前端看到的模型名全部来自 core 事件或 refreshModelInfo 的拉取结果。
@@ -300,6 +319,7 @@ export class SemaSessionWrapper {
         if (this.lastTodos.length > 0) {
             this.post({ type: 'todosUpdate', todos: this.lastTodos });
         }
+        this.post({ type: 'goalUpdate', goal: this.lastGoal });
     }
 
     // ─── 消息历史 ─────────────────────────────────────────────────────────────
@@ -384,7 +404,28 @@ export class SemaSessionWrapper {
                 this.lastTodos = data.todos;
                 this.post({ type: 'todosUpdate', todos: data.todos });
             }
+            // 回填 core 侧当前长期目标（恢复历史时 core 已把 running 降为 paused，重开不会自动续轮）；
+            // JB 的 RemoteSession 过界后为异步返回，Promise.resolve 同时兼容同步 / 异步
+            void Promise.resolve(this.session.getGoal()).then((goal) => {
+                this.lastGoal = goal ?? null;
+                this.post({ type: 'goalUpdate', goal: this.lastGoal });
+            }).catch(() => { /* ignore */ });
             this.callbacks.onSessionReady?.(this.sessionId, data);
+        });
+
+        // 长期目标状态变化：所有 reason 都同步状态条；只有达成落一条随历史持久化的轮末块（随 fork 回滚一起截掉）
+        this.session.on<GoalUpdateData>('goal:update', (data) => {
+            this.lastGoal = data.goal ?? null;
+            this.post({ type: 'goalUpdate', goal: this.lastGoal, reason: data.reason });
+            if (data.reason === 'completed') {
+                const msg: Message = {
+                    id: this.generateId(),
+                    type: 'system',
+                    content: { type: 'goal_achieved', summary: data.goal?.summary ?? '' },
+                };
+                this.messageHistory.push(msg);
+                this.sendAppendMessages([msg]);
+            }
         });
 
         this.session.on<FileReferenceData>('file:reference', (data) => {
@@ -482,6 +523,8 @@ export class SemaSessionWrapper {
             });
             this.lastTodos = [];
             this.lastUsage = null;
+            this.lastGoal = null;
+            this.post({ type: 'goalUpdate', goal: null });
             this.sendContentUpdate();
             this.callbacks.onSessionCleared?.(this.sessionId);
         });
@@ -511,6 +554,7 @@ export class SemaSessionWrapper {
                 attachments: data.attachments,  // core 回吐的规范化图片，按 inputId 天然对应
                 ...(pastes ? { pastes } : {}),
                 source: data.source,
+                ...(data.goal ? { goal: data.goal } : {}),
             };
             this.messageHistory.push(userMsg);
             this.sendAppendMessages([userMsg]);

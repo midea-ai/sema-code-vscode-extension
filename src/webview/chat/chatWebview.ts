@@ -96,6 +96,9 @@ export class ChatWebviewProvider {
                 insertPermissionRequest: () => this.sessionController.getSessionWrapper(sid!)?.insertPermissionRequestMessage(msg.permissionData),
                 updateAgentMode: () => this.sessionController.getSessionWrapper(sid!)?.updateAgentMode(msg.mode),
                 updatePermissionLevel: () => this.sessionController.getSessionWrapper(sid!)?.updatePermissionLevel(msg.level),
+                // 长期目标：暂停 / 恢复 / 清除 与 更新文字，不排队立即生效，状态经 goal:update 回前端
+                goalAction: () => this.sessionController.getSessionWrapper(sid!)?.goalAction(msg.action),
+                updateGoal: () => this.sessionController.getSessionWrapper(sid!)?.updateGoal(msg.text),
                 transferAgentToBackground: () => { this.sessionController.getSessionWrapper(sid!)?.transferAgentToBackground(msg.taskId); },
                 // 模型显示是会话级的（来自 core 会话级事件/拉取）；切换 = 本会话 + 全局默认，其他已打开会话不动
                 requestModelInfo: () => this.sessionController.getSessionWrapper(sid!)?.refreshModelInfo(true),

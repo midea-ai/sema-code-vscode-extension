@@ -173,6 +173,9 @@ export class Controller {
             case 'insertPermissionRequest': this.sessions.get(sid ?? '')?.wrapper.insertPermissionRequestMessage(msg.permissionData); break;
             case 'updateAgentMode': this.sessions.get(sid ?? '')?.wrapper.updateAgentMode(msg.mode); break;
             case 'updatePermissionLevel': this.sessions.get(sid ?? '')?.wrapper.updatePermissionLevel(msg.level); break;
+            // 长期目标：暂停 / 恢复 / 清除 与 更新文字（对齐 chatWebview）
+            case 'goalAction': this.sessions.get(sid ?? '')?.wrapper.goalAction(msg.action); break;
+            case 'updateGoal': this.sessions.get(sid ?? '')?.wrapper.updateGoal(msg.text); break;
 
             // 模型显示是会话级的（对齐 chatWebview）；切换 = 本会话 + 全局默认，其他已打开会话不动
             case 'requestModelInfo': await this.sessions.get(sid ?? '')?.wrapper.refreshModelInfo(true); break;
