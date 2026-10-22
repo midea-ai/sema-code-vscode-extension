@@ -1,7 +1,7 @@
 import { InputMention } from '../../../types';
 import { getLeadingCommand } from './commandUtils';
 import { buildMentionChipHtml, refLabel } from '../../../utils/fileRefDisplay';
-import { buildSkillLabelHtml, matchSkillPrefix, skillDisplayOf } from '../../../utils/skillDisplay';
+import { buildSkillLabelHtml, displayName, displayOf, matchSkillPrefix } from '../../../utils/skillDisplay';
 
 export const MENTION_CLASS = 'file-mention';
 export const COMMAND_CLASS = 'command-mention';
@@ -12,7 +12,7 @@ export const isAtomicToken = (node: Node): node is HTMLElement =>
     node.nodeType === Node.ELEMENT_NODE && (node as HTMLElement).dataset.raw !== undefined;
 
 /**
- * 开头技能标签：`/<映射技能名>` 显示为「图标 + 名字」，data-raw 存 `/<name>`（其后的空格仍是普通文本）
+ * 开头技能 / 内置命令标签：`/<映射名>` 显示为「图标 + 名字」，data-raw 存 `/<name>`（其后的空格仍是普通文本）
  */
 export function createSkillSpan(name: string): HTMLSpanElement {
     const span = document.createElement('span');
@@ -22,7 +22,7 @@ export function createSkillSpan(name: string): HTMLSpanElement {
     span.dataset.skill = name;
     span.dataset.raw = '/' + name;
     span.title = '/' + name;
-    const display = skillDisplayOf(name);
+    const display = displayOf(name);
     span.innerHTML = display ? buildSkillLabelHtml(display) : '';
     return span;
 }
@@ -106,13 +106,13 @@ export function getMentionsFromDom(root: HTMLElement): InputMention[] {
     return result;
 }
 
-/** 技能标签是否完好：不可编辑、data-raw 与技能名一致、名字未被改动 */
+/** 技能 / 命令标签是否完好：不可编辑、data-raw 与名字一致、显示名未被改动 */
 function isSkillIntact(span: HTMLElement): boolean {
     if (span.contentEditable !== 'false') return false;
     const name = span.dataset.skill || '';
-    const display = skillDisplayOf(name);
+    const display = displayOf(name);
     if (!display || span.dataset.raw !== '/' + name) return false;
-    return span.querySelector('.skill-label-name')?.textContent === display.name;
+    return span.querySelector('.skill-label-name')?.textContent === displayName(display);
 }
 
 /** mention 标签是否完好：不可编辑、逻辑文本与 data 一致、芯片名字未被改动 */
@@ -141,7 +141,7 @@ export function scanAndUnwrapStaleMentions(root: HTMLElement): boolean {
         }
         mutated = true;
     }
-    // 技能标签：结构被破坏时还原为 `/<name>` 逻辑文本；空壳 remove
+    // 技能 / 命令标签：结构被破坏时还原为 `/<name>` 逻辑文本；空壳 remove
     for (const span of Array.from(root.querySelectorAll<HTMLElement>('span.' + SKILL_CLASS))) {
         if (isSkillIntact(span)) continue;
         if (span.dataset.raw) span.replaceWith(document.createTextNode(span.dataset.raw)); else span.remove();
@@ -176,7 +176,7 @@ export function renderEditorContent(root: HTMLElement, text: string, mentions: I
             if (i < parts.length - 1) root.appendChild(document.createElement('br'));
         }
     };
-    // 开头若是有显示映射的技能且其后已有空格：渲染成「图标 + 名字」原子标签（raw = `/<name>`，空格留作普通文本）；
+    // 开头若是有显示映射的技能 / 内置命令且其后已有空格：渲染成「图标 + 名字」原子标签（raw = `/<name>`，空格留作普通文本）；
     // 否则命中已知快捷指令时渲染成文本高亮块
     const sk = matchSkillPrefix(text, true);
     if (sk && (sorted.length === 0 || sorted[0].start >= sk.name.length + 1)) {

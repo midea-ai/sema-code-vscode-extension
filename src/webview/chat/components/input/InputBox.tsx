@@ -9,7 +9,6 @@ import { usePendingPastes } from './hooks/usePendingPastes';
 import PasteChip from './components/PasteChip';
 import { isLongPaste, PasteAttachment } from '../../../common/paste';
 import { FILE_REF_RE } from '../../utils/fileRefDisplay';
-import { matchSkillPrefix } from '../../utils/skillDisplay';
 import {
     SendIcon,
     StopIcon,
@@ -40,6 +39,7 @@ import {
     scanAndUnwrapStaleMentions,
     renderEditorContent
 } from './utils/mentionDom';
+import { matchSkillPrefix } from '../../utils/skillDisplay';
 import {
     getEditorText,
     getCaretOffset,
@@ -764,13 +764,16 @@ const InputBox = forwardRef<InputBoxHandle, InputBoxProps>(({
     const restoreFromHistory = (direction: 'up' | 'down') => {
         const el = inputBoxRef.current; if (!el) return;
         const item = inputHistory.navigateHistory(direction, inputValue, fileSelection.selectedFiles, mentions);
-        renderEditorContent(el, item.text, item.mentions);
-        setInputValue(item.text);
+        // 历史里存的是 trim 过的文本：整条只有 `/<命令或技能名>`（如直发的 /compact）时补一个尾随空格，否则编辑器不会把它换成标签（标签要求名后跟空格，与 webui 一致）
+        const sk = matchSkillPrefix(item.text);
+        const text = sk && item.text.length === sk.prefixLen && !/\s$/.test(item.text) ? item.text + ' ' : item.text;
+        renderEditorContent(el, text, item.mentions);
+        setInputValue(text);
         setMentions(item.mentions);
         fileSelection.setSelectedFiles(item.files);
-        setCaretOffset(el, item.text.length);
+        setCaretOffset(el, text.length);
         el.focus();
-        commitHistory({ text: item.text, mentions: item.mentions, caret: item.text.length }, 'op');
+        commitHistory({ text, mentions: item.mentions, caret: text.length }, 'op');
     };
 
     const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {

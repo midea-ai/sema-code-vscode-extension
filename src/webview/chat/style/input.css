@@ -369,6 +369,15 @@
     font-weight: 500;
 }
 
+/* 无固定色的内置命令：输入框 / 气泡里与 @ 文件芯片同用链接高亮色；斜杠面板里保持命令名原有的正文色 */
+.skill-label-accent {
+    color: var(--chat-text-link);
+}
+
+.skill-label-panel {
+    color: var(--chat-text-primary);
+}
+
 /* 图标盒子尺寸由 SkillLabel / buildSkillLabelHtml 内联指定，三处统一取 FILE_LABEL_ICON（15） */
 .skill-label-icon {
     display: inline-flex;

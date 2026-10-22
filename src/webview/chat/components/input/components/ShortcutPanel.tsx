@@ -2,7 +2,7 @@ import React, { useMemo, useEffect, useRef, useState, useCallback } from 'react'
 import { ShortcutCommand } from '../../../../../utils/command';
 import { filterShortcutCommands } from '../utils/commandUtils';
 import Tooltip from '../../ui/Tooltip';
-import { SkillLabel, skillDisplayOf } from '../../../utils/skillDisplay';
+import { SkillLabel, commandDisplayOf, displayDesc, skillDisplayOf } from '../../../utils/skillDisplay';
 
 // 描述文本：当被 ellipsis 截断时，悬浮显示完整内容
 const ShortcutDesc: React.FC<{ desc: string }> = ({ desc }) => {
@@ -95,8 +95,8 @@ const ShortcutPanel: React.FC<ShortcutPanelProps> = ({
     });
 
     const renderItem = ({ item, flatIndex }: Indexed) => {
-        // 有显示映射的 skill：用「图标 + 名字 + 短描述」代替斜杠名与 frontmatter 描述
-        const d = item.category === 'skill' ? skillDisplayOf(item.text) : undefined;
+        // 有显示映射的 skill / 内置命令：用「图标 + 名字 + 短描述」代替斜杠名与原描述（自定义命令不在 COMMAND_DISPLAY 里，保持斜杠名）
+        const d = item.category === 'skill' ? skillDisplayOf(item.text) : item.category === 'command' && !item.isCustom ? commandDisplayOf(item.text) : undefined;
         return (
             <div
                 key={flatIndex}
@@ -105,14 +105,14 @@ const ShortcutPanel: React.FC<ShortcutPanelProps> = ({
                 onClick={() => onExecuteShortcut(item.text, item.send ?? false)}
             >
                 {d ? (
-                    <span className="shortcut-command shortcut-skill"><SkillLabel display={d} /></span>
+                    <span className="shortcut-command shortcut-skill"><SkillLabel display={d} panel /></span>
                 ) : (
                     <>
                         <span className="shortcut-slash">/</span>
                         <span className="shortcut-command">{item.text}</span>
                     </>
                 )}
-                <ShortcutDesc desc={d ? d.desc : item.desc} />
+                <ShortcutDesc desc={d ? displayDesc(d) : item.desc} />
             </div>
         );
     };

@@ -2,7 +2,7 @@ import { getBuiltinShortcutCommands, ShortcutCommand } from '../../../../../util
 import { CommandConfig } from '../../../../config/types/command';
 import { SkillConfig } from '../../../../config/types/skill';
 import { AgentConfig } from '../../../../config/types/agent';
-import { skillDisplayOf, skillDisplayOrder } from '../../../utils/skillDisplay';
+import { commandDisplayOf, displayDesc, displayName, skillDisplayOf, skillDisplayOrder } from '../../../utils/skillDisplay';
 
 // 存储自定义命令（由后端推送更新）
 let customCommands: ShortcutCommand[] = [];
@@ -146,11 +146,11 @@ export const filterShortcutCommands = (
     const matched: Ranked[] = [];
 
     commands.forEach((cmd, idx) => {
-        // 有显示映射的技能：显示名 / 短描述也参与匹配（输入 "word" 能命中 minimax-docx）
+        // 有显示映射的技能 / 内置命令：显示名 / 短描述也参与匹配（输入 "word" 能命中 minimax-docx，输入「目标」能命中 goal）
         const names = [cmd.text.toLowerCase()];
         const descs = [(cmd.desc ?? '').toLowerCase()];
-        const d = cmd.category === 'skill' ? skillDisplayOf(cmd.text) : undefined;
-        if (d) { names.push(d.name.toLowerCase()); descs.push(d.desc.toLowerCase()); }
+        const d = cmd.category === 'skill' ? skillDisplayOf(cmd.text) : cmd.category === 'command' && !cmd.isCustom ? commandDisplayOf(cmd.text) : undefined;
+        if (d) { names.push(displayName(d).toLowerCase()); descs.push(displayDesc(d).toLowerCase()); }
 
         let rank: number;
         if (names.some(n => n.startsWith(query))) {
