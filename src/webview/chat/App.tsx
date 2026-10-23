@@ -5,7 +5,7 @@ import InputBox, { InputBoxHandle } from './components/input/InputBox';
 import MessageItem from './MessageItem';
 import UserInputBlock from './blocks/UserInputBlock';
 import { parsePasteInput, type PasteAttachment } from '../common/paste';
-import GroupedToolBlock from './blocks/tools/GroupedToolBlock';
+import GroupedToolBlock, { McpRunBlock } from './blocks/tools/GroupedToolBlock';
 import GeneratedImageBlock from './blocks/tools/GeneratedImageBlock';
 import SessionTabs from './components/SessionTabs';
 import { SessionActiveContext, SessionContext } from './SessionContext';
@@ -885,6 +885,13 @@ const ChatSession: React.FC<ChatSessionProps> = ({ vscode: rawVscode, sessionId,
                             </div>
                         );
                     }
+                    if (item.kind === 'mcpRun') {
+                        return (
+                            <div key={item.id} className="msg-wrap">
+                                <McpRunBlock server={item.server} messages={item.messages} />
+                            </div>
+                        );
+                    }
 
                     return (
                         <div key={item.message.id} className="msg-wrap">
@@ -994,6 +1001,13 @@ const ChatSession: React.FC<ChatSessionProps> = ({ vscode: rawVscode, sessionId,
                         return (
                             <div key={item.id} className="msg-wrap">
                                 <GeneratedImageBlock contents={item.messages.map(m => m.content)} vscode={vscode} />
+                            </div>
+                        );
+                    }
+                    if (item.kind === 'mcpRun') {
+                        return (
+                            <div key={item.id} className="msg-wrap">
+                                <McpRunBlock server={item.server} messages={item.messages} />
                             </div>
                         );
                     }

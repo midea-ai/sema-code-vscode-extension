@@ -85,6 +85,8 @@ type ExpandedItem =
     | { kind: 'read-summary'; item: ReadSummaryItem }
     /** 组内相邻的多次 generate_image 调用合并成一行缩略图 */
     | { kind: 'gen-image'; id: string; messages: Message[] }
+    /** 组内相邻的同服务 MCP 调用（≥2 次）合并成「调用了 xx n 次」二级可展开行 */
+    | { kind: 'mcp-run'; id: string; server: string; messages: Message[] }
     | { kind: 'message'; message: Message };
 
 /** 成功的 Read 消息；Read 的执行报错与读文件的权限面板 content.toolName 也是 view_file，需排除，不并入合并行 */
@@ -162,11 +164,16 @@ export const getReadSummaryItems = (messages: Message[]): ReadSummaryItem[] => {
     return items;
 };
 
-/** 组内展开项：连续 Read 合并为一行，连续生成图片合并为一行缩略图，其余（含执行报错）逐条 */
+/**
+ * 组内展开项：连续 Read 合并为一行，连续生成图片合并为一行缩略图，
+ * 连续同服务 MCP 调用 ≥2 次合并为「调用了 xx n 次」二级行（1 次仍单行；报错打断合并），其余（含执行报错）逐条
+ */
 export const getExpandedItems = (messages: Message[]): ExpandedItem[] => {
     const items: ExpandedItem[] = [];
     let readRun: Message[] = [];
     let genImageRun: Message[] = [];
+    let mcpRun: Message[] = [];
+    let mcpServer = '';
 
     const flushReadRun = () => {
         if (readRun.length === 0) {
@@ -191,25 +198,50 @@ export const getExpandedItems = (messages: Message[]): ExpandedItem[] => {
         genImageRun = [];
     };
 
+    const flushMcpRun = () => {
+        if (mcpRun.length >= 2) {
+            items.push({ kind: 'mcp-run', id: `mcp-run-${mcpRun[0].id}`, server: mcpServer, messages: mcpRun });
+        } else if (mcpRun.length === 1) {
+            items.push({ kind: 'message', message: mcpRun[0] });
+        }
+        mcpRun = [];
+    };
+
     for (const message of messages) {
         if (isReadMessage(message)) {
             flushGenImageRun();
+            flushMcpRun();
             readRun.push(message);
             continue;
         }
         if (isGenImageMessage(message)) {
             flushReadRun();
+            flushMcpRun();
             genImageRun.push(message);
+            continue;
+        }
+
+        const server = getMcpServerName(message);
+        if (server) {
+            flushReadRun();
+            flushGenImageRun();
+            if (mcpRun.length > 0 && server !== mcpServer) {
+                flushMcpRun();
+            }
+            mcpServer = server;
+            mcpRun.push(message);
             continue;
         }
 
         flushReadRun();
         flushGenImageRun();
+        flushMcpRun();
         items.push({ kind: 'message', message });
     }
 
     flushReadRun();
     flushGenImageRun();
+    flushMcpRun();
     return items;
 };
 
@@ -523,6 +555,32 @@ const McpItemBlock: React.FC<{ message: Message }> = ({ message }) => {
     );
 };
 
+/**
+ * 连续同服务 MCP 调用合并行：「调用了 xx n 次 ›」，默认折叠，展开后逐条列出各次调用行（再点开看参数与结果）。
+ * 组内二级行与组外单独渲染共用；展开体复用组内容的缩进样式。
+ */
+export const McpRunBlock: React.FC<{ server: string; messages: Message[] }> = ({ server, messages }) => {
+    const t = useT();
+    const [isExpanded, setIsExpanded] = useState(false);
+
+    return (
+        <div className="chat-block chat-block--borderless">
+            <ToolRowHeader
+                icon={<PlugIcon />}
+                verb={t('tool.calledTimes', { name: server, count: messages.length })}
+                expandable
+                isExpanded={isExpanded}
+                onClick={() => setIsExpanded(prev => !prev)}
+            />
+            {isExpanded && (
+                <div className="chat-block-content grouped-tool-content">
+                    {messages.map(message => <McpItemBlock key={message.id} message={message} />)}
+                </div>
+            )}
+        </div>
+    );
+};
+
 /** 抓网页 / 后台任务 / 定时任务行的图标与动词 */
 const getPubRowMeta = (toolName: string, t: Translate, interrupted?: boolean): { icon: React.ReactNode; verb: string } | null => {
     if (toolName === TOOL_NAME_FETCH_URL) {
@@ -770,6 +828,9 @@ const renderExpandedItem = (
     }
     if (item.kind === 'gen-image') {
         return <GeneratedImageBlock key={item.id} contents={item.messages.map(m => m.content)} vscode={vscode} />;
+    }
+    if (item.kind === 'mcp-run') {
+        return <McpRunBlock key={item.id} server={item.server} messages={item.messages} />;
     }
 
     const { message } = item;

@@ -77,6 +77,7 @@ export const zh = {
     'tool.searchIn': '在 {dir}',
     'tool.called': '已调用 {name}',
     'tool.calling': '正在调用 {name}',
+    'tool.calledTimes': '调用了 {name} {count} 次',
     'tool.fetched': '已抓取',
     'tool.fetching': '正在抓取',
     'tool.fetchInterrupted': '抓取已中断',

@@ -22,7 +22,9 @@ export type RenderItem =
     | { kind: 'message'; message: Message; originalIndex: number }
     | { kind: 'group'; id: string; messages: Message[]; originalStartIndex: number }
     /** 组外单独渲染时，相邻的多次 generate_image 调用合并成一行（对齐 core webui 的 GenImageCard） */
-    | { kind: 'genImage'; id: string; messages: Message[]; originalStartIndex: number };
+    | { kind: 'genImage'; id: string; messages: Message[]; originalStartIndex: number }
+    /** 组外单独渲染时，相邻的同服务 MCP 调用（≥2 次）合并成「调用了 xx n 次」一项，成组门槛里只算 1 条 */
+    | { kind: 'mcpRun'; id: string; server: string; messages: Message[]; originalStartIndex: number };
 
 interface GroupMessagesOptions {
     streamingToolId?: string | null;
@@ -283,27 +285,62 @@ const toGenImageItem = (run: RunItem[]): RenderItem => ({
     originalStartIndex: run[0].index,
 });
 
-/** 单独渲染的消息：相邻的生成图片调用合并成一个 genImage 项（一行缩略图），其余逐条；id 取首条，追加时组件实例不重建 */
+const toMcpRunItem = (run: RunItem[], server: string): RenderItem => ({
+    kind: 'mcpRun',
+    id: `mcp-run-${run[0].message.id}`,
+    server,
+    messages: run.map(({ message }) => message),
+    originalStartIndex: run[0].index,
+});
+
+/**
+ * 单独渲染的消息：相邻的生成图片调用合并成一个 genImage 项（一行缩略图），
+ * 相邻的同服务 MCP 调用 ≥2 次合并成一个 mcpRun 项（1 次仍逐条；报错是 system 消息，会打断合并），其余逐条；
+ * 合并项 id 取首条，追加时组件实例不重建
+ */
 const toMessageItems = (run: RunItem[]): RenderItem[] => {
     const items: RenderItem[] = [];
     let genImageRun: RunItem[] = [];
+    let mcpRun: RunItem[] = [];
+    let mcpServer = '';
     const flushGenImageRun = () => {
         if (genImageRun.length > 0) {
             items.push(toGenImageItem(genImageRun));
             genImageRun = [];
         }
     };
+    const flushMcpRun = () => {
+        if (mcpRun.length >= 2) {
+            items.push(toMcpRunItem(mcpRun, mcpServer));
+        } else if (mcpRun.length === 1) {
+            items.push({ kind: 'message', message: mcpRun[0].message, originalIndex: mcpRun[0].index });
+        }
+        mcpRun = [];
+    };
 
     for (const item of run) {
         if (isGenImageMessage(item.message)) {
+            flushMcpRun();
             genImageRun.push(item);
             continue;
         }
         flushGenImageRun();
+
+        const server = getMcpServerName(item.message);
+        if (server) {
+            if (mcpRun.length > 0 && server !== mcpServer) {
+                flushMcpRun();
+            }
+            mcpServer = server;
+            mcpRun.push(item);
+            continue;
+        }
+        flushMcpRun();
         items.push({ kind: 'message', message: item.message, originalIndex: item.index });
     }
 
     flushGenImageRun();
+    flushMcpRun();
     return items;
 };
 
@@ -319,7 +356,8 @@ const toGroupItem = (run: RunItem[]): RenderItem => ({
  * closed 表示段之后是否已有其它渲染内容。未封口（或末条仍在流式）时段尾一条作为「尾巴」原样单独渲染，
  * 便于查看运行中的输出，其余并入组；段一封口尾巴随之并入。并入的部分 ≥2 条（报错也算）才出组头，否则逐条渲染；全是报错时组头走兜底文案。
  * memory 写入不做尾巴、1 条也折叠、流式中也直接进组，避免先展开 diff 再折叠的闪动。
- * 尾巴是生成图片时，末尾相邻的几次调用整体作为尾巴，保持合并成一行；成组门槛里合并后的一行也只算 1 条。
+ * 尾巴是生成图片时，末尾相邻的几次调用整体作为尾巴，保持合并成一行；成组门槛里合并后的一行（生图、同服务 MCP）都只算 1 条。
+ * MCP 尾巴不整体后移：末条仍单独露出运行状态，封口后再并入「调用了 xx n 次」。
  * 组 id 只取首条消息 id，尾巴并入时组件实例不重建，已展开状态得以保留。
  */
 const flushRun = (

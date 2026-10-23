@@ -76,6 +76,7 @@ export const en: Record<keyof typeof zh, string> = {
     'tool.searchIn': 'in {dir}',
     'tool.called': 'Called {name}',
     'tool.calling': 'Calling {name}',
+    'tool.calledTimes': 'Called {name} {count} times',
     'tool.fetched': 'Fetched',
     'tool.fetching': 'Fetching',
     'tool.fetchInterrupted': 'Fetch interrupted',
