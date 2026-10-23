@@ -308,30 +308,7 @@
 }
 
 /* ========== Grouped Tool Block ========== */
-/* 组头无图标：首个动词加粗、计数弱化色、箭头常显；组内行的行头由 .tool-row-* 提供 */
-
-.grouped-tool-header {
-    cursor: pointer;
-}
-
-/* 组头标题过长时单行省略，不越界被裁 */
-.grouped-tool-header .chat-block-title-label {
-    color: var(--chat-color-muted);
-    flex-shrink: 1;
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-
-.grouped-tool-toggle-btn {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
-    width: 14px;
-    height: 14px;
-    color: var(--chat-color-muted);
-}
+/* 组头与组内行同用 ToolRowHeader（.tool-row-*）：图标 + 标题（过长单行省略）+ 折叠时 hover 才出现的箭头，不加粗 */
 
 .grouped-tool-content {
     padding: var(--chat-spacing-xs) 0 var(--chat-spacing-xs) var(--chat-spacing-md);

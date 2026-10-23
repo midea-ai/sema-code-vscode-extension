@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
-import { BrainIcon, ClockIcon, FileTextIcon, GlobeIcon, PlugIcon, QuestionBubbleIcon, TerminalIcon, ToggleIcon, WrenchIcon, XIcon } from '../../components/ui/IconButton';
+import { BrainIcon, ClockIcon, FileTextIcon, GlobeIcon, ImageIcon, PlugIcon, PuzzleIcon, QuestionBubbleIcon, TerminalIcon, WrenchIcon, XIcon } from '../../components/ui/IconButton';
 import { FileChange, Message } from '../../types';
 import { CONTINUATION_SYMBOL } from '../../utils/symbols';
 import { countDiffChanges } from '../../utils/diffParser';
@@ -50,6 +50,7 @@ import ToolRowHeader, { SearchRowHeader } from './ToolRowHeader';
 import CollapsibleDiff from '../../components/ui/CollapsibleDiff';
 import CollapsibleContent from '../../components/ui/CollapsibleContent';
 import { useT } from '../../../common/i18n/react';
+import type { I18nKey } from '../../../common/i18n/react';
 
 type Translate = ReturnType<typeof useT>;
 
@@ -303,7 +304,15 @@ const getCategoryKind = (message: Message): GroupCategoryKind => {
 };
 
 /**
- * 组内消息按类别计数，类别按首次出现顺序排列；MCP 按服务名分别计数；生成图片按张数计；
+ * 类别优先级（高 → 低）：组图标取组内命中的最高一档，组头文案各类别也按此排序，
+ * 同一组合不论组内先后顺序都显示成同样的样子；MCP 多个服务同属一档，服务之间按首次出现顺序
+ */
+const GROUP_KIND_PRIORITY: GroupCategoryKind[] = ['ran', 'mcp', 'image', 'skill', 'explore', 'fetch', 'ask', 'memory', 'cron', 'job'];
+
+const kindRank = (kind: GroupCategoryKind): number => GROUP_KIND_PRIORITY.indexOf(kind);
+
+/**
+ * 组内消息按类别计数，结果按 GROUP_KIND_PRIORITY 排序；MCP 按服务名分别计数；生成图片按张数计；
  * 执行报错与权限面板（拒绝/中断）都不计入，只在组内展示
  */
 export const getGroupCategories = (messages: Message[]): GroupCategory[] => {
@@ -331,66 +340,56 @@ export const getGroupCategories = (messages: Message[]): GroupCategory[] => {
         category.count += weight;
     }
 
-    return categories;
+    // sort 稳定：同档（多个 MCP 服务）保持首次出现顺序
+    return categories.sort((a, b) => kindRank(a.kind) - kindRank(b.kind));
 };
 
-const formatCount = (count: number, singular: string, plural: string): string => {
-    return `${count} ${count === 1 ? singular : plural}`;
+/** 类别文案 key：many 为通用句式（中文不分单复数），one 为英文单数 */
+const GROUP_TEXT_KEYS: Record<GroupCategoryKind, { many: I18nKey; one: I18nKey }> = {
+    ran: { many: 'tool.group.ran', one: 'tool.group.ran.one' },
+    mcp: { many: 'tool.group.mcp', one: 'tool.group.mcp.one' },
+    image: { many: 'tool.group.image', one: 'tool.group.image.one' },
+    skill: { many: 'tool.group.skill', one: 'tool.group.skill.one' },
+    explore: { many: 'tool.group.explore', one: 'tool.group.explore.one' },
+    fetch: { many: 'tool.group.fetch', one: 'tool.group.fetch.one' },
+    ask: { many: 'tool.group.ask', one: 'tool.group.ask.one' },
+    memory: { many: 'tool.group.memory', one: 'tool.group.memory.one' },
+    cron: { many: 'tool.group.cron', one: 'tool.group.cron.one' },
+    job: { many: 'tool.group.job', one: 'tool.group.job.one' },
 };
 
-/** 类别文案（组头固定英文）：动词 + 主语（仅 MCP 服务名）+ 计数，如 Called figma 3 times */
-const getCategoryText = (category: GroupCategory): { verb: string; subject: string; count: string } => {
-    switch (category.kind) {
-        case 'mcp':
-            return { verb: 'Called', subject: category.server || '', count: formatCount(category.count, 'time', 'times') };
-        case 'ran':
-            return { verb: 'Ran', subject: '', count: formatCount(category.count, 'command', 'commands') };
-        case 'fetch':
-            return { verb: 'Fetched', subject: '', count: formatCount(category.count, 'url', 'urls') };
-        case 'job':
-            return { verb: 'Managed', subject: '', count: formatCount(category.count, 'job', 'jobs') };
-        case 'cron':
-            return { verb: 'Managed', subject: '', count: formatCount(category.count, 'cron', 'crons') };
-        case 'memory':
-            return { verb: 'Wrote', subject: '', count: formatCount(category.count, 'memory', 'memories') };
-        case 'image':
-            return { verb: 'Generated', subject: '', count: formatCount(category.count, 'image', 'images') };
-        case 'skill':
-            return { verb: 'Used', subject: '', count: formatCount(category.count, 'skill', 'skills') };
-        case 'ask':
-            return { verb: 'Asked', subject: 'user', count: formatCount(category.count, 'time', 'times') };
-        default:
-            return { verb: 'Explored', subject: '', count: formatCount(category.count, 'tool', 'tools') };
-    }
+/** 类别文案：如「执行 2 条命令」「调用 figma 3 次」/ Ran 2 commands、Called figma 3 times */
+const getCategoryText = (category: GroupCategory, t: Translate): string => {
+    const keys = GROUP_TEXT_KEYS[category.kind];
+    return t(category.count === 1 ? keys.one : keys.many, { name: category.server || '', count: category.count });
 };
 
-/** 组内全是不计数的消息（中断/出错无成图的生图调用、报错、权限面板）时的组头兜底文案 */
-const FALLBACK_GROUP_TITLE = 'Called tools';
-
-/** 组头标题：各类别按首次出现顺序拼接，首个动词大写，其余小写，如 Explored 6 tools, ran 4 commands；无类别时用兜底文案 */
-export const getGroupTitle = (messages: Message[]): string => {
-    return getGroupCategories(messages).map((category, index) => {
-        const { verb, subject, count } = getCategoryText(category);
-        return [index === 0 ? verb : verb.toLowerCase(), subject, count].filter(Boolean).join(' ');
-    }).join(', ') || FALLBACK_GROUP_TITLE;
+/**
+ * 组头标题：各类别（已按优先级排序）用语言分隔符拼接，如「执行 4 条命令、探索 6 个工具」；
+ * 组内全是不计数的消息（中断/出错无成图的生图调用、报错、权限面板）时用兜底文案「调用工具」
+ */
+export const getGroupTitle = (categories: GroupCategory[], t: Translate): string => {
+    return categories.map(category => getCategoryText(category, t)).join(t('tool.group.sep')) || t('tool.group.fallback');
 };
 
-/** 组头（无图标）：首个动词加粗，计数与后续类别弱化色，箭头常显 */
-const GroupHeader: React.FC<{
-    titleText: string;
-    isExpanded: boolean;
-    onToggle: () => void;
-    children: React.ReactNode;
-}> = ({ titleText, isExpanded, onToggle, children }) => (
-    <div className="chat-block-header grouped-tool-header" onClick={onToggle}>
-        <div className="chat-block-title">
-            <span className="chat-block-title-label" title={titleText}>{children}</span>
-            <div className="grouped-tool-toggle-btn">
-                <ToggleIcon isExpanded={isExpanded} />
-            </div>
-        </div>
-    </div>
-);
+/** 各类别的组头图标（与组内对应行的图标一致） */
+const GROUP_KIND_ICONS: Record<GroupCategoryKind, React.ReactNode> = {
+    ran: <TerminalIcon />,
+    mcp: <PlugIcon />,
+    image: <ImageIcon />,
+    skill: <PuzzleIcon />,
+    explore: <FileTextIcon />,
+    fetch: <GlobeIcon />,
+    ask: <QuestionBubbleIcon />,
+    memory: <BrainIcon />,
+    cron: <ClockIcon />,
+    job: <WrenchIcon />,
+};
+
+/** 组头图标：取优先级最高的类别；无类别时用通用工具图标兜底，保证组头永远有图标、文字起点对齐 */
+const getGroupIcon = (categories: GroupCategory[]): React.ReactNode => {
+    return categories.length > 0 ? GROUP_KIND_ICONS[categories[0].kind] : <WrenchIcon />;
+};
 
 // ==================== 结果行 ====================
 
@@ -556,7 +555,7 @@ const McpItemBlock: React.FC<{ message: Message }> = ({ message }) => {
 };
 
 /**
- * 连续同服务 MCP 调用合并行：「调用了 xx n 次 ›」，默认折叠，展开后逐条列出各次调用行（再点开看参数与结果）。
+ * 连续同服务 MCP 调用合并行：「调用 xx n 次 ›」，默认折叠，展开后逐条列出各次调用行（再点开看参数与结果）。
  * 组内二级行与组外单独渲染共用；展开体复用组内容的缩进样式。
  */
 export const McpRunBlock: React.FC<{ server: string; messages: Message[] }> = ({ server, messages }) => {
@@ -881,8 +880,8 @@ const renderExpandedItem = (
 // ==================== 混合工具组 ====================
 
 /**
- * 混合工具组：组头按类别拼接标题（见 getGroupTitle）；
- * 展开后每项统一为「图标 动词 目标 ›」行，同一缩进，点击行才展示完整文本与结果。
+ * 混合工具组：组头与组内行同构，「图标 标题 ›」，图标取优先级最高的类别，标题按类别优先级拼接（见 getGroupTitle），
+ * 箭头折叠时 hover 才出现；展开后每项统一为「图标 动词 目标 ›」行，同一缩进，点击行才展示完整文本与结果。
  * 组内 memory 写入折叠时 EditBlock 不挂载，由组块代为上报文件变更。
  */
 const GroupedToolBlock: React.FC<GroupedToolBlockProps> = ({ messages, vscode, onFileChange }) => {
@@ -890,7 +889,8 @@ const GroupedToolBlock: React.FC<GroupedToolBlockProps> = ({ messages, vscode, o
     const [isExpanded, setIsExpanded] = useState(false);
 
     const categories = useMemo(() => getGroupCategories(messages), [messages]);
-    const titleText = useMemo(() => getGroupTitle(messages), [messages]);
+    const titleText = useMemo(() => getGroupTitle(categories, t), [categories, t]);
+    const icon = useMemo(() => getGroupIcon(categories), [categories]);
 
     useEffect(() => {
         if (!onFileChange) {
@@ -925,22 +925,14 @@ const GroupedToolBlock: React.FC<GroupedToolBlockProps> = ({ messages, vscode, o
 
     return (
         <div className="chat-block chat-block--borderless grouped-tool-block">
-            <GroupHeader titleText={titleText} isExpanded={isExpanded} onToggle={() => setIsExpanded(prev => !prev)}>
-                {categories.length === 0 && <strong>{FALLBACK_GROUP_TITLE}</strong>}
-                {categories.map((category, index) => {
-                    const { verb, subject, count } = getCategoryText(category);
-                    return (
-                        <React.Fragment key={category.key}>
-                            {index > 0 && <span className="grouped-tool-muted-text">, </span>}
-                            {index === 0
-                                ? <strong>{verb}</strong>
-                                : <span className="grouped-tool-muted-text">{verb.toLowerCase()}</span>}
-                            {subject && <> {subject}</>}
-                            {' '}<span className="grouped-tool-muted-text">{count}</span>
-                        </React.Fragment>
-                    );
-                })}
-            </GroupHeader>
+            <ToolRowHeader
+                icon={icon}
+                verb={titleText}
+                title={titleText}
+                expandable
+                isExpanded={isExpanded}
+                onClick={() => setIsExpanded(prev => !prev)}
+            />
             {isExpanded && (
                 <div className="chat-block-content grouped-tool-content">
                     {expandedItems.map(item => renderExpandedItem(item, handleFileOpen, vscode, t))}

@@ -172,6 +172,13 @@ export const ImageIcon: React.FC<ToolIconProps> = ({ size = 14 }) => (
     </svg>
 );
 
+// 拼图图标（混合工具组组头：技能）
+export const PuzzleIcon: React.FC<ToolIconProps> = ({ size = 14 }) => (
+    <svg {...toolIconAttrs(size)}>
+        <path d="M3 5h2.5a1.5 1.5 0 1 1 3 0H11v2.5a1.5 1.5 0 1 1 0 3V13H3z" />
+    </svg>
+);
+
 // 插头图标（工具行：MCP 调用）
 export const PlugIcon: React.FC<ToolIconProps> = ({ size = 14 }) => (
     <svg {...toolIconAttrs(size)}>
