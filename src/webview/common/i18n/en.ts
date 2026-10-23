@@ -112,6 +112,7 @@ export const en: Record<keyof typeof zh, string> = {
     'tool.failed.call': 'Failed to call {name}',
     'chat.session.close': 'Close session',
     'chat.input.switchAgentMode': 'Switch agent mode',
+    'chat.input.agentModeLocked': 'Design sessions cannot switch mode',
     'chat.input.loadingModels': 'Loading models...',
     'chat.input.noModel': 'No model set',
     'chat.input.notSet': 'Not set',

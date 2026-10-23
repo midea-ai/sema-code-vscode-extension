@@ -621,6 +621,15 @@
     filter: none;
 }
 
+/* Design 会话锁定：按钮退化为纯标签，不可点、无悬停反馈 */
+.agent-mode-btn.agent-mode-locked {
+    cursor: default;
+}
+
+.agent-mode-btn.agent-mode-locked:hover {
+    filter: none;
+}
+
 /* Agent 模式按钮内的图标 */
 .agent-mode-btn svg {
     width: 10px;

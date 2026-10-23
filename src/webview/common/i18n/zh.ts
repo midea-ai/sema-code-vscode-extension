@@ -113,6 +113,7 @@ export const zh = {
     'tool.failed.call': '调用 {name} 失败',
     'chat.session.close': '关闭会话',
     'chat.input.switchAgentMode': '切换 Agent 模式',
+    'chat.input.agentModeLocked': 'Design 会话不可切换模式',
     'chat.input.loadingModels': '正在加载模型...',
     'chat.input.noModel': '未设置模型',
     'chat.input.notSet': '未设置',

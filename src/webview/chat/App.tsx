@@ -781,10 +781,15 @@ const ChatSession: React.FC<ChatSessionProps> = ({ vscode: rawVscode, sessionId,
     const showModelReminder = modelInfoLoaded && availableModels.length === 0 && !modelReminderDismissed;
     const inputPlaceholder = inputPlaceholderMsg ?? (inputDisabled ? t('chat.initializing') : t('chat.inputPlaceholder'));
 
-    // 已有消息的 Design 会话不能切到 Agent/Plan：上下文已按 Design 铺开，切出无意义
-    const agentModeLocked = agentMode === 'Design' && messages.length > 0;
+    // Design 与 Agent/Plan 完全分开：Design 会话一律不能切出；
+    // 已有消息的 Agent/Plan 会话切 Design 时新开会话，当前会话模式不变（空会话原地切）
+    const agentModeLocked = agentMode === 'Design';
     const handleAgentModeChange = (mode: AgentMode) => {
-        if (agentModeLocked && mode !== 'Design') return;
+        if (agentModeLocked || mode === agentMode) return;
+        if (mode === 'Design' && messages.length > 0) {
+            vscode.postMessage({ type: 'createSession', mode: 'Design' });
+            return;
+        }
         setAgentMode(mode);
         vscode.postMessage({
             type: 'updateAgentMode',

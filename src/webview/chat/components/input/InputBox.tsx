@@ -1181,21 +1181,20 @@ const InputBox = forwardRef<InputBoxHandle, InputBoxProps>(({
                 <div className="input-bottom-row">
                 <div className="bottom-left-container">
                     <div className="agent-mode-container">
-                        <Tooltip content={disabled || agentModeMenu.showAgentModeMenu ? '' : t('chat.input.switchAgentMode')}>
+                        <Tooltip content={disabled || agentModeMenu.showAgentModeMenu ? '' : t(agentModeLocked ? 'chat.input.agentModeLocked' : 'chat.input.switchAgentMode')}>
                             <button
                                 ref={agentModeButtonRef}
-                                className={`agent-mode-btn mode-${agentMode.toLowerCase()}`}
-                                onClick={agentModeMenu.handleToggleAgentModeMenu}
+                                className={`agent-mode-btn mode-${agentMode.toLowerCase()}${agentModeLocked ? ' agent-mode-locked' : ''}`}
+                                onClick={agentModeLocked ? undefined : agentModeMenu.handleToggleAgentModeMenu}
                                 disabled={disabled}
                             >
                                 <span>{agentMode}</span>
-                                <ChevronDownIcon />
+                                {!agentModeLocked && <ChevronDownIcon />}
                             </button>
                         </Tooltip>
                         <AgentModeMenu
-                            show={agentModeMenu.showAgentModeMenu}
+                            show={agentModeMenu.showAgentModeMenu && !agentModeLocked}
                             currentMode={agentMode}
-                            modes={agentModeLocked ? ['Design'] : undefined}
                             onModeSelect={agentModeMenu.handleAgentModeSelect}
                             agentModeMenuRef={agentModeMenuRef}
                         />
