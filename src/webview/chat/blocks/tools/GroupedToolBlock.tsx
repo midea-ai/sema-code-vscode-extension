@@ -545,7 +545,7 @@ const McpItemBlock: React.FC<{ message: Message }> = ({ message }) => {
     return (
         <GroupedResultRow
             icon={<PlugIcon />}
-            verb={t('tool.called', { name: mcpName })}
+            verb={message.content?.interrupted ? t('tool.callInterrupted', { name: mcpName }) : t('tool.called', { name: mcpName })}
             target={toolName}
             full={params}
             content={message.content?.content}

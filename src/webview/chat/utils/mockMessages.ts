@@ -322,6 +322,31 @@ export const mockMessageMap: Record<string, Message[]> = {
         },
     ],
 
+    McpInterrupted: [
+        {
+            id: nextId(),
+            type: 'tool',
+            toolName: 'mcp__chrome-use__navigate',
+            content: {
+                toolId: 'mcp-interrupted-1',
+                toolName: 'mcp__chrome-use__navigate',
+                title: '{"url":"https://github.com/midea-ai/sema-code-core"}',
+                summary: '',
+                content: '[Tool use interrupted by user]',
+                completed: true,
+                interrupted: true,
+            },
+        },
+        {
+            id: nextId(),
+            type: 'system',
+            content: {
+                type: 'interrupted',
+                content: '[Request interrupted by user]',
+            },
+        },
+    ],
+
     ToolError: [
         {
             id: nextId(),

@@ -77,6 +77,7 @@ export const zh = {
     'tool.searchIn': '在 {dir}',
     'tool.called': '已调用 {name}',
     'tool.calling': '正在调用 {name}',
+    'tool.callInterrupted': '调用已中断 {name}',
     'tool.calledTimes': '调用 {name} {count} 次',
     // 混合工具组组头：各类别文案（中文不分单复数，.one 与通用句式相同）、分隔符、兜底
     'tool.group.ran': '执行 {count} 条命令',

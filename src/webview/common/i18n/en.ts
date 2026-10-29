@@ -76,6 +76,7 @@ export const en: Record<keyof typeof zh, string> = {
     'tool.searchIn': 'in {dir}',
     'tool.called': 'Called {name}',
     'tool.calling': 'Calling {name}',
+    'tool.callInterrupted': 'Call interrupted {name}',
     'tool.calledTimes': 'Called {name} {count} times',
     // grouped tool block header: per-category text (plural / singular), separator, fallback
     'tool.group.ran': 'Ran {count} commands',

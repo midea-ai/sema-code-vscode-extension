@@ -88,7 +88,9 @@ const PubBlock: React.FC<PubBlockProps> = React.memo(({ content, messageId, vsco
         if (mcpMatch) {
             return {
                 icon: <PlugIcon />,
-                verb: isStreaming ? t('tool.calling', { name: mcpMatch[1] }) : t('tool.called', { name: mcpMatch[1] }),
+                verb: isStreaming ? t('tool.calling', { name: mcpMatch[1] })
+                    : content.interrupted ? t('tool.callInterrupted', { name: mcpMatch[1] })
+                        : t('tool.called', { name: mcpMatch[1] }),
                 target: mcpMatch[2],
                 params: title,
             };
@@ -111,7 +113,9 @@ const PubBlock: React.FC<PubBlockProps> = React.memo(({ content, messageId, vsco
             default:
                 return {
                     icon: <WrenchIcon />,
-                    verb: isStreaming ? t('tool.calling', { name: toolValue }) : t('tool.called', { name: toolValue }),
+                    verb: isStreaming ? t('tool.calling', { name: toolValue })
+                        : content.interrupted ? t('tool.callInterrupted', { name: toolValue })
+                            : t('tool.called', { name: toolValue }),
                     target: title && title !== toolName ? title : undefined,
                 };
         }
@@ -123,15 +127,10 @@ const PubBlock: React.FC<PubBlockProps> = React.memo(({ content, messageId, vsco
         (toolContent ?? '').toString().split('\n').filter(line => line.trim()).join('\n'),
     ].filter(Boolean).join('\n');
 
-    // 终端类工具（StopBackgroundJob）与 Shell/BackgroundJob 同一套规则：
-    // 用户未手动操作过时，展开状态跟随「是否为最后一个块」；手动操作后钉住用户设的状态。
-    // 其它工具只在首次渲染处于流式中时展开。
-    const DEFAULT_EXPANDED_TOOLS = [TOOL_NAME_STOP_BG_JOB];
-    const followsLast = DEFAULT_EXPANDED_TOOLS.includes(toolName);
-    const [manualExpanded, setManualExpanded] = useState<boolean | null>(
-        followsLast ? null : (content.completed === false)
-    );
-    const isExpanded = manualExpanded ?? (followsLast && isLast);
+    // 与 Shell/BackgroundJob 同一套规则：用户未手动操作过时，展开状态跟随「是否为最后一个块」，
+    // 新回复出现后自动收起；手动操作后钉住用户设的状态。
+    const [manualExpanded, setManualExpanded] = useState<boolean | null>(null);
+    const isExpanded = manualExpanded ?? isLast;
 
     const handleToggle = () => {
         setManualExpanded(!isExpanded);
