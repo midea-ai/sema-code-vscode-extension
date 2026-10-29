@@ -65,6 +65,25 @@
     cursor: help;
 }
 
+/* 展开区顶部的错误条 */
+.mcp-error-banner {
+    border-top: 1px solid var(--s-card-border);
+    padding: var(--s-gap-sm) 14px;
+    background: var(--vscode-editor-background);
+}
+
+.mcp-error-banner-text {
+    margin: 0;
+    font-family: inherit;
+    font-size: var(--s-font-base);
+    line-height: 1.5;
+    color: var(--vscode-foreground);
+    white-space: pre-wrap;
+    word-break: break-all;
+    user-select: text;
+    cursor: text;
+}
+
 /* 工具列表区域 */
 .mcp-server-tools {
     border-top: 1px solid var(--s-card-border);

@@ -169,6 +169,7 @@ const MCPServerCard: React.FC<{
 
     const connectStatus = (server as any).connectStatus;
     const statusKey = typeof connectStatus === 'string' ? connectStatus : 'disconnected';
+    const errorText: string | undefined = statusKey === 'error' ? (server as any).error : undefined;
 
     const isToolEnabled = (toolName: string): boolean => {
         if (server.config.useTools === null || server.config.useTools === undefined) return true;
@@ -197,8 +198,8 @@ const MCPServerCard: React.FC<{
                     style={{ backgroundColor: statusColors[statusKey] || statusColors.disconnected }}
                     title={STATUS_TEXT_KEYS[statusKey] ? t(STATUS_TEXT_KEYS[statusKey]) : statusKey}
                 />
-                {statusKey === 'error' && (server as any).error && (
-                    <span className="mcp-error-hint" title={(server as any).error}>!</span>
+                {errorText && (
+                    <span className="mcp-error-hint" title={errorText}>!</span>
                 )}
                 {!canEdit && <span className="readonly-tab">{t('common.readonly')}</span>}
                 <div className="section-card-actions" onClick={(e) => e.stopPropagation()}>
@@ -241,15 +242,27 @@ const MCPServerCard: React.FC<{
                 </div>
             </div>
             {expanded && (
-                <ToolsPanel
-                    tools={toolsPanelItems}
-                    canToggle={canToolToggle}
-                    onToolToggle={(toolName, enabled) => onToolToggle(server.config.name, toolName, enabled)}
-                />
+                <>
+                    {errorText && <MCPErrorBanner text={errorText} />}
+                    <ToolsPanel
+                        tools={toolsPanelItems}
+                        canToggle={canToolToggle}
+                        onToolToggle={(toolName, enabled) => onToolToggle(server.config.name, toolName, enabled)}
+                    />
+                </>
             )}
         </div>
     );
 };
+
+// ─── MCPErrorBanner ──────────────────────────────────────────────────────────
+
+// 连接失败时展开区顶部的错误条：文本可选中复制
+const MCPErrorBanner: React.FC<{ text: string }> = ({ text }) => (
+    <div className="mcp-error-banner">
+        <pre className="mcp-error-banner-text">{text}</pre>
+    </div>
+);
 
 // ─── SystemToolsCard ─────────────────────────────────────────────────────────
 
@@ -371,7 +384,7 @@ const MCPEditModal: React.FC<{
             }
             const name = serverNames[0];
             const config: MCPServerConfig = { name, ...parsed.mcpServers[name] };
-            if (!config.transport) { setError(t('config.mcp.err.transportRequired')); return; }
+            if (!config.transport && !(config as any).type) { setError(t('config.mcp.err.transportRequired')); return; }
             if (mode === 'add' && installedNames?.has(name)) {
                 setError(t('config.mcp.err.nameExists', { name })); return;
             }
