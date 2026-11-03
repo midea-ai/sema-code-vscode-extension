@@ -252,6 +252,19 @@
     text-overflow: ellipsis;
 }
 
+/* 预测文字后的「Tab 采纳」小标签：不参与收缩，预测过长时只省略前面的文字 */
+.input-prediction-hint {
+    flex-shrink: 0;
+    margin-left: 6px;
+    padding: 0 4px;
+    font-size: var(--chat-font-xs);
+    line-height: 16px;
+    border-radius: var(--chat-radius-sm);
+    background: var(--chat-bg-hover);
+    color: var(--chat-text-secondary);
+    white-space: nowrap;
+}
+
 /* 快捷指令高亮块 */
 .command-mention {
     background-color: var(--chat-bg-button);

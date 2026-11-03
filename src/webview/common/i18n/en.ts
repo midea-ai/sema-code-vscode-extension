@@ -145,6 +145,7 @@ export const en: Record<keyof typeof zh, string> = {
     'chat.input.send': 'Send (Enter)',
     'chat.input.interrupt': 'Interrupt (Ctrl+C)',
     'chat.input.pasteShowInInput': 'Show in input',
+    'chat.input.predictionAccept': 'Tab to accept',
     'skill.minimax-docx.desc': 'Create and edit Word documents',
     'skill.minimax-xlsx.desc': 'Create, edit and analyze spreadsheets',
     'skill.pptx-generator.desc': 'Generate and edit slides',

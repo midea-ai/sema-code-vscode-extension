@@ -134,6 +134,8 @@ const InputBox = forwardRef<InputBoxHandle, InputBoxProps>(({
     const permissionLevelMenuRef = useRef<HTMLDivElement>(null);
     const permissionLevelButtonRef = useRef<HTMLButtonElement>(null);
     const composingRef = useRef<boolean>(false);
+    // 合成期间 inputValue 不同步（仍为空），用 state 驱动渲染层隐藏预测幽灵文本，避免压在拼音上
+    const [composing, setComposing] = useState(false);
     const atPositionRef = useRef<number>(-1);
 
     const inputHistory = useInputHistory();
@@ -225,8 +227,15 @@ const InputBox = forwardRef<InputBoxHandle, InputBoxProps>(({
         let caret = caretOverride !== undefined ? caretOverride : getCaretOffset(el);
         const mutated = scanAndUnwrapStaleMentions(el);
         if (mutated && caret !== null) setCaretOffset(el, caret);
-        const text = getEditorText(el);
-        const ms = getMentionsFromDom(el);
+        let text = getEditorText(el);
+        let ms = getMentionsFromDom(el);
+        // 删光后 Chromium 残留孤立 <br>（序列化为 "\n"），当成空处理，否则预测与占位符不显示
+        if (text === '\n' && ms.length === 0) {
+            el.innerHTML = '';
+            text = '';
+            ms = [];
+            caret = 0;
+        }
         setInputValue(text);
         setMentions(ms);
         const cursorPos = caret ?? text.length;
@@ -331,12 +340,14 @@ const InputBox = forwardRef<InputBoxHandle, InputBoxProps>(({
 
     const handleCompositionEnd = () => {
         composingRef.current = false;
+        setComposing(false);
         // 输入法合成结束后再扫描 mention，避免拼音中间态误清
         commitHistory(syncFromDom(), 'type');
     };
 
     const handleCompositionStart = () => {
         composingRef.current = true;
+        setComposing(true);
     };
 
     const getClipboardPlainText = (clipboardData: DataTransfer): string => {
@@ -741,7 +752,7 @@ const InputBox = forwardRef<InputBoxHandle, InputBoxProps>(({
     const handleStop = () => onStop();
 
     // 输入预测幽灵文本：仅在输入框完全为空（无文字、无附件）且可输入时展示，与 placeholder 互斥
-    const showPrediction = !!prediction && inputValue === '' && pendingImages.images.length === 0 && pendingPastes.pastes.length === 0 && !disabled;
+    const showPrediction = !!prediction && inputValue === '' && !composing && pendingImages.images.length === 0 && pendingPastes.pastes.length === 0 && !disabled;
 
     // 采纳预测：整帧写入编辑器（同 setText 模式），采纳后 inputValue 非空、幽灵自动消失
     const acceptPrediction = () => {
@@ -1174,6 +1185,7 @@ const InputBox = forwardRef<InputBoxHandle, InputBoxProps>(({
                     {showPrediction && (
                         <div className="input-prediction-ghost">
                             <span className="input-prediction-text">{prediction}</span>
+                            <span className="input-prediction-hint">{t('chat.input.predictionAccept')}</span>
                         </div>
                     )}
                 </div>

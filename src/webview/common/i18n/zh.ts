@@ -146,6 +146,7 @@ export const zh = {
     'chat.input.send': '发送 Enter',
     'chat.input.interrupt': '中断 Ctrl+C',
     'chat.input.pasteShowInInput': '在文本框中显示',
+    'chat.input.predictionAccept': 'Tab 采纳',
     'skill.minimax-docx.desc': '创建和编辑 Word 文档',
     'skill.minimax-xlsx.desc': '创建、编辑和分析电子表格',
     'skill.pptx-generator.desc': '生成和编辑幻灯片',
