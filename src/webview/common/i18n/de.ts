@@ -215,6 +215,7 @@ export const de: Partial<Record<keyof typeof zh, string>> = {
     'config.mcp.group.user': 'Benutzer-MCP',
     'config.mcp.group.plugin': 'Plug-in-MCP',
     'config.mcp.noTools': 'Keine Tools',
+    'config.mcp.serverDisabled': 'Deaktiviert',
     'config.mcp.reconnect': 'Neu verbinden',
     'config.mcp.reconnectDisabled': 'Server ist nicht aktiv, Neuverbindung nicht möglich',
     'config.mcp.editConfig': 'Konfiguration bearbeiten',

@@ -100,7 +100,8 @@ const ToolsPanel: React.FC<{
     tools: ToolsPanelItem[];
     canToggle: boolean;
     onToolToggle: (toolName: string, enabled: boolean) => void;
-}> = ({ tools, canToggle, onToolToggle }) => {
+    emptyText?: string;  // 无工具时的提示，默认「暂无工具」
+}> = ({ tools, canToggle, onToolToggle, emptyText }) => {
     const t = useT();
     const [toolPage, setToolPage] = useState(1);
     const toolCount = tools.length;
@@ -144,7 +145,7 @@ const ToolsPanel: React.FC<{
                     )}
                 </>
             ) : (
-                <div className="mcp-tools-empty">{t('config.mcp.noTools')}</div>
+                <div className="mcp-tools-empty">{emptyText ?? t('config.mcp.noTools')}</div>
             )}
         </div>
     );
@@ -198,6 +199,9 @@ const MCPServerCard: React.FC<{
                     style={{ backgroundColor: statusColors[statusKey] || statusColors.disconnected }}
                     title={STATUS_TEXT_KEYS[statusKey] ? t(STATUS_TEXT_KEYS[statusKey]) : statusKey}
                 />
+                {statusKey === 'connecting' && (
+                    <span className="mcp-status-text">{t('config.mcp.status.connecting')}</span>
+                )}
                 {errorText && (
                     <span className="mcp-error-hint" title={errorText}>!</span>
                 )}
@@ -248,6 +252,7 @@ const MCPServerCard: React.FC<{
                         tools={toolsPanelItems}
                         canToggle={canToolToggle}
                         onToolToggle={(toolName, enabled) => onToolToggle(server.config.name, toolName, enabled)}
+                        emptyText={server.status === false ? t('config.mcp.serverDisabled') : undefined}
                     />
                 </>
             )}

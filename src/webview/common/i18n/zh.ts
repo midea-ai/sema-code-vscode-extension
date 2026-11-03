@@ -324,6 +324,7 @@ export const zh = {
     'config.mcp.status.connected': '已连接',
     'config.mcp.status.error': '错误',
     'config.mcp.noTools': '暂无工具',
+    'config.mcp.serverDisabled': '已停用',
     'config.mcp.reconnect': '重新连接',
     'config.mcp.reconnectDisabled': '服务未生效，无法重连',
     'config.mcp.editConfig': '编辑配置',

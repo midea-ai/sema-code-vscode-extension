@@ -50,6 +50,13 @@
     flex-shrink: 0;
 }
 
+/* 连接中时圆点后的文字提示 */
+.mcp-status-text {
+    font-size: var(--s-font-xs);
+    color: var(--vscode-descriptionForeground);
+    flex-shrink: 0;
+}
+
 /* 错误提示 */
 .mcp-error-hint {
     display: inline-flex;

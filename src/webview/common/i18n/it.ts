@@ -219,6 +219,7 @@ export const it: Partial<Record<keyof typeof zh, string>> = {
     'config.mcp.group.user': 'MCP utente',
     'config.mcp.group.plugin': 'MCP dei plugin',
     'config.mcp.noTools': 'Nessuno strumento',
+    'config.mcp.serverDisabled': 'Disattivato',
     'config.mcp.reconnect': 'Riconnetti',
     'config.mcp.reconnectDisabled': 'Server non attivo, impossibile riconnettersi',
     'config.mcp.editConfig': 'Modifica config',

@@ -323,6 +323,7 @@ export const en: Record<keyof typeof zh, string> = {
     'config.mcp.status.connected': 'Connected',
     'config.mcp.status.error': 'Error',
     'config.mcp.noTools': 'No tools',
+    'config.mcp.serverDisabled': 'Disabled',
     'config.mcp.reconnect': 'Reconnect',
     'config.mcp.reconnectDisabled': 'Server is not active, cannot reconnect',
     'config.mcp.editConfig': 'Edit config',
