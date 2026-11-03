@@ -1,7 +1,7 @@
 import { SemaSessionWrapper, SessionWrapperCallbacks, PermissionLevel } from '../../../core/semaSessionWrapper';
 import { transformCommandToPrompt } from '../../../utils/prompt';
 import { TOOL_NAME_VIEW_FILE, TOOL_NAME_WRITE_FILE, TOOL_NAME_PATCH_FILE } from '../../../utils/tool';
-import { DEFAULT_CUSTOM_RULES, isBuiltinCustomRules } from '../../config/default/defaultConfig';
+import { DEFAULT_CUSTOM_RULES, isBuiltinCustomRules, normalizePermissionLevel } from '../../config/default/defaultConfig';
 import { Transport } from './transport';
 import { RemoteCore, RemoteSession } from './remote';
 import { normalizeLang, t } from '../../common/i18n/core';
@@ -538,14 +538,13 @@ export class Controller {
         }
     }
 
-    /** 读系统配置里的默认权限档位（Kotlin 本地持久化，对齐 semaSidebarProvider.getDefaultPermissionLevel），非法值回落 'AutoRun' */
+    /** 读系统配置里的默认权限档位（Kotlin 本地持久化，对齐 semaSidebarProvider.getDefaultPermissionLevel），缺失或非法回落到 defaultConfig 默认值 */
     private async getDefaultPermissionLevel(): Promise<PermissionLevel> {
         try {
             const res = await this.t.callEditor('systemConfig', { op: 'get' });
-            const level = res?.config?.defaultPermissionLevel;
-            return level === 'Ask' || level === 'AutoEdit' || level === 'Bypass' ? level : 'AutoRun';
+            return normalizePermissionLevel(res?.config?.defaultPermissionLevel);
         } catch {
-            return 'AutoRun';
+            return normalizePermissionLevel(undefined);
         }
     }
 

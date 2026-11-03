@@ -441,7 +441,7 @@ const SystemConfig: React.FC<SystemConfigProps> = ({ vscode }) => {
                             <div className="perm-level-select">
                                 <IconSelect
                                     id="defaultPermissionLevel"
-                                    value={config.defaultPermissionLevel || 'AutoRun'}
+                                    value={config.defaultPermissionLevel || defaultConfig.defaultPermissionLevel}
                                     onChange={(value) => handleChange('defaultPermissionLevel', value)}
                                     options={PERMISSION_LEVEL_OPTIONS.map(opt => ({
                                         value: opt.value,

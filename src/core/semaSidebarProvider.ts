@@ -20,6 +20,7 @@ import { pet } from '../pet/pet-client';
 import { ensurePetRunning, killPet } from '../pet/pet-launcher';
 import { wirePetEvents, setPetSessionState } from '../pet/pet-events';
 import { t } from '../webview/common/i18n/core';
+import { normalizePermissionLevel } from '../webview/config/default/defaultConfig';
 
 /** chatWebview 用于驱动会话生命周期的控制接口 */
 export interface SessionController {
@@ -197,10 +198,9 @@ export class SemaSidebarProvider implements vscode.WebviewViewProvider {
 
     // ─── 会话生命周期 ─────────────────────────────────────────────────────────
 
-    /** 读系统配置里的默认权限档位（扩展端本地字段），非法值回落 'AutoRun' */
+    /** 读系统配置里的默认权限档位（扩展端本地字段），缺失或非法回落到 defaultConfig 默认值 */
     private getDefaultPermissionLevel(): PermissionLevel {
-        const level = (this.processWrapper.getSystemConfig() as Record<string, any>).defaultPermissionLevel;
-        return level === 'Ask' || level === 'AutoEdit' || level === 'Bypass' ? level : 'AutoRun';
+        return normalizePermissionLevel((this.processWrapper.getSystemConfig() as Record<string, any>).defaultPermissionLevel);
     }
 
     /**

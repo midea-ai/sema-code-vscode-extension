@@ -47,7 +47,6 @@ class SystemConfigManager {
             "enableToolSearch" to true,
             "enableInputPrediction" to true,
             "enablePet" to false,
-            "defaultPermissionLevel" to "AutoRun",
         )
 
         // 仅落本地、不推 sema-core 的键（对齐 semaProcessWrapper.LOCAL_SYSTEM_CONFIG_KEYS）

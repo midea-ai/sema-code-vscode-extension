@@ -3,6 +3,7 @@
  * 这个文件不依赖任何 VSCode API，可以在 webview 中安全使用
  */
 import type { Language } from '../../common/i18n/core';
+import type { PermissionLevel } from '../../chat/types';
 
 /** 各语言下 customRules 的默认值；Record<Language> 约束新增语言时必须补齐 */
 export const DEFAULT_CUSTOM_RULES: Record<Language, string> = {
@@ -41,5 +42,12 @@ export const defaultConfig = {
     enableInputPrediction: true,
     enablePet: false,
     enableBrowserControl: false,
-    defaultPermissionLevel: 'AutoRun'
+    defaultPermissionLevel: 'Bypass' as PermissionLevel
 };
+
+/** 把系统配置里存的权限档位规整为合法值；缺失或非法一律回落到 defaultConfig.defaultPermissionLevel */
+export function normalizePermissionLevel(level: unknown): PermissionLevel {
+    return level === 'Ask' || level === 'AutoEdit' || level === 'AutoRun' || level === 'Bypass'
+        ? level
+        : defaultConfig.defaultPermissionLevel;
+}
