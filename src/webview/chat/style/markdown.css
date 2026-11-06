@@ -66,7 +66,7 @@
 /* 文件路径内联代码 / 本地路径链接：verifyFilePath 确认后由 AiResponseBlock 把内容换成统一的文件高亮结构
    （.file-ref-chip，尺寸/间距/对齐见 input.css），名字仍是原文。这里只管去掉代码底色、界面字体与光标；
    文件名用 VS Code 链接高亮色（.file-ref-chip 自带），图标保持文件类型色（内联 style）。
-   悬停下划线要打在 .file-ref-name 上：外层 code 的 text-decoration 不会传进 inline-flex 芯片里 */
+   悬停下划线打在 .file-ref-name 上 */
 .markdown-content .file-path-code {
   background: none;
   padding: 0;
@@ -79,6 +79,22 @@
 .markdown-content .file-path-code:hover .file-ref-name {
   text-decoration: underline;
   text-underline-offset: 2px;
+}
+
+/* 正文里芯片的名字是原文全文（可能是很长的绝对路径），不能沿用 input.css 的单行省略：
+   芯片改回普通行内盒，紧跟前文并可在任意位置折行，路径完整显示 */
+.markdown-content .file-path-code .file-ref-chip {
+  display: inline;
+  height: auto;
+  vertical-align: baseline;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+/* 行内盒下 gap 不生效，间距改用 margin；图标中心对齐文字大写高度的中线（15px 图标盒的一半为 7.5px） */
+.markdown-content .file-path-code .file-ref-icon {
+  margin-right: 4px;
+  vertical-align: calc(0.35em - 7.5px);
 }
 
 /* 链接前的站点图标：外网 https 为 favicon <img>，其余为 CSS mask 地球
