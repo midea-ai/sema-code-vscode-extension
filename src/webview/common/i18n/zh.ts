@@ -82,6 +82,8 @@ export const zh = {
     // 混合工具组组头：各类别文案（中文不分单复数，.one 与通用句式相同）、分隔符、兜底
     'tool.group.ran': '执行 {count} 条命令',
     'tool.group.ran.one': '执行 {count} 条命令',
+    'tool.group.edit': '编辑 {count} 个文件',
+    'tool.group.edit.one': '编辑 {count} 个文件',
     'tool.group.mcp': '调用 {name} {count} 次',
     'tool.group.mcp.one': '调用 {name} {count} 次',
     'tool.group.image': '生成 {count} 张图片',

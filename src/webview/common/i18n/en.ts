@@ -81,6 +81,8 @@ export const en: Record<keyof typeof zh, string> = {
     // grouped tool block header: per-category text (plural / singular), separator, fallback
     'tool.group.ran': 'Ran {count} commands',
     'tool.group.ran.one': 'Ran 1 command',
+    'tool.group.edit': 'Edited {count} files',
+    'tool.group.edit.one': 'Edited 1 file',
     'tool.group.mcp': 'Called {name} {count} times',
     'tool.group.mcp.one': 'Called {name} 1 time',
     'tool.group.image': 'Generated {count} images',

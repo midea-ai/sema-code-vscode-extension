@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
-import { BrainIcon, ClockIcon, FileTextIcon, GlobeIcon, ImageIcon, PlugIcon, PuzzleIcon, QuestionBubbleIcon, TerminalIcon, WrenchIcon, XIcon } from '../../components/ui/IconButton';
+import { BrainIcon, ClockIcon, FileTextIcon, GlobeIcon, ImageIcon, PencilIcon, PlugIcon, PuzzleIcon, QuestionBubbleIcon, TerminalIcon, WrenchIcon, XIcon } from '../../components/ui/IconButton';
 import { FileChange, Message } from '../../types';
 import { CONTINUATION_SYMBOL } from '../../utils/symbols';
 import { countDiffChanges } from '../../utils/diffParser';
@@ -30,7 +30,9 @@ import {
     getToolTitle,
     isAskFormPanelMessage,
     isAskToolMessage,
+    isFoldedEditMessage,
     isGenImageMessage,
+    isGroupedFileEditMessage,
     isMemoryEditMessage,
     isPermissionPanelMessage,
     isShellRunMessage,
@@ -57,7 +59,7 @@ type Translate = ReturnType<typeof useT>;
 interface GroupedToolBlockProps {
     messages: Message[];
     vscode: any;
-    /** 组内 memory 写入折叠时 EditBlock 不挂载，由组块代为上报文件变更，与单条渲染时行为一致 */
+    /** 组内折叠的文件写入（memory、可视化产物、临时文件）EditBlock 不挂载，由组块代为上报文件变更，与单条渲染时行为一致 */
     onFileChange?: (change: FileChange) => void;
 }
 
@@ -249,7 +251,7 @@ export const getExpandedItems = (messages: Message[]): ExpandedItem[] => {
 // ==================== 类别与组头 ====================
 
 type GroupCategoryKind =
-    | 'explore' | 'ran' | 'mcp' | 'fetch' | 'job' | 'cron' | 'memory' | 'image'
+    | 'explore' | 'ran' | 'edit' | 'mcp' | 'fetch' | 'job' | 'cron' | 'memory' | 'image'
     | 'skill' | 'ask';
 
 interface GroupCategory {
@@ -271,7 +273,7 @@ const getGenImageWeight = (message: Message): number => {
 };
 
 /**
- * 非 MCP 消息的类别：提问（面板或记录）、技能、memory 写入、生成图片、非只读命令、
+ * 非 MCP 消息的类别：提问（面板或记录）、技能、memory 写入、可视化产物与临时文件写入（编辑文件）、生成图片、非只读命令、
  * 抓网页、后台任务、定时任务，其余（Read/Search/只读命令）为探索
  */
 const getCategoryKind = (message: Message): GroupCategoryKind => {
@@ -283,6 +285,9 @@ const getCategoryKind = (message: Message): GroupCategoryKind => {
     }
     if (isMemoryEditMessage(message)) {
         return 'memory';
+    }
+    if (isGroupedFileEditMessage(message)) {
+        return 'edit';
     }
     if (isGenImageMessage(message)) {
         return 'image';
@@ -307,17 +312,19 @@ const getCategoryKind = (message: Message): GroupCategoryKind => {
  * 类别优先级（高 → 低）：组图标取组内命中的最高一档，组头文案各类别也按此排序，
  * 同一组合不论组内先后顺序都显示成同样的样子；MCP 多个服务同属一档，服务之间按首次出现顺序
  */
-const GROUP_KIND_PRIORITY: GroupCategoryKind[] = ['ran', 'mcp', 'image', 'skill', 'explore', 'fetch', 'ask', 'memory', 'cron', 'job'];
+const GROUP_KIND_PRIORITY: GroupCategoryKind[] = ['ran', 'edit', 'mcp', 'image', 'skill', 'explore', 'fetch', 'ask', 'memory', 'cron', 'job'];
 
 const kindRank = (kind: GroupCategoryKind): number => GROUP_KIND_PRIORITY.indexOf(kind);
 
 /**
  * 组内消息按类别计数，结果按 GROUP_KIND_PRIORITY 排序；MCP 按服务名分别计数；生成图片按张数计；
+ * 编辑文件按文件数计（同一文件多次写入/修改只算 1 个）；
  * 执行报错与权限面板（拒绝/中断）都不计入，只在组内展示
  */
 export const getGroupCategories = (messages: Message[]): GroupCategory[] => {
     const categories: GroupCategory[] = [];
     const byKey = new Map<string, GroupCategory>();
+    const editedFiles = new Set<string>();
 
     for (const message of messages) {
         if (isToolErrorMessage(message) || isPermissionPanelMessage(message)) {
@@ -326,7 +333,12 @@ export const getGroupCategories = (messages: Message[]): GroupCategory[] => {
         const server = getMcpServerName(message);
         const kind = server ? 'mcp' : getCategoryKind(message);
         const key = server ? `mcp:${server}` : kind;
-        const weight = kind === 'image' ? getGenImageWeight(message) : 1;
+        let weight = kind === 'image' ? getGenImageWeight(message) : 1;
+        if (kind === 'edit') {
+            const filePath = getToolTitle(message).trim();
+            weight = editedFiles.has(filePath) ? 0 : 1;
+            editedFiles.add(filePath);
+        }
         if (weight === 0) {
             continue;
         }
@@ -347,6 +359,7 @@ export const getGroupCategories = (messages: Message[]): GroupCategory[] => {
 /** 类别文案 key：many 为通用句式（中文不分单复数），one 为英文单数 */
 const GROUP_TEXT_KEYS: Record<GroupCategoryKind, { many: I18nKey; one: I18nKey }> = {
     ran: { many: 'tool.group.ran', one: 'tool.group.ran.one' },
+    edit: { many: 'tool.group.edit', one: 'tool.group.edit.one' },
     mcp: { many: 'tool.group.mcp', one: 'tool.group.mcp.one' },
     image: { many: 'tool.group.image', one: 'tool.group.image.one' },
     skill: { many: 'tool.group.skill', one: 'tool.group.skill.one' },
@@ -375,6 +388,7 @@ export const getGroupTitle = (categories: GroupCategory[], t: Translate): string
 /** 各类别的组头图标（与组内对应行的图标一致） */
 const GROUP_KIND_ICONS: Record<GroupCategoryKind, React.ReactNode> = {
     ran: <TerminalIcon />,
+    edit: <PencilIcon />,
     mcp: <PlugIcon />,
     image: <ImageIcon />,
     skill: <PuzzleIcon />,
@@ -657,10 +671,10 @@ const ReadSummaryRow: React.FC<{
     );
 };
 
-// ==================== memory 写入行 ====================
+// ==================== 文件写入行（memory / 可视化产物 / 临时文件） ====================
 
 /** 与 EditBlock.reportFileChange 口径一致；组默认折叠、EditBlock 不挂载，需由组块自行上报 */
-const getMemoryFileChange = (message: Message): FileChange | null => {
+const getFileEditChange = (message: Message): FileChange | null => {
     const fileName = getToolTitle(message);
     const diffContent = message.content?.content;
     if (!fileName || typeof diffContent !== 'object' || diffContent === null
@@ -680,11 +694,13 @@ const getMemoryFileChange = (message: Message): FileChange | null => {
     };
 };
 
-/** memory 写入行：已写入 + 文件名 + 增删行数；文件名可点打开文件对比（与 EditBlock 一致），展开为 diff，点击 diff 同样打开对比 */
-const MemoryItemBlock: React.FC<{ message: Message; vscode?: any }> = ({ message, vscode }) => {
-    const t = useT();
+/**
+ * 组内文件写入行（memory、可视化产物、临时文件共用，图标与动词由调用方给）：动词 + 文件名 + 增删行数；
+ * 文件名可点打开文件对比（与 EditBlock 一致），展开为 diff，点击 diff 同样打开对比
+ */
+const FileEditItemBlock: React.FC<{ message: Message; vscode?: any; icon: React.ReactNode; verb: string }> = ({ message, vscode, icon, verb }) => {
     const [isExpanded, setIsExpanded] = useState(false);
-    const change = getMemoryFileChange(message);
+    const change = getFileEditChange(message);
     const diffContent = message.content?.content;
     const fileName = getToolTitle(message);
     const ext = fileName.split('.').pop()?.toLowerCase() || '';
@@ -701,8 +717,8 @@ const MemoryItemBlock: React.FC<{ message: Message; vscode?: any }> = ({ message
     return (
         <div className="chat-block chat-block--borderless">
             <ToolRowHeader
-                icon={<BrainIcon />}
-                verb={t('tool.wrote')}
+                icon={icon}
+                verb={verb}
                 target={change?.fileName || fileName}
                 targetTitle={fileName}
                 onTargetClick={handleShowDiff}
@@ -849,7 +865,19 @@ const renderExpandedItem = (
         return <AskToolItemBlock key={message.id} message={message} />;
     }
     if (isMemoryEditMessage(message)) {
-        return <MemoryItemBlock key={message.id} message={message} vscode={vscode} />;
+        return <FileEditItemBlock key={message.id} message={message} vscode={vscode} icon={<BrainIcon />} verb={t('tool.wrote')} />;
+    }
+    // 可视化产物 / 临时文件写入：图标与动词同单条渲染的 EditBlock
+    if (isGroupedFileEditMessage(message)) {
+        return (
+            <FileEditItemBlock
+                key={message.id}
+                message={message}
+                vscode={vscode}
+                icon={<PencilIcon />}
+                verb={toolName === TOOL_NAME_WRITE_FILE ? t('tool.wrote') : t('tool.edited')}
+            />
+        );
     }
     if (isToolErrorMessage(message)) {
         return (
@@ -882,7 +910,8 @@ const renderExpandedItem = (
 /**
  * 混合工具组：组头与组内行同构，「图标 标题 ›」，图标取优先级最高的类别，标题按类别优先级拼接（见 getGroupTitle），
  * 箭头折叠时 hover 才出现；展开后每项统一为「图标 动词 目标 ›」行，同一缩进，点击行才展示完整文本与结果。
- * 组内 memory 写入折叠时 EditBlock 不挂载，由组块代为上报文件变更。
+ * 组内折叠的文件写入（memory、可视化产物、临时文件）EditBlock 不挂载，由组块代为上报文件变更；
+ * 可视化产物等 attachments 路径由 App 的 handleFileChange 过滤，不进文件变更面板。
  */
 const GroupedToolBlock: React.FC<GroupedToolBlockProps> = ({ messages, vscode, onFileChange }) => {
     const t = useT();
@@ -897,10 +926,10 @@ const GroupedToolBlock: React.FC<GroupedToolBlockProps> = ({ messages, vscode, o
             return;
         }
         messages.forEach(message => {
-            if (!isMemoryEditMessage(message)) {
+            if (!isFoldedEditMessage(message)) {
                 return;
             }
-            const change = getMemoryFileChange(message);
+            const change = getFileEditChange(message);
             if (change) {
                 onFileChange(change);
             }

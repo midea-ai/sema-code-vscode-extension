@@ -17,6 +17,7 @@ import {
     TOOL_NAME_WRITE_FILE,
 } from '../../../utils/tool';
 import { isMcpToolType, parseMcpToolName } from './permissionUtils';
+import { isVizPath } from '../../common/viz';
 
 export type RenderItem =
     | { kind: 'message'; message: Message; originalIndex: number }
@@ -216,14 +217,61 @@ export const isMemoryEditMessage = (message: Message): boolean => {
     return /\.md$/i.test(fileName) && parentDir === 'memory';
 };
 
+/** 新增/编辑可视化产物（attachments/<uuid>/*.html，见 common/viz.ts）的工具消息；产物本身在轮末内联嵌入，写入过程不必单独展开 */
+export const isVizEditMessage = (message: Message): boolean => {
+    if (message.type !== 'tool') {
+        return false;
+    }
+
+    const toolName = getToolName(message);
+    if (toolName !== TOOL_NAME_WRITE_FILE && toolName !== TOOL_NAME_PATCH_FILE) {
+        return false;
+    }
+
+    return isVizPath(getToolTitle(message).trim());
+};
+
+/**
+ * 系统临时目录下的路径，口径同 sema-core 的 isTempFile（/tmp、/var/tmp、macOS 的 /var/folders，含 /private 真实路径；
+ * Windows 的 AppData\Local\Temp）。webview 拿不到 os.tmpdir()，只看路径形状，自定义 $TMPDIR 识别不到。
+ * 项目内文件的 title 是相对路径，不会命中（项目本身放在临时目录下也不受影响）。
+ */
+const POSIX_TEMP_PATH_RE = /^(?:\/private)?\/(?:tmp|var\/tmp|var\/folders)\//;
+const WIN_TEMP_PATH_RE = /[\\/]AppData[\\/]Local[\\/]Temp[\\/]/i;
+
+/** 新增/编辑系统临时目录下文件（模型的探测脚本、中间产物等）的工具消息 */
+export const isTempEditMessage = (message: Message): boolean => {
+    if (message.type !== 'tool') {
+        return false;
+    }
+
+    const toolName = getToolName(message);
+    if (toolName !== TOOL_NAME_WRITE_FILE && toolName !== TOOL_NAME_PATCH_FILE) {
+        return false;
+    }
+
+    const filePath = getToolTitle(message).trim();
+    return POSIX_TEMP_PATH_RE.test(filePath) || WIN_TEMP_PATH_RE.test(filePath);
+};
+
+/** 并入组并在组头计入「编辑 n 个文件」的文件写入：可视化产物、临时文件（都不是项目文件，写入过程不必单独展开） */
+export const isGroupedFileEditMessage = (message: Message): boolean => {
+    return isVizEditMessage(message) || isTempEditMessage(message);
+};
+
+/** 始终折叠进组的文件写入（memory、可视化产物、临时文件）：不做尾巴、1 条也成组 */
+export const isFoldedEditMessage = (message: Message): boolean => {
+    return isMemoryEditMessage(message) || isGroupedFileEditMessage(message);
+};
+
 /**
  * 可并入混合工具组的消息：探索类（Read/Search/只读命令）、其余终端命令、MCP 调用，
- * 抓网页、后台任务查看/停止、定时任务管理、memory 写入、生成图片、技能、提问记录，任何工具的执行报错，
+ * 抓网页、后台任务查看/停止、定时任务管理、memory 写入、可视化产物与临时文件写入、生成图片、技能、提问记录，任何工具的执行报错，
  * 以及权限拒绝/中断面板与旧会话里的用户回应表单面板。
- * 相邻的可并入消息不分种类进同一段；文件编辑、子代理等其它工具与可见正文一样作为段边界。
+ * 相邻的可并入消息不分种类进同一段；其余文件编辑、子代理等其它工具与可见正文一样作为段边界。
  */
 export const isGroupableToolMessage = (message: Message): boolean => {
-    if (isToolErrorMessage(message) || isMemoryEditMessage(message) || isGenImageMessage(message)
+    if (isToolErrorMessage(message) || isFoldedEditMessage(message) || isGenImageMessage(message)
         || isPermissionPanelMessage(message) || isAskFormPanelMessage(message)) {
         return true;
     }
@@ -355,7 +403,7 @@ const toGroupItem = (run: RunItem[]): RenderItem => ({
  * 把一段可并入的工具消息输出为渲染项。
  * closed 表示段之后是否已有其它渲染内容。未封口（或末条仍在流式）时段尾一条作为「尾巴」原样单独渲染，
  * 便于查看运行中的输出，其余并入组；段一封口尾巴随之并入。并入的部分 ≥2 条（报错也算）才出组头，否则逐条渲染；全是报错时组头走兜底文案。
- * memory 写入不做尾巴、1 条也折叠、流式中也直接进组，避免先展开 diff 再折叠的闪动。
+ * memory、可视化产物、临时文件的写入不做尾巴、1 条也折叠、流式中也直接进组，避免先展开 diff 再折叠的闪动。
  * 尾巴是生成图片时，末尾相邻的几次调用整体作为尾巴，保持合并成一行；成组门槛里合并后的一行（生图、同服务 MCP）都只算 1 条。
  * MCP 尾巴不整体后移：末条仍单独露出运行状态，封口后再并入「调用了 xx n 次」。
  * 组 id 只取首条消息 id，尾巴并入时组件实例不重建，已展开状态得以保留。
@@ -372,7 +420,7 @@ const flushRun = (
 
     const last = run[run.length - 1];
     const keepTail = (!closed || isStreamingToolMessage(last.message, streamingToolId))
-        && !isMemoryEditMessage(last.message);
+        && !isFoldedEditMessage(last.message);
     let tailStart = run.length - 1;
     if (keepTail && isGenImageMessage(last.message)) {
         while (tailStart > 0 && isGenImageMessage(run[tailStart - 1].message)) {
@@ -382,7 +430,7 @@ const flushRun = (
     const head = keepTail ? run.slice(0, tailStart) : run;
 
     const headItems = toMessageItems(head);
-    if (headItems.length >= 2 || head.some(({ message }) => isMemoryEditMessage(message))) {
+    if (headItems.length >= 2 || head.some(({ message }) => isFoldedEditMessage(message))) {
         items.push(toGroupItem(head));
     } else {
         items.push(...headItems);
