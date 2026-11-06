@@ -55,6 +55,9 @@ export interface Message {
     pastes?: PasteAttachment[];            // 超长粘贴转存的附件文件（从 input 粘贴模板解析），随历史持久化
     source?: InputSource;                  // 输入来源；非 user（如 cron / goal）时气泡上方渲染来源标签，随历史持久化
     goal?: GoalInputMark;                  // 长期目标标记：/goal 设定 / 更新与自动续轮，气泡据此加标签，随历史持久化
+    /** 运行中的轮内注入（core input:processing 的 injected）：输入追加进当前轮的工具结果，在 core 历史里不是独立消息，
+     *  不能作为回退 / 分支锚点；气泡不吸顶。随历史持久化 */
+    injected?: boolean;
     toolName?: string;
     toolArgs?: any;
     reasoning?: string;
@@ -555,6 +558,8 @@ export class SemaSessionWrapper {
                 ...(pastes ? { pastes } : {}),
                 source: data.source,
                 ...(data.goal ? { goal: data.goal } : {}),
+                // 轮内注入标记：旧版 sema-core 的类型里没有该字段，按可选字段读，缺省即非注入
+                ...((data as { injected?: boolean }).injected ? { injected: true } : {}),
             };
             this.messageHistory.push(userMsg);
             this.sendAppendMessages([userMsg]);

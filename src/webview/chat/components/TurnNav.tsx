@@ -7,7 +7,7 @@ const NAV_PAD = 12; // 指示条上下内边距之和（与 .turn-nav 一致）
 const MIN_TICKS = 5;
 const MAX_CHARS = 400; // 小面板最多显示三行，取这么多字符足够截断
 /** 少于这么多轮不显示指示条 */
-export const MIN_TURNS = 4;
+export const MIN_TURNS = 2;
 
 export interface TurnNavItem {
     /** 用户输入（或轮次开头块的文案）的纯文字 */
@@ -27,13 +27,13 @@ const isGoalRound = (m: Message) => m.type === 'user' && m.source === 'goal' && 
 const isTrailer = (m: Message) => m.type === 'system' && ['goal_achieved', 'task_end', 'file_reference'].includes(m.content?.type);
 
 /**
- * 从消息列表算出导航条目（与 App 的轮次分组一致：每条用户输入开一轮，目标自动续轮并入上一轮）。
+ * 从消息列表算出导航条目（与 App 的轮次分组一致：每条用户输入开一轮，目标自动续轮、运行中轮内注入的输入并入所在轮）。
  * 开头没有用户输入的前置消息不算一轮；最后一轮正在运行时不给结论。
  */
 export const turnNavItems = (messages: Message[], processing: boolean): TurnNavItem[] => {
     const turns: Message[][] = [];
     for (const m of messages) {
-        if (m.type === 'user' && !isGoalRound(m)) turns.push([m]);
+        if (m.type === 'user' && !isGoalRound(m) && !m.injected) turns.push([m]);
         else if (turns.length) turns[turns.length - 1].push(m);
     }
     return turns.map((turn, i) => {

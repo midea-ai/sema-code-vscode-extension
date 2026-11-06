@@ -139,6 +139,8 @@ export interface Message {
     pastes?: { path: string; preview: string }[];
     source?: InputSource;             // 输入来源；'cron' 等非 user 来源在气泡上方显示标签
     goal?: GoalInputMark;             // 长期目标标记；设定 / 更新加标签，自动续轮不渲染气泡只留标签行
+    /** 运行中的轮内注入：在 core 历史里不是独立消息，不能作为回退 / 分支锚点；气泡不吸顶 */
+    injected?: boolean;
 }
 
 // ─── Fork / 撤销（与 sema-core types/fork 镜像，前端独立定义） ──────────────────

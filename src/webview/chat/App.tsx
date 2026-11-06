@@ -197,7 +197,9 @@ const ChatSession: React.FC<ChatSessionProps> = ({ vscode: rawVscode, sessionId,
         if (branchReqRef.current) return;
         const clickedIndex = messages.findIndex(m => m.id === messageId);
         if (clickedIndex < 0) return;
-        const nextUser = messages.slice(clickedIndex + 1).find(m => m.type === 'user');
+        // 轮内注入的输入不是独立消息、不能当截断点，跳过它取下一轮真正的用户输入
+        // （注入后被中断的轮，按钮所在的最后一段正文在注入气泡之前）
+        const nextUser = messages.slice(clickedIndex + 1).find(m => m.type === 'user' && !m.injected);
         // 锚点用 uuid（== core inputId）；中间轮次的按钮仅在下一轮用户输入有 uuid 时展示，
         // 这里兜底：有下一轮却拿不到锚点时不发起，避免误发全量分支
         if (nextUser && !nextUser.uuid) return;
@@ -935,9 +937,10 @@ const ChatSession: React.FC<ChatSessionProps> = ({ vscode: rawVscode, sessionId,
             break;
         }
 
+        // 最后一轮的开头：运行中轮内注入的气泡不是轮次边界，跳过
         let lastUserInputIndex = -1;
         for (let i = messages.length - 1; i >= 0; i--) {
-            if (messages[i].type === 'user') {
+            if (messages[i].type === 'user' && !messages[i].injected) {
                 lastUserInputIndex = i;
                 break;
             }
@@ -945,11 +948,12 @@ const ChatSession: React.FC<ChatSessionProps> = ({ vscode: rawVscode, sessionId,
 
         // 按「轮次」分组：每条用户输入开启一组，后续消息归入同组。
         // 用户输入在组内 position:sticky 吸顶，被下一组顶替。
-        // 目标自动续轮没有气泡本体，不单开一轮：并入上一组，上一条用户 / 定时任务输入的吸顶在续轮期间继续有效
+        // 目标自动续轮没有气泡本体，不单开一轮：并入上一组，上一条用户 / 定时任务输入的吸顶在续轮期间继续有效。
+        // 运行中轮内注入的输入同样不开新轮（模型在同一轮里接着跑）：气泡留在注入位置并入所在组，本轮开头的输入继续吸顶
         const isGoalRound = (m: Message) => m.type === 'user' && m.source === 'goal' && m.goal?.action === 'round';
         const groups: Array<{ key: string; items: Array<{ message: Message; index: number }> }> = [];
         messages.forEach((message, index) => {
-            if ((message.type === 'user' && !isGoalRound(message)) || groups.length === 0) {
+            if ((message.type === 'user' && !isGoalRound(message) && !message.injected) || groups.length === 0) {
                 groups.push({ key: message.id, items: [] });
             }
             groups[groups.length - 1].items.push({ message, index });
@@ -1026,11 +1030,11 @@ const ChatSession: React.FC<ChatSessionProps> = ({ vscode: rawVscode, sessionId,
                         if (!hasReasoning && !hasContent) return null;
                     }
 
-                    // 目标自动续轮只有「目标第 n/m 轮」标签行，不吸顶；用户 / 定时任务输入照常吸顶
+                    // 目标自动续轮只有「目标第 n/m 轮」标签行，不吸顶；运行中轮内注入的气泡在组内不是开头，也不吸顶（本轮开头的输入继续吸顶）；用户 / 定时任务输入照常吸顶
                     return (
                         <div
                             key={message.id}
-                            className={`msg-wrap${message.type === 'user' && !isGoalRound(message) ? ' msg-wrap--sticky-user' : ''}`}
+                            className={`msg-wrap${message.type === 'user' && !isGoalRound(message) && !message.injected ? ' msg-wrap--sticky-user' : ''}`}
                         >
                             <MessageItem
                                 message={message}
