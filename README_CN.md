@@ -18,7 +18,7 @@
 **Sema Code Extension** 是基于 [Sema Code Core](https://github.com/midea-ai/sema-code-core) 引擎的智能编程插件，支持 VSCode 插件和 JetBrains 插件（IntelliJ IDEA / PyCharm / GoLand / WebStorm / CLion 等）。
 
 <p align="center">
-  <img src="https://github.com/midea-ai/sema-code-core/releases/download/docs-assets/plan-mode.gif" alt="Sema Code VSCode Extension"/>
+  <img src="https://github.com/midea-ai/sema-code-core/releases/download/docs-assets/sema-code.png" alt="Sema Code VSCode Extension"/>
 </p>
 
 ## ✨ 核心特性

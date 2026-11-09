@@ -18,7 +18,7 @@
 **Sema Code Extension** is an intelligent programming plugin built on the [Sema Code Core](https://github.com/midea-ai/sema-code-core) engine, available as both a VSCode extension and a JetBrains plugin (IntelliJ IDEA / PyCharm / GoLand / WebStorm / CLion, etc.).
 
 <p align="center">
-  <img src="https://github.com/midea-ai/sema-code-core/releases/download/docs-assets/plan-mode.gif" alt="Sema Code VSCode Extension"/>
+  <img src="https://github.com/midea-ai/sema-code-core/releases/download/docs-assets/sema-code.png" alt="Sema Code VSCode Extension"/>
 </p>
 
 ## ✨ Key Features
