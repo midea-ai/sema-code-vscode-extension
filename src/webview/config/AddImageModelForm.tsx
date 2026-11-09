@@ -8,6 +8,7 @@ import {
     defaultImageProvider,
     DEFAULT_IMAGE_PROVIDER,
     IMAGE_PROVIDER_ORDER,
+    customImageModelsUrl,
     isTextToImageModel,
     ImageListModel
 } from './default/defaultImageProvider';
@@ -64,8 +65,8 @@ const AddImageModelForm: React.FC<AddImageModelFormProps> = ({ onSuccess, onCanc
     const apiKeyInputRef = useRef<HTMLInputElement>(null);
 
     const defaults = defaultImageProvider[provider];
-    /** 有列表接口或内置列表的服务商才提供下拉选择；自定义接口只能手动输入 */
-    const hasList = !!(defaults.modelsUrl || defaults.presetModels?.length);
+    /** 有列表接口或内置列表的服务商才提供下拉选择；自定义接口的列表地址跟着接口地址走，拿不到再手动输入 */
+    const hasList = provider === 'custom' || !!(defaults.modelsUrl || defaults.presetModels?.length);
     const pickFromList = hasList && !isManualInput;
 
     // 进入新增页（含从编辑态切回新增）时聚焦 API Key：服务商与地址有默认值，第一个要填的就是它；编辑态不抢焦点
@@ -172,11 +173,13 @@ const AddImageModelForm: React.FC<AddImageModelFormProps> = ({ onSuccess, onCanc
         setIsFetchingModels(true);
         vscode.postMessage({
             command: 'fetchImageModels',
-            data: { provider, baseURL, apiKey: apiKey || '', adapt: 'openai', modelsUrl: defaults.modelsUrl }
+            data: { provider, baseURL, apiKey: apiKey || '', adapt: 'openai', modelsUrl: provider === 'custom' ? customImageModelsUrl(baseURL) : defaults.modelsUrl }
         });
     };
 
     const currentModelName = pickFromList ? selectedModel : modelName.trim();
+    /** 「获取 API Key」跳转地址：当前模型在列表里自带 key_doc_url 时跳它的申请页，否则跳服务商的 API Key 页 */
+    const apiKeyUrl = availableModels.find(m => m.id === currentModelName)?.key_doc_url || defaults.apikeyUrl;
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
@@ -262,13 +265,13 @@ const AddImageModelForm: React.FC<AddImageModelFormProps> = ({ onSuccess, onCanc
                 <div className="form-group">
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
                         <label htmlFor="imageApiKey">API Key</label>
-                        {defaults.apikeyUrl && (
+                        {apiKeyUrl && (
                             <a
                                 className="label-action"
-                                href={defaults.apikeyUrl}
+                                href={apiKeyUrl}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                title={defaults.apikeyUrl}
+                                title={apiKeyUrl}
                             >
                                 {t('config.modelForm.getApiKey')}
                                 <OpenIcon size={11} />
