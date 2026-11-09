@@ -259,12 +259,6 @@ const AddMarketplaceModal: React.FC<{
                             placeholder={sourceType === 'github' ? t('config.plugin.repoPlaceholder', { repo: RECOMMENDED_PLUGIN_MARKET_REPO }) : t('config.plugin.dirPlaceholder')}
                             value={value}
                             onChange={(e) => { setValue(e.target.value); setError(null); }}
-                            onKeyDown={(e) => {
-                                if (e.key === 'Tab' && sourceType === 'github' && !value.trim()) {
-                                    e.preventDefault();
-                                    setValue(RECOMMENDED_PLUGIN_MARKET_REPO);
-                                }
-                            }}
                         />
                     </div>
                     {error && <div className="section-edit-error">{error}</div>}

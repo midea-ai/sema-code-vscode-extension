@@ -379,7 +379,7 @@ export const zh = {
     'config.plugin.addMarketTitle': '添加插件市场',
     'config.plugin.sourceGithub': 'GitHub 仓库',
     'config.plugin.sourceDir': '本地目录',
-    'config.plugin.repoPlaceholder': '按【Tab】键使用推荐市场：{repo}',
+    'config.plugin.repoPlaceholder': '例如：{repo}',
     'config.plugin.dirPlaceholder': '例如：/Users/name/my-plugins',
     'config.plugin.removeMarket': '移除市场',
     'config.plugin.noMatch': '没有匹配的插件',

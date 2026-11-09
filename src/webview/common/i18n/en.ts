@@ -378,7 +378,7 @@ export const en: Record<keyof typeof zh, string> = {
     'config.plugin.addMarketTitle': 'Add plugin marketplace',
     'config.plugin.sourceGithub': 'GitHub repository',
     'config.plugin.sourceDir': 'Local directory',
-    'config.plugin.repoPlaceholder': 'Press Tab to use the recommended marketplace: {repo}',
+    'config.plugin.repoPlaceholder': 'e.g. {repo}',
     'config.plugin.dirPlaceholder': 'e.g. /Users/name/my-plugins',
     'config.plugin.removeMarket': 'Remove marketplace',
     'config.plugin.noMatch': 'No matching plugins',

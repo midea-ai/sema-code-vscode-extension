@@ -257,7 +257,7 @@ export const de: Partial<Record<keyof typeof zh, string>> = {
     'config.plugin.addMarketTitle': 'Plug-in-Marktplatz hinzufügen',
     'config.plugin.sourceGithub': 'GitHub-Repository',
     'config.plugin.sourceDir': 'Lokales Verzeichnis',
-    'config.plugin.repoPlaceholder': 'Tab drücken für empfohlenen Marktplatz: {repo}',
+    'config.plugin.repoPlaceholder': 'z. B. {repo}',
     'config.plugin.dirPlaceholder': 'z. B. /Users/name/my-plugins',
     'config.plugin.removeMarket': 'Marktplatz entfernen',
     'config.plugin.noMatch': 'Keine passenden Plug-ins',
