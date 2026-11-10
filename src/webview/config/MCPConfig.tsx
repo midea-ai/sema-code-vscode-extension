@@ -6,24 +6,28 @@ import { defaultMCPMarketInfos, MCPMarketInfo } from './default/defaultMCPMarket
 import { inlineSvgIcons } from './utils/mcpIcon';
 import { initialBgColors, hashString } from './utils/iconUtils';
 import { openFileWithRange } from './utils/fileUtils';
+import { uiScope } from './utils/scope';
 import { useT, I18nKey } from '../common/i18n/react';
 import './style/section.css';
 import './style/mcp.css';
 
 
 type MCPTabType = 'installed' | 'market';
-type MCPGroupScope = 'project' | 'user' | 'plugin';
+// builtin：宿主注入（core 的 host），界面层归为内置，只读
+type MCPGroupScope = 'builtin' | 'project' | 'user' | 'plugin';
 
-const GROUP_ORDER: MCPGroupScope[] = ['project', 'user', 'plugin'];
+const GROUP_ORDER: MCPGroupScope[] = ['builtin', 'project', 'user', 'plugin'];
 
 // 分组标题文案 key，渲染期经 t() 取值
 const GROUP_TITLE_KEYS: Record<MCPGroupScope, I18nKey> = {
+    builtin: 'config.mcp.group.builtin',
     project: 'config.mcp.group.project',
     user: 'config.mcp.group.user',
     plugin: 'config.mcp.group.plugin',
 };
 
 const GROUP_PATHS: Record<MCPGroupScope, string> = {
+    builtin: '',
     project: '.sema/.mcp.json',
     user: '~/.sema/.mcp.json',
     plugin: '',
@@ -31,6 +35,7 @@ const GROUP_PATHS: Record<MCPGroupScope, string> = {
 
 // 各分组允许的操作
 const GROUP_ACTIONS: Record<MCPGroupScope, { canEdit: boolean; canDelete: boolean; canToggle: boolean; canToolToggle: boolean }> = {
+    builtin: { canEdit: false, canDelete: false, canToggle: false, canToolToggle: false },
     project: { canEdit: true, canDelete: true, canToggle: true, canToolToggle: true },
     user: { canEdit: true, canDelete: true, canToggle: true, canToolToggle: true },
     plugin: { canEdit: false, canDelete: false, canToggle: true, canToolToggle: true },
@@ -613,11 +618,13 @@ const MCPConfig: React.FC<MCPConfigProps> = ({ vscode, onOpenSystemConfig }) => 
     // 根据 scope 字段分组
     const groupedServers = useMemo(() => {
         const groups: Record<MCPGroupScope, MCPServerInfo[]> = {
-            project: [], user: [], plugin: [],
+            builtin: [], project: [], user: [], plugin: [],
         };
         servers.forEach(server => {
-            const scope = (server.config?.scope || server.scope) as MCPGroupScope;
-            if (scope === 'project') groups.project.push(server);
+            // 宿主注入的归为内置分组
+            const scope = uiScope(server.config?.scope || server.scope);
+            if (scope === 'builtin') groups.builtin.push(server);
+            else if (scope === 'project') groups.project.push(server);
             else if (scope === 'user') groups.user.push(server);
             else if (scope === 'plugin') groups.plugin.push(server);
         });
@@ -634,7 +641,7 @@ const MCPConfig: React.FC<MCPConfigProps> = ({ vscode, onOpenSystemConfig }) => 
 
     const totalToolCount = useMemo(() => {
         const systemCount = systemTools.filter(tool => tool.enabled).length;
-        const mcpCount = [...groupedServers.project, ...groupedServers.user, ...groupedServers.plugin]
+        const mcpCount = [...groupedServers.builtin, ...groupedServers.project, ...groupedServers.user, ...groupedServers.plugin]
             .filter(s => s.config.enabled !== false)
             .reduce((sum, s) => {
                 const tools = s.capabilities?.tools || [];

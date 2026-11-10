@@ -4,6 +4,7 @@ import { getColorByName } from './utils/iconUtils';
 import { RefreshIcon, EditIcon, TrashIcon, OpenIcon } from './utils/svgIcons';
 import AddCommandForm from './AddCommandForm';
 import { CommandScope, CommandConfig as CommandConfigItem } from './types/command';
+import { uiScope } from './utils/scope';
 import { useT, I18nKey } from '../common/i18n/react';
 import './style/section.css';
 import './style/agent.css';
@@ -14,16 +15,18 @@ interface CommandConfigProps {
 
 type CommandTabType = 'installed' | 'add';
 
-const LOCATE_ORDER: CommandScope[] = ['project', 'user', 'plugin'];
+const LOCATE_ORDER: CommandScope[] = ['builtin', 'project', 'user', 'plugin'];
 
 // 分组标题文案 key，渲染期经 t() 取值
 const LOCATE_SECTION_TITLE_KEYS: Record<CommandScope, I18nKey> = {
+    builtin: 'config.command.group.builtin',
     plugin: 'config.command.group.plugin',
     project: 'config.command.group.project',
     user: 'config.command.group.user',
 };
 
 const LOCATE_PATHS: Record<CommandScope, string> = {
+    builtin: '',
     plugin: '',
     project: '.sema/commands/',
     user: '~/.sema/commands/',
@@ -40,13 +43,16 @@ const CommandConfig: React.FC<CommandConfigProps> = ({ vscode }) => {
 
     const groupedCommands = useMemo(() => {
         const groups: Record<CommandScope, CommandConfigItem[]> = {
+            builtin: [],
             plugin: [],
             project: [],
             user: [],
         };
         commands.forEach(cmd => {
-            if (cmd.locate && groups[cmd.locate]) {
-                groups[cmd.locate].push(cmd);
+            // 宿主注入的归为内置分组
+            const loc = uiScope(cmd.locate);
+            if (loc && groups[loc]) {
+                groups[loc].push({ ...cmd, locate: loc });
             }
         });
         return groups;
@@ -117,7 +123,8 @@ const CommandConfig: React.FC<CommandConfigProps> = ({ vscode }) => {
         const description = cmd.description || t('common.noDescription');
         const isDescExpanded = expandedDescriptions.has(globalIndex);
         const isLongDesc = description.length > DESC_MAX;
-        const isReadonly = cmd.locate === 'plugin';
+        // 内置（宿主注入）/ 插件命令不可编辑删除
+        const isReadonly = cmd.locate === 'builtin' || cmd.locate === 'plugin';
 
         return (
             <div key={globalIndex} className="section-card">
@@ -260,8 +267,8 @@ const CommandConfig: React.FC<CommandConfigProps> = ({ vscode }) => {
                     <div className="section-groups">
                         {ALL_SECTIONS.map(scope => {
                             const sectionCommands = groupedCommands[scope] || [];
-                            // 项目级 / 用户级 始终显示；插件级为空时隐藏
-                            if (sectionCommands.length === 0 && scope === 'plugin') return null;
+                            // 项目级 / 用户级 始终显示；内置 / 插件级为空时隐藏
+                            if (sectionCommands.length === 0 && (scope === 'builtin' || scope === 'plugin')) return null;
 
                             const isCollapsed = collapsedSections.has(scope);
                             const toggleCollapse = () => setCollapsedSections(prev => {

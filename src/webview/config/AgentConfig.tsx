@@ -4,6 +4,7 @@ import { getColorByName } from './utils/iconUtils';
 import { RefreshIcon, EditIcon, TrashIcon, OpenIcon } from './utils/svgIcons';
 import AddAgentForm from './AddAgentForm';
 import { AgentScope, AgentConfig as AgentConfigItem } from './types/agent';
+import { uiScope } from './utils/scope';
 import { useT, I18nKey } from '../common/i18n/react';
 import './style/section.css';
 import './style/agent.css';
@@ -50,8 +51,10 @@ const AgentConfig: React.FC<AgentConfigProps> = ({ vscode }) => {
             user: [],
         };
         agents.forEach(agent => {
-            if (groups[agent.locate]) {
-                groups[agent.locate].push(agent);
+            // 宿主注入的并入内置分组
+            const loc = uiScope(agent.locate);
+            if (groups[loc]) {
+                groups[loc].push({ ...agent, locate: loc });
             }
         });
         return groups;

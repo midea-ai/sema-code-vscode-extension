@@ -317,6 +317,7 @@ export const en: Record<keyof typeof zh, string> = {
     'config.iconSelect.noMatch': 'No matching options',
 
     // ── config: MCP ──
+    'config.mcp.group.builtin': 'Built-in MCP',
     'config.mcp.group.project': 'Project MCP',
     'config.mcp.group.user': 'User MCP',
     'config.mcp.group.plugin': 'Plugin MCP',
@@ -445,6 +446,7 @@ export const en: Record<keyof typeof zh, string> = {
     'config.agent.mainDefault': 'Main (default)',
 
     // ── config: hooks ──
+    'config.hooks.group.builtin': 'Built-in hooks',
     'config.hooks.group.project': 'Project hooks',
     'config.hooks.group.user': 'User hooks',
     'config.hooks.group.plugin': 'Plugin hooks',
@@ -461,6 +463,7 @@ export const en: Record<keyof typeof zh, string> = {
     'config.hooks.empty': 'No hooks',
 
     // ── config: commands ──
+    'config.command.group.builtin': 'Built-in commands',
     'config.command.group.project': 'Project commands',
     'config.command.group.user': 'User commands',
     'config.command.group.plugin': 'Plugin commands',

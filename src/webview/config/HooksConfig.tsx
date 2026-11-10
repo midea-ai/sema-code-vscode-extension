@@ -4,6 +4,7 @@ import { getColorByName } from './utils/iconUtils';
 import { RefreshIcon, OpenIcon } from './utils/svgIcons';
 import { HooksInfo, HookEntryInfo, HookSource, HOOK_EVENTS, TOOL_HOOK_EVENTS } from './types/hook';
 import { openFileWithRange } from './utils/fileUtils';
+import { uiScope } from './utils/scope';
 import { useT, I18nKey } from '../common/i18n/react';
 import './style/section.css';
 import './style/agent.css';
@@ -13,17 +14,19 @@ interface HooksConfigProps {
     vscode: VscodeApi;
 }
 
-const SOURCE_ORDER: HookSource[] = ['project', 'user', 'plugin'];
+const SOURCE_ORDER: HookSource[] = ['builtin', 'project', 'user', 'plugin'];
 
 // 分组标题 / 状态文案 key，渲染期经 t() 取值
 const SOURCE_SECTION_TITLE_KEYS: Record<HookSource, I18nKey> = {
+    builtin: 'config.hooks.group.builtin',
     project: 'config.hooks.group.project',
     user: 'config.hooks.group.user',
     plugin: 'config.hooks.group.plugin'
 };
 
-// 插件 hooks 各自在插件目录下，无统一路径
+// 内置（宿主注入）hooks 无配置文件；插件 hooks 各自在插件目录下，无统一路径
 const SOURCE_PATHS: Record<HookSource, string> = {
+    builtin: '',
     project: '.sema/hooks/hooks.json',
     user: '~/.sema/hooks/hooks.json',
     plugin: ''
@@ -50,13 +53,14 @@ const HooksConfig: React.FC<HooksConfigProps> = ({ vscode }) => {
 
     // 按来源分组，同一事件的多条 hook 合并为一组（一张卡片），事件按 HOOK_EVENTS 固定顺序排列
     const groupedEvents = useMemo(() => {
-        const groups: Record<HookSource, HookEventGroup[]> = { project: [], user: [], plugin: [] };
+        const groups: Record<HookSource, HookEventGroup[]> = { builtin: [], project: [], user: [], plugin: [] };
         if (!hooksInfo?.events) return groups;
         const knownEvents = HOOK_EVENTS.filter(e => hooksInfo.events[e]);
         const extraEvents = Object.keys(hooksInfo.events).filter(e => !(HOOK_EVENTS as readonly string[]).includes(e));
         [...knownEvents, ...extraEvents].forEach(event => {
             (hooksInfo.events[event] || []).forEach(entry => {
-                const list = groups[entry.source];
+                // 宿主注入的归为内置分组
+                const list = groups[uiScope(entry.source)];
                 if (!list) return;
                 const existing = list.find(g => g.event === event && g.pluginName === entry.pluginName);
                 if (existing) existing.entries.push(entry); else list.push({ event, pluginName: entry.pluginName, entries: [entry] });
@@ -65,7 +69,7 @@ const HooksConfig: React.FC<HooksConfigProps> = ({ vscode }) => {
         return groups;
     }, [hooksInfo]);
 
-    const totalCount = [...groupedEvents.project, ...groupedEvents.user, ...groupedEvents.plugin]
+    const totalCount = [...groupedEvents.builtin, ...groupedEvents.project, ...groupedEvents.user, ...groupedEvents.plugin]
         .reduce((sum, g) => sum + g.entries.length, 0);
 
     useEffect(() => {
@@ -105,7 +109,7 @@ const HooksConfig: React.FC<HooksConfigProps> = ({ vscode }) => {
 
     // 打开对应来源的 hooks.json 配置文件
     const handleOpenConfig = (source: HookSource) => {
-        if (source === 'plugin') return;
+        if (source === 'plugin' || source === 'builtin') return;
         const filePath = source === 'user' ? hooksInfo?.userConfigPath : hooksInfo?.projectConfigPath;
         if (filePath) {
             vscode.postMessage({ command: 'openFile', filePath });
@@ -134,8 +138,9 @@ const HooksConfig: React.FC<HooksConfigProps> = ({ vscode }) => {
     const renderEventCard = (source: HookSource, group: HookEventGroup, key: string) => {
         const { event, pluginName, entries } = group;
         const isToolEvent = TOOL_HOOK_EVENTS.has(event);
-        // 插件 hooks 只能靠 entry.filePath 定位，没有则不给打开入口
-        const canOpen = source !== 'plugin' || entries.some(e => e.filePath);
+        // 内置 / 插件 hooks 只能靠 entry.filePath 定位，没有则不给打开入口
+        const hasOwnConfig = source === 'project' || source === 'user';
+        const canOpen = hasOwnConfig || entries.some(e => e.filePath);
 
         return (
             <div key={key} className="section-card">
@@ -156,7 +161,7 @@ const HooksConfig: React.FC<HooksConfigProps> = ({ vscode }) => {
                         <div className="section-card-actions">
                             <button
                                 className="section-icon-btn"
-                                title={source === 'plugin' ? t('common.open') : t('config.hooks.openFile', { path: SOURCE_PATHS[source] })}
+                                title={hasOwnConfig ? t('config.hooks.openFile', { path: SOURCE_PATHS[source] }) : t('common.open')}
                                 onClick={(e) => { e.stopPropagation(); handleOpenEntry(source, entries); }}
                             >
                                 <OpenIcon />
@@ -233,7 +238,7 @@ const HooksConfig: React.FC<HooksConfigProps> = ({ vscode }) => {
                         {t('config.hooks.parseError', {
                             source: err.source === 'plugin' && err.pluginName
                                 ? t('config.hooks.pluginSource', { name: err.pluginName })
-                                : t(SOURCE_SECTION_TITLE_KEYS[err.source]),
+                                : t(SOURCE_SECTION_TITLE_KEYS[uiScope(err.source)]),
                             message: err.message
                         })}
                     </div>
@@ -241,11 +246,11 @@ const HooksConfig: React.FC<HooksConfigProps> = ({ vscode }) => {
                 <div className="section-groups">
                     {SOURCE_ORDER.map(source => {
                         const sectionGroups = groupedEvents[source];
-                        // 项目级 / 用户级 始终显示；插件级为空时隐藏
-                        if (sectionGroups.length === 0 && source === 'plugin') return null;
-                        const configExists = source === 'plugin'
-                            ? false
-                            : source === 'user' ? hooksInfo?.userConfigExists : hooksInfo?.projectConfigExists;
+                        // 项目级 / 用户级 始终显示；内置 / 插件级为空时隐藏
+                        if (sectionGroups.length === 0 && (source === 'builtin' || source === 'plugin')) return null;
+                        const configExists = source === 'user' ? hooksInfo?.userConfigExists
+                            : source === 'project' ? hooksInfo?.projectConfigExists
+                            : false;
 
                         const isCollapsed = collapsedSections.has(source);
                         const toggleCollapse = () => setCollapsedSections(prev => {

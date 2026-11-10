@@ -1,4 +1,5 @@
-export type HookSource = 'user' | 'project' | 'plugin'
+/** builtin：宿主注入（core 的 host），界面层归为内置，只读 */
+export type HookSource = 'user' | 'project' | 'plugin' | 'builtin'
 
 /** 基础功能支持的 8 个 hook 事件（与 sema-core HOOK_EVENTS 对齐；core 未从 types 入口导出该常量，本地维护一份，用于固定展示顺序与导入过滤） */
 export const HOOK_EVENTS = [

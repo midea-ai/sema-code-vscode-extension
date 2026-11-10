@@ -318,6 +318,7 @@ export const zh = {
     'config.iconSelect.noMatch': '无匹配选项',
 
     // ── 配置页：MCP ──
+    'config.mcp.group.builtin': '内置 MCP',
     'config.mcp.group.project': '项目级 MCP',
     'config.mcp.group.user': '用户级 MCP',
     'config.mcp.group.plugin': '插件 MCP',
@@ -446,6 +447,7 @@ export const zh = {
     'config.agent.mainDefault': 'Main (默认)',
 
     // ── 配置页：Hooks ──
+    'config.hooks.group.builtin': '内置 Hooks',
     'config.hooks.group.project': '项目级 Hooks',
     'config.hooks.group.user': '用户级 Hooks',
     'config.hooks.group.plugin': '插件 Hooks',
@@ -462,6 +464,7 @@ export const zh = {
     'config.hooks.empty': '暂无 Hook',
 
     // ── 配置页：Command ──
+    'config.command.group.builtin': '内置 Commands',
     'config.command.group.project': '项目级 Commands',
     'config.command.group.user': '用户级 Commands',
     'config.command.group.plugin': '插件 Commands',

@@ -3,6 +3,7 @@ import { VscodeApi } from './types';
 import { getColorByName } from './utils/iconUtils';
 import { RefreshIcon, EditIcon, TrashIcon, OpenIcon, GitHubIcon } from './utils/svgIcons';
 import { SkillScope, SkillConfig as SkillConfigItem } from './types/skill';
+import { uiScope } from './utils/scope';
 import { useT, I18nKey } from '../common/i18n/react';
 import './style/section.css';
 
@@ -81,9 +82,10 @@ const SkillConfig: React.FC<SkillConfigProps> = ({ vscode }) => {
             user: [],
         };
         skills.forEach(skill => {
-            const loc = skill.locate;
+            // 宿主注入的并入内置分组
+            const loc = uiScope(skill.locate);
             if (loc && groups[loc]) {
-                groups[loc].push(skill);
+                groups[loc].push({ ...skill, locate: loc });
             }
         });
         LOCATE_ORDER.forEach(scope => {
