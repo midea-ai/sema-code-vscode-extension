@@ -334,7 +334,6 @@ export const zh = {
     'config.mcp.builtinTools': '内置工具',
     'config.mcp.err.needMcpServers': '格式错误：需要 mcpServers 对象',
     'config.mcp.err.singleServer': '格式错误：mcpServers 中只能有一个服务配置',
-    'config.mcp.err.transportRequired': 'transport 字段是必需的',
     'config.mcp.err.replacePlaceholders': '请将 {keys} 替换为实际值',
     'config.mcp.err.invalidJson': 'JSON 格式错误',
     'config.mcp.requirePrefix': '请将 ',

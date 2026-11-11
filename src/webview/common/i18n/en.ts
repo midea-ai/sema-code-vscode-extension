@@ -333,7 +333,6 @@ export const en: Record<keyof typeof zh, string> = {
     'config.mcp.builtinTools': 'Built-in tools',
     'config.mcp.err.needMcpServers': 'Invalid format: an mcpServers object is required',
     'config.mcp.err.singleServer': 'Invalid format: mcpServers must contain exactly one server',
-    'config.mcp.err.transportRequired': 'The transport field is required',
     'config.mcp.err.replacePlaceholders': 'Please replace {keys} with actual values',
     'config.mcp.err.invalidJson': 'Invalid JSON',
     'config.mcp.requirePrefix': 'Please replace ',

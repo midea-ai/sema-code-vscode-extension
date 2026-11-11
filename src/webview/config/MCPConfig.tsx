@@ -394,7 +394,8 @@ const MCPEditModal: React.FC<{
             }
             const name = serverNames[0];
             const config: MCPServerConfig = { name, ...parsed.mcpServers[name] };
-            if (!config.transport && !(config as any).type) { setError(t('config.mcp.err.transportRequired')); return; }
+            // 缺 transport / type 时按 command / url 推断：只有 url 视为 http，其余默认 stdio（与导入逻辑一致）
+            if (!config.transport && !(config as any).type) config.transport = (!config.command && config.url) ? 'http' : 'stdio';
             if (mode === 'add' && installedNames?.has(name)) {
                 setError(t('config.mcp.err.nameExists', { name })); return;
             }
