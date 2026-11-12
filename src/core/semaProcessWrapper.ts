@@ -25,6 +25,7 @@ import {
     MemoryConfig,
     RuleConfig,
     HooksInfo,
+    HookConfig,
     TaskListItem,
     CronTask
 } from 'sema-core/types';
@@ -326,6 +327,22 @@ export class SemaProcessWrapper {
 
     public getHooksInfo(refresh?: boolean): Promise<HooksInfo> {
         return this.semaCore.getHooksInfo(refresh);
+    }
+
+    public addHook(hookConf: HookConfig): Promise<HooksInfo> {
+        return this.semaCore.addHook(hookConf);
+    }
+
+    public removeHook(id: string): Promise<HooksInfo> {
+        return this.semaCore.removeHook(id);
+    }
+
+    public enableHook(id: string): Promise<HooksInfo> {
+        return this.semaCore.enableHook(id);
+    }
+
+    public disableHook(id: string): Promise<HooksInfo> {
+        return this.semaCore.disableHook(id);
     }
 
     // ===== Design 资源 =====

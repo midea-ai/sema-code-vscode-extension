@@ -73,21 +73,18 @@
     flex-wrap: wrap;
 }
 
+/* 值标签（工具名、hook 的匹配 / 超时）：用次级按钮的低对比配色，不抢正文；+n / 收起 同色，只多可点击态 */
 .tool-tag {
     font-size: var(--s-font-xs);
     padding: 2px 6px;
-    background: var(--vscode-badge-background);
-    color: var(--vscode-badge-foreground);
+    background: var(--s-btn-secondary-bg);
+    color: var(--s-btn-secondary-fg);
     border-radius: var(--s-radius-sm);
-    opacity: 0.7;
 }
 
 .tool-more,
 .tool-collapse {
-    background: var(--s-btn-secondary-bg);
-    color: var(--s-btn-secondary-fg);
     cursor: pointer;
-    opacity: 1;
     transition: opacity 0.2s ease;
 }
 
@@ -99,8 +96,8 @@
 .tools-all {
     font-size: var(--s-font-xs);
     padding: 2px 6px;
-    background: var(--s-color-info-bg);
-    color: var(--s-color-info);
+    background: var(--s-btn-secondary-bg);
+    color: var(--s-btn-secondary-fg);
     border-radius: var(--s-radius-sm);
 }
 

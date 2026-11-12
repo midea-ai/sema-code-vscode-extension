@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { VscodeApi } from './types';
 import { getColorByName } from './utils/iconUtils';
-import { RefreshIcon, OpenIcon } from './utils/svgIcons';
-import { HooksInfo, HookEntryInfo, HookSource, HOOK_EVENTS, TOOL_HOOK_EVENTS } from './types/hook';
+import { RefreshIcon, OpenIcon, TrashIcon, PlusIcon } from './utils/svgIcons';
+import { HooksInfo, HookEntryInfo, HookConfig, HookSource, HOOK_EVENTS, TOOL_HOOK_EVENTS } from './types/hook';
+import AddHookModal from './AddHookModal';
 import { openFileWithRange } from './utils/fileUtils';
 import { uiScope } from './utils/scope';
 import { useT, I18nKey } from '../common/i18n/react';
@@ -44,8 +45,13 @@ const STATUS_LABEL_KEYS: Record<string, I18nKey> = {
     invalid: 'config.hooks.status.invalid'
 };
 
+/** 删除确认框里的条目名：hook 没有名字，用 事件 + 命令 指代，命令过长截断 */
+const CONFIRM_COMMAND_MAX = 80;
+
 const HooksConfig: React.FC<HooksConfigProps> = ({ vscode }) => {
     const t = useT();
+    const [showAddModal, setShowAddModal] = useState(false);
+    const [isAdding, setIsAdding] = useState(false);
     const [hooksInfo, setHooksInfo] = useState<HooksInfo | null>(null);
     const [loading, setLoading] = useState(true);
     const [isRefreshing, setIsRefreshing] = useState(false);
@@ -89,6 +95,21 @@ const HooksConfig: React.FC<HooksConfigProps> = ({ vscode }) => {
                         setHooksInfo(message.data || null);
                     }
                     break;
+                case 'addHookResult':
+                case 'removeHookResult':
+                case 'toggleHookResult':
+                    // 添加：成功失败都收起弹窗（失败原因由宿主提示）
+                    if (message.command === 'addHookResult') {
+                        setIsAdding(false);
+                        setShowAddModal(false);
+                    }
+                    // 增删启停都带回最新视图，直接覆盖；失败时重拉恢复真实状态（回滚开关的乐观更新）
+                    if (message.success && message.data) {
+                        setHooksInfo(message.data);
+                    } else if (!message.success) {
+                        vscode.postMessage({ command: 'loadHooksInfo' });
+                    }
+                    break;
             }
         };
 
@@ -105,6 +126,12 @@ const HooksConfig: React.FC<HooksConfigProps> = ({ vscode }) => {
     const handleRefresh = () => {
         setIsRefreshing(true);
         vscode.postMessage({ command: 'refreshHooks' });
+    };
+
+    // 手动添加：弹窗已校验格式，宿主逐条调 core 的新增接口（已存在的条目 core 不重复写），带回最新视图
+    const handleAddHooks = (items: HookConfig[]) => {
+        setIsAdding(true);
+        vscode.postMessage({ command: 'addHook', data: items });
     };
 
     // 打开对应来源的 hooks.json 配置文件
@@ -124,6 +151,23 @@ const HooksConfig: React.FC<HooksConfigProps> = ({ vscode }) => {
         } else {
             handleOpenConfig(source);
         }
+    };
+
+    // 写入哪层 settings 由 core 按条目所在层决定（项目级条目→项目级，用户级 / 插件→用户级全局）
+    const handleToggleHook = (entry: HookEntryInfo, enabled: boolean) => {
+        // 先本地乐观更新（内容相同的重复条目共用 id，一起变），结果消息回来后以真实数据为准
+        setHooksInfo(prev => prev && {
+            ...prev,
+            events: Object.fromEntries(Object.entries(prev.events).map(([event, list]) =>
+                [event, list.map(e => e.id === entry.id ? { ...e, enabled } : e)]
+            ))
+        });
+        vscode.postMessage({ command: 'toggleHook', id: entry.id, enabled });
+    };
+
+    const handleDeleteHook = (entry: HookEntryInfo) => {
+        const command = entry.command.length > CONFIRM_COMMAND_MAX ? entry.command.slice(0, CONFIRM_COMMAND_MAX) + '...' : entry.command;
+        vscode.postMessage({ command: 'removeHook', id: entry.id, name: `${entry.event}: ${command}` });
     };
 
     if (loading) {
@@ -169,15 +213,44 @@ const HooksConfig: React.FC<HooksConfigProps> = ({ vscode }) => {
                         </div>
                     )}
                 </div>
-                {entries.map((entry, i) => (
-                    <div key={i} className="hook-entry">
+                {entries.map((entry, i) => {
+                    // 旧版 core 无 id / enabled：不给开关和删除，按启用展示
+                    const isDisabled = entry.enabled === false;
+                    // 开关：状态正常的非内置条目（插件条目可启停）；删除：只有项目级 / 用户级条目（插件条目只能禁用）
+                    const canToggle = !!entry.id && source !== 'builtin' && entry.status === 'ok';
+                    const canDelete = !!entry.id && hasOwnConfig;
+                    return (
+                    <div key={i} className={`hook-entry ${isDisabled ? 'hook-entry-disabled' : ''}`}>
                         <div className="hook-command-row">
                             <span className="tools-label">{t('config.hooks.commandLabel')}</span>
-                            <code className="hook-command">{entry.command || t('config.hooks.emptyCommand')}</code>
+                            <code className="hook-command" title={entry.command}>{entry.command || t('config.hooks.emptyCommand')}</code>
                             {entry.status !== 'ok' && (
                                 <span className={`hook-status-tag hook-status-${entry.status}`} title={entry.statusReason || ''}>
                                     {STATUS_LABEL_KEYS[entry.status] ? t(STATUS_LABEL_KEYS[entry.status]) : entry.status}
                                 </span>
+                            )}
+                            {(canToggle || canDelete) && (
+                                <div className="hook-entry-actions">
+                                    {canDelete && (
+                                        <button
+                                            className="section-icon-btn section-icon-btn-danger"
+                                            title={t('common.delete')}
+                                            onClick={(e) => { e.stopPropagation(); handleDeleteHook(entry); }}
+                                        >
+                                            <TrashIcon />
+                                        </button>
+                                    )}
+                                    {canToggle && (
+                                        <label className="section-switch" title={isDisabled ? (source === 'project' ? t('config.skill.disabledProject') : t('config.skill.disabledGlobal')) : t('config.skill.enabled')}>
+                                            <input
+                                                type="checkbox"
+                                                checked={!isDisabled}
+                                                onChange={(e) => handleToggleHook(entry, e.target.checked)}
+                                            />
+                                            <span className="section-switch-slider"></span>
+                                        </label>
+                                    )}
+                                </div>
                             )}
                         </div>
                         {(isToolEvent || !!entry.timeout) && (
@@ -200,7 +273,8 @@ const HooksConfig: React.FC<HooksConfigProps> = ({ vscode }) => {
                             <div className="hook-status-reason">{entry.statusReason}</div>
                         )}
                     </div>
-                ))}
+                    );
+                })}
             </div>
         );
     };
@@ -216,6 +290,14 @@ const HooksConfig: React.FC<HooksConfigProps> = ({ vscode }) => {
                     )}
                 </div>
                 <div className="section-tab-actions">
+                    <button
+                        className="section-btn primary small"
+                        onClick={() => setShowAddModal(true)}
+                        title={t('config.hooks.manualAddTip')}
+                    >
+                        <PlusIcon />
+                        {t('config.mcp.manualAdd')}
+                    </button>
                     <button
                         className={`section-icon-btn ${isRefreshing ? 'btn-loading' : ''}`}
                         onClick={handleRefresh}
@@ -291,6 +373,15 @@ const HooksConfig: React.FC<HooksConfigProps> = ({ vscode }) => {
                     })}
                 </div>
             </div>
+
+            {/* 手动添加弹窗：每次打开重新挂载，不保留上次内容 */}
+            {showAddModal && (
+                <AddHookModal
+                    isSaving={isAdding}
+                    onClose={() => { if (!isAdding) setShowAddModal(false); }}
+                    onSave={handleAddHooks}
+                />
+            )}
         </div>
     );
 };

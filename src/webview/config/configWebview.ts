@@ -6,6 +6,7 @@ import { defaultConfig, DEFAULT_CUSTOM_RULES } from './default/defaultConfig';
 import { SkillCatalogManager, CatalogScope } from '../../managers/SkillCatalogManager';
 import { AgentConfig } from './types/agent';
 import { CommandConfig } from './types/command';
+import { HookConfig } from './types/hook';
 import type { ClawCoordinator } from '../../claw/coordinator';
 import { t, getLang, normalizeLang } from '../common/i18n/core';
 import { BrowserControlManager } from '../../managers/BrowserControlManager';
@@ -139,6 +140,9 @@ export class ConfigWebviewProvider {
                 uninstallCatalogSkill:      () => this.uninstallCatalogSkill(m.id),
                 loadHooksInfo:              () => this.loadHooksInfo(),
                 refreshHooks:               () => this.refreshHooksInfo(),
+                addHook:                    () => this.addHook(m.data),
+                removeHook:                 () => this.removeHook(m.id, m.name),
+                toggleHook:                 () => this.toggleHook(m.id, m.enabled),
                 loadCommandsInfo:           () => this.loadCommandsInfo(),
                 refreshCommandsInfo:        () => this.refreshCommandsInfo(),
                 addCommand:                 () => this.addCommand(m.data),
@@ -825,6 +829,41 @@ export class ConfigWebviewProvider {
         } catch (error) {
             this.postMessage({ command: 'refreshHooksInfoResult', success: false, data: null, message: (error as Error).message });
         }
+    }
+
+    // 增删启停都返回最新 hooks 视图，成功消息由 execute 统一发送（successExtra 挂 data）；失败时页面收到 success:false 会重拉恢复真实状态
+    // 手动添加：页面把 hooks.json 片段拍平成列表，core 的新增接口一次只收一条，这里逐条调，最后一次的返回即最新视图
+    private async addHook(items: HookConfig[]) {
+        await this.execute(
+            'addHookResult',
+            t('host.cfg.op.addHook'),
+            async () => {
+                let hooksInfo;
+                for (const item of items) hooksInfo = await this.coreManager.addHook(item);
+                return hooksInfo;
+            },
+            (hooksInfo) => ({ message: t('host.cfg.hookAdded'), data: hooksInfo }),
+        );
+    }
+
+    private async removeHook(id: string, name: string) {
+        if (!await this.confirm(t('host.cfg.deleteHookConfirm', { name }), t('common.delete'))) return;
+        await this.execute(
+            'removeHookResult',
+            t('host.cfg.op.deleteHook'),
+            async () => await this.coreManager.removeHook(id),
+            (hooksInfo) => ({ message: t('host.cfg.hookDeleted'), data: hooksInfo }),
+        );
+    }
+
+    private async toggleHook(id: string, enabled: boolean) {
+        // 写入哪层 settings 由 core 按条目所在层决定
+        await this.execute(
+            'toggleHookResult',
+            enabled ? t('host.cfg.op.enableHook') : t('host.cfg.op.disableHook'),
+            async () => (enabled ? await this.coreManager.enableHook(id) : await this.coreManager.disableHook(id)),
+            (hooksInfo) => ({ data: hooksInfo }),
+        );
     }
 
     // ─── Commands ─────────────────────────────────────────────────────────────

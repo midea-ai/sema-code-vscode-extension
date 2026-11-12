@@ -396,6 +396,23 @@ export class ConfigController {
             case 'refreshHooks':
                 await this.respond('refreshHooksInfoResult', () => this.core.getHooksInfo(true), (data) => ({ data }), null);
                 break;
+            // 增删启停都返回最新 hooks 视图；失败时 UI 收到 success:false 会重拉恢复真实状态
+            case 'addHook':
+                // 手动添加：m.data 是页面拍平后的列表，core 的新增接口一次只收一条，逐条调，最后一次的返回即最新视图
+                await this.respond('addHookResult', async () => {
+                    let hooksInfo;
+                    for (const item of m.data) hooksInfo = await this.core.addHook(item);
+                    return hooksInfo;
+                }, (data) => ({ message: t('host.cfg.hookAdded'), data }), null);
+                break;
+            case 'removeHook':
+                if (!await this.confirm(t('host.cfg.deleteHookConfirm', { name: m.name }), t('common.delete'))) break;
+                await this.respond('removeHookResult', () => this.core.removeHook(m.id), (data) => ({ message: t('host.cfg.hookDeleted'), data }), null);
+                break;
+            case 'toggleHook':
+                // 写入哪层 settings 由 core 按条目所在层决定
+                await this.respond('toggleHookResult', () => (m.enabled ? this.core.enableHook(m.id) : this.core.disableHook(m.id)), (data) => ({ data }), null);
+                break;
 
             // ─── Cron ──────────────────────────────────────────────────
             case 'loadCronTasks':

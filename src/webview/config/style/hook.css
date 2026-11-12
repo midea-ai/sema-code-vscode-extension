@@ -38,6 +38,24 @@
     margin-top: var(--s-gap-sm);
 }
 
+/* 命令行右侧操作区（删除 / 开关）：贴右、与首行对齐；按钮高于文字行，上下各收 4px 不撑高命令行 */
+.hook-entry-actions {
+    display: flex;
+    align-items: center;
+    gap: var(--s-action-gap);
+    margin: -4px 0 -4px auto;
+    align-self: flex-start;
+    flex-shrink: 0;
+}
+
+/* 停用的条目置灰但不挪位置（同一事件下的顺序就是执行顺序），操作区保持原样 */
+.hook-entry-disabled .hook-command-row > .tools-label,
+.hook-entry-disabled .hook-command,
+.hook-entry-disabled .agent-tools,
+.hook-entry-disabled .hook-status-reason {
+    opacity: 0.5;
+}
+
 .hook-command {
     font-family: var(--vscode-editor-font-family, monospace);
     font-size: var(--s-font-xs);
@@ -46,6 +64,12 @@
     padding: 2px 6px;
     border-radius: var(--s-radius-sm);
     word-break: break-all;
+    /* 长命令最多显示两行，超出省略（完整内容在悬浮提示里） */
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    overflow: hidden;
+    min-width: 0;
 }
 
 /* 状态标签（ok 不展示） */

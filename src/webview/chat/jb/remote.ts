@@ -203,6 +203,10 @@ export class RemoteCore {
     getMemoryInfo(refresh?: boolean): Promise<any> { return this.t.call('getMemoryInfo', { refresh }, ''); }
     getRuleInfo(refresh?: boolean): Promise<any> { return this.t.call('getRuleInfo', { refresh }, ''); }
     getHooksInfo(refresh?: boolean): Promise<any> { return this.t.call('getHooksInfo', { refresh }, ''); }
+    addHook(hookConf: any): Promise<any> { return this.t.call('addHook', hookConf, ''); }
+    removeHook(id: string): Promise<any> { return this.t.call('removeHook', { id }, ''); }
+    enableHook(id: string): Promise<any> { return this.t.call('enableHook', { id }, ''); }
+    disableHook(id: string): Promise<any> { return this.t.call('disableHook', { id }, ''); }
     getDesignSkillsInfo(refresh?: boolean): Promise<any> { return this.t.call('getDesignSkillsInfo', { refresh }, ''); }
     getDesignSystemsInfo(refresh?: boolean): Promise<any> { return this.t.call('getDesignSystemsInfo', { refresh }, ''); }
 }
