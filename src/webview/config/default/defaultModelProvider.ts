@@ -101,7 +101,7 @@ export const defaultModelProvider: Record<string, ProviderDefaults> = {
         modelsUrl: 'https://api.minimaxi.com/anthropic/v1/models',
         baseURLPlaceholder: 'https://api.minimaxi.com/anthropic',
         apiKeyProviderLabel: 'MiniMax',
-        defaultModel: 'MiniMax-M3',
+        defaultModel: 'MiniMax-M3.1-Flash',
         apikeyUrl: 'https://platform.minimaxi.com/user-center/basic-information/interface-key',
         defaultAdapt: 'anthropic',
     },
