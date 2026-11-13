@@ -1284,3 +1284,46 @@ svg.provider-logo-openrouter {
     border-radius: 4px;
     box-shadow: 0 4px 24px rgba(0, 0, 0, 0.4);
 }
+
+/* 放大遮罩右上角：图片像素尺寸 + 跳转按钮（在编辑器中打开图片文件）。
+   遮罩底色固定为深色，这里同样用固定的浅色前景 */
+.image-preview-toolbar {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.image-preview-size {
+    font-size: var(--chat-font-sm);
+    line-height: 1;
+    white-space: nowrap;
+    color: rgba(255, 255, 255, 0.7);
+    font-variant-numeric: tabular-nums;
+}
+
+.image-preview-open {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    padding: 0;
+    border: none;
+    border-radius: 4px;
+    background-color: rgba(255, 255, 255, 0.12);
+    color: rgba(255, 255, 255, 0.85);
+    cursor: pointer;
+}
+
+/* 共用的 OpenIcon 线宽为 2（24 视口），在深色遮罩上偏粗，这里单独收细 */
+.image-preview-open svg {
+    stroke-width: 1.5;
+}
+
+.image-preview-open:hover {
+    background-color: rgba(255, 255, 255, 0.24);
+    color: #fff;
+}

@@ -79,7 +79,7 @@ const GeneratedThumb: React.FC<{ image: GeneratedImageItem; vscode?: VscodeApi; 
  */
 const GeneratedImageBlock: React.FC<GeneratedImageBlockProps> = React.memo(({ contents, vscode }) => {
     const t = useT();
-    const [previewSrc, setPreviewSrc] = useState<string | null>(null);
+    const [preview, setPreview] = useState<{ src: string; filePath: string } | null>(null);
     const [manualExpanded, setManualExpanded] = useState<boolean | null>(null);
 
     const pendingCount = contents.filter(c => c.completed === false).length;
@@ -128,15 +128,26 @@ const GeneratedImageBlock: React.FC<GeneratedImageBlockProps> = React.memo(({ co
             {expandable && isExpanded && (
                 <div className="generated-image-list">
                     {images.map(img => (
-                        <GeneratedThumb key={img.filePath} image={img} vscode={vscode} onOpen={setPreviewSrc} />
+                        <GeneratedThumb
+                            key={img.filePath}
+                            image={img}
+                            vscode={vscode}
+                            onOpen={src => setPreview({ src, filePath: img.filePath })}
+                        />
                     ))}
                     {Array.from({ length: pendingCount }, (_, i) => (
                         <div key={`pending-${i}`} className="generated-image-pending" />
                     ))}
                 </div>
             )}
-            {previewSrc && (
-                <ImagePreviewModal src={previewSrc} onClose={() => setPreviewSrc(null)} />
+            {preview && (
+                <ImagePreviewModal
+                    src={preview.src}
+                    onClose={() => setPreview(null)}
+                    onOpenFile={vscode
+                        ? () => vscode.postMessage({ type: 'openFile', filePath: preview.filePath, line: 1 })
+                        : undefined}
+                />
             )}
         </div>
     );
