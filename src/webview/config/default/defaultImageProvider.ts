@@ -20,9 +20,9 @@ export interface ImageProviderDefaults {
     presetModels?: { id: string; name: string }[];
 }
 
-export const DEFAULT_IMAGE_PROVIDER = 'openrouter';
+export const DEFAULT_IMAGE_PROVIDER = 'volcengine';
 
-export const IMAGE_PROVIDER_ORDER = ['custom', 'volcengine', 'openrouter'];
+export const IMAGE_PROVIDER_ORDER = ['custom', 'volcengine', 'minimax', 'openrouter'];
 
 export const defaultImageProvider: Record<string, ImageProviderDefaults> = {
     // 图像接口地址是 /api/v1/images，必须带 /images 结尾，否则会被追加成不存在的地址；模型列表接口不需要 API Key
@@ -34,14 +34,27 @@ export const defaultImageProvider: Record<string, ImageProviderDefaults> = {
         defaultModel: 'openai/gpt-image-2.5-flare',
         apikeyUrl: 'https://openrouter.ai/settings/keys',
     },
-    // 火山方舟（豆包 Seedream）：接口 /api/v3/images/generations 与 OpenAI Images 同形；
+    // MiniMax（H3 Image）：接口 /v1/images/generations 与 OpenAI Images 同形，地址写全以区别于对话模型的地址；
+    // 没有图像模型列表接口，用内置列表
+    'minimax': {
+        name: 'MiniMax',
+        baseURL: 'https://api.minimax.cn/v1/images/generations',
+        defaultModel: 'MiniMax-H3-Image',
+        apikeyUrl: 'https://platform.minimaxi.com/user-center/basic-information/interface-key',
+        presetModels: [
+            { id: 'MiniMax-H3-Image', name: 'MiniMax H3 Image' },
+            { id: 'MiniMax-H3-Image-Highspeed', name: 'MiniMax H3 Image Highspeed' },
+        ],
+    },
+    // 火山方舟（豆包 Seedream）：接口 /api/v3/images/generations 与 OpenAI Images 同形，地址写全以区别于对话模型的地址；
     // 没有公开的图像模型列表接口，用内置列表，模型 ID 以方舟控制台「模型列表」页为准
     'volcengine': {
         name: 'Volcengine (火山引擎)',
-        baseURL: 'https://ark.cn-beijing.volces.com/api/v3',
+        baseURL: 'https://ark.cn-beijing.volces.com/api/v3/images/generations',
         defaultModel: 'doubao-seedream-5-0-260128',
         apikeyUrl: 'https://console.volcengine.com/ark/region:ark+cn-beijing/apiKey',
         presetModels: [
+            { id: 'doubao-seedream-5-5-261028', name: 'Doubao Seedream 5.5' },
             { id: 'doubao-seedream-5-0-pro-260628', name: 'Doubao Seedream 5.0 Pro' },
             { id: 'doubao-seedream-5-0-flash-260915', name: 'Doubao Seedream 5.0 Flash' },
         ],
