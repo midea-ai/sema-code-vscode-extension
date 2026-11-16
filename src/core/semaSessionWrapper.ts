@@ -2,6 +2,7 @@ import { SemaSession } from 'sema-core';
 import type { ForkOptions, ForkPreview, ForkResult, BranchResult } from 'sema-core';
 import { t } from '../webview/common/i18n/core';
 import { parsePasteInput, type PasteAttachment } from '../webview/common/paste';
+import { isAttachmentPath } from '../webview/common/viz';
 import {
     MessageCompleteData,
     StateUpdateData,
@@ -23,6 +24,7 @@ import {
     FileReferenceData,
     ToolExecutionChunkData,
     InputProcessingData,
+    InputRetractedData,
     TaskStartData,
     TaskEndData,
     TaskTransferData,
@@ -433,16 +435,20 @@ export class SemaSessionWrapper {
 
         this.session.on<FileReferenceData>('file:reference', (data) => {
             if (data.references && data.references.length > 0) {
-                const msg: Message = {
-                    id: this.generateId(),
-                    type: 'system',
-                    content: {
-                        type: 'file_reference',
-                        content: data.references.map(ref => ref.content)
-                    },
-                };
-                this.messageHistory.push(msg);
-                this.sendAppendMessages([msg]);
+                // 粘贴转存文件在气泡里已有芯片，不再重复一行 Read <attachments 路径>
+                const shown = data.references.filter(ref => !isAttachmentPath(ref.name));
+                if (shown.length > 0) {
+                    const msg: Message = {
+                        id: this.generateId(),
+                        type: 'system',
+                        content: {
+                            type: 'file_reference',
+                            content: shown.map(ref => ref.content)
+                        },
+                    };
+                    this.messageHistory.push(msg);
+                    this.sendAppendMessages([msg]);
+                }
                 this.callbacks.onFileReference?.(this.sessionId, data);
             }
         });
@@ -566,6 +572,46 @@ export class SemaSessionWrapper {
 
             // 通知前端清除 pending 状态
             this.post({ type: 'inputProcessing', data });
+        });
+
+        // 输入撤销（enableInputRetract）：模型产出正文前被用户中断，core 把这条输入当作没发生，不再发 session:interrupted。
+        // 这里同步删掉它的气泡、本轮已流出的思考和 @文件 引用行，原文交给前端放回输入框。
+        // 有排队输入时 core 紧接着处理下一批、不会先转 idle，所以在事件到达时就回填
+        this.session.on<InputRetractedData>('input:retracted', (data) => {
+            const idx = this.messageHistory.findIndex(m => m.type === 'user' && m.uuid === data.inputId);
+            if (idx < 0) return;
+            const userMsg = this.messageHistory[idx];
+
+            // 撤销只发生在本轮第一次模型请求，气泡之后的主代理回复都属于这一轮；
+            // hook 提示、后台任务通知等其他消息保留（core 不回滚已执行的 hook）
+            const removedIds: string[] = [];
+            this.messageHistory = this.messageHistory.filter((m, i) => {
+                const removed = i === idx || (i > idx && (
+                    m.type === 'assistant'
+                    || (m.type === 'system' && m.content?.type === 'file_reference')
+                ));
+                if (removed) removedIds.push(m.id);
+                return !removed;
+            });
+            this.streamingAssistantMap.clear();
+            // 删除后下标前移，同步 taskAgentMap 里记录的位置
+            for (const entry of this.taskAgentMap.values()) {
+                const newIdx = this.messageHistory.indexOf(entry.msg);
+                if (newIdx !== -1) entry.idx = newIdx;
+            }
+
+            // 标题取自首条用户输入：撤销后没有用户消息了就退回默认标题
+            if (!this.messageHistory.some(m => m.type === 'user')) {
+                this.setTitle(t('common.newSession'));
+            }
+
+            this.post({
+                type: 'inputRetracted',
+                removedIds,
+                text: typeof userMsg.content === 'string' ? userMsg.content : '',
+                attachments: userMsg.attachments,
+                pastes: userMsg.pastes,
+            });
         });
 
         // enableInputPrediction 开启时，一轮回复自然结束后 core 用 quick 模型预测用户下一句；

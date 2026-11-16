@@ -83,6 +83,8 @@ export class SemaProcessWrapper {
             logLevel: 'error',
             ...toCoreSystemConfig(systemConfig as Record<string, any>),
             disabledTools: disabledTools,
+            // 输入撤销固定开启、不出配置项：模型产出正文前被用户中断，core 改发 input:retracted（见 SemaSessionWrapper）
+            enableInputRetract: true,
             maxSessions: MAX_SESSIONS,
             usageProduct: USAGE_PRODUCT,
         };

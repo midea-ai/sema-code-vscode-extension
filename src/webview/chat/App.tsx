@@ -420,6 +420,25 @@ const ChatSession: React.FC<ChatSessionProps> = ({ vscode: rawVscode, sessionId,
                 case 'inputPredict':
                     setInputPrediction(message.data?.prediction || '');
                     break;
+                case 'inputRetracted': {
+                    // 输入撤销：宿主已从历史里删掉这条输入和本轮已流出的思考，这里同步删气泡并把原文放回输入框
+                    const removedIds = new Set<string>(Array.isArray(message.removedIds) ? message.removedIds : []);
+                    if (removedIds.size > 0) {
+                        messagesRef.current = messagesRef.current.filter(m => !removedIds.has(m.id));
+                        setMessages(messagesRef.current);
+                        if (streamingAssistantIdRef.current && removedIds.has(streamingAssistantIdRef.current)) {
+                            streamingAssistantIdRef.current = null;
+                            setStreamingAssistantId(null);
+                        }
+                    }
+                    const retractedText = typeof message.text === 'string' ? message.text : '';
+                    const hasAttachments = Array.isArray(message.attachments) && message.attachments.length > 0;
+                    const hasPastes = Array.isArray(message.pastes) && message.pastes.length > 0;
+                    if (retractedText || hasAttachments || hasPastes) {
+                        inputBoxRef.current?.prependText(retractedText, message.attachments, message.pastes);
+                    }
+                    break;
+                }
                 case 'clearPendingInputs':
                     setPendingInputs([]);
                     break;

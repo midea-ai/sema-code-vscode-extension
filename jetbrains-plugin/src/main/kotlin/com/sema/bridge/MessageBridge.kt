@@ -437,6 +437,9 @@ class MessageBridge(
         merged["disabledTools"] = sysConfig.getDisabledTools()
         // 启用使用统计采集（对齐 VSCode semaProcessWrapper 构造 SemaCore 时的 usageProduct）
         merged["usageProduct"] = USAGE_PRODUCT
+        // 输入撤销固定开启、不出配置项（对齐 VSCode semaProcessWrapper）；事件处理在共享的 SemaSessionWrapper。
+        // 只放 init：旧版 core 的 updateCoreConfig 遇到不认识的键会抛错
+        merged["enableInputRetract"] = true
         // webview 传入的 init 覆盖项优先级更高（当前为空对象，预留）
         for ((k, v) in payload.entrySet()) merged[k] = jsonToAny(v)
         return gson.toJson(merged)

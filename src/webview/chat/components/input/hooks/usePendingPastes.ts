@@ -53,9 +53,8 @@ export function usePendingPastes(vscode: VscodeApi) {
 
     const clear = useCallback(() => { setPastes([]); }, []);
 
-    /** fork 回填：转存文件仍在磁盘上则按路径读回正文复用原路径；已被退场清理的跳过 */
-    const setFromAttachments = useCallback(async (items: PasteAttachment[] | undefined) => {
-        if (!items || items.length === 0) { setPastes([]); return; }
+    /** 转存文件仍在磁盘上则按路径读回正文复用原路径；已被退场清理的跳过 */
+    const readAttachments = useCallback(async (items: PasteAttachment[]): Promise<PendingPaste[]> => {
         const restored: PendingPaste[] = [];
         for (const p of items) {
             const reqId = `paste-read-${Date.now()}-${seq.current++}`;
@@ -64,11 +63,26 @@ export function usePendingPastes(vscode: VscodeApi) {
             if (content === null) { console.warn('[paste] pasted file no longer exists, skipped:', p.path); continue; }
             restored.push({ id: reqId, path: p.path, preview: p.preview, text: content });
         }
-        setPastes(restored);
+        return restored;
     }, [vscode]);
+
+    /** fork 回填：替换当前全部粘贴附件 */
+    const setFromAttachments = useCallback(async (items: PasteAttachment[] | undefined) => {
+        if (!items || items.length === 0) { setPastes([]); return; }
+        setPastes(await readAttachments(items));
+    }, [readAttachments]);
+
+    /** 输入撤销回填：排在已有粘贴附件之前，按路径去重，已有的不动 */
+    const prependFromAttachments = useCallback(async (items: PasteAttachment[] | undefined) => {
+        if (!items || items.length === 0) return;
+        const restored = await readAttachments(items.filter(p => !pastesRef.current.some(x => x.path === p.path)));
+        if (restored.length === 0) return;
+        // 读文件是异步的，入队时按最新队列再去重一次
+        setPastes(prev => [...restored.filter(p => !prev.some(x => x.path === p.path)), ...prev]);
+    }, [readAttachments]);
 
     const toAttachments = useCallback((): PasteAttachment[] =>
         pastesRef.current.map(p => ({ path: p.path, preview: p.preview })), []);
 
-    return { pastes, add, remove, clear, setFromAttachments, toAttachments };
+    return { pastes, add, remove, clear, setFromAttachments, prependFromAttachments, toAttachments };
 }

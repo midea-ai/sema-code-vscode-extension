@@ -71,6 +71,8 @@ function mentionsFromText(text: string): InputMention[] {
 export interface InputBoxHandle {
     focus: () => void;
     setText: (text: string, attachments?: ImageAttachment[], pastes?: PasteAttachment[]) => void;
+    /** 输入撤销回填：不覆盖输入框里已有的内容，撤销的输入排在前面 */
+    prependText: (text: string, attachments?: ImageAttachment[], pastes?: PasteAttachment[]) => void;
 }
 
 interface InputBoxProps {
@@ -164,6 +166,30 @@ const InputBox = forwardRef<InputBoxHandle, InputBoxProps>(({
             setCaretOffset(el, text.length);
             el.focus();
             editorHistory.reset({ text, mentions: ms, caret: text.length });
+        },
+        // 输入撤销回填：输入框为空直接填；已有内容时撤销的文字插在前面并换行，图片与粘贴排在已有之前。
+        // 已有内容连同它的 mention 原样保留；落一帧撤销历史，Ctrl+Z 可退回回填前
+        prependText: (text: string, attachments?: ImageAttachment[], pastes?: PasteAttachment[]) => {
+            const el = inputBoxRef.current;
+            if (!el) return;
+            if (text) {
+                const cur = getEditorText(el);
+                const hasCur = cur.trim() !== '';
+                const newText = hasCur ? `${text}\n${cur}` : text;
+                const shift = text.length + 1;
+                const ms = [
+                    ...mentionsFromText(text),
+                    ...(hasCur ? getMentionsFromDom(el).map(m => ({ ...m, start: m.start + shift })) : [])
+                ];
+                renderEditorContent(el, newText, ms);
+                setInputValue(newText);
+                setMentions(ms);
+                setCaretOffset(el, newText.length);
+                editorHistory.commit({ text: newText, mentions: ms, caret: newText.length }, 'op');
+            }
+            pendingImages.prependFromAttachments(attachments);
+            void pendingPastes.prependFromAttachments(pastes);
+            el.focus();
         }
     }));
 

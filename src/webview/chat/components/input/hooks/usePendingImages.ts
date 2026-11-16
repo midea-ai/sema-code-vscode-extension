@@ -95,15 +95,10 @@ export function usePendingImages() {
         setImages([]);
     }, []);
 
-    // 从已有 attachments 恢复（如 fork 回填）：core 形状只有 data/media_type，
-    // previewUrl 直接用 data URI（无 objectURL 可 revoke），尺寸异步现算、文件名缺省
-    const setFromAttachments = useCallback((attachments: ImageAttachment[]) => {
-        imagesRef.current.forEach(i => URL.revokeObjectURL(i.previewUrl));
-        if (!attachments || attachments.length === 0) {
-            setImages([]);
-            return;
-        }
-        const items: PendingImage[] = attachments.slice(0, MAX_IMAGES).map(a => ({
+    // core 形状的 attachments 只有 data/media_type：previewUrl 直接用 data URI（无 objectURL 可 revoke），
+    // 尺寸异步现算、文件名缺省
+    const fromAttachments = useCallback((attachments: ImageAttachment[], limit: number): PendingImage[] => {
+        const items: PendingImage[] = attachments.slice(0, Math.max(0, limit)).map(a => ({
             id: `img-${Date.now()}-${idCounter.current++}`,
             data: a.data,
             media_type: a.media_type,
@@ -112,7 +107,6 @@ export function usePendingImages() {
             height: 0,
             previewUrl: `data:${a.media_type};base64,${a.data}`
         }));
-        setImages(items);
         // 异步补尺寸
         items.forEach(it => {
             const img = new Image();
@@ -120,7 +114,21 @@ export function usePendingImages() {
                 p.id === it.id ? { ...p, width: img.naturalWidth, height: img.naturalHeight } : p));
             img.src = it.previewUrl;
         });
+        return items;
     }, []);
+
+    // 从已有 attachments 恢复（如 fork 回填），替换当前全部图片
+    const setFromAttachments = useCallback((attachments: ImageAttachment[]) => {
+        imagesRef.current.forEach(i => URL.revokeObjectURL(i.previewUrl));
+        setImages(fromAttachments(attachments || [], MAX_IMAGES));
+    }, [fromAttachments]);
+
+    // 输入撤销回填：排在已有图片之前，已有的不动；超出上限的部分丢弃
+    const prependFromAttachments = useCallback((attachments: ImageAttachment[] | undefined) => {
+        if (!attachments || attachments.length === 0) return;
+        const items = fromAttachments(attachments, MAX_IMAGES - imagesRef.current.length);
+        if (items.length > 0) setImages(prev => [...items, ...prev]);
+    }, [fromAttachments]);
 
     const toAttachments = useCallback((): ImageAttachment[] =>
         imagesRef.current.map(i => ({ type: 'image', data: i.data, media_type: i.media_type })), []);
@@ -130,5 +138,5 @@ export function usePendingImages() {
         imagesRef.current.forEach(i => URL.revokeObjectURL(i.previewUrl));
     }, []);
 
-    return { images, addFiles, remove, clear, toAttachments, setFromAttachments };
+    return { images, addFiles, remove, clear, toAttachments, setFromAttachments, prependFromAttachments };
 }
