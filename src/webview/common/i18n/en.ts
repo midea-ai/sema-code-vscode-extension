@@ -44,6 +44,7 @@ export const en: Record<keyof typeof zh, string> = {
     'chat.createSessionFailed': 'Failed to create session',
     'chat.openConfig': 'Configure a model',
     'chat.welcome.subtitle': 'AI-powered coding assistant',
+    'chat.welcomeTip.dismiss': "Don't show again",
     'chat.design.hint': 'Describe the page / prototype / demo you want ~',
     'chat.task.running': 'Running...',
     'chat.task.done': 'Completed',

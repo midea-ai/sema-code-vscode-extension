@@ -1,13 +1,17 @@
 // Welcome.tsx
 import React from 'react';
 import { useT } from '../../../common/i18n/react';
+import { VscodeApi } from '../../types';
+import WelcomeTip from './WelcomeTip';
 
 // 由 webpack DefinePlugin 在构建时注入（取自 sema-core/package.json）
 declare const __SEMA_CORE_VERSION__: string;
 
-const Welcome: React.FC = () => {
+const Welcome: React.FC<{ vscode: VscodeApi }> = ({ vscode }) => {
     const t = useT();
     return (
+    <>
+    <WelcomeTip vscode={vscode} />
     <div className="welcome-container">
         <h1 className="welcome-title">Sema Code</h1>
         <a
@@ -20,6 +24,7 @@ const Welcome: React.FC = () => {
         </a>
         <p className="welcome-subtitle">{t('chat.welcome.subtitle')}</p>
     </div>
+    </>
     );
 };
 

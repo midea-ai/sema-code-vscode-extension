@@ -97,7 +97,12 @@ class MessageBridge(
         val op = payload.str("op")
         val data: Any = try {
             when (op) {
-                "get" -> mapOf("config" to sysConfig.getConfig(), "platform" to platform())
+                "get" -> mapOf(
+                    "config" to sysConfig.getConfig(),
+                    "platform" to platform(),
+                    "welcomeTipDismissedId" to sysConfig.getWelcomeTipDismissedId(),
+                )
+                "dismissWelcomeTip" -> { sysConfig.setWelcomeTipDismissedId(payload.str("id")); emptyMap<String, Any?>() }
                 "save" -> { sysConfig.saveConfig(toMap(payload.get("config"))); emptyMap<String, Any?>() }
                 "saveByKey" -> { sysConfig.saveByKey(payload.str("key"), jsonToAny(payload.get("value"))); emptyMap<String, Any?>() }
                 "saveDisabledTools" -> {

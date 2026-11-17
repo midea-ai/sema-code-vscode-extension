@@ -15,6 +15,7 @@ import TodosPanel from './components/panels/TodosPanel';
 import GoalBar, { GoalBarAction } from './components/panels/GoalBar';
 import GoalEditDialog from './components/ui/GoalEditDialog';
 import Welcome from './components/panels/Welcome';
+import { setWelcomeTipDismissedId } from './components/panels/WelcomeTip';
 import DesignModeHint from './components/panels/DesignModeHint';
 import PermissionDialog from './components/permission/PermissionDialog';
 import AskFormDialog, { PickOptionRequestData } from './components/ui/AskFormDialog';
@@ -390,6 +391,9 @@ const ChatSession: React.FC<ChatSessionProps> = ({ vscode: rawVscode, sessionId,
                     }
                     if (typeof message.showThinkingText === 'boolean') {
                         setShowThinkingText(message.showThinkingText);
+                    }
+                    if (typeof message.welcomeTipDismissedId === 'string') {
+                        setWelcomeTipDismissedId(message.welcomeTipDismissedId);
                     }
                     break;
                 case 'permissionLevelUpdate':
@@ -937,7 +941,7 @@ const ChatSession: React.FC<ChatSessionProps> = ({ vscode: rawVscode, sessionId,
                 if (agentMode === 'Design') {
                     return <DesignModeHint />;
                 }
-                return <Welcome />;
+                return <Welcome vscode={vscode} />;
             }
             return null;
         }

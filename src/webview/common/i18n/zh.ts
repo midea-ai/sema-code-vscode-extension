@@ -45,6 +45,7 @@ export const zh = {
     'chat.createSessionFailed': '创建会话失败',
     'chat.openConfig': '去配置模型',
     'chat.welcome.subtitle': 'AI 驱动的智能编程助手',
+    'chat.welcomeTip.dismiss': '不再显示',
     'chat.design.hint': '请描述你想要的页面 / 原型 / 演示 ～',
     'chat.task.running': '运行中...',
     'chat.task.done': '已完成',

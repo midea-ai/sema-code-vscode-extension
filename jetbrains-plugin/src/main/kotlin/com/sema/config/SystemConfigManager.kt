@@ -23,6 +23,8 @@ class SystemConfigManager {
     companion object {
         private const val CONFIG_KEY = "sema.systemConfig"
         private const val DISABLED_TOOLS_KEY = "sema.disabledTools"
+        /** 欢迎页跑马灯最后一次点「不再显示」的内容 id；独立键，不随系统配置保存/重置（对齐 VSCode chatWebview 的同名 globalState 键，内容定义见 webview 的 welcomeTip.ts） */
+        private const val WELCOME_TIP_DISMISSED_ID_KEY = "sema.welcomeTipDismissedId"
 
         /** APP 级单例，供 Action / VirtualFile 等拿不到注入的原生 UI 处按当前语言取文案。 */
         fun instance(): SystemConfigManager =
@@ -106,6 +108,12 @@ class SystemConfigManager {
     fun saveDisabledTools(tools: List<String>?) {
         if (tools == null) props.unsetValue(DISABLED_TOOLS_KEY)
         else props.setValue(DISABLED_TOOLS_KEY, gson.toJson(tools))
+    }
+
+    fun getWelcomeTipDismissedId(): String = props.getValue(WELCOME_TIP_DISMISSED_ID_KEY, "")
+
+    fun setWelcomeTipDismissedId(id: String) {
+        props.setValue(WELCOME_TIP_DISMISSED_ID_KEY, id)
     }
 
     /** core 子集：去掉纯本地键，用于推 sema-core / init seed。 */

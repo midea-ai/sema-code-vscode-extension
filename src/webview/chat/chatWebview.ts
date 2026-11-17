@@ -66,6 +66,8 @@ export class ChatWebviewProvider {
     ) { }
 
     private static readonly INPUT_HISTORY_KEY = 'sema.inputHistory';
+    /** globalState 键：欢迎页跑马灯最后一次点「不再显示」的内容 id（独立于系统配置，不受恢复默认影响；内容定义见 welcomeTip.ts） */
+    private static readonly WELCOME_TIP_DISMISSED_ID_KEY = 'sema.welcomeTipDismissedId';
     private static readonly INPUT_HISTORY_MAX = 50;
 
     public setWebviewView(webviewView: vscode.WebviewView) {
@@ -123,6 +125,7 @@ export class ChatWebviewProvider {
                 resolveImagePath: () => this.resolveImagePath(msg.filePath, msg.tempId),
                 openExternal: () => this.openExternal(msg.url),
                 requestSystemConfig: () => this.sendSystemConfig(),
+                dismissWelcomeTip: () => { void this.context.globalState.update(ChatWebviewProvider.WELCOME_TIP_DISMISSED_ID_KEY, msg.id); },
                 updateLanguage: () => this.updateLanguage(msg.lang),
                 requestCommands: () => this.sendCommands(),
                 requestSkills: () => this.sendSkills(),
@@ -282,6 +285,7 @@ export class ChatWebviewProvider {
                 skipFileEditPermission: config.skipFileEditPermission || false,
                 thinking: config.thinking !== false,
                 showThinkingText: (config as Record<string, any>).showThinkingText !== false,
+                welcomeTipDismissedId: this.context.globalState.get<string>(ChatWebviewProvider.WELCOME_TIP_DISMISSED_ID_KEY, ''),
                 lang: (config as Record<string, any>).lang
             });
         } catch (error) {

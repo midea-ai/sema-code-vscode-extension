@@ -183,6 +183,7 @@ export class Controller {
             // 模型显示是会话级的（对齐 chatWebview）；切换 = 本会话 + 全局默认，其他已打开会话不动
             case 'requestModelInfo': await this.sessions.get(sid ?? '')?.wrapper.refreshModelInfo(true); break;
             case 'requestSystemConfig': void this.sendSystemConfig(); break;
+            case 'dismissWelcomeTip': void this.t.callEditor('systemConfig', { op: 'dismissWelcomeTip', id: msg.id }).catch(() => {}); break;
             case 'updateLanguage': await this.updateLanguage(msg.lang); break;
             case 'switchModel': await this.switchSessionModel(sid, msg.modelName); break;
             case 'requestCommands': void this.sendCommands(); break;
@@ -561,6 +562,7 @@ export class Controller {
                 skipFileEditPermission: config.skipFileEditPermission || false,
                 thinking: config.thinking !== false,
                 showThinkingText: config.showThinkingText !== false,
+                welcomeTipDismissedId: typeof res?.welcomeTipDismissedId === 'string' ? res.welcomeTipDismissedId : '',
                 lang: config.lang,
             });
         } catch {

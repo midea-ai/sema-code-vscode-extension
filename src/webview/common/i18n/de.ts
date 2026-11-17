@@ -40,6 +40,7 @@ export const de: Partial<Record<keyof typeof zh, string>> = {
     'chat.modelNotConfigured.desc': 'Fügen Sie ein Modell hinzu und testen Sie die Verbindung, um zu chatten',
     'chat.openConfig': 'Modell konfigurieren',
     'chat.welcome.subtitle': 'KI-gestützter Programmierassistent',
+    'chat.welcomeTip.dismiss': 'Nicht mehr anzeigen',
     'chat.design.hint': 'Beschreiben Sie die gewünschte Seite / den Prototyp / die Demo ~',
     'chat.code.wrapOn': 'Zeilenumbruch aktivieren',
     'chat.code.wrapOff': 'Zeilenumbruch deaktivieren',

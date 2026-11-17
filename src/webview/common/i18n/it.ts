@@ -41,6 +41,7 @@ export const it: Partial<Record<keyof typeof zh, string>> = {
     'chat.modelNotConfigured.desc': 'Aggiungi un modello e testa la connessione per iniziare a chattare',
     'chat.openConfig': 'Configura un modello',
     'chat.welcome.subtitle': 'Assistente di programmazione basato su IA',
+    'chat.welcomeTip.dismiss': 'Non mostrare più',
     'chat.design.hint': 'Descrivi la pagina / il prototipo / la demo che desideri ~',
     'chat.code.wrapOn': 'Attiva ritorno a capo',
     'chat.code.wrapOff': 'Disattiva ritorno a capo',
