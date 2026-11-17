@@ -696,9 +696,9 @@ class EditorOps(
 
     // ─── 超长粘贴转附件（对齐 VSCode utils/pasteAttachments.ts）────────────────
     // <semaRoot>/attachments/<uuid>/pasted-text.txt；semaRoot = SEMA_ROOT 环境变量，缺省 ~/.sema
+    // 退场由 core 负责：发送后登记到会话名下随会话删除，没发送的由 core 的期限兜底回收，这里不做清理
 
     private val pasteFileName = "pasted-text.txt"
-    private val pasteMaxDirs = 100
     private val uuidRe = Regex("^[0-9a-f-]{36}$", RegexOption.IGNORE_CASE)
 
     private fun attachmentsRoot(): File {
@@ -707,16 +707,14 @@ class EditorOps(
         return File(semaRoot, "attachments")
     }
 
-    /** 落盘一段粘贴文本并回推 pastedTextSaved{reqId, path}；失败 path 为 null。顺带退场最旧目录。 */
+    /** 落盘一段粘贴文本并回推 pastedTextSaved{reqId, path}；失败 path 为 null。 */
     private fun savePastedText(text: String?, reqId: com.google.gson.JsonElement?) {
         val path: String? = runCatching {
             if (text.isNullOrEmpty()) return@runCatching null
-            val root = attachmentsRoot()
-            val dir = File(root, java.util.UUID.randomUUID().toString())
+            val dir = File(attachmentsRoot(), java.util.UUID.randomUUID().toString())
             dir.mkdirs()
             val file = File(dir, pasteFileName)
             file.writeText(text, Charsets.UTF_8)
-            evictPastes(root)
             file.absolutePath
         }.getOrNull()
         val message = JsonObject().apply {
@@ -754,13 +752,6 @@ class EditorOps(
             if (content != null) addProperty("content", content) else add("content", com.google.gson.JsonNull.INSTANCE)
         }
         pushAppMessage(message)
-    }
-
-    private fun evictPastes(root: File) {
-        runCatching {
-            val dirs = root.listFiles { f -> f.isDirectory && uuidRe.matches(f.name) }?.sortedByDescending { it.lastModified() } ?: return
-            dirs.drop(pasteMaxDirs).forEach { it.deleteRecursively() }
-        }
     }
 
     // ─── 可视化产物内联嵌入（对齐 VSCode utils/vizEmbed.ts）────────────────────

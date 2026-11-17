@@ -9,6 +9,8 @@ export interface PendingPaste {
     path: string;
     preview: string;
     text: string;
+    /** fork / 输入撤销回填的粘贴：文件已经发送过、归会话所有（core 随会话退场），删芯片时不删文件 */
+    sent?: boolean;
 }
 
 const SAVE_TIMEOUT_MS = 3000;
@@ -44,10 +46,10 @@ export function usePendingPastes(vscode: VscodeApi) {
         return true;
     }, [vscode]);
 
-    /** 删芯片：删掉宿主的 uuid 目录并从队列移除 */
+    /** 删芯片：从队列移除；没发送过的粘贴同时删掉宿主的 uuid 目录，回填的粘贴（sent）分支出去的会话还在引用，不删文件 */
     const remove = useCallback((id: string) => {
         const target = pastesRef.current.find(p => p.id === id);
-        if (target) vscode.postMessage({ type: 'removePastedText', path: target.path });
+        if (target && !target.sent) vscode.postMessage({ type: 'removePastedText', path: target.path });
         setPastes(prev => prev.filter(p => p.id !== id));
     }, [vscode]);
 
@@ -61,7 +63,7 @@ export function usePendingPastes(vscode: VscodeApi) {
             vscode.postMessage({ type: 'readPastedText', path: p.path, reqId });
             const content = await waitFor<string | null>('pastedTextRead', reqId, m => (typeof m.content === 'string' ? m.content : null));
             if (content === null) { console.warn('[paste] pasted file no longer exists, skipped:', p.path); continue; }
-            restored.push({ id: reqId, path: p.path, preview: p.preview, text: content });
+            restored.push({ id: reqId, path: p.path, preview: p.preview, text: content, sent: true });
         }
         return restored;
     }, [vscode]);

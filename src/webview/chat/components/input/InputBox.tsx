@@ -490,7 +490,7 @@ const InputBox = forwardRef<InputBoxHandle, InputBoxProps>(({
         insertPlainTextAtCaretAt(currentText, selRange.start, selRange.end, pastedText);
     };
 
-    // 「在文本框中显示」：把粘贴内容展开回光标处，再删掉转存文件与芯片
+    // 「在文本框中显示」：把粘贴内容展开回光标处，再移除芯片（转存文件是否删除见 usePendingPastes.remove）
     const showPasteInInput = (id: string) => {
         const target = pendingPastes.pastes.find(p => p.id === id);
         const el = inputBoxRef.current;
