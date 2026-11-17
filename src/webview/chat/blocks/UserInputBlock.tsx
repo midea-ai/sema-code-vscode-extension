@@ -107,7 +107,8 @@ const UserInputBlock: React.FC<UserInputBlockProps> = React.memo(({ content, att
     const [isExpanded, setIsExpanded] = useState<boolean>(false);
     const [isOverflowing, setIsOverflowing] = useState<boolean>(false);
     const [copied, setCopied] = useState<boolean>(false);
-    const [previewSrc, setPreviewSrc] = useState<string | null>(null);
+    // 放大预览中的图片；filePath 为原图路径（有才在预览右上角显示尺寸与「打开文件」，同生图卡片）
+    const [preview, setPreview] = useState<{ src: string; filePath?: string } | null>(null);
     const contentRef = useRef<HTMLDivElement>(null);
     const copyTimerRef = useRef<number | null>(null);
 
@@ -181,7 +182,7 @@ const UserInputBlock: React.FC<UserInputBlockProps> = React.memo(({ content, att
             {attachments && attachments.length > 0 && (
                 <div className="user-input-images">
                     {attachments.map((att, i) => (
-                        <BubbleImage key={i} attachment={att} onOpen={setPreviewSrc} />
+                        <BubbleImage key={i} attachment={att} onOpen={src => setPreview({ src, filePath: att.path })} />
                     ))}
                 </div>
             )}
@@ -224,8 +225,14 @@ const UserInputBlock: React.FC<UserInputBlockProps> = React.memo(({ content, att
                     <ForkIcon />
                 </button>
             )}
-            {previewSrc && (
-                <ImagePreviewModal src={previewSrc} onClose={() => setPreviewSrc(null)} />
+            {preview && (
+                <ImagePreviewModal
+                    src={preview.src}
+                    onClose={() => setPreview(null)}
+                    onOpenFile={vscode && preview.filePath
+                        ? () => vscode.postMessage({ type: 'openFile', filePath: preview.filePath, line: 1 })
+                        : undefined}
+                />
             )}
         </div>
     );

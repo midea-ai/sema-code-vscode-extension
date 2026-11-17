@@ -69,6 +69,8 @@ export interface ImageAttachment {
     type: 'image';
     data: string;        // 纯 base64（无 data:...;base64, 前缀）
     media_type: 'image/jpeg' | 'image/png' | 'image/gif' | 'image/webp';
+    /** 原图落盘的绝对路径：core input:processing 回吐时带上，气泡放大预览据此提供「打开文件」；发送时不带 */
+    path?: string;
 }
 
 // 输入框中 @文件 的高亮区间。start/length 基于纯文本字符偏移。
