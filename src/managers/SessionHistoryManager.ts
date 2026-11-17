@@ -1,7 +1,14 @@
 import * as vscode from 'vscode';
+import * as fs from 'fs';
+import * as path from 'path';
 import type { AgentMode } from 'sema-core/types';
 import type { SemaSessionWrapper } from '../core/semaSessionWrapper';
 import { CLAW_SESSION_ID } from '../claw/paths';
+
+/** 附图原图的扩展名 → media_type（core 按文件头识别后落盘为这四种） */
+const ATTACHED_IMAGE_MEDIA_TYPES: Record<string, string> = {
+    '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.gif': 'image/gif', '.webp': 'image/webp',
+};
 
 /**
  * 会话数据结构
@@ -58,11 +65,41 @@ export class SessionHistoryManager {
             }
             if (message.type === 'tool' && message.toolName === 'Agent' && message.content?.status === 'running') {
                 result.push({ ...message, content: { ...message.content, status: 'interrupted' } });
+            } else if (message.type === 'user' && Array.isArray(message.attachments) && message.attachments.some((a: any) => a?.path && a?.data)) {
+                // 附图有原图路径（core input:processing 带回）的不存 base64，加载历史时按路径读回，见 restoreAttachments
+                result.push({
+                    ...message,
+                    attachments: message.attachments.map((a: any) => (a?.path ? { type: a.type, media_type: a.media_type, path: a.path } : a)),
+                });
             } else {
                 result.push(message);
             }
         }
         return result;
+    }
+
+    /**
+     * 存档里只留了原图路径的附图：读回原图补上 base64，气泡显示、回退回填与存档前一致。
+     * media_type 按原图扩展名取（存档里记的是压缩后的类型，可能与原图不同）；
+     * 原图已被清理的图去掉；旧存档自带 base64 的不动
+     */
+    private restoreAttachments(messages: any[]): any[] {
+        return messages.map(message => {
+            if (message?.type !== 'user' || !Array.isArray(message.attachments)
+                || !message.attachments.some((a: any) => a?.path && !a?.data)) {
+                return message;
+            }
+            const attachments = message.attachments.flatMap((a: any) => {
+                if (!a?.path || a.data) return [a];
+                try {
+                    const mediaType = ATTACHED_IMAGE_MEDIA_TYPES[path.extname(a.path).toLowerCase()] ?? a.media_type;
+                    return [{ ...a, media_type: mediaType, data: fs.readFileSync(a.path).toString('base64') }];
+                } catch {
+                    return [];
+                }
+            });
+            return { ...message, attachments: attachments.length > 0 ? attachments : undefined };
+        });
     }
 
     /**
@@ -215,7 +252,9 @@ export class SessionHistoryManager {
      */
     public async getSession(sessionId: string): Promise<Session | null> {
         const sessions = await this.getSessions();
-        return sessions.find(s => s.id === sessionId) || null;
+        const session = sessions.find(s => s.id === sessionId);
+        // 返回副本：读回的图片只进内存，不改动 workspaceState 里的存档对象
+        return session ? { ...session, content: this.restoreAttachments(session.content || []) } : null;
     }
 
     /**

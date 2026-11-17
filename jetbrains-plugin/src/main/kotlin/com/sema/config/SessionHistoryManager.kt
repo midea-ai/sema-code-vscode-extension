@@ -2,6 +2,7 @@ package com.sema.config
 
 import com.google.gson.Gson
 import com.google.gson.JsonArray
+import com.google.gson.JsonElement
 import com.google.gson.JsonObject
 import com.intellij.openapi.components.PersistentStateComponent
 import com.intellij.openapi.components.Service
@@ -9,6 +10,8 @@ import com.intellij.openapi.components.State
 import com.intellij.openapi.components.Storage
 import com.intellij.openapi.components.StoragePathMacros
 import com.intellij.openapi.project.Project
+import java.io.File
+import java.util.Base64
 
 /**
  * 会话历史本地存储（项目级）——对齐 VSCode 端 SessionHistoryManager（context.workspaceState，项目隔离）。
@@ -35,6 +38,11 @@ class SessionHistoryManager(private val project: Project) : PersistentStateCompo
 
     companion object {
         private const val MAX_SESSIONS = 50
+
+        /** 附图原图的扩展名 → media_type（core 按文件头识别后落盘为这四种）。 */
+        private val ATTACHED_IMAGE_MEDIA_TYPES = mapOf(
+            "png" to "image/png", "jpg" to "image/jpeg", "jpeg" to "image/jpeg", "gif" to "image/gif", "webp" to "image/webp",
+        )
     }
 
     private fun read(): MutableList<JsonObject> {
@@ -51,7 +59,54 @@ class SessionHistoryManager(private val project: Project) : PersistentStateCompo
         myState.sessionsJson = gson.toJson(arr)
     }
 
-    fun get(id: String): JsonObject? = read().firstOrNull { it.str("id") == id }
+    /** 取一条会话用于重放：存档里只留了路径的附图在这里读回原图（read() 每次新解析，改的是副本不是存档）。 */
+    fun get(id: String): JsonObject? = read().firstOrNull { it.str("id") == id }?.also { restoreAttachments(it) }
+
+    /** 用户消息里的附图数组；不是用户消息或没有附图时为 null。 */
+    private fun userAttachments(message: JsonElement): JsonArray? {
+        val obj = message.takeIf { it.isJsonObject }?.asJsonObject ?: return null
+        if (obj.str("type") != "user") return null
+        return obj.get("attachments")?.takeIf { it.isJsonArray }?.asJsonArray
+    }
+
+    /** 存档前：附图有原图路径（core input:processing 带回）的不存 base64，加载时按路径读回，见 restoreAttachments。 */
+    private fun stripAttachmentData(content: JsonArray) {
+        for (message in content) {
+            val attachments = userAttachments(message) ?: continue
+            for (a in attachments) {
+                val obj = a.takeIf { it.isJsonObject }?.asJsonObject ?: continue
+                if (obj.str("path").isNotEmpty()) obj.remove("data")
+            }
+        }
+    }
+
+    /**
+     * 存档里只留了原图路径的附图：读回原图补上 base64，气泡显示、回退回填与存档前一致。
+     * media_type 按原图扩展名取（存档里记的是压缩后的类型，可能与原图不同）；
+     * 原图已被清理的图去掉；旧存档自带 base64 的不动。
+     */
+    private fun restoreAttachments(session: JsonObject) {
+        val content = session.get("content")?.takeIf { it.isJsonArray }?.asJsonArray ?: return
+        for (message in content) {
+            val attachments = userAttachments(message) ?: continue
+            val restored = JsonArray()
+            for (a in attachments) {
+                val obj = a.takeIf { it.isJsonObject }?.asJsonObject
+                val path = obj?.str("path").orEmpty()
+                if (obj == null || path.isEmpty() || obj.str("data").isNotEmpty()) {
+                    restored.add(a)
+                    continue
+                }
+                val file = File(path)
+                val bytes = runCatching { file.readBytes() }.getOrNull() ?: continue
+                obj.addProperty("data", Base64.getEncoder().encodeToString(bytes))
+                ATTACHED_IMAGE_MEDIA_TYPES[file.extension.lowercase()]?.let { obj.addProperty("media_type", it) }
+                restored.add(obj)
+            }
+            val messageObj = message.asJsonObject
+            if (restored.size() > 0) messageObj.add("attachments", restored) else messageObj.remove("attachments")
+        }
+    }
 
     /** upsert：更新保留 createdAt；新会话置顶，超上限截尾（对齐 VSCode saveSession）。 */
     fun save(session: JsonObject?) {
@@ -61,6 +116,7 @@ class SessionHistoryManager(private val project: Project) : PersistentStateCompo
         if (id.isEmpty() || title.isEmpty()) return
         val content = session.getAsJsonArray("content") ?: return
         if (content.size() == 0) return
+        stripAttachmentData(content)
 
         val list = read()
         val now = System.currentTimeMillis()
