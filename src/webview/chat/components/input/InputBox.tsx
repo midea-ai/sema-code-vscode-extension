@@ -23,11 +23,13 @@ import { useModelMenu } from './hooks/useModelMenu';
 import { useShortcutPanel } from './hooks/useShortcutPanel';
 import { useAgentModeMenu } from './hooks/useAgentModeMenu';
 import { usePermissionLevelMenu } from './hooks/usePermissionLevelMenu';
+import { useReviewPicker } from './hooks/useReviewPicker';
 
 import TokenProgress from './components/TokenProgress';
 import FilePicker from './components/FilePicker';
 import ModelMenu from './components/ModelMenu';
 import ShortcutPanel from './components/ShortcutPanel';
+import ReviewPicker from './components/ReviewPicker';
 import AgentModeMenu from './components/AgentModeMenu';
 import PermissionLevelMenu from './components/PermissionLevelMenu';
 
@@ -48,6 +50,7 @@ import {
     insertNodeAtOffset
 } from './utils/editorDom';
 import { ShortcutCommand } from '../../../../utils/command';
+import { REVIEW_COMMAND } from '../../../../utils/review';
 import { useT } from '../../../common/i18n/react';
 
 // 从纯文本里按 `@路径[:a-b]` 正则重建 mention（回填用）。只认裸路径形式：带引号的 `@"a b.ts"` 其
@@ -147,6 +150,8 @@ const InputBox = forwardRef<InputBoxHandle, InputBoxProps>(({
     const shortcutPanel = useShortcutPanel(disabled, shortcutPanelRef, inputBoxRef);
     const agentModeMenu = useAgentModeMenu(disabled, agentMode, onAgentModeChange, agentModeMenuRef, agentModeButtonRef);
     const permissionLevelMenu = usePermissionLevelMenu(disabled, onPermissionLevelChange, permissionLevelMenuRef, permissionLevelButtonRef);
+    // /review 范围面板：选定后按斜杠命令直接发送
+    const reviewPicker = useReviewPicker(vscode, disabled, inputValue, inputBoxRef, text => sendShortcut(text), () => clearEditor(), () => reopenShortcutPanelAtReview());
 
     useImperativeHandle(ref, () => ({
         focus: () => { inputBoxRef.current?.focus(); },
@@ -309,6 +314,9 @@ const InputBox = forwardRef<InputBoxHandle, InputBoxProps>(({
                 setSelectedCommandIndex(0);
             }
         }
+
+        // /review 范围面板打开期间输入框有改动：范围步骤关闭面板，提交步骤按新过滤词回到首项
+        reviewPicker.onTextChange();
 
         if (inputHistory.historyIndex !== -1) inputHistory.exitNavigation();
 
@@ -712,6 +720,14 @@ const InputBox = forwardRef<InputBoxHandle, InputBoxProps>(({
 
     const completeShortcut = (text: string) => {
         const el = inputBoxRef.current; if (!el) return;
+        // /review 不进输入框：清掉已敲的 `/rev…`，直接弹范围面板，选定即发送
+        if (text === REVIEW_COMMAND) {
+            clearEditor();
+            shortcutPanel.setShowShortcutPanel(false);
+            el.focus();
+            reviewPicker.open();
+            return;
+        }
         const newValue = `/${text} `;
         renderEditorContent(el, newValue, []);
         setInputValue(newValue);
@@ -722,12 +738,33 @@ const InputBox = forwardRef<InputBoxHandle, InputBoxProps>(({
         commitHistory({ text: newValue, mentions: [], caret: newValue.length }, 'op');
     };
 
+    // 审查范围面板返回上一步：输入框回到 `/`，斜杠命令面板重新打开并停在「审查」
+    const reopenShortcutPanelAtReview = () => {
+        const el = inputBoxRef.current; if (!el) return;
+        renderEditorContent(el, '/', []);
+        setInputValue('/');
+        setMentions([]);
+        setCaretOffset(el, 1);
+        el.focus();
+        commitHistory({ text: '/', mentions: [], caret: 1 }, 'op');
+        shortcutPanel.setShowShortcutPanel(true);
+        setSelectedCommandIndex(Math.max(0, getFilteredShortcutCommands('').findIndex(c => c.text === REVIEW_COMMAND)));
+    };
+
+    // /review 不进输入历史：范围是当时选的，翻历史重发没有意义
+    const isReviewInput = (text: string) => new RegExp(`^/${REVIEW_COMMAND}(\\s|$)`).test(text.trim());
+
+    const recordHistory = (text: string, files: SelectedFile[], ms: InputMention[]) => {
+        inputHistory.resetNavigation();
+        if (isReviewInput(text)) return;
+        const item = inputHistory.addToHistory(text, files, ms);
+        if (item) vscode.postMessage({ type: 'saveInputHistory', item: { ...item, ts: Date.now() } });
+    };
+
     const sendShortcut = (text: string) => {
         if (disabled) return;
         const fullText = `/${text}`;
-        const item = inputHistory.addToHistory(fullText, [], []);
-        inputHistory.resetNavigation();
-        if (item) vscode.postMessage({ type: 'saveInputHistory', item: { ...item, ts: Date.now() } });
+        recordHistory(fullText, [], []);
         onSend(fullText, [], [], []);
         clearEditor();
         fileSelection.setSelectedFiles([]);
@@ -764,9 +801,7 @@ const InputBox = forwardRef<InputBoxHandle, InputBoxProps>(({
 
         const files = filesFromMentions(mentions);
         // 图片/粘贴附件不进输入历史（base64 太大；粘贴文件会被退场清理）
-        const item = inputHistory.addToHistory(text, files, mentions);
-        inputHistory.resetNavigation();
-        if (item) vscode.postMessage({ type: 'saveInputHistory', item: { ...item, ts: Date.now() } });
+        recordHistory(text, files, mentions);
 
         onSend(trimmed, files, attachments, pastes);
         clearEditor();
@@ -910,6 +945,9 @@ const InputBox = forwardRef<InputBoxHandle, InputBoxProps>(({
             }
         }
 
+        // /review 范围面板
+        if (reviewPicker.handleKeyDown(e, IS_JB ? eventIsComposing(e) : composingRef.current)) return;
+
         // 快捷面板
         if (shortcutPanel.showShortcutPanel) {
             const searchQuery = inputValue.startsWith('/') ? inputValue.slice(1).split(' ')[0] : '';
@@ -927,7 +965,11 @@ const InputBox = forwardRef<InputBoxHandle, InputBoxProps>(({
                         setSelectedCommandIndex(prev => prev > 0 ? prev - 1 : filteredCommands.length - 1);
                     }
                     return;
-                } else if (e.key === 'Tab') {
+                } else if (e.key === 'Tab'
+                    // → 等同 Tab：仅在光标已在末尾、不带修饰键、非输入法选字时，否则照常移动光标 / 扩选
+                    || (e.key === 'ArrowRight' && !e.shiftKey && !e.metaKey && !e.ctrlKey && !e.altKey
+                        && !(IS_JB ? eventIsComposing(e) : composingRef.current)
+                        && getCaretOffset(e.currentTarget) === inputValue.length)) {
                     e.preventDefault();
                     if (filteredCommands.length > 0) {
                         const safeIndex = Math.min(selectedCommandIndex, filteredCommands.length - 1);
@@ -1190,6 +1232,8 @@ const InputBox = forwardRef<InputBoxHandle, InputBoxProps>(({
                     onExecuteShortcut={(text: string) => completeShortcut(text)}
                     shortcutPanelRef={shortcutPanelRef}
                 />
+
+                <ReviewPicker {...reviewPicker.panelProps} />
 
                 <div className="input-textarea-container">
                     <div

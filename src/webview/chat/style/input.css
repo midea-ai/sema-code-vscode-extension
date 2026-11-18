@@ -189,6 +189,56 @@
     justify-content: flex-start;
 }
 
+/* /review 范围面板：复用斜杠面板的弹窗与行样式。提交标题可能很长，超出省略。
+   右边的说明（不可选的原因）放不下时整段不显示：行固定一行高并允许换行，说明换到第二行后被裁掉 */
+.review-picker-item {
+    flex-wrap: wrap;
+    align-content: flex-start;
+    row-gap: 8px;
+    box-sizing: content-box;
+    height: 1lh;
+    overflow: hidden;
+}
+
+.review-picker-item .shortcut-command {
+    flex: 0 1 auto;
+    min-width: 0;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.review-picker-item .shortcut-desc {
+    flex: 0 0 auto;
+}
+
+/* 范围标签前缀：主题高亮色 */
+.review-picker-tag {
+    color: var(--chat-text-link);
+}
+
+/* 不可选的范围（没有未提交的改动 / 不在仓库里） */
+.review-picker-item.disabled {
+    cursor: default;
+}
+
+.review-picker-item.disabled .shortcut-command {
+    color: var(--chat-text-secondary);
+    opacity: 0.7;
+}
+
+.review-picker-item.disabled .review-picker-tag {
+    color: inherit;
+}
+
+.review-picker-empty {
+    padding: 2px 12px 8px;
+    font-size: var(--chat-font-base);
+    color: var(--chat-text-secondary);
+    opacity: 0.7;
+}
+
 /* 输入框（contentEditable div） */
 .input-textarea {
     width: 100%;

@@ -62,7 +62,8 @@ const ShortcutPanel: React.FC<ShortcutPanelProps> = ({
     // 确保 selectedIndex 在有效范围内
     const safeSelectedIndex = Math.max(0, Math.min(selectedIndex, filteredCommands.length - 1));
 
-    // 当选中项改变时，滚动到可见区域
+    // 当选中项改变时，滚动到可见区域；面板重新打开时也要滚一次
+    // （从审查范围返回时选中项下标与关闭前相同，只靠下标变化不会触发）
     useEffect(() => {
         if (selectedItemRef.current) {
             selectedItemRef.current.scrollIntoView({
@@ -70,7 +71,7 @@ const ShortcutPanel: React.FC<ShortcutPanelProps> = ({
                 behavior: 'smooth'
             });
         }
-    }, [safeSelectedIndex]);
+    }, [safeSelectedIndex, show]);
 
     if (!show) return null;
 

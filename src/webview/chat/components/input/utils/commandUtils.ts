@@ -3,6 +3,7 @@ import { CommandConfig } from '../../../../config/types/command';
 import { SkillConfig } from '../../../../config/types/skill';
 import { AgentConfig } from '../../../../config/types/agent';
 import { commandDisplayOf, displayDesc, displayName, skillDisplayOf, skillDisplayOrder } from '../../../utils/skillDisplay';
+import { uiScope } from '../../../../config/utils/scope';
 
 // 存储自定义命令（由后端推送更新）
 let customCommands: ShortcutCommand[] = [];
@@ -50,11 +51,11 @@ export const setSkills = (skillList: SkillConfig[]) => {
 export const getSkillFilePath = (name: string): string | undefined => skillFilePaths[name];
 
 /**
- * 由后端推送子代理时调用，更新子代理列表（过滤内置 agent）
+ * 由后端推送子代理时调用，更新子代理列表（过滤内置 agent：core 内置的，以及宿主内联的，如只由 /review 调用的审查子代理）
  */
 export const setAgents = (agentList: AgentConfig[]) => {
     agents = agentList
-        .filter(agent => agent.locate !== 'builtin')
+        .filter(agent => uiScope(agent.locate) !== 'builtin')
         .map(agent => ({
             text: agent.name,
             desc: agent.description,

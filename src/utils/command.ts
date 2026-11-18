@@ -1,4 +1,5 @@
 import { t } from '../webview/common/i18n/core';
+import { REVIEW_COMMAND } from './review';
 
 // 快捷命令配置类型
 export interface ShortcutCommand {
@@ -29,5 +30,10 @@ export const getBuiltinShortcutCommands = (): ShortcutCommand[] => [
     {
         text: "goal",
         desc: t('chat.cmd.goal')
-    }
+    },
+    // 代码审查：选中后弹出范围面板（未提交的改动 / 某次提交）。范围数据来自 VS Code 的 git 扩展，JetBrains 端不提供
+    ...((globalThis as any).__SEMA_JB__ ? [] : [{
+        text: REVIEW_COMMAND,
+        desc: t('chat.cmd.review')
+    }])
 ];
