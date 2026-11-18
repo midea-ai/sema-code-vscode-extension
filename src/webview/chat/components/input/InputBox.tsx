@@ -315,7 +315,7 @@ const InputBox = forwardRef<InputBoxHandle, InputBoxProps>(({
             }
         }
 
-        // /review 范围面板打开期间输入框有改动：范围步骤关闭面板，提交步骤按新过滤词回到首项
+        // /review 面板打开期间输入框有改动：关闭面板
         reviewPicker.onTextChange();
 
         if (inputHistory.historyIndex !== -1) inputHistory.exitNavigation();

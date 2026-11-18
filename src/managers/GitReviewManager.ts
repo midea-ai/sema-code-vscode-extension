@@ -82,11 +82,11 @@ export class GitReviewManager {
         return [...seen].sort();
     }
 
-    /** 斜杠面板第一步用：有没有仓库、有没有未提交的改动（只用来置灰选项） */
+    /** 斜杠面板第一步用：有没有仓库、有没有未提交的改动、有没有提交（只用来置灰选项） */
     public async getInfo(): Promise<ReviewInfo> {
         const repo = await this.getRepository();
-        if (typeof repo === 'string') return { reason: repo, files: 0 };
-        return { files: this.changedFiles(repo).length };
+        if (typeof repo === 'string') return { reason: repo, files: 0, hasCommits: false };
+        return { files: this.changedFiles(repo).length, hasCommits: !!repo.state.HEAD?.commit };
     }
 
     public async getRecentCommits(): Promise<ReviewCommit[]> {

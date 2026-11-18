@@ -47,6 +47,8 @@ export interface ReviewInfo {
     reason?: 'noGit' | 'noRepo';
     /** 未提交改动涉及的文件数（为 0 时该选项置灰） */
     files: number;
+    /** 仓库是否已有提交（没有时「某次提交」选项置灰） */
+    hasCommits: boolean;
 }
 
 /** 斜杠面板「选择一次提交」里的一条（宿主 reviewCommitsLoaded） */
@@ -116,7 +118,7 @@ export function buildReviewInstruction(scope: ReviewScope, title: string, doneLi
     return [
         `Run a code review by delegating to the \`${REVIEWER_AGENT_NAME}\` sub-agent. Do exactly the following and nothing else:`,
         '',
-        `1. Call the sub_agent tool exactly once, in the foreground (not in the background), with agent_type "${REVIEWER_AGENT_NAME}" and title "${title}". Pass the text inside <reviewer_task> as its instructions, verbatim: do not add, remove, or rephrase anything. Do not run any command or read any file yourself first.`,
+        `1. Call the sub_agent tool exactly once, in the foreground (not in the background), with agent_type "${REVIEWER_AGENT_NAME}" and title ${JSON.stringify(title)}. Pass the text inside <reviewer_task> as its instructions, verbatim: do not add, remove, or rephrase anything. Do not run any command or read any file yourself first.`,
         `2. When it returns, do not repeat, summarize, or comment on its result: the interface already shows the full review to the user. Reply with exactly one line: ${doneLine}`,
         '3. If the sub-agent fails or returns no review, say so in one line instead. Do not write a review yourself.',
         '4. Do not fix or change anything unless the user asks afterwards.',

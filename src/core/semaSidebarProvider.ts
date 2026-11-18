@@ -491,7 +491,10 @@ export class SemaSidebarProvider implements vscode.WebviewViewProvider {
             const scope = resolved.scope;
             const title = scope.kind === 'uncommitted'
                 ? t('host.review.titleUncommitted')
-                : t('host.review.titleCommit', { hash: scope.hash.slice(0, 7) });
+                : t('host.review.titleCommit', {
+                    hash: scope.hash.slice(0, 7),
+                    subject: scope.subject ? `: ${scope.subject}` : '',
+                });
             wrapper.processUserInput(
                 buildReviewInstruction(scope, title, t('host.review.done')),
                 reviewDisplayText(scope)

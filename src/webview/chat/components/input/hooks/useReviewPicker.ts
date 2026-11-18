@@ -10,7 +10,7 @@ export interface UseReviewPickerReturn {
     panelProps: ReviewPickerProps;
     /** 斜杠面板选中「审查」时调用：打开范围面板（调用方先清空输入框，命令本身不进输入框） */
     open: () => void;
-    /** 输入框文本被用户改动后调用：范围步骤视为改去输入别的内容，关闭面板；提交步骤是过滤词变化，回到首项 */
+    /** 输入框文本被用户改动后调用：关闭审查面板 */
     onTextChange: () => void;
     /** 面板打开时处理 ↑↓ / 回车 / Tab / Esc；返回 true 表示按键已被面板接管 */
     handleKeyDown: (e: React.KeyboardEvent, composing: boolean) => boolean;
@@ -29,7 +29,7 @@ export const useReviewPicker = (
     inputBoxRef: RefObject<HTMLElement>,
     /** 发送一条斜杠命令（不含 /） */
     send: (text: string) => void,
-    /** 清空输入框（从提交列表退回范围时清掉过滤词） */
+    /** 清空输入框（从提交列表退回范围时调用） */
     clearInput: () => void,
     /** 从范围一步返回斜杠命令面板 */
     backToCommands: () => void
@@ -80,31 +80,29 @@ export const useReviewPicker = (
     }, [step, disabled]);
 
     const onTextChange = () => {
-        if (step === 'scope') setStep(null);
-        else if (step === 'commit') setIndex(0);
+        if (step) setStep(null);
     };
-
-    // 提交步骤的过滤词：面板打开期间输入框里敲的文字
-    const query = inputValue.trim().toLowerCase();
 
     const items: ReviewPickerItem[] = useMemo(() => {
         if (step === 'scope') {
             const reasonText = info?.reason ? t(`chat.review.${info.reason}`) : '';
+            const noChanges = !reasonText && info?.files === 0;
+            const noCommits = !reasonText && info?.hasCommits === false;
             // 两个选项固定写英文，不随界面语言变（同技能名的做法）；右侧只在不可选时给出原因
+            // 没有改动 / 没有提交时标题直接变成 No change / No commit，不再另缀一句说明
             // 信息还没回来时不置灰：直接回车也能发起，范围为空由宿主提示
             return [
-                { key: 'uncommitted', tag: '[未提交]', label: 'Review uncommitted changes', desc: reasonText || (info?.files === 0 ? t('chat.review.noChanges') : ''), disabled: !!reasonText || info?.files === 0 },
-                { key: 'commit', tag: '[已提交]', label: 'Review a commit', desc: reasonText, disabled: !!reasonText },
+                { key: 'uncommitted', tag: '[未提交]', label: noChanges ? 'No change' : 'Review uncommitted changes', desc: reasonText, disabled: !!reasonText || noChanges },
+                { key: 'commit', tag: '[已提交]', label: noCommits ? 'No commit' : 'Review a commit', desc: reasonText, disabled: !!reasonText || noCommits },
             ];
         }
         if (step === 'commit') {
             return (commits ?? [])
-                .filter(c => !query || c.subject.toLowerCase().includes(query) || c.hash.toLowerCase().startsWith(query))
                 // 只显示提交标题（没有标题时退回短 sha）
                 .map(c => ({ key: c.hash, label: c.subject || c.hash.slice(0, 7), desc: '' }));
         }
         return [];
-    }, [step, info, commits, query, t]);
+    }, [step, info, commits, t]);
 
     const selectedIndex = Math.max(0, Math.min(index, items.length - 1));
 
@@ -121,7 +119,7 @@ export const useReviewPicker = (
             send(`${REVIEW_COMMAND} uncommitted`);
             return;
         }
-        // 「某次提交…」：进入提交列表，在输入框里打字可过滤；本次打开期间已取过就不再重取
+        // 「某次提交…」：进入提交列表；本次打开期间已取过就不再重取
         setStep('commit');
         setIndex(0);
         if (commits === null) vscode.postMessage({ type: 'requestReviewCommits' });
