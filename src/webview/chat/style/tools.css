@@ -466,8 +466,9 @@
     border-left: 2px solid var(--chat-color-error);
 }
 
-.task-block-header {
-    cursor: default;
+/* 整个面板即「查看详情」入口 */
+.task-block {
+    cursor: pointer;
 }
 
 .task-background-tag {
@@ -506,21 +507,28 @@
 
 .task-title-text {
     font-size: var(--chat-font-base);
+    min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
 }
 
+/* 无边框的文字按钮；非悬浮时不占用标题宽度 */
 .task-detail-btn {
     font-size: var(--chat-font-sm);
     padding: 2px 8px;
     background-color: transparent;
-    border: 1px solid var(--chat-border);
+    border: none;
     border-radius: var(--chat-radius-sm);
     color: var(--chat-color-muted);
     cursor: pointer;
-    transition: all 0.15s;
+    transition: background-color 0.15s, color 0.15s;
     flex-shrink: 0;
+    display: none;
+}
+
+.task-block:hover .task-detail-btn {
+    display: block;
 }
 
 .task-detail-btn:hover {
@@ -544,6 +552,11 @@
 /* 代码审查（Reviewer 子代理）：完成后在块下方直接展开审查全文，按普通回复的 markdown 渲染 */
 .review-result {
     margin-top: var(--chat-spacing-xs);
+}
+
+/* 审查结果中的 [文字](文件路径) 保留文件高亮与点击，只隐藏文件图标 */
+.review-result .markdown-content .file-path-code .file-ref-icon {
+    display: none;
 }
 
 /* 每条发现是「- 标题行」+ 紧跟的正文段落：条目之间空一行，正文贴着标题；标题行开头的 - 不显示，标题与正文左对齐 */

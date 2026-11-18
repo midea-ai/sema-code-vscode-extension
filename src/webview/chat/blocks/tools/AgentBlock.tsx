@@ -190,9 +190,28 @@ const AgentBlock: React.FC<AgentBlockProps> = React.memo(({ content, vscode, for
         onExternalClose?.();
     }, [onExternalClose]);
 
+    // 面板整体可点开详情，但要区分「拖动选中摘要文字」：位移超过阈值或存在选区时不触发
+    const mouseDownPosRef = useRef<{ x: number; y: number } | null>(null);
+
+    const handleBlockMouseDown = useCallback((e: React.MouseEvent) => {
+        mouseDownPosRef.current = { x: e.clientX, y: e.clientY };
+    }, []);
+
+    const handleBlockClick = useCallback((e: React.MouseEvent) => {
+        const start = mouseDownPosRef.current;
+        mouseDownPosRef.current = null;
+        if (start && (Math.abs(e.clientX - start.x) > 4 || Math.abs(e.clientY - start.y) > 4)) return;
+        if ((window.getSelection()?.toString() ?? '').length > 0) return;
+        handleOpenModal();
+    }, [handleOpenModal]);
+
     return (
         <>
-            <div className={`chat-block task-block task-status-${status}`}>
+            <div
+                className={`chat-block task-block task-status-${status}`}
+                onMouseDown={handleBlockMouseDown}
+                onClick={handleBlockClick}
+            >
                 <div className="chat-block-header task-block-header">
                     <div className="chat-block-title task-block-title">
                         {getStatusIcon()}
@@ -202,7 +221,8 @@ const AgentBlock: React.FC<AgentBlockProps> = React.memo(({ content, vscode, for
                     {status === 'running' && !background && (
                         <button
                             className="task-detail-btn"
-                            onClick={() => {
+                            onClick={(e) => {
+                                e.stopPropagation();
                                 vscode.postMessage({ type: 'transferAgentToBackground', sessionId, taskId: content.taskId });
                             }}
                         >
@@ -211,7 +231,10 @@ const AgentBlock: React.FC<AgentBlockProps> = React.memo(({ content, vscode, for
                     )}
                     <button
                         className="task-detail-btn"
-                        onClick={handleOpenModal}
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            handleOpenModal();
+                        }}
                     >
                         {t('chat.agent.viewDetail')}
                     </button>
