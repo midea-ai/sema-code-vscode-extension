@@ -17,15 +17,15 @@ export interface WelcomeTipDef {
     content: { zh: string; en: string } & Partial<Record<Language, string>>;
 }
 
-const SEMAWORK_RELEASE = 'https://github.com/midea-ai/sema-code-core/releases/tag/SemaWork';
+const SEMAWORK_DETAILS_URL = 'https://github.com/midea-ai/sema-code-core';
 
 export const WELCOME_TIP: WelcomeTipDef | null = {
     id: 'semawork',
     content: {
-        zh: `试试 SemaWork：\`npm i -g sema-code-ui\` 安装，运行 \`sema-ui\` 启动，查看[详情](${SEMAWORK_RELEASE})`,
-        en: `Try SemaWork: install with \`npm i -g sema-code-ui\`, run \`sema-ui\` to start. See [details](${SEMAWORK_RELEASE})`,
-        de: `SemaWork ausprobieren: mit \`npm i -g sema-code-ui\` installieren, mit \`sema-ui\` starten. Siehe [Details](${SEMAWORK_RELEASE})`,
-        fr: `Essayez SemaWork : installez avec \`npm i -g sema-code-ui\`, lancez \`sema-ui\` pour démarrer. Voir les [détails](${SEMAWORK_RELEASE})`,
-        it: `Prova SemaWork: installa con \`npm i -g sema-code-ui\`, esegui \`sema-ui\` per avviare. Vedi i [dettagli](${SEMAWORK_RELEASE})`,
+        zh: `试试 SemaWork：\`npm i -g sema-code-ui\` 安装，运行 \`sema-ui\` 启动，查看[详情](${SEMAWORK_DETAILS_URL})`,
+        en: `Try SemaWork: install with \`npm i -g sema-code-ui\`, run \`sema-ui\` to start. See [details](${SEMAWORK_DETAILS_URL})`,
+        de: `SemaWork ausprobieren: mit \`npm i -g sema-code-ui\` installieren, mit \`sema-ui\` starten. Siehe [Details](${SEMAWORK_DETAILS_URL})`,
+        fr: `Essayez SemaWork : installez avec \`npm i -g sema-code-ui\`, lancez \`sema-ui\` pour démarrer. Voir les [détails](${SEMAWORK_DETAILS_URL})`,
+        it: `Prova SemaWork: installa con \`npm i -g sema-code-ui\`, esegui \`sema-ui\` per avviare. Vedi i [dettagli](${SEMAWORK_DETAILS_URL})`,
     },
 };

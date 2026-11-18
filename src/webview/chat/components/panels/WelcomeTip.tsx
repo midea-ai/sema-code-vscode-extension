@@ -60,8 +60,9 @@ function renderInline(text: string, openLink: (url: string) => void): React.Reac
             nodes.push(<TipCommand key={match.index} text={match[1]} />);
         } else {
             const url = match[3];
+            // 不写 href：VS Code webview 会自行打开带真实 href 的 <a>（不看 preventDefault），与 openLink 叠加成两个标签
             nodes.push(
-                <a key={match.index} href={url} className="welcome-tip-link" onClick={(e) => { e.preventDefault(); openLink(url); }}>
+                <a key={match.index} className="welcome-tip-link" title={url} onClick={() => openLink(url)}>
                     {match[2]}
                 </a>
             );
