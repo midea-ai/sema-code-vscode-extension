@@ -157,12 +157,12 @@ export function renderMarkdownToHtml(content: string, vscode?: any): string {
     // 路径须含 / 或 . 以排除普通括号写法（如 "数组[i](见下文)"）；
     // 先渲染为待验证纯文本（md-local-link），扩展端 verifyFilePath 确认存在后
     // 由 AiResponseBlock 加 file-path-code 升级为可点链接（openFile 在编辑器打开）；
-    // 不存在则回退展示原始 markdown 文本。必须晚于图片与 scheme 链接提取。
+    // 不存在则保持纯文本（只显示链接文字）。必须晚于图片与 scheme 链接提取。
     processedContent = processedContent.replace(
       /\[([^\]\x00]+)\]\((?![a-zA-Z][a-zA-Z0-9+.\-]+:(?!\d+(?:[-~]\d+)?\)))(?=(?:[^()\s\x00]|\([^()\s\x00]*\))*[/.])((?:[^()\s\x00#]|\([^()\s\x00]*\))(?:[^()\s\x00]|\([^()\s\x00]*\))*)\)/g,
-      (match, text, path) => {
+      (_match, text, path) => {
         const placeholder = `\x00URL_${urlPlaceholders.length}\x00`;
-        urlPlaceholders.push(createLocalLinkHtml(text, path, vscode, match));
+        urlPlaceholders.push(createLocalLinkHtml(text, path, vscode));
         return placeholder;
       }
     );
@@ -591,10 +591,9 @@ function isPrivateHost(h: string): boolean {
 /**
  * 创建本地路径链接 HTML - [text](wiki/foo.md) 等无 scheme 路径
  * 初始为待验证纯文本样式（title 悬停显示真实路径），verifyFilePath 确认存在后
- * 由 AiResponseBlock 加 file-path-code 变为可点；不存在时用 data-md-original
- * 回退展示原始 markdown 文本，避免误判普通括号写法时吞掉原文
+ * 由 AiResponseBlock 加 file-path-code 变为可点；不存在时保持纯文本（只显示链接文字，与 webui 一致）
  */
-function createLocalLinkHtml(text: string, path: string, vscode: any, originalMd: string): string {
+function createLocalLinkHtml(text: string, path: string, vscode: any): string {
   // 模型按 CommonMark 把空格写成 %20（my%20notes.md），先解码再校验，否则 stat 的是带 %20 的字面量永远不存在；非法编码保持原样
   let decoded = path;
   try { decoded = decodeURIComponent(path); } catch { /* keep */ }
@@ -613,7 +612,7 @@ function createLocalLinkHtml(text: string, path: string, vscode: any, originalMd
     });
   }, 0);
 
-  return `<a class="md-local-link" data-temp-id="${tempId}" data-md-original="${escapeHtml(originalMd)}" title="${escapeHtml(decoded)}">${escapeHtml(text)}</a>`;
+  return `<a class="md-local-link" data-temp-id="${tempId}" title="${escapeHtml(decoded)}">${escapeHtml(text)}</a>`;
 }
 
 /**

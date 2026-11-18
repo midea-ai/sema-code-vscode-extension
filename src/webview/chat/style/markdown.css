@@ -63,19 +63,24 @@
   border-radius: var(--chat-radius-sm);
 }
 
-/* 文件路径内联代码 / 本地路径链接：verifyFilePath 确认后由 AiResponseBlock 把内容换成统一的文件高亮结构
-   （.file-ref-chip，尺寸/间距/对齐见 input.css），名字仍是原文。这里只管去掉代码底色、界面字体与光标；
-   文件名用 VS Code 链接高亮色（.file-ref-chip 自带），图标保持文件类型色（内联 style）。
-   悬停下划线打在 .file-ref-name 上 */
+/* 文件路径内联代码 / 本地路径链接：verifyFilePath 确认后由 AiResponseBlock 加 file-path-code 变为可点。
+   - 内联代码（`src/a.ts:10-12`）：不放图标，原文直接用链接高亮色 + 500 字重（与芯片名字同观感），长路径可任意位置折行；
+   - 本地路径链接（[text](path)）：内容换成统一的文件高亮结构（.file-ref-chip，尺寸/间距/对齐见 input.css），
+     名字仍是原文，图标保持文件类型色（内联 style）。
+   这里统一去掉代码底色、换界面字体与光标；悬停下划线分别打在内联代码自身 / 芯片的 .file-ref-name 上 */
 .markdown-content .file-path-code {
   background: none;
   padding: 0;
+  color: var(--chat-text-link);
   font-family: var(--vscode-font-family);
   font-size: inherit;
+  font-weight: 500;
   cursor: pointer;
   text-decoration: none;
+  overflow-wrap: anywhere;
 }
 
+.markdown-content code.file-path-code:hover,
 .markdown-content .file-path-code:hover .file-ref-name {
   text-decoration: underline;
   text-underline-offset: 2px;
@@ -299,7 +304,7 @@
 }
 
 /* 本地路径链接 - [text](wiki/foo.md) 无 scheme 路径
-   待验证阶段与正文同色、不可点（title 悬停可看真实路径）；
+   待验证阶段与正文同色、不可点（title 悬停可看真实路径），文件不存在时一直保持这个外观；
    verifyFilePath 确认存在后加 file-path-code，需覆盖此规则恢复可点样式 */
 .markdown-content .md-local-link {
   color: inherit;

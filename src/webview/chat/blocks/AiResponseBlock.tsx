@@ -55,18 +55,13 @@ const AiResponseBlock: React.FC<AiResponseBlockProps> = React.memo(({
                         if (lineInfo) {
                             element.setAttribute('data-line-info', lineInfo);
                         }
-                        // 内容换成统一的文件高亮结构（图标 + 原文名字，图标按文件类型上色；SVG 来自内置常量，名字已转义）
-                        if (!element.querySelector('.file-ref-chip')) {
+                        // 本地路径链接（.md-local-link）：内容换成统一的文件高亮结构（图标 + 原文名字，图标按文件类型上色；SVG 来自内置常量，名字已转义）。
+                        // 内联代码文件路径（`src/a.ts:10-12`）出现得密，只上链接色不放图标，避免满屏图标
+                        if (element.classList.contains('md-local-link') && !element.querySelector('.file-ref-chip')) {
                             element.innerHTML = buildFileLabelHtml(String(filePath), false, element.textContent || '', true);
                         }
-                    } else {
-                        // 本地路径链接（带 data-md-original）不存在时回退为原始 markdown 文本；
-                        // 内联代码文件路径无此属性，保持原样
-                        const original = element.getAttribute('data-md-original');
-                        if (original) {
-                            element.parentNode?.replaceChild(document.createTextNode(original), element);
-                        }
                     }
+                    // 不存在时两种写法都保持待验证阶段的外观：本地路径链接是正文色纯文本（title 悬停可见目标路径），内联代码是普通内联代码
                     element.removeAttribute('data-temp-id');
                 }
             } else if (message.type === 'imagePathResolved' && contentRef.current) {
