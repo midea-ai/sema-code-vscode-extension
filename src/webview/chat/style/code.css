@@ -87,43 +87,6 @@
     min-width: 5px;
 }
 
-/* 复制按钮 - 悬浮时显示，使用 opacity 避免布局变化 */
-.edit-copy-btn,
-.bash-copy-btn {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 2px 8px;
-    background-color: transparent;
-    border: none;
-    border-radius: 2px;
-    color: var(--chat-color-muted);
-    cursor: pointer;
-    font-size: var(--chat-font-sm);
-    transition: all 0.15s;
-    flex-shrink: 0;
-    white-space: nowrap;
-    opacity: 0;
-    /* 按钮文字是真实文本节点，禁止选中，避免划选复制消息时把“复制”带进剪贴板 */
-    user-select: none;
-}
-
-.edit-block-header:hover .edit-copy-btn,
-.bash-block-header:hover .bash-copy-btn {
-    opacity: 1;
-}
-
-.edit-copy-btn:hover,
-.bash-copy-btn:hover {
-    background-color: var(--chat-bg-hover);
-    color: var(--chat-color-muted-hover);
-}
-
-.edit-copy-btn:active,
-.bash-copy-btn:active {
-    background-color: var(--chat-bg-active);
-}
-
 /* 内容区整体可点击：点击代码 / 「+ xx lines」均打开文件 diff，与点击文件名一致。
    用双 class 提高特异性，确保覆盖 blocks.css 的 .chat-block-content（二者加载顺序不定）。 */
 .chat-block-content.edit-block-content {

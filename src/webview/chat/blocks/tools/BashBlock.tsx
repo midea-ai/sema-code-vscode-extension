@@ -112,13 +112,6 @@ const BashBlock: React.FC<BashBlockProps> = ({ content: toolContent, messageId, 
         setManualExpanded(!isExpanded);
     };
 
-    const handleCopy = (e: React.MouseEvent) => {
-        e.stopPropagation();
-        if (command) {
-            navigator.clipboard.writeText(command);
-        }
-    };
-
     // 「省略了 N 行」→ 仅打开纯执行结果（无命令、无开头 #）
     const handleViewAll = (e: React.MouseEvent) => {
         e.stopPropagation();
@@ -155,7 +148,6 @@ const BashBlock: React.FC<BashBlockProps> = ({ content: toolContent, messageId, 
                 expandable
                 isExpanded={isExpanded}
                 onClick={handleToggle}
-                right={command ? <div className="bash-copy-btn" onClick={handleCopy}>{t('common.copy')}</div> : undefined}
             />
             {isExpanded && (
                 <div className="chat-block-content bash-block-content">

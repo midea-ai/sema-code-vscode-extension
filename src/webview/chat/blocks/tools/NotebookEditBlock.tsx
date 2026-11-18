@@ -110,22 +110,6 @@ const NotebookEditBlock: React.FC<NotebookEditBlockProps> = React.memo(({
         reportFileChange();
     }, [reportFileChange]);
 
-    const handleCopy = useCallback(() => {
-        if (!diffContent) return;
-
-        const lines: string[] = [];
-        for (const hunk of diffContent.patch) {
-            for (const line of hunk.lines) {
-                const marker = line[0];
-                const lineContent = line.substring(1);
-                if (marker !== '-') {
-                    lines.push(lineContent);
-                }
-            }
-        }
-        navigator.clipboard.writeText(lines.join('\n'));
-    }, [diffContent]);
-
     const handleToggle = useCallback(() => {
         setManualExpanded(!isExpanded);
     }, [isExpanded]);
@@ -182,7 +166,6 @@ const NotebookEditBlock: React.FC<NotebookEditBlockProps> = React.memo(({
                 isExpanded={isExpanded}
                 onClick={handleHeaderClick}
                 className="edit-block-header"
-                right={<div className="edit-copy-btn" onClick={(e) => { e.stopPropagation(); handleCopy(); }}>{t('common.copy')}</div>}
             />
             {isExpanded && (
                 <div className="chat-block-content edit-block-content" onClick={handleShowDiff}>
