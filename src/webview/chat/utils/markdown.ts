@@ -135,37 +135,27 @@ export function renderMarkdownToHtml(content: string, vscode?: any): string {
       return placeholder;
     });
 
-    // markdown 链接占位 - [text](url)，scheme 白名单 http/https/file，天然挡掉 javascript: 等
-    // 必须晚于 ![alt](src) 图片提取（否则会抢走图片语法的 [alt](src) 部分）。
+    // markdown 链接占位：共用扫描器识别 URL / 本地路径，支持文字里的嵌套方括号及反斜杠转义。
+    // 必须晚于图片提取；目标地址仍沿用 scheme 白名单及本地路径规则。
     // "显示文本≠真实目标"的欺骗风险由两层缓解：title 悬停展示完整 URL；
     // http(s) 经 openExternal 打开时受 VS Code Trusted Domains 弹窗兜底。
-    processedContent = processedContent.replace(
-      /\[([^\]]+)\]\(((?:https?|file):\/\/[^)\s]+)\)/g,
-      (_match, text, url) => {
-        const safeUrl = escapeHtml(url);
-        const placeholder = `\x00URL_${urlPlaceholders.length}\x00`;
+    let linkedContent = '';
+    let linkEnd = 0;
+    for (const link of parseMarkdownLinks(processedContent)) {
+      linkedContent += processedContent.slice(linkEnd, link.start);
+      linkedContent += `\x00URL_${urlPlaceholders.length}\x00`;
+      if (link.kind === 'url') {
+        const safeUrl = escapeHtml(link.target);
         urlPlaceholders.push(
-          `<a class="md-url-link" data-url="${safeUrl}" title="${safeUrl}">${createLinkIconHtml(url)}${escapeHtml(text)}</a>`
+          `<a class="md-url-link" data-url="${safeUrl}" title="${safeUrl}">${createLinkIconHtml(link.target)}${escapeHtml(link.text)}</a>`
         );
-        return placeholder;
+      } else {
+        // 本地路径仍由扩展端验证，AiResponseBlock 确认存在后再升级为可点击链接。
+        urlPlaceholders.push(createLocalLinkHtml(link.text, link.target, vscode));
       }
-    );
-
-    // 本地路径链接占位 - [text](wiki/foo.md) 等无 scheme 路径（单字母盘符 C:\ 除外）
-    // scheme 排除对「文件名.扩展名:行号」（README.md:12 / README.md:1-10）放行：冒号后只有行号紧接 ) 的不算协议头；
-    // 路径允许一层成对括号（CommonMark 链接目标规则，如 notes(draft).md），否则在文件名里的 ) 处截断、残文漏到正文；
-    // 路径须含 / 或 . 以排除普通括号写法（如 "数组[i](见下文)"）；
-    // 先渲染为待验证纯文本（md-local-link），扩展端 verifyFilePath 确认存在后
-    // 由 AiResponseBlock 加 file-path-code 升级为可点链接（openFile 在编辑器打开）；
-    // 不存在则保持纯文本（只显示链接文字）。必须晚于图片与 scheme 链接提取。
-    processedContent = processedContent.replace(
-      /\[([^\]\x00]+)\]\((?![a-zA-Z][a-zA-Z0-9+.\-]+:(?!\d+(?:[-~]\d+)?\)))(?=(?:[^()\s\x00]|\([^()\s\x00]*\))*[/.])((?:[^()\s\x00#]|\([^()\s\x00]*\))(?:[^()\s\x00]|\([^()\s\x00]*\))*)\)/g,
-      (_match, text, path) => {
-        const placeholder = `\x00URL_${urlPlaceholders.length}\x00`;
-        urlPlaceholders.push(createLocalLinkHtml(text, path, vscode));
-        return placeholder;
-      }
-    );
+      linkEnd = link.end;
+    }
+    processedContent = linkedContent + processedContent.slice(linkEnd);
 
     // 裸 URL 占位 - 任意 host 的 http(s) 地址（本机 / 局域网 / 公网）及 GFM 风格的 www. 无 scheme 写法，
     // 去向由扩展端 openExternal 分流：私网地址在 VS Code 内置 Simple Browser 打开，其余系统浏览器。
@@ -670,6 +660,62 @@ function parseFilePath(code: string): { filePath: string; lineInfo?: string } {
   return { filePath: code };
 }
 
+interface MarkdownLink {
+  start: number;
+  end: number;
+  text: string;
+  target: string;
+  kind: 'url' | 'local';
+}
+
+/**
+ * 扫描链接文字的成对方括号；转义字符不参与括号配对。
+ * 渲染与 hasMarkdownFormatting 共用，避免嵌套 / 转义文字只在其中一处被识别。
+ * 目标规则保持不变：URL 仅 http/https/file；本地路径须含 / 或 .，
+ * 放行文件名:行号、单字母盘符及一层成对括号，排除其它 scheme 和纯锚点。
+ */
+function* parseMarkdownLinks(content: string): Generator<MarkdownLink> {
+  const openings: number[] = [];
+  // sticky 匹配只从链接文字后紧接的 ( 开始，不搜索后面的其它括号。
+  const urlTarget = /\(((?:https?|file):\/\/[^)\s]+)\)/y;
+  const localTarget = /\((?![a-zA-Z][a-zA-Z0-9+.\-]+:(?!\d+(?:[-~]\d+)?\)))(?=(?:[^()\s\x00]|\([^()\s\x00]*\))*[/.])((?:[^()\s\x00#]|\([^()\s\x00]*\))(?:[^()\s\x00]|\([^()\s\x00]*\))*)\)/y;
+
+  for (let i = 0; i < content.length; i++) {
+    if (content[i] === '\\') {
+      i++;
+      continue;
+    }
+    if (content[i] === '[') {
+      openings.push(i);
+      continue;
+    }
+    if (content[i] !== ']') continue;
+    const start = openings.pop();
+    if (start === undefined || i === start + 1 || content[i + 1] !== '(') continue;
+    // 图片交给图片解析器，不能把未被提取的图片降级成文字链接。
+    if (content[start - 1] === '!') continue;
+
+    urlTarget.lastIndex = localTarget.lastIndex = i + 1;
+    const url = urlTarget.exec(content);
+    const target = url || localTarget.exec(content);
+    if (!target) continue;
+    const rawText = content.slice(start + 1, i);
+    if (!url && rawText.includes('\x00')) continue;
+
+    yield {
+      start,
+      end: i + 1 + target[0].length,
+      // CommonMark 只反转义 ASCII 标点，保留普通字符前的反斜杠。
+      text: rawText.replace(/\\([!-/:-@[-`{-~])/g, '$1'),
+      target: target[1],
+      kind: url ? 'url' : 'local',
+    };
+    i += target[0].length;
+    // 已经生成的链接不能再被外层括号包成嵌套链接。
+    openings.length = 0;
+  }
+}
+
 /**
  * 检查内容是否包含Markdown格式
  */
@@ -685,8 +731,6 @@ export function hasMarkdownFormatting(content: string): boolean {
     /^\|.+\|$/m,           // 表格行
     /!\[[^\]]*\]\([^)\s]+?\)/, // 图片
     /<img\b[^>]*?>/i,          // 原始 <img> 标签
-    /\[[^\]]+\]\((?:https?|file):\/\/[^)\s]+\)/, // markdown 链接
-    /\[[^\]]+\]\((?![a-zA-Z][a-zA-Z0-9+.\-]+:(?!\d+(?:[-~]\d+)?\)))(?=(?:[^()\s]|\([^()\s]*\))*[/.])(?:[^()\s#]|\([^()\s]*\))(?:[^()\s]|\([^()\s]*\))*\)/, // 本地路径链接（与步骤 3.6 一致：放行 文件名:行号、一层成对括号）
     /(?:https?:\/\/|(?<![\w./@-])www\.)\S+/i, // 裸 URL（任意 host / www. 写法，与步骤 3.6 一致）
     /\$\$[\s\S]+?\$\$/,    // 块级公式
     /(?<![\\$])\$(?!\s)[^\n$]+?(?<!\s)\$(?!\d)/, // 行内公式
@@ -694,7 +738,7 @@ export function hasMarkdownFormatting(content: string): boolean {
     /^\s{0,3}-\s+\S/m,      // 无序列表（要求 - 后有空格且有内容）
   ];
 
-  return markdownPatterns.some(pattern => pattern.test(content));
+  return markdownPatterns.some(pattern => pattern.test(content)) || !parseMarkdownLinks(content).next().done;
 }
 
 /**
