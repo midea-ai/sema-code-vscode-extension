@@ -1,6 +1,8 @@
-import React, { useState, useCallback, useEffect, useRef, useContext } from 'react';
+import React, { useState, useCallback, useEffect, useMemo, useRef, useContext } from 'react';
 import { DiffContent, FileChange, Message, ToolContent, VscodeApi } from '../../types';
 import TaskDetailModal from '../../TaskDetailModal';
+import AiResponseBlock from '../AiResponseBlock';
+import { REVIEWER_AGENT_NAME } from '../../../../utils/review';
 import { SessionActiveContext, SessionContext } from '../../SessionContext';
 import { countDiffChanges } from '../../utils/diffParser';
 import { TOOL_NAME_EDIT_NOTEBOOK, TOOL_NAME_PATCH_FILE, TOOL_NAME_WRITE_FILE } from '../../../../utils/tool';
@@ -143,8 +145,26 @@ const AgentBlock: React.FC<AgentBlockProps> = React.memo(({ content, vscode, for
 
     const { agent_type, title: agentTitle, status, summary, taskMessages, background } = content;
 
+    // 代码审查（/review 与 Source Control 标题栏入口发起，见 utils/review.ts）：主代理按指令不复述结果，
+    // 审查全文取子代理最后一条不带工具调用的回复，完成后直接展开在块下方
+    const isReview = agent_type === REVIEWER_AGENT_NAME;
+    const reviewText = useMemo(() => {
+        if (!isReview || status !== 'completed') return '';
+        const list = taskMessages || [];
+        for (let i = list.length - 1; i >= 0; i--) {
+            const m = list[i];
+            const text = m.type === 'assistant' && !m.content?.hasToolCalls ? m.content?.content : undefined;
+            if (typeof text === 'string' && text.trim()) return text;
+        }
+        return '';
+    }, [isReview, status, taskMessages]);
+    const reviewIncomplete = isReview && (status === 'failed' || status === 'interrupted' || (status === 'completed' && !reviewText));
+
     // 构建标题
-    const title = `${agent_type}(${agentTitle})`;
+    const title = !isReview ? `${agent_type}(${agentTitle})`
+        : status === 'running' ? t('chat.review.running', { title: agentTitle })
+        : reviewIncomplete ? agentTitle
+        : t('chat.review.finished', { title: agentTitle });
 
     // 获取状态图标
     const getStatusIcon = () => {
@@ -196,14 +216,21 @@ const AgentBlock: React.FC<AgentBlockProps> = React.memo(({ content, vscode, for
                         {t('chat.agent.viewDetail')}
                     </button>
                 </div>
-                {summary && (
+                {(summary || reviewIncomplete) && (
                     <div className="task-block-summary">
-                        {summary.split('\n').map((line, i) => (
+                        {summary && summary.split('\n').map((line, i) => (
                             <div key={i}>{line}</div>
                         ))}
+                        {reviewIncomplete && <div>{t('chat.review.incomplete')}</div>}
                     </div>
                 )}
             </div>
+
+            {reviewText && (
+                <div className="review-result">
+                    <AiResponseBlock content={reviewText} messageId={`${content.taskId}-review`} vscode={vscode} />
+                </div>
+            )}
 
             {isModalOpen && (
                 <TaskDetailModal

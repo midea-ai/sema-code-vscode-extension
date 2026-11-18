@@ -541,6 +541,22 @@
     text-overflow: ellipsis;
 }
 
+/* 代码审查（Reviewer 子代理）：完成后在块下方直接展开审查全文，按普通回复的 markdown 渲染 */
+.review-result {
+    margin-top: var(--chat-spacing-xs);
+}
+
+/* 每条发现是「- 标题行」+ 紧跟的正文段落：条目之间空一行，正文贴着标题；标题行开头的 - 不显示，标题与正文左对齐 */
+.review-result .markdown-content .md-list {
+    margin: 1em 0 0;
+    padding-left: 0;
+    list-style-type: none;
+}
+
+.review-result .markdown-content .md-list + p {
+    margin: 0;
+}
+
 /* ========== Task Detail Modal ========== */
 .task-modal-overlay {
     position: fixed;
