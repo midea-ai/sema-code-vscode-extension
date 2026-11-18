@@ -1157,13 +1157,12 @@ html.jb #output-container {
 }
 
 
-/* 行高取正文行高：面板在 #output-container 之外，否则继承 body 的 normal，
-   文件芯片（1lh）会比旧的 18px 图标矮，悬浮出现的中文「放弃」走 CJK 回退字体行框更高，会把整行撑高 */
+/* 与命令/文件面板保持相同的行高和上下间距。面板在 #output-container 之外，
+   需显式设置行高，避免文件芯片（1lh）与悬浮时的「放弃」把行撑高。 */
 .file-change-item {
     display: flex;
     align-items: center;
-    padding: 4px 8px;
-    margin-bottom: 2px;
+    padding: 2px 8px;
     border-radius: 3px;
     transition: background-color 0.15s;
     cursor: pointer;
