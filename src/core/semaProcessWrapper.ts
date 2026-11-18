@@ -31,6 +31,7 @@ import {
 } from 'sema-core/types';
 
 import { SystemConfigManager } from '../managers/SystemConfigManager';
+import { REVIEWER_AGENT } from '../utils/reviewerAgent';
 
 /** 进程级事件类型（与 sema-core 的 ProcessEvent 对齐） */
 export type ProcessEventName = 'cron:update' | 'mcp:server:status';
@@ -87,6 +88,9 @@ export class SemaProcessWrapper {
             enableInputRetract: true,
             maxSessions: MAX_SESSIONS,
             usageProduct: USAGE_PRODUCT,
+            // 扩展内置的子代理（host 域内联，只读，正文不出现在查询接口里）。目前只有代码审查用的 Reviewer：
+            // /review 与 Source Control 标题栏入口让主代理把审查交给它，见 utils/review.ts 与 utils/reviewerAgent.ts
+            agents: { items: [REVIEWER_AGENT] },
         };
 
         this.semaCore = new SemaCore(config);

@@ -3,6 +3,7 @@ import * as crypto from 'crypto';
 import * as os from 'os';
 import { FileStateDiffManager } from '../../managers/FileStateDiffManager';
 import { FileOperationManager } from '../../managers/FileOperationManager';
+import type { GitReviewManager } from '../../managers/GitReviewManager';
 import { SemaProcessWrapper } from '../../core/semaProcessWrapper';
 import type { SessionController } from '../../core/semaSidebarProvider';
 import { transformCommandToPrompt } from '../../utils/prompt';
@@ -12,6 +13,7 @@ import { t, getLang, normalizeLang, type Language } from '../common/i18n/core';
 import { buildPasteInput, type PasteAttachment } from '../common/paste';
 import { savePastedText, removePastedText, readPastedText } from '../../utils/pasteAttachments';
 import { buildVizEmbedHtml } from '../../utils/vizEmbed';
+import { parseReviewCommand } from '../../utils/review';
 
 const FILE_REFERENCE_QUOTE_REGEX = /[\s。，、；：！？""''「」『』（）《》〈〉【】,;!?]/;
 
@@ -59,6 +61,7 @@ export class ChatWebviewProvider {
         private readonly processWrapper: SemaProcessWrapper,
         private readonly fileStateDiffManager: FileStateDiffManager,
         private readonly fileOperationManager: FileOperationManager,
+        private readonly gitReviewManager: GitReviewManager,
         private readonly onOpenConfig: (page?: string, taskId?: string) => void,
         private readonly context: vscode.ExtensionContext,
         private readonly sessionController: SessionController,
@@ -130,6 +133,9 @@ export class ChatWebviewProvider {
                 requestCommands: () => this.sendCommands(),
                 requestSkills: () => this.sendSkills(),
                 requestAgents: () => this.sendAgents(),
+                // /review 面板：审查范围信息（有无仓库、未提交改动规模）与最近提交列表
+                requestReviewInfo: async () => this.postMessage({ type: 'reviewInfoLoaded', info: await this.gitReviewManager.getInfo() }),
+                requestReviewCommits: async () => this.postMessage({ type: 'reviewCommitsLoaded', commits: await this.gitReviewManager.getRecentCommits() }),
                 openBashOutput: () => this.fileOperationManager.openBashOutputAsDocument(msg.content, msg.command, msg.toolId),
                 requestInputHistory: () => this.sendInputHistory(),
                 saveInputHistory: () => this.appendInputHistory(msg.item),
@@ -185,6 +191,12 @@ export class ChatWebviewProvider {
     private async handleUserInput(sessionId: string | undefined, text: string, files?: Array<any>, attachments?: InputImageAttachment[], pastes?: PasteAttachment[]): Promise<void> {
         const wrapper = sessionId ? this.sessionController.getSessionWrapper(sessionId) : undefined;
         if (!wrapper) return;
+        // /review：不把原文交给 core，由宿主解析范围后给会话发审查指令（见 utils/review.ts）
+        const reviewRequest = parseReviewCommand(text);
+        if (reviewRequest) {
+            await this.sessionController.startReview(wrapper, reviewRequest);
+            return;
+        }
         try {
             let content = text;
             const body = text;

@@ -21,6 +21,11 @@ import { ensurePetRunning, killPet } from '../pet/pet-launcher';
 import { wirePetEvents, setPetSessionState } from '../pet/pet-events';
 import { t } from '../webview/common/i18n/core';
 import { normalizePermissionLevel } from '../webview/config/default/defaultConfig';
+import { GitReviewManager } from '../managers/GitReviewManager';
+import { ReviewRequest, buildReviewInstruction, reviewDisplayText } from '../utils/review';
+
+/** 等会话就绪的上限：首次唤出侧边栏要等 webview 加载并建好首个会话 */
+const SESSION_READY_TIMEOUT_MS = 10000;
 
 /** chatWebview 用于驱动会话生命周期的控制接口 */
 export interface SessionController {
@@ -31,6 +36,8 @@ export interface SessionController {
     closeSession(sessionId: string): Promise<void>;
     /** 分支到新聊天：全量复制源会话历史到新会话并以新 tab 打开 */
     branchSession(sessionId: string, beforeMessageUuid?: string): Promise<{ ok: boolean; error?: string }>;
+    /** 代码审查：在指定会话发起审查 */
+    startReview(wrapper: SemaSessionWrapper, request: ReviewRequest): Promise<void>;
 }
 
 export class SemaSidebarProvider implements vscode.WebviewViewProvider {
@@ -52,6 +59,7 @@ export class SemaSidebarProvider implements vscode.WebviewViewProvider {
     private fileStateDiffManager: FileStateDiffManager;
     private fileOperationManager: FileOperationManager;
     private systemConfigManager: SystemConfigManager;
+    private gitReviewManager: GitReviewManager;
 
     private saveSessionTimers: Map<string, NodeJS.Timeout> = new Map();
     /** 每个会话的桌宠事件解绑函数。桌宠监听所有会话，而非仅当前活跃会话。 */
@@ -67,6 +75,7 @@ export class SemaSidebarProvider implements vscode.WebviewViewProvider {
             (filePath, line) => this.fileOperationManager.openFileAtLine(filePath, line ?? 1)
         );
         this.systemConfigManager = new SystemConfigManager(this.context);
+        this.gitReviewManager = new GitReviewManager(this.workingDir);
 
         this.processWrapper = new SemaProcessWrapper(
             this.workingDir,
@@ -96,6 +105,7 @@ export class SemaSidebarProvider implements vscode.WebviewViewProvider {
             switchSession: (sessionId) => this.switchActiveSession(sessionId),
             closeSession: (sessionId) => this.closeSession(sessionId),
             branchSession: (sessionId, beforeMessageUuid) => this.branchToNewChat(sessionId, beforeMessageUuid),
+            startReview: (wrapper, request) => this.startReview(wrapper, request),
         };
 
         this.chatWebviewProvider = new ChatWebviewProvider(
@@ -103,6 +113,7 @@ export class SemaSidebarProvider implements vscode.WebviewViewProvider {
             this.processWrapper,
             this.fileStateDiffManager,
             this.fileOperationManager,
+            this.gitReviewManager,
             (page?: string, taskId?: string) => this.openConfigPanel(page, taskId),
             this.context,
             sessionController,
@@ -426,6 +437,80 @@ export class SemaSidebarProvider implements vscode.WebviewViewProvider {
         // 首次唤出侧边栏时 webview 还在加载，稍等再发，避免消息丢失
         if (!alreadyResolved) await new Promise(resolve => setTimeout(resolve, 600));
         this.chatWebviewProvider.postMessage({ type: 'insertFileMentions', files });
+    }
+
+    // ─── 代码审查 ─────────────────────────────────────────────────────────────
+
+    /** Source Control 标题栏的「Review in SemaCode」：唤出侧边栏，在当前会话审查未提交的改动 */
+    public async reviewUncommitted(): Promise<void> {
+        try {
+            await vscode.commands.executeCommand('sema-vscode-view.focus');
+        } catch { /* 视图不可用时仍尝试 */ }
+        // 首次唤出侧边栏时，首个会话由前端加载完成后创建，等它就绪
+        const wrapper = await this.waitForActiveSession();
+        if (!wrapper) {
+            vscode.window.showWarningMessage(t('host.review.noSession'));
+            return;
+        }
+        await this.startReview(wrapper, { kind: 'uncommitted' });
+    }
+
+    /**
+     * 在指定会话发起审查：解析范围 → 给会话发一条固定指令（主代理把审查交给 Reviewer 子代理）。
+     * 气泡显示的是 /review 命令本身；会话忙或不在 Agent 模式时不排队，提示改在新会话里审查。
+     */
+    private async startReview(wrapper: SemaSessionWrapper, request: ReviewRequest): Promise<void> {
+        if (request.kind === 'invalid') {
+            vscode.window.showWarningMessage(t('host.review.usage'));
+            return;
+        }
+        try {
+            const resolved = await this.gitReviewManager.resolve(request);
+            if (resolved.ok === false) {
+                vscode.window.showWarningMessage(t(`host.review.${resolved.reason}`));
+                return;
+            }
+
+            const blocked = wrapper.getCurrentState() !== 'idle' ? t('host.review.sessionBusy')
+                : wrapper.getAgentMode() !== 'Agent' ? t('host.review.notAgentMode')
+                : '';
+            if (blocked) {
+                const action = t('host.review.inNewSession');
+                const choice = await vscode.window.showInformationMessage(blocked, action);
+                if (choice !== action) return;
+                const created = await this.createNewSession({ agentMode: 'Agent' });
+                if (!created.ok) return;
+                const fresh = await this.waitForActiveSession();
+                if (!fresh) {
+                    vscode.window.showWarningMessage(t('host.review.noSession'));
+                    return;
+                }
+                wrapper = fresh;
+            }
+
+            const scope = resolved.scope;
+            const title = scope.kind === 'uncommitted'
+                ? t('host.review.titleUncommitted')
+                : t('host.review.titleCommit', { hash: scope.hash.slice(0, 7) });
+            wrapper.processUserInput(
+                buildReviewInstruction(scope, title, t('host.review.done')),
+                reviewDisplayText(scope)
+            );
+        } catch (error) {
+            console.error('Error starting review:', error);
+            vscode.window.showErrorMessage(t('host.review.failed', { error: error instanceof Error ? error.message : t('common.unknownError') }));
+        }
+    }
+
+    /** 等当前活跃会话就绪（core 发出 session:ready）；超时返回 undefined */
+    private async waitForActiveSession(): Promise<SemaSessionWrapper | undefined> {
+        const deadline = Date.now() + SESSION_READY_TIMEOUT_MS;
+        for (;;) {
+            const wrapper = this.activeSessionId ? this.sessions.get(this.activeSessionId) : undefined;
+            if (wrapper?.isReady()) return wrapper;
+            if (Date.now() >= deadline) return undefined;
+            await new Promise(resolve => setTimeout(resolve, 100));
+        }
     }
 
     // ─── 桌宠 ─────────────────────────────────────────────────────────────────

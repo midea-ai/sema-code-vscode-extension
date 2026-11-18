@@ -67,6 +67,11 @@
         "title": "Add to SemaCode"
       },
       {
+        "command": "sema-vscode-extension.reviewUncommitted",
+        "title": "Review in SemaCode",
+        "icon": "imgs/icon.svg"
+      },
+      {
         "command": "sema-vscode-extension.openSidebar",
         "title": "%command.openSidebar.title%",
         "icon": "imgs/icon.svg"
@@ -91,6 +96,18 @@
         {
           "command": "sema-vscode-extension.openSidebar",
           "group": "navigation@0"
+        }
+      ],
+      "scm/title": [
+        {
+          "command": "sema-vscode-extension.reviewUncommitted",
+          "when": "scmProvider == git",
+          "group": "navigation"
+        },
+        {
+          "command": "sema-vscode-extension.reviewUncommitted",
+          "when": "scmProvider == git",
+          "group": "0_sema@0"
         }
       ],
       "view/title": [
