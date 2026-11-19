@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { VscodeApi } from './types';
-import { RefreshIcon, LinkIcon } from './utils/svgIcons';
+import { RefreshIcon } from './utils/svgIcons';
 import { useT, I18nKey } from '../common/i18n/react';
 import './style/section.css';
 import './style/agent.css';
@@ -9,8 +9,24 @@ interface MemoryConfigItem {
     prompt: string;
     from?: string;
     FilePath?: string;
-    refFilePath?: string[];
 }
+
+/** MEMORY.md 索引行：`- [标题](文件.md) — 摘要` */
+interface MemoryEntry {
+    title: string;
+    file: string;
+    hook: string;
+}
+
+const parseMemoryIndex = (prompt: string): MemoryEntry[] =>
+    prompt.split(/\r?\n/).flatMap(line => {
+        const m = line.match(/^\s*[-*]\s*\[([^\]]+)\]\(([^)]+)\)\s*(?:[—–-]+\s*)?(.*)$/);
+        return m ? [{ title: m[1].trim(), file: m[2].trim(), hook: m[3].trim() }] : [];
+    });
+
+/** 条目数：解析不出索引行时原文算 1 条 */
+const memoryEntryCount = (item: MemoryConfigItem): number =>
+    parseMemoryIndex(item.prompt || '').length || (item.prompt ? 1 : 0);
 
 type MemoryScope = 'project' | 'other';
 
@@ -159,6 +175,11 @@ const RuleMemoryConfig: React.FC<RuleMemoryConfigProps> = ({ vscode }) => {
 
     const renderMemoryCard = (item: MemoryConfigItem, index: number) => {
         const readonly = isMemoryReadonly(item);
+        const entries = parseMemoryIndex(item.prompt || '');
+        // 索引里的链接是相对 MEMORY.md 所在目录的文件名，拼回可打开的路径
+        const memoryDir = item.FilePath ? item.FilePath.replace(/[\\/][^\\/]+$/, '') : '.sema/memory';
+        const openEntry = (file: string) =>
+            openFile(/^(\/|[a-zA-Z]:[\\/])/.test(file) ? file : `${memoryDir}/${file.replace(/^\.\//, '')}`);
         return (
             <div key={index} className="section-card">
                 <div className="section-card-header">
@@ -173,44 +194,25 @@ const RuleMemoryConfig: React.FC<RuleMemoryConfigProps> = ({ vscode }) => {
                         {readonly && <span className="readonly-tab">{t('common.readonly')}</span>}
                         {readonly && item.from && <span className="readonly-tab">{item.from}</span>}
                     </div>
+                    <span className="section-group-count">
+                        {t('config.memory.entryCount', { count: memoryEntryCount(item) })}
+                    </span>
                 </div>
-                {item.prompt && (
-                    <pre style={{
-                        fontSize: '12px',
-                        color: 'var(--vscode-foreground)',
-                        background: 'transparent',
-                        padding: '10px',
-                        borderRadius: '4px',
-                        whiteSpace: 'pre-wrap',
-                        wordBreak: 'break-word',
-                        margin: 0,
-                        maxHeight: '300px',
-                        overflowY: 'auto',
-                    }}>
-                        {item.prompt}
-                    </pre>
-                )}
-                {item.refFilePath && item.refFilePath.length > 0 && (
-                    <div style={{ marginTop: '14px', padding: '0 14px 14px' }}>
-                        <div style={{ fontSize: '12px', color: 'var(--vscode-foreground)', marginBottom: '4px' }}>
-                            {t('config.memory.refFiles', { count: item.refFilePath.length })}
-                        </div>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                            {item.refFilePath.map((fp, fi) => (
-                                <div
-                                    key={fi}
-                                    className="memory-ref-file"
-                                    title={fp}
-                                    onClick={() => openFile(fp)}
-                                    style={{ cursor: 'pointer' }}
-                                >
-                                    <LinkIcon size={12} />
-                                    <span className="memory-ref-file-name">{getFileName(fp)}</span>
+                {entries.length > 0 ? (
+                    <div className="memory-index">
+                        {entries.map((entry, i) => (
+                            <div key={i} className="memory-entry">
+                                <div className="memory-entry-title" title={entry.file} onClick={() => openEntry(entry.file)}>
+                                    {entry.title}
                                 </div>
-                            ))}
-                        </div>
+                                {entry.hook && <div className="memory-entry-hook" title={entry.hook}>{entry.hook}</div>}
+                            </div>
+                        ))}
                     </div>
-                )}
+                ) : item.prompt ? (
+                    // 非索引格式的自由写法，退回原文展示
+                    <div className="memory-fallback">{item.prompt}</div>
+                ) : null}
             </div>
         );
     };

@@ -571,7 +571,6 @@ export const zh = {
     'config.import.start': '开始导入',
     'config.import.importing': '导入中...',
     'config.import.loadFailed': '读取失败：{error}',
-    'config.import.cat.rule': '规则',
 
     // ── 配置页：使用情况 ──
     'config.usage.title': '使用情况',
@@ -736,7 +735,7 @@ export const zh = {
     'config.rule.empty': '暂无 Rule 配置',
     'config.memory.group.project': '项目级 Memory',
     'config.memory.group.other': '外部 Memory',
-    'config.memory.refFiles': '关联文件（{count}）',
+    'config.memory.entryCount': '{count} 项',
     'config.memory.refresh': '刷新 Memory',
     'config.memory.empty': '暂无 Memory 配置',
 

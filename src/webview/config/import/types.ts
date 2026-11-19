@@ -1,16 +1,16 @@
 /**
  * 「导入」页共享类型：纯数据，无 fs / vscode 依赖，VSCode 宿主与 JB webview 两端共用。
- * 导入只有三种动作：复制文件（Skill 目录、Agent / Command / 规则 md）、MCP 提取 JSON 后调 core add、Hook 合并进 hooks.json。
+ * 导入只有三种动作：复制文件（Skill 目录、Agent / Command / 规则 md、记忆目录）、MCP 提取 JSON 后调 core add、Hook 合并进 hooks.json。
  */
 
 import type { MCPServerConfig } from '../types/mcp';
 
 export type ImportSource = 'claude' | 'codex' | 'cursor';
-export type ImportCategory = 'mcp' | 'skill' | 'agent' | 'command' | 'hook' | 'rule';
+export type ImportCategory = 'mcp' | 'skill' | 'agent' | 'command' | 'hook' | 'rule' | 'memory';
 export type ImportScope = 'project' | 'user';
 
 export const IMPORT_SOURCES: ImportSource[] = ['claude', 'codex', 'cursor'];
-export const IMPORT_CATEGORIES: ImportCategory[] = ['mcp', 'skill', 'agent', 'command', 'hook', 'rule'];
+export const IMPORT_CATEGORIES: ImportCategory[] = ['mcp', 'skill', 'agent', 'command', 'hook', 'rule', 'memory'];
 
 /** 宿主提供的最小文件系统接口：VSCode 用 Node fs，JB 经 callEditor('fileOps') 下沉到 Kotlin */
 export interface ImportFs {
@@ -41,10 +41,11 @@ export interface ImportCore {
     getCommandsInfo(refresh?: boolean): Promise<any>;
     getHooksInfo(refresh?: boolean): Promise<any>;
     getRuleInfo(refresh?: boolean): Promise<any>;
+    getMemoryInfo(refresh?: boolean): Promise<any>;
 }
 
 export type ImportPayload =
-    /** 原样复制：Skill 整目录、Agent / Command / 规则 md */
+    /** 原样复制：Skill / 记忆整目录、Agent / Command / 规则 md */
     | { kind: 'copy'; src: string; dst: string; dir: boolean }
     /** 提取后调 core addMCPServer（scope 执行时按条目 scope 补上） */
     | { kind: 'mcp'; config: Omit<MCPServerConfig, 'scope'> }

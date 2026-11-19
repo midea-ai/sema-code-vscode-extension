@@ -12,9 +12,9 @@ import './style/import.css';
  * 探测、预览、执行三个消息与宿主对接（VSCode configWebview / JB config-controller 同名）。
  */
 
-// 产品名与 MCP / Skills 等产品术语保持英文，不走 i18n（对齐侧栏导航）；「规则」不是产品术语，走 i18n
+// 产品名与 MCP / Skills / Rules 等产品术语保持英文，不走 i18n（对齐侧栏导航）
 const SOURCE_LABELS: Record<ImportSource, string> = { claude: 'Claude Code', codex: 'Codex', cursor: 'Cursor' };
-const CATEGORY_LABELS: Partial<Record<ImportCategory, string>> = { mcp: 'MCP', skill: 'Skills', agent: 'Agents', command: 'Commands', hook: 'Hooks' };
+const CATEGORY_LABELS: Record<ImportCategory, string> = { mcp: 'MCP', skill: 'Skills', agent: 'Agents', command: 'Commands', hook: 'Hooks', rule: 'Rules', memory: 'Memory' };
 
 /** 来源图标：圆角色块 + 首字母，不用品牌图标 */
 const SourceIcon: React.FC<{ source: ImportSource }> = ({ source }) => (
@@ -128,7 +128,7 @@ const ImportConfig: React.FC<ImportConfigProps> = ({ vscode }) => {
             <div key={cat.category} className={`import-cat-row ${disabled ? 'disabled' : ''}`}>
                 <div className="import-cat-head">
                     <input type="checkbox" checked={checked} disabled={disabled} onChange={e => toggleCategory(cat, e.target.checked)} />
-                    <span className="import-cat-name">{CATEGORY_LABELS[cat.category] ?? t('config.import.cat.rule')}</span>
+                    <span className="import-cat-name">{CATEGORY_LABELS[cat.category]}</span>
                     <span className="section-tab-count">{cat.items.length}</span>
                     <span className="import-cat-paths" title={cat.sourcePaths.join('\n')}>{cat.sourcePaths.join(' · ')}</span>
                     <button className="import-expand" onClick={() => toggleExpanded(cat.category)}>

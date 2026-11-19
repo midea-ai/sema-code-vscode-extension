@@ -416,7 +416,6 @@ export const it: Partial<Record<keyof typeof zh, string>> = {
     'config.import.summary': '{n} elementi verranno importati, {m} saltati',
     'config.import.start': 'Avvia importazione',
     'config.import.importing': 'Importazione...',
-    'config.import.cat.rule': 'Regole',
 
     // ── config: task config / background tasks / cron ──
     'config.task.title': 'Config attività',
@@ -501,7 +500,7 @@ export const it: Partial<Record<keyof typeof zh, string>> = {
     'config.rule.empty': 'Nessuna regola',
     'config.memory.group.project': 'Memoria di progetto',
     'config.memory.group.other': 'Memoria esterna',
-    'config.memory.refFiles': 'File correlati ({count})',
+    'config.memory.entryCount': '{count} elementi',
     'config.memory.refresh': 'Aggiorna memoria',
     'config.memory.empty': 'Nessuna memoria',
 

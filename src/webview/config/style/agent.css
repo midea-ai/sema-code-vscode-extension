@@ -138,28 +138,44 @@
     box-sizing: border-box;
 }
 
-/* 关联文件行 */
-.memory-ref-file {
+/* 记忆索引条目：MEMORY.md 解析出的标题 + 摘要 */
+.memory-index {
     display: flex;
-    align-items: center;
-    gap: 4px;
-    padding: 3px 0;
-    cursor: pointer;
-    width: fit-content;
-    color: var(--vscode-descriptionForeground);
+    flex-direction: column;
+    padding: 0 0 8px;
 }
 
-.memory-ref-file:hover .memory-ref-file-name {
+.memory-entry {
+    padding: 4px 14px;
+}
+
+.memory-entry-title {
+    font-size: 12px;
+    color: var(--vscode-textLink-foreground);
+    cursor: pointer;
+    word-break: break-word;
+}
+
+.memory-entry-title:hover {
     text-decoration: underline;
 }
 
-.memory-ref-file-name {
+.memory-entry-hook {
     font-size: 12px;
+    color: var(--vscode-descriptionForeground);
+    line-height: 1.5;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
-.memory-ref-file svg {
-    flex-shrink: 0;
-    opacity: 0.7;
+/* 非索引格式的 MEMORY.md：退回原文展示 */
+.memory-fallback {
+    padding: 0 14px 12px;
+    font-size: 12px;
+    color: var(--vscode-descriptionForeground);
+    white-space: pre-wrap;
+    word-break: break-word;
 }
 
 /* 创建 Agent 表单 */

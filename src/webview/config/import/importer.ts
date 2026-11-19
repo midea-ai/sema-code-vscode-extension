@@ -2,7 +2,8 @@
  * 导入编排：探测来源 / 预览可导项 / 执行导入。只依赖 ImportFs 与 ImportCore，VSCode 与 JB 两端共用。
  *
  * 来源布局（方案第 3 节）：
- * - Claude Code：~/.claude.json 与 .mcp.json 的 mcpServers；.claude/{skills,agents,commands}；settings*.json 的 hooks；CLAUDE.md
+ * - Claude Code：~/.claude.json 与 .mcp.json 的 mcpServers；.claude/{skills,agents,commands}；settings*.json 的 hooks；CLAUDE.md；
+ *   ~/.claude/projects/<项目路径转义>/memory（项目级记忆）
  * - Codex：config.toml 的 [mcp_servers.*]；.codex/skills、.agents/skills；~/.codex/AGENTS.md
  * - Cursor：.cursor/mcp.json；.cursor/{skills,agents,commands}
  * 冲突规则固定：目标已有同名文件、目录或 MCP 服务器一律跳过；Hook 按事件 + 命令去重。
@@ -137,6 +138,28 @@ function scanRule(ctx: Ctx, src: string, scope: ImportScope) {
     ctx.cats.rule.sourcePaths.push(src);
 }
 
+/**
+ * Claude Code 把项目 cwd 里的非字母数字字符统一换成 - 作为 ~/.claude/projects 下的目录名
+ * （/Users/x/repo → -Users-x-repo，Windows 的 C:\Users\x 盘符冒号同样变成 -），另外补一个只替换分隔符的写法做兜底。
+ */
+function claudeProjectSlugs(project: string): string[] {
+    const base = project.replace(/[\\/]+$/, '');
+    return [...new Set([base.replace(/[^a-zA-Z0-9]/g, '-'), base.replace(/[\\/]/g, '-')])];
+}
+
+/** 记忆：Claude 项目记忆整目录复制为 <项目>/.sema/memory，仅项目级；目标已有记忆则整项标「已存在」 */
+async function scanMemory(ctx: Ctx) {
+    const { fs, roots, j } = ctx;
+    if (!roots.project) return;
+    for (const slug of claudeProjectSlugs(roots.project)) {
+        const src = j(roots.home, '.claude', 'projects', slug, 'memory');
+        if ((await fs.readDir(src)).length === 0) continue;
+        ctx.cats.memory.items.push(copyItem('memory', 'project', 'Memory', src, j(semaRoot(roots, 'project'), 'memory'), true));
+        ctx.cats.memory.sourcePaths.push(src);
+        return;
+    }
+}
+
 /** MCP：字段与 Sema 同构，缺 type 时按 command / url 推断 transport；有条目时把来源文件记入 sourcePaths */
 function scanMcpServers(ctx: Ctx, servers: unknown, scope: ImportScope, file: string) {
     if (!servers || typeof servers !== 'object') return;
@@ -232,6 +255,7 @@ async function scanSource(fs: ImportFs, roots: ImportRoots, source: ImportSource
             for (const f of [j(P, 'CLAUDE.md'), j(P, '.claude', 'CLAUDE.md')]) {
                 if (await exists(fs, f)) { scanRule(ctx, f, 'project'); break; }
             }
+            await scanMemory(ctx);
         }
     } else if (source === 'codex') {
         await scanMcpToml(ctx, j(H, '.codex', 'config.toml'), 'user');
@@ -379,6 +403,7 @@ export async function executeImport(fs: ImportFs, roots: ImportRoots, core: Impo
         command: () => core.getCommandsInfo(true),
         hook: () => core.getHooksInfo(true),
         rule: () => core.getRuleInfo(true),
+        memory: () => core.getMemoryInfo(true),
     };
     await Promise.allSettled([...touched].map(c => refresh[c]?.()));
     return result;

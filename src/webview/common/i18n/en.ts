@@ -570,7 +570,6 @@ export const en: Record<keyof typeof zh, string> = {
     'config.import.start': 'Start import',
     'config.import.importing': 'Importing...',
     'config.import.loadFailed': 'Failed to read: {error}',
-    'config.import.cat.rule': 'Rules',
 
     // ── Config: usage ──
     'config.usage.title': 'Usage',
@@ -735,7 +734,7 @@ export const en: Record<keyof typeof zh, string> = {
     'config.rule.empty': 'No rules',
     'config.memory.group.project': 'Project memory',
     'config.memory.group.other': 'External memory',
-    'config.memory.refFiles': 'Related files ({count})',
+    'config.memory.entryCount': '{count} items',
     'config.memory.refresh': 'Refresh memory',
     'config.memory.empty': 'No memory',
 
