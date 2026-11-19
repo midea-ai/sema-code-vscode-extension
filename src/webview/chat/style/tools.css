@@ -513,10 +513,13 @@
     white-space: nowrap;
 }
 
-/* 无边框的文字按钮；非悬浮时不占用标题宽度 */
+/* 无边框的文字按钮；非悬浮时不占用标题宽度。
+   高度锁在标题行高以内，避免悬浮出现时把 header 撑高 */
 .task-detail-btn {
     font-size: var(--chat-font-sm);
-    padding: 2px 8px;
+    height: 14px;
+    line-height: 14px;
+    padding: 0 8px;
     background-color: transparent;
     border: none;
     border-radius: var(--chat-radius-sm);
