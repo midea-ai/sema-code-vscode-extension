@@ -125,6 +125,13 @@ code, pre, .code {
        贴底跟随由 ResizeObserver 主动置底，不依赖关闭锚定。 */
 }
 
+/* 未贴底时底部渐隐，提示输入框上方还有内容，避免正文在容器边缘被硬切。
+   贴底时（.fade-bottom 不在）不做遮罩，最后一行保持完全不透明。 */
+#output-container.fade-bottom {
+    -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 28px), transparent 100%);
+    mask-image: linear-gradient(to bottom, #000 calc(100% - 28px), transparent 100%);
+}
+
 /* 内容包裹层：ResizeObserver 观察对象；min-height 撑满滚动区，让空状态欢迎页能按滚动区高度居中 */
 .output-content {
     position: relative;
@@ -1147,7 +1154,7 @@ html.jb #output-container {
 
 .file-changes-content {
     padding: 0 var(--chat-spacing-md) 8px var(--chat-spacing-md);
-    max-height: 150px;
+    max-height: 75px;
     overflow-y: auto;
 }
 

@@ -1096,7 +1096,7 @@ const ChatSession: React.FC<ChatSessionProps> = ({ vscode: rawVscode, sessionId,
             <SessionActiveContext.Provider value={active}>
             <div className="chat-session" style={{ display: active ? 'flex' : 'none' }}>
                 <div className="output-scroll-wrap">
-                <div id="output-container" ref={outputContainerRef}>
+                <div id="output-container" ref={outputContainerRef} className={overflow && !stick ? 'fade-bottom' : undefined}>
                 <div className="output-content" ref={outputContentRef}>
                     {renderedContent}
                     {progressMessage && (
