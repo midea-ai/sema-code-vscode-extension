@@ -123,7 +123,7 @@ function isMentionIntact(span: HTMLElement): boolean {
     if (!name) return false;
     const ls = span.dataset.lineStart;
     const le = span.dataset.lineEnd;
-    const expected = refLabel(span.dataset.path || '', span.dataset.isDir === '1', ls ? Number(ls) : undefined, le ? Number(le) : undefined);
+    const expected = refLabel(span.dataset.path || '', ls ? Number(ls) : undefined, le ? Number(le) : undefined);
     return name.textContent === expected;
 }
 

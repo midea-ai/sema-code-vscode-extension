@@ -55,12 +55,11 @@ export function refPaths(text: string): string[] {
     return [...out];
 }
 
-/** 芯片上显示的名字：basename（目录保留尾部 /），带行号时追加 `:13-17` */
-export function refLabel(path: string, isDirectory: boolean, line?: number, endLine?: number): string {
+/** 芯片上显示的名字：basename（目录靠图标区分，名字不再加尾 /），带行号时追加 `:13-17` */
+export function refLabel(path: string, line?: number, endLine?: number): string {
     const trimmed = path.replace(/[\\/]+$/, '');
     const base = trimmed.split(/[\\/]/).pop() || path;
-    const name = isDirectory ? `${base}/` : base;
-    return line ? `${name}:${line}${endLine ? `-${endLine}` : ''}` : name;
+    return line ? `${base}:${line}${endLine ? `-${endLine}` : ''}` : base;
 }
 
 /** 文件高亮统一图标尺寸（px）：.file-ref-icon 的盒子大小，SkillLabel 的图标也取这个值 */
@@ -100,7 +99,7 @@ export function FileLabel({ path, isDirectory = false, label, typeColor = true, 
  */
 export function FileRefChip({ seg, onOpen }: { seg: RefSegment; onOpen?: (seg: RefSegment) => void }) {
     return (
-        <FileLabel path={seg.path} isDirectory={seg.isDirectory} label={refLabel(seg.path, seg.isDirectory, seg.line, seg.endLine)}
+        <FileLabel path={seg.path} isDirectory={seg.isDirectory} label={refLabel(seg.path, seg.line, seg.endLine)}
             typeColor={false} title={seg.path} className={onOpen ? 'clickable' : undefined}
             onMouseDown={onOpen ? e => { e.preventDefault(); e.stopPropagation(); } : undefined}
             onClick={onOpen ? e => { e.stopPropagation(); onOpen(seg); } : undefined} />
@@ -121,5 +120,5 @@ export function buildFileLabelHtml(path: string, isDirectory: boolean, label: st
 
 /** 输入框 mention span 的内部 HTML：图标不设类型色、随文字用链接色 */
 export function buildMentionChipHtml(m: { path: string; isDirectory?: boolean; startLine?: number; endLine?: number }): string {
-    return buildFileLabelHtml(m.path, !!m.isDirectory, refLabel(m.path, !!m.isDirectory, m.startLine, m.endLine), false);
+    return buildFileLabelHtml(m.path, !!m.isDirectory, refLabel(m.path, m.startLine, m.endLine), false);
 }
