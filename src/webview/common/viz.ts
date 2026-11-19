@@ -21,6 +21,8 @@ export type VizTheme = 'light' | 'dark';
 export type VizMessage =
     /** iframe → 宿主：文档高度与标题（加载后、尺寸变化时上报） */
     | { type: typeof VIZ_MSG_TYPE; kind: 'size'; height: number; title: string }
+    /** iframe → 宿主：沙箱内选中的文字交给 VS Code 扩展写系统剪贴板 */
+    | { type: typeof VIZ_MSG_TYPE; kind: 'copyText'; text: string }
     /** 宿主 → iframe：请求整页截图 */
     | { type: typeof VIZ_MSG_TYPE; kind: 'snapshot'; id: number }
     /** iframe → 宿主：截图结果（png Blob；失败时 blob 为空并带 error） */

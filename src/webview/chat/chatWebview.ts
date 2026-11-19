@@ -152,6 +152,7 @@ export class ChatWebviewProvider {
                 readPastedText: () => this.postMessage({ type: 'pastedTextRead', reqId: msg.reqId, path: msg.path, content: readPastedText(String(msg.path || '')) }),
                 // 可视化产物内联嵌入：复制到临时目录并注入 viz-runtime，回 webview 可加载的 url
                 prepareVizEmbed: () => this.prepareVizEmbed(String(msg.path || ''), msg.reqId),
+                copyVizText: () => { if (typeof msg.text === 'string' && msg.text) void vscode.env.clipboard.writeText(msg.text); },
             };
             await handlers[msg.type]?.();
         });

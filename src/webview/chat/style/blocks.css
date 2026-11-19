@@ -102,12 +102,6 @@
     background: #fff;
 }
 
-/* 折叠态：只露顶部，底部渐隐到透明（mask 适配任意背景），与 .user-input-content.collapsed / .collapsible-diff.collapsed 同一套 */
-.viz-embed-body--collapsed {
-    -webkit-mask-image: linear-gradient(to bottom, #000 80%, transparent 100%);
-    mask-image: linear-gradient(to bottom, #000 80%, transparent 100%);
-}
-
 /* iframe 高度由组件按真实文档高度设定（内联 style），不在 iframe 内部滚动 */
 .viz-embed-frame {
     display: block;
@@ -119,29 +113,6 @@
 
 .viz-embed-frame--pending {
     opacity: 0;
-}
-
-/* 展开 / 收起：紧贴内容下方右对齐，弱化色，样式同 .user-input-toggle */
-.viz-embed-toggle-row {
-    display: flex;
-    justify-content: flex-end;
-    margin-top: 2px;
-}
-
-.viz-embed-toggle {
-    padding: 0;
-    border: none;
-    background: transparent;
-    color: var(--chat-color-muted);
-    font-size: var(--chat-font-sm);
-    line-height: 1.4;
-    cursor: pointer;
-    user-select: none;
-}
-
-.viz-embed-toggle:hover {
-    color: var(--chat-color-muted-hover);
-    text-decoration: underline;
 }
 
 .viz-embed-loading {

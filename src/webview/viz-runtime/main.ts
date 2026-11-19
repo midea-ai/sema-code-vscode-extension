@@ -23,8 +23,13 @@ if (window.parent !== window) {
 
     let last = -1;
     const report = () => {
-        const doc = document.documentElement;
-        const height = Math.ceil(Math.max(doc.scrollHeight, document.body?.scrollHeight || 0));
+        const body = document.body;
+        if (!body) return;
+        // html.scrollHeight 至少是 iframe 的视口高度；拿它回设 iframe 高度后，
+        // 内容变短也无法缩回，旧视口会变成页面底部的大块空白。
+        // body 的实际盒子高度随内容变化，不受 iframe 当前高度的下限影响。
+        const marginBottom = parseFloat(getComputedStyle(body).marginBottom) || 0;
+        const height = Math.max(1, Math.ceil(body.getBoundingClientRect().bottom + window.scrollY + marginBottom));
         if (height === last) return;
         last = height;
         post({ type: VIZ_MSG_TYPE, kind: 'size', height, title: document.title || '' });
@@ -40,6 +45,26 @@ if (window.parent !== window) {
     };
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start); else start();
     window.addEventListener('load', report);
+
+    // VS Code 的 srcdoc 沙箱是独立的不透明源，选区无法由外层页面直接读取。
+    // 复制命令有时只落在 webview 外层；在子页收到按键或右键复制时主动上报选区。
+    if (location.href === 'about:srcdoc') {
+        const selectedText = () => window.getSelection()?.toString() || '';
+        window.addEventListener('keydown', e => {
+            if (!(e.ctrlKey || e.metaKey) || e.altKey || e.key.toLowerCase() !== 'c') return;
+            const text = selectedText();
+            if (!text) return;
+            e.preventDefault();
+            post({ type: VIZ_MSG_TYPE, kind: 'copyText', text });
+        }, true);
+        document.addEventListener('copy', e => {
+            const text = selectedText();
+            if (!text) return;
+            e.clipboardData?.setData('text/plain', text);
+            e.preventDefault();
+            post({ type: VIZ_MSG_TYPE, kind: 'copyText', text });
+        }, true);
+    }
 
     window.addEventListener('message', async (e: MessageEvent<VizMessage>) => {
         const m = e.data;
