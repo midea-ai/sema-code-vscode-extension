@@ -53,23 +53,11 @@ export function renderMarkdownToHtml(content: string, vscode?: any): string {
     return placeholder;
   });
 
-  // 步骤2: 提取内联代码（先处理双反引号，允许内部包含单反引号）
-  // 使用更宽松的匹配：两个反引号之间的任意内容（非贪婪）
-  processedContent = processedContent.replace(/``([\s\S]+?)``/g, (match, code) => {
-    const escapedCode = escapeHtml(code);
+  // 步骤2/3: 按反引号数量配对内联代码。未闭合的定界符留在原文中，
+  // 不跨行吞掉后续列表项；反斜杠转义的反引号不作为闭合定界符。
+  processedContent = extractInlineCode(processedContent, (code) => {
     const placeholder = `\x00INLINE_CODE_${inlineCodePlaceholders.length}\x00`;
-    const codeHtml = createInlineCodeHtml(code, escapedCode, vscode);
-    inlineCodePlaceholders.push(codeHtml);
-    return placeholder;
-  });
-
-  // 步骤3: 提取单反引号内联代码（避免匹配占位符中的内容）
-  // [^`\x00] 表示：不是反引号，也不是 NULL 字符
-  processedContent = processedContent.replace(/`([^`\x00]+?)`/g, (match, code) => {
-    const escapedCode = escapeHtml(code);
-    const placeholder = `\x00INLINE_CODE_${inlineCodePlaceholders.length}\x00`;
-    const codeHtml = createInlineCodeHtml(code, escapedCode, vscode);
-    inlineCodePlaceholders.push(codeHtml);
+    inlineCodePlaceholders.push(createInlineCodeHtml(code, escapeHtml(code), vscode));
     return placeholder;
   });
 
@@ -511,6 +499,53 @@ function escapeHtml(text: string): string {
   const div = document.createElement('div');
   div.textContent = text;
   return div.innerHTML;
+}
+
+/** 只在当前行内寻找同长度的闭合反引号，避免未闭合片段吞掉后续 Markdown 块。 */
+function extractInlineCode(content: string, replaceCode: (code: string) => string): string {
+  return content.split('\n').map(line => {
+    let result = '';
+    let i = 0;
+    while (i < line.length) {
+      if (line[i] === '\\' && line[i + 1] === '`') {
+        result += line.slice(i, i + 2);
+        i += 2;
+        continue;
+      }
+      if (line[i] !== '`') {
+        result += line[i++];
+        continue;
+      }
+
+      let openerEnd = i;
+      while (line[openerEnd] === '`') openerEnd++;
+      const delimiterLength = openerEnd - i;
+      let close = openerEnd;
+      while (close < line.length) {
+        if (line[close] === '\\' && line[close + 1] === '`') {
+          close += 2;
+          continue;
+        }
+        if (line[close] !== '`') {
+          close++;
+          continue;
+        }
+        let closeEnd = close;
+        while (line[closeEnd] === '`') closeEnd++;
+        if (closeEnd - close === delimiterLength) break;
+        close = closeEnd;
+      }
+      if (close >= line.length || close === openerEnd) {
+        result += line.slice(i, openerEnd);
+        i = openerEnd;
+        continue;
+      }
+      const code = line.slice(openerEnd, close).replace(/\\`/g, '`');
+      result += replaceCode(code);
+      i = close + delimiterLength;
+    }
+    return result;
+  }).join('\n');
 }
 
 /**

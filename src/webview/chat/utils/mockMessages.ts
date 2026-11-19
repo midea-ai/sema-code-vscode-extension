@@ -759,6 +759,17 @@ npm run dev
 [1] [iiQWorks.PLC UNI 1.0 手册 p.20](file:///Users/allen/.cache/plc-knowledge-base/originals/iiqworks/%28CN%29%20iiQWorks.PLC%20UNI%201.0.pdf#page=20)
 [2] [iiQWorks.PLC UNI 入门指南 (虚拟调试) p.18](file:///Users/allen/.cache/plc-knowledge-base/originals/iiqworks/%28CN%29%20iiQWorks.PLC%20UNI%20%E5%85%A5%E9%97%A8%E6%8C%87%E5%8D%97%20%28%E8%99%9A%E6%8B%9F%E8%B0%83%E8%AF%95%29%20.pdf#page=18)`,
             },
+        },
+        {
+            id: nextId(),
+            type: 'assistant',
+            content: {
+                content: `是故意的，而且只加在“芯片标签”上，不改发送出去的文本：
+
+- [fileRefDisplay.tsx:59-63](/Users/zhoujie195/midea-code/sema-vscode-extension/src/webview/chat/utils/fileRefDisplay.tsx) 的 \`refLabel\` 里 \`isDirectory ? \`\${base}/\`\` 拼上尾斜杠，注释也写了“目录保留尾部 /”。
+- 发出去的原文仍是 \`@src\`（[InputBox.tsx:567](/Users/zhoujie195/midea-code/sema-vscode-extension/src/webview/chat/components/input/InputBox.tsx)、\`InputBox.tsx:653\`），所以斜杠纯属显示层。
+- 用户气泡里的目录判断也不是靠斜杠，而是宿主 stat 结果（[UserInputBlock.tsx:127](/Users/zhoujie195/midea-code/sema-vscode-extension/src/webview/chat/blocks/UserInputBlock.tsx) 用 \`st.isDirectory\` 覆盖了文本解析出的标记），只有手打 \`@src/\` 的裸文本才用 \`/[\\\\/]$/\` 兜底（\`fileRefDisplay.tsx:41\`）。`,
+            },
         }
     ],
 
