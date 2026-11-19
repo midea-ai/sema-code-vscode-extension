@@ -68,7 +68,8 @@ export interface ImportItem {
 /** 类别预览：不支持或没找到的类别 items 为空，面板直接不显示 */
 export interface CategoryPreview {
     category: ImportCategory;
-    sourcePaths: string[];
+    /** 来源位置（扫描的目录 / 文件，不细到单个条目）；scope 决定归到项目还是用户全局 */
+    sourcePaths: { path: string; scope: ImportScope }[];
     items: ImportItem[];
 }
 

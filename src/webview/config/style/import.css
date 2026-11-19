@@ -1,4 +1,4 @@
-/* 「导入」页：来源列表 + 导入面板（勾选列表复用 styles.css 的 .checkbox-label，计数徽标复用 section.css 的 .section-tab-count） */
+/* 「导入」页：来源列表 + 导入面板（类别卡片 + 条目勾选） */
 
 .import-subtitle {
     font-size: var(--s-font-sm);
@@ -60,122 +60,174 @@
     max-height: 85vh;
 }
 
-/* 范围筛选：分段按钮，与下方勾选列表区分 */
-.import-scope-row {
+/* 面板顶栏：范围分段控件 + 右侧已选计数 */
+.import-toolbar {
     display: flex;
     align-items: center;
-    gap: var(--s-gap-sm);
+    gap: var(--s-gap-md);
     margin-bottom: var(--s-gap-md);
 }
 
-.import-scope-label {
-    font-size: var(--s-font-sm);
+.import-toolbar-label {
+    font-size: var(--s-font-base);
     color: var(--vscode-descriptionForeground);
-    margin-right: 2px;
 }
 
-.import-scope-chip {
+.import-segmented {
+    display: inline-flex;
+    gap: 2px;
+    padding: 3px;
+    border-radius: var(--s-radius-md);
+    background: color-mix(in srgb, var(--vscode-foreground, #ccc) 10%, transparent);
+}
+
+.import-seg-btn {
     padding: 4px 12px;
-    border-radius: 999px;
-    border: 1px solid var(--s-card-border);
+    border: none;
+    border-radius: var(--s-radius-sm);
     background: transparent;
     color: var(--vscode-descriptionForeground);
-    font-size: var(--s-font-sm);
+    font-size: var(--s-font-md);
     cursor: pointer;
 }
 
-.import-scope-chip:hover {
+.import-seg-btn:hover {
     color: var(--vscode-foreground);
 }
 
-.import-scope-chip.active {
-    background: var(--vscode-button-background);
-    border-color: var(--vscode-button-background);
-    color: var(--vscode-button-foreground);
+.import-seg-btn.active {
+    background: var(--vscode-editor-background);
+    color: var(--vscode-foreground);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
 }
 
-.import-cat-list {
+.import-toolbar-count {
+    margin-left: auto;
+    font-size: var(--s-font-base);
+    color: var(--vscode-descriptionForeground);
+}
+
+/* ===== 类别卡片 ===== */
+
+.import-cards {
     display: flex;
     flex-direction: column;
-    border: 1px solid var(--s-card-border);
-    border-radius: var(--s-radius-sm);
+    gap: var(--s-gap-sm);
 }
 
-/* 类别行的复选框不在 label 内，单独覆盖 styles.css 的全局 input { width:100%; padding } */
-.import-cat-head input[type="checkbox"] {
+.import-card {
+    border: 1px solid var(--s-card-border);
+    border-radius: var(--s-radius-lg);
+    overflow: hidden;
+}
+
+.import-card-head {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+}
+
+/* 复选框不在 label 内，单独覆盖 styles.css 的全局 input { width:100%; padding } */
+.import-check {
     width: auto;
     padding: 0;
     margin: 0;
     flex-shrink: 0;
 }
 
-.import-cat-head input[type="checkbox"]:focus {
+.import-check:focus {
     box-shadow: none;
 }
 
-.import-cat-row + .import-cat-row {
-    border-top: 1px solid var(--s-card-border);
-}
-
-.import-cat-head {
-    display: flex;
+.import-card-icon {
+    display: inline-flex;
     align-items: center;
-    gap: var(--s-gap-sm);
-    padding: 8px 10px;
-    font-size: var(--s-font-md);
-}
-
-.import-cat-row.disabled .import-cat-head {
-    color: var(--vscode-disabledForeground, var(--vscode-descriptionForeground));
-}
-
-.import-cat-name {
-    font-weight: 500;
-    min-width: 90px;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border-radius: var(--s-radius-md);
     flex-shrink: 0;
+    background: color-mix(in srgb, var(--vscode-focusBorder, #4eabff) 14%, transparent);
+    color: color-mix(in srgb, var(--vscode-focusBorder, #4eabff) 70%, var(--vscode-foreground, #ccc));
 }
 
-.import-cat-paths {
+/* 名称 + 说明纵向两行，占满中间空间 */
+.import-card-text {
+    display: flex;
+    flex-direction: column;
     flex: 1;
     min-width: 0;
-    font-size: var(--s-font-xs);
-    color: var(--vscode-descriptionForeground);
-    font-family: var(--vscode-editor-font-family, monospace);
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
 }
 
-.import-expand {
-    background: none;
-    border: none;
-    color: var(--vscode-descriptionForeground);
-    cursor: pointer;
-    font-size: var(--s-font-xs);
-    padding: 2px 6px;
-    flex-shrink: 0;
-}
-
-.import-expand:hover {
+.import-card-title {
+    font-size: var(--s-font-md);
+    font-weight: 600;
     color: var(--vscode-foreground);
 }
 
-.import-items {
-    padding: 0 10px 8px 32px;
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
+.import-card-desc {
+    margin-top: 2px;
+    font-size: var(--s-font-sm);
+    color: var(--vscode-descriptionForeground);
 }
 
-/* 在 .checkbox-label 基础上只补字号与收缩 */
+.import-card-count {
+    font-size: var(--s-font-base);
+    color: var(--vscode-descriptionForeground);
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.import-card-toggle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 2px;
+    border: none;
+    background: none;
+    color: var(--vscode-descriptionForeground);
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: transform 0.15s ease;
+}
+
+.import-card-toggle:hover {
+    color: var(--vscode-foreground);
+}
+
+.import-card-toggle.expanded {
+    transform: rotate(180deg);
+}
+
+.import-card.disabled .import-card-title,
+.import-card.disabled .import-card-desc {
+    color: var(--vscode-disabledForeground, var(--vscode-descriptionForeground));
+}
+
+.import-card-body {
+    padding: 0 12px 10px;
+}
+
+/* ===== 卡片内条目 ===== */
+
+.import-items {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-gap-xs);
+}
+
+/* 在 .checkbox-label 基础上补浅底与内边距 */
 .import-item {
     gap: var(--s-gap-sm);
-    font-size: var(--s-font-sm);
+    padding: 6px 10px;
+    border-radius: var(--s-radius-md);
+    background: color-mix(in srgb, var(--vscode-foreground, #ccc) 6%, transparent);
     min-width: 0;
 }
 
 .import-item.exists {
-    color: var(--vscode-descriptionForeground);
+    opacity: 0.7;
 }
 
 .import-item-name {
@@ -183,33 +235,56 @@
     white-space: nowrap;
 }
 
-.import-item-detail {
-    flex: 1;
-    min-width: 0;
-    color: var(--vscode-descriptionForeground);
-    font-family: var(--vscode-editor-font-family, monospace);
-    font-size: var(--s-font-xs);
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
-.import-tag {
-    font-size: var(--s-font-xs);
-    padding: 0 5px;
-    border-radius: var(--s-radius-sm);
-    border: 1px solid var(--s-card-border);
+.import-item-tag {
+    font-size: var(--s-font-sm);
     color: var(--vscode-descriptionForeground);
     white-space: nowrap;
     flex-shrink: 0;
 }
 
+.import-item-path {
+    margin-left: auto;
+    min-width: 0;
+    font-family: var(--vscode-editor-font-family, monospace);
+    font-size: var(--s-font-sm);
+    color: var(--vscode-descriptionForeground);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.import-card-source {
+    display: flex;
+    gap: 6px;
+    margin-top: var(--s-gap-sm);
+    padding: 0 10px;
+    font-size: var(--s-font-sm);
+    color: var(--vscode-descriptionForeground);
+    min-width: 0;
+}
+
+.import-card-source-path {
+    min-width: 0;
+    font-family: var(--vscode-editor-font-family, monospace);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* ===== 底栏 ===== */
+
 .import-summary {
     flex: 1;
-    font-size: var(--s-font-sm);
+    font-size: var(--s-font-base);
     color: var(--vscode-descriptionForeground);
 }
 
 .import-modal .section-modal-footer {
     align-items: center;
+}
+
+.import-start {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
 }

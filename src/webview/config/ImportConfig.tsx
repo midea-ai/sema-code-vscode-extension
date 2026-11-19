@@ -1,7 +1,11 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { VscodeApi } from './types';
-import { CloseIcon } from './utils/svgIcons';
+import {
+    ArrowRightIcon, BotIcon, BrainIcon, ChevronDownIcon, CloseIcon,
+    FileTextIcon, SparklesIcon, SquareSlashIcon, WebhookIcon, WrenchIcon,
+} from './utils/svgIcons';
 import { useT } from '../common/i18n/react';
+import type { I18nKey } from '../common/i18n/react';
 import type { CategoryPreview, ImportCategory, ImportItem, ImportPreview, ImportScope, ImportSource, SourceStatus } from './import/types';
 import './style/section.css';
 import './style/import.css';
@@ -15,6 +19,21 @@ import './style/import.css';
 // 产品名与 MCP / Skills / Rules 等产品术语保持英文，不走 i18n（对齐侧栏导航）
 const SOURCE_LABELS: Record<ImportSource, string> = { claude: 'Claude Code', codex: 'Codex', cursor: 'Cursor' };
 const CATEGORY_LABELS: Record<ImportCategory, string> = { mcp: 'MCP', skill: 'Skills', agent: 'Agents', command: 'Commands', hook: 'Hooks', rule: 'Rules', memory: 'Memory' };
+
+/** 类别图标：Lucide 图形，按类别固定 */
+const CATEGORY_ICONS: Record<ImportCategory, React.FC<{ size?: number }>> = {
+    mcp: WrenchIcon, skill: SparklesIcon, agent: BotIcon, command: SquareSlashIcon, hook: WebhookIcon, rule: FileTextIcon, memory: BrainIcon,
+};
+
+const CATEGORY_DESCS: Record<ImportCategory, I18nKey> = {
+    mcp: 'config.import.cat.mcp',
+    skill: 'config.import.cat.skill',
+    agent: 'config.import.cat.agent',
+    command: 'config.import.cat.command',
+    hook: 'config.import.cat.hook',
+    rule: 'config.import.cat.rule',
+    memory: 'config.import.cat.memory',
+};
 
 /** 来源图标：圆角色块 + 首字母，不用品牌图标 */
 const SourceIcon: React.FC<{ source: ImportSource }> = ({ source }) => (
@@ -32,8 +51,9 @@ const ImportConfig: React.FC<ImportConfigProps> = ({ vscode }) => {
     const [panelSource, setPanelSource] = useState<ImportSource | null>(null);
     const [preview, setPreview] = useState<ImportPreview | null>(null);
     const [previewError, setPreviewError] = useState<string | null>(null);
-    const [scopes, setScopes] = useState<Record<ImportScope, boolean>>({ project: true, user: true });
-    const [selected, setSelected] = useState<Set<string>>(new Set());
+    const [scopeTab, setScopeTab] = useState<ImportScope>('project');
+    // 两个范围各自保留勾选，互不影响
+    const [selected, setSelected] = useState<Record<ImportScope, Set<string>>>({ project: new Set(), user: new Set() });
     const [expanded, setExpanded] = useState<Set<ImportCategory>>(new Set());
     const [importing, setImporting] = useState(false);
 
@@ -48,8 +68,11 @@ const ImportConfig: React.FC<ImportConfigProps> = ({ vscode }) => {
                     if (message.success) {
                         const p = message.data as ImportPreview;
                         setPreview(p);
-                        setScopes({ project: true, user: true });
-                        setSelected(new Set(p.categories.flatMap(c => c.items.filter(i => !i.exists).map(i => i.id))));
+                        // 默认落在有内容的一侧：项目无条目时直接看用户全局
+                        setScopeTab(p.categories.some(c => c.items.some(i => i.scope === 'project')) ? 'project' : 'user');
+                        const pick = (scope: ImportScope) =>
+                            new Set(p.categories.flatMap(c => c.items.filter(i => i.scope === scope && !i.exists).map(i => i.id)));
+                        setSelected({ project: pick('project'), user: pick('user') });
                         setExpanded(new Set());
                     } else {
                         setPreviewError(message.message || t('common.unknownError'));
@@ -81,19 +104,25 @@ const ImportConfig: React.FC<ImportConfigProps> = ({ vscode }) => {
         setPreview(null);
     };
 
-    // 范围过滤后的可见类别 / 条目：范围未选中的条目既不导入也不计数；条目为空的类别不显示
+    // 范围 tab 只影响显示：这里按当前 tab 过滤类别与条目，条目为空的类别不显示
     const visibleCats = useMemo<CategoryPreview[]>(() => (preview?.categories ?? [])
-        .map(cat => ({ ...cat, items: cat.items.filter(i => scopes[i.scope]) }))
-        .filter(cat => cat.items.length > 0), [preview, scopes]);
+        .map(cat => ({ ...cat, items: cat.items.filter(i => i.scope === scopeTab) }))
+        .filter(cat => cat.items.length > 0), [preview, scopeTab]);
 
+    // 计数只算当前 tab，两个范围互不影响
+    const selectedInTab = selected[scopeTab];
     const summary = useMemo(() => {
         let n = 0, m = 0;
-        for (const cat of visibleCats) for (const item of cat.items) { if (selected.has(item.id)) n++; else m++; }
+        for (const cat of visibleCats) for (const item of cat.items) { if (selectedInTab.has(item.id)) n++; else m++; }
         return { n, m };
-    }, [visibleCats, selected]);
+    }, [visibleCats, selectedInTab]);
+
+    const updateSelected = (fn: (prev: Set<string>) => Set<string>) => {
+        setSelected(prev => ({ ...prev, [scopeTab]: fn(prev[scopeTab]) }));
+    };
 
     const toggleCategory = (cat: CategoryPreview, checked: boolean) => {
-        setSelected(prev => {
+        updateSelected(prev => {
             const next = new Set(prev);
             for (const item of cat.items) { if (item.exists) continue; if (checked) next.add(item.id); else next.delete(item.id); }
             return next;
@@ -101,7 +130,7 @@ const ImportConfig: React.FC<ImportConfigProps> = ({ vscode }) => {
     };
 
     const toggleItem = (id: string, checked: boolean) => {
-        setSelected(prev => { const next = new Set(prev); if (checked) next.add(id); else next.delete(id); return next; });
+        updateSelected(prev => { const next = new Set(prev); if (checked) next.add(id); else next.delete(id); return next; });
     };
 
     const toggleExpanded = (category: ImportCategory) => {
@@ -110,7 +139,7 @@ const ImportConfig: React.FC<ImportConfigProps> = ({ vscode }) => {
 
     const startImport = () => {
         if (!preview || !panelSource) return;
-        const items: ImportItem[] = visibleCats.flatMap(c => c.items.filter(i => selected.has(i.id)));
+        const items: ImportItem[] = visibleCats.flatMap(c => c.items.filter(i => selectedInTab.has(i.id)));
         setImporting(true);
         setPreviewError(null);
         vscode.postMessage({ command: 'importExecute', source: panelSource, items });
@@ -118,39 +147,72 @@ const ImportConfig: React.FC<ImportConfigProps> = ({ vscode }) => {
 
     const scopeLabel = (scope: ImportScope) => (scope === 'project' ? t('config.import.scope.project') : t('config.import.scope.user'));
 
-    // 只渲染范围过滤后仍有条目的类别（visibleCats 已过滤），不支持或没找到的类别不做解释
-    const renderCategoryRow = (cat: CategoryPreview) => {
+    // 类别卡片：整行是勾选 + 图标 + 名称/说明 + 数量 + 展开箭头；不支持或没找到的类别不显示
+    const renderCategoryCard = (cat: CategoryPreview) => {
         const selectable = cat.items.filter(i => !i.exists);
         const disabled = selectable.length === 0;
-        const checked = !disabled && selectable.every(i => selected.has(i.id));
+        const checked = !disabled && selectable.every(i => selectedInTab.has(i.id));
         const isExpanded = expanded.has(cat.category);
+        const Icon = CATEGORY_ICONS[cat.category];
+        // 来源行只给 MCP / Hook：这两类条目不带文件路径；其余类别条目行里已有路径
+        const sourcePaths = cat.category === 'mcp' || cat.category === 'hook'
+            ? cat.sourcePaths.filter(s => s.scope === scopeTab).map(s => s.path)
+            : [];
         return (
-            <div key={cat.category} className={`import-cat-row ${disabled ? 'disabled' : ''}`}>
-                <div className="import-cat-head">
-                    <input type="checkbox" checked={checked} disabled={disabled} onChange={e => toggleCategory(cat, e.target.checked)} />
-                    <span className="import-cat-name">{CATEGORY_LABELS[cat.category]}</span>
-                    <span className="section-tab-count">{cat.items.length}</span>
-                    <span className="import-cat-paths" title={cat.sourcePaths.join('\n')}>{cat.sourcePaths.join(' · ')}</span>
-                    <button className="import-expand" onClick={() => toggleExpanded(cat.category)}>
-                        {isExpanded ? t('common.collapse') : t('common.expand')}
+            <div key={cat.category} className={`import-card ${disabled ? 'disabled' : ''}`}>
+                <div className="import-card-head">
+                    <input
+                        type="checkbox"
+                        className="import-check"
+                        checked={checked}
+                        disabled={disabled}
+                        onChange={e => toggleCategory(cat, e.target.checked)}
+                    />
+                    <span className="import-card-icon"><Icon size={16} /></span>
+                    <span className="import-card-text">
+                        <span className="import-card-title">{CATEGORY_LABELS[cat.category]}</span>
+                        <span className="import-card-desc">{t(CATEGORY_DESCS[cat.category])}</span>
+                    </span>
+                    <span className="import-card-count">{t('config.import.itemCount', { n: cat.items.length })}</span>
+                    <button
+                        className={`import-card-toggle ${isExpanded ? 'expanded' : ''}`}
+                        onClick={() => toggleExpanded(cat.category)}
+                        title={isExpanded ? t('common.collapse') : t('common.expand')}
+                    >
+                        <ChevronDownIcon size={16} />
                     </button>
                 </div>
                 {isExpanded && (
-                    <div className="import-items">
-                        {cat.items.map(item => (
-                            <label key={item.id} className={`checkbox-label import-item ${item.exists ? 'exists' : ''}`} title={item.sourcePath}>
-                                <input
-                                    type="checkbox"
-                                    checked={selected.has(item.id)}
-                                    disabled={item.exists}
-                                    onChange={e => toggleItem(item.id, e.target.checked)}
-                                />
-                                <span className="import-item-name">{item.name}</span>
-                                <span className="import-tag">{scopeLabel(item.scope)}</span>
-                                {item.detail && <span className="import-item-detail" title={item.detail}>{item.detail}</span>}
-                                {item.exists && <span className="import-tag">{t('config.import.exists')}</span>}
-                            </label>
-                        ))}
+                    <div className="import-card-body">
+                        <div className="import-items">
+                            {cat.items.map(item => {
+                                // MCP / Hook 的条目都来自同一个来源文件，右侧改显示命令/URL 这类描述
+                                const trailing = cat.category === 'mcp' || cat.category === 'hook' ? item.detail : item.sourcePath;
+                                return (
+                                    <label
+                                        key={item.id}
+                                        className={`checkbox-label import-item ${item.exists ? 'exists' : ''}`}
+                                        title={trailing}
+                                    >
+                                        <input
+                                            type="checkbox"
+                                            checked={selectedInTab.has(item.id)}
+                                            disabled={item.exists}
+                                            onChange={e => toggleItem(item.id, e.target.checked)}
+                                        />
+                                        <span className="import-item-name">{item.name}</span>
+                                        {item.exists && <span className="import-item-tag">{t('config.import.exists')}</span>}
+                                        {trailing && <span className="import-item-path">{trailing}</span>}
+                                    </label>
+                                );
+                            })}
+                        </div>
+                        {sourcePaths.length > 0 && (
+                            <div className="import-card-source">
+                                <span>{t('config.import.sourceLabel')}</span>
+                                <span className="import-card-source-path" title={sourcePaths.join('\n')}>{sourcePaths.join(' · ')}</span>
+                            </div>
+                        )}
                     </div>
                 )}
             </div>
@@ -163,22 +225,25 @@ const ImportConfig: React.FC<ImportConfigProps> = ({ vscode }) => {
         const scopeOptions: ImportScope[] = preview.hasProject ? ['project', 'user'] : ['user'];
         return (
             <>
-                {/* 范围筛选：分段按钮，与下方的勾选列表区分开 */}
-                <div className="import-scope-row">
-                    <span className="import-scope-label">{t('config.import.scopeLabel')}</span>
-                    {scopeOptions.map(scope => (
-                        <button
-                            key={scope}
-                            className={`import-scope-chip ${scopes[scope] ? 'active' : ''}`}
-                            onClick={() => setScopes(s => ({ ...s, [scope]: !s[scope] }))}
-                        >
-                            {scopeLabel(scope)}
-                        </button>
-                    ))}
+                {/* 范围筛选：分段控件切换 tab，两侧勾选各自独立 */}
+                <div className="import-toolbar">
+                    <span className="import-toolbar-label">{t('config.import.scopeLabel')}</span>
+                    <div className="import-segmented">
+                        {scopeOptions.map(scope => (
+                            <button
+                                key={scope}
+                                className={`import-seg-btn ${scopeTab === scope ? 'active' : ''}`}
+                                onClick={() => setScopeTab(scope)}
+                            >
+                                {scopeLabel(scope)}
+                            </button>
+                        ))}
+                    </div>
+                    <span className="import-toolbar-count">{t('config.import.selectedCount', { n: summary.n })}</span>
                 </div>
                 {previewError && <div className="section-edit-error">{previewError}</div>}
                 {visibleCats.length > 0
-                    ? <div className="import-cat-list">{visibleCats.map(renderCategoryRow)}</div>
+                    ? <div className="import-cards">{visibleCats.map(renderCategoryCard)}</div>
                     : <div className="section-empty">{t('config.import.nothingToImport')}</div>}
             </>
         );
@@ -218,12 +283,12 @@ const ImportConfig: React.FC<ImportConfigProps> = ({ vscode }) => {
                             <span className="import-summary">{preview ? t('config.import.summary', { n: summary.n, m: summary.m }) : ''}</span>
                             <button className="section-btn secondary" onClick={closePanel} disabled={importing}>{t('common.cancel')}</button>
                             <button
-                                className={`section-btn primary ${importing ? 'btn-loading' : ''}`}
+                                className={`section-btn primary import-start ${importing ? 'btn-loading' : ''}`}
                                 onClick={startImport}
                                 disabled={!preview || importing || summary.n === 0}
                             >
                                 {importing && <span className="spinner" />}
-                                {importing ? t('config.import.importing') : t('config.import.start')}
+                                {importing ? t('config.import.importing') : <>{t('config.import.start')}<ArrowRightIcon size={14} /></>}
                             </button>
                         </div>
                     </div>

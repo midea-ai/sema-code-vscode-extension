@@ -30,10 +30,13 @@ function join(sep: string, ...parts: string[]): string {
 type Join = (...parts: string[]) => string;
 const joiner = (roots: ImportRoots): Join => (...p) => join(roots.sep, ...p);
 
-/** 供 UI 展示：home 缩成 ~，项目根缩成 . */
+/** 供 UI 展示：home 缩成 ~，项目内路径缩成相对项目的 .claude/… */
 function display(roots: ImportRoots, p: string): string {
+    // 项目优先：项目常在工作区内的 home 下，否则会显示成 ~/…/repo/.claude/…
+    if (roots.project && p.startsWith(roots.project)) {
+        return p.slice(roots.project.length).replace(/^[\\/]+/, '') || '.';
+    }
     if (roots.home && p.startsWith(roots.home)) return '~' + p.slice(roots.home.length);
-    if (roots.project && p.startsWith(roots.project)) return '.' + p.slice(roots.project.length);
     return p;
 }
 
@@ -111,7 +114,7 @@ async function scanSkills(ctx: Ctx, dir: string, scope: ImportScope) {
     const flags = await Promise.all(dirs.map(e => exists(fs, j(dir, e.name, 'SKILL.md'))));
     const skills = dirs.filter((_, i) => flags[i]);
     if (skills.length === 0) return;
-    ctx.cats.skill.sourcePaths.push(dir);
+    ctx.cats.skill.sourcePaths.push({ path: dir, scope });
     for (const e of skills) {
         ctx.cats.skill.items.push(copyItem('skill', scope, e.name, j(dir, e.name), j(semaRoot(roots, scope), 'skills', e.name), true));
     }
@@ -122,7 +125,7 @@ async function scanMd(ctx: Ctx, category: 'agent' | 'command', dir: string, scop
     const { fs, roots, j } = ctx;
     const files = await listMd(fs, j, dir, category === 'command');
     if (files.length === 0) return;
-    ctx.cats[category].sourcePaths.push(dir);
+    ctx.cats[category].sourcePaths.push({ path: dir, scope });
     const dstDir = j(semaRoot(roots, scope), category === 'agent' ? 'agents' : 'commands');
     for (const { file, rel } of files) {
         const name = rel.join(':').replace(/\.md$/i, '');
@@ -135,7 +138,7 @@ function scanRule(ctx: Ctx, src: string, scope: ImportScope) {
     const { roots, j } = ctx;
     const dst = scope === 'user' ? j(semaRoot(roots, 'user'), 'AGENTS.md') : j(roots.project!, 'AGENTS.md');
     ctx.cats.rule.items.push(copyItem('rule', scope, 'AGENTS.md', src, dst, false));
-    ctx.cats.rule.sourcePaths.push(src);
+    ctx.cats.rule.sourcePaths.push({ path: src, scope });
 }
 
 /**
@@ -155,7 +158,7 @@ async function scanMemory(ctx: Ctx) {
         const src = j(roots.home, '.claude', 'projects', slug, 'memory');
         if ((await fs.readDir(src)).length === 0) continue;
         ctx.cats.memory.items.push(copyItem('memory', 'project', 'Memory', src, j(semaRoot(roots, 'project'), 'memory'), true));
-        ctx.cats.memory.sourcePaths.push(src);
+        ctx.cats.memory.sourcePaths.push({ path: src, scope: 'project' });
         return;
     }
 }
@@ -177,7 +180,7 @@ function scanMcpServers(ctx: Ctx, servers: unknown, scope: ImportScope, file: st
         found = true;
         ctx.cats.mcp.items.push({ id: `mcp:${scope}:${config.name}`, category: 'mcp', scope, name: config.name, detail, sourcePath: file, exists: false, payload: { kind: 'mcp', config } });
     }
-    if (found) ctx.cats.mcp.sourcePaths.push(file);
+    if (found) ctx.cats.mcp.sourcePaths.push({ path: file, scope });
 }
 
 async function scanMcpJson(ctx: Ctx, file: string, scope: ImportScope) {
@@ -224,7 +227,7 @@ async function scanHooks(ctx: Ctx, file: string, scope: ImportScope) {
             }
         }
     }
-    if (found) ctx.cats.hook.sourcePaths.push(file);
+    if (found) ctx.cats.hook.sourcePaths.push({ path: file, scope });
 }
 
 async function scanSource(fs: ImportFs, roots: ImportRoots, source: ImportSource): Promise<CategoryPreview[]> {
@@ -339,7 +342,7 @@ export async function previewImport(fs: ImportFs, roots: ImportRoots, core: Impo
         else item.exists = hookKeys.get(p.dstFile)!.has(hookKey(p.event, p.command));
         item.sourcePath = display(roots, item.sourcePath);
     }));
-    for (const cat of categories) cat.sourcePaths = cat.sourcePaths.map(p => display(roots, p));
+    for (const cat of categories) cat.sourcePaths = cat.sourcePaths.map(s => ({ ...s, path: display(roots, s.path) }));
     return { source, hasProject: !!roots.project, categories };
 }
 
