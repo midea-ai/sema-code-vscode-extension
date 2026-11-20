@@ -19,7 +19,23 @@ import DesignConfig from './DesignConfig';
 import ClawConfig from './ClawConfig';
 import ImportConfig from './ImportConfig';
 import UsageConfig from './UsageConfig';
-import { RefreshIcon } from './utils/svgIcons';
+import {
+    RefreshIcon,
+    LayersIcon,
+    SettingsIcon,
+    BrainIcon,
+    ListChecksIcon,
+    TrendingUpIcon,
+    WrenchIcon,
+    SparklesIcon,
+    BotIcon,
+    BoxIcon,
+    SquareSlashIcon,
+    WebhookIcon,
+    PaletteIcon,
+    MonitorIcon,
+    DownloadIcon,
+} from './utils/svgIcons';
 import { setLang, useT } from '../common/i18n/react';
 
 type PageType = 'models' | 'system' | 'memory' | 'mcp' | 'skill' | 'agent' | 'hooks' | 'command' | 'plugin' | 'task' | 'design' | 'import' | 'claw' | 'usage';
@@ -162,34 +178,34 @@ const App: React.FC<AppProps> = ({ vscode }) => {
 
     // 侧栏三组导航：组名仅作标题，不可点击。Tools & MCP 等为产品术语，保持英文不走 i18n。
     // Claw 远程在 JB 下隐藏，但「更多」组名保留。
-    const navGroups: { title: string; items: { page: PageType; label: string }[] }[] = [
+    const navGroups: { title: string; items: { page: PageType; label: string; icon: React.ReactNode }[] }[] = [
         {
             title: t('config.nav.group.basic'),
             items: [
-                { page: 'models', label: t('config.nav.models') },
-                { page: 'system', label: t('config.nav.system') },
-                { page: 'memory', label: t('config.nav.memory') },
-                { page: 'task', label: t('config.nav.task') },
-                { page: 'usage', label: t('config.nav.usage') },
+                { page: 'models', label: t('config.nav.models'), icon: <LayersIcon /> },
+                { page: 'system', label: t('config.nav.system'), icon: <SettingsIcon /> },
+                { page: 'memory', label: t('config.nav.memory'), icon: <BrainIcon /> },
+                { page: 'task', label: t('config.nav.task'), icon: <ListChecksIcon /> },
+                { page: 'usage', label: t('config.nav.usage'), icon: <TrendingUpIcon /> },
             ],
         },
         {
             title: t('config.nav.group.extension'),
             items: [
-                { page: 'mcp', label: 'Tools & MCP' },
-                { page: 'skill', label: 'Skills' },
-                { page: 'agent', label: 'Agents' },
-                { page: 'plugin', label: 'Plugins' },
-                { page: 'command', label: 'Commands' },
-                { page: 'hooks', label: 'Hooks' },
+                { page: 'mcp', label: 'Tools & MCP', icon: <WrenchIcon /> },
+                { page: 'skill', label: 'Skills', icon: <SparklesIcon /> },
+                { page: 'agent', label: 'Agents', icon: <BotIcon /> },
+                { page: 'plugin', label: 'Plugins', icon: <BoxIcon /> },
+                { page: 'command', label: 'Commands', icon: <SquareSlashIcon /> },
+                { page: 'hooks', label: 'Hooks', icon: <WebhookIcon /> },
             ],
         },
         {
             title: t('config.nav.group.more'),
             items: [
-                { page: 'design', label: 'Design' },
-                ...(IS_JB ? [] : [{ page: 'claw' as PageType, label: t('config.nav.claw') }]),
-                { page: 'import', label: t('config.nav.import') },
+                { page: 'design', label: 'Design', icon: <PaletteIcon /> },
+                ...(IS_JB ? [] : [{ page: 'claw' as PageType, label: t('config.nav.claw'), icon: <MonitorIcon /> }]),
+                { page: 'import', label: t('config.nav.import'), icon: <DownloadIcon /> },
             ],
         },
     ];
@@ -207,7 +223,8 @@ const App: React.FC<AppProps> = ({ vscode }) => {
                                 className={`nav-item nav-main ${currentPage === item.page ? 'active' : ''}`}
                                 onClick={() => setCurrentPage(item.page)}
                             >
-                                {item.label}
+                                <span className="nav-icon" aria-hidden="true">{item.icon}</span>
+                                <span className="nav-label">{item.label}</span>
                             </div>
                         ))}
                     </div>
