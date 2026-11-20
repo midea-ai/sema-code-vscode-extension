@@ -4,6 +4,7 @@ import { getColorByName } from './utils/iconUtils';
 import { RefreshIcon, ExpandArrowIcon, OpenIcon } from './utils/svgIcons';
 import { DesignSkillInfo, DesignSystemInfo, DesignSystemColor } from './types/design';
 import { useT } from '../common/i18n/react';
+import ClampDescription from './ClampDescription';
 import './style/section.css';
 
 interface DesignConfigProps {
@@ -116,25 +117,19 @@ const DesignConfig: React.FC<DesignConfigProps> = ({ vscode }) => {
 
     const renderDescription = (
         description: string,
-        index: number,
         isExpanded: boolean,
         onToggle: () => void,
     ) => {
-        const DESC_MAX = 150;
         const text = description || t('common.noDescription');
-        const isLong = text.length > DESC_MAX;
         return (
-            <div className={`section-card-desc ${isLong && !isExpanded ? 'collapsed' : ''}`}>
-                {isLong && !isExpanded ? text.slice(0, DESC_MAX) + '...' : text}
-                {isLong && (
-                    <span
-                        className="description-toggle"
-                        onClick={(e) => { e.stopPropagation(); onToggle(); }}
-                    >
-                        {isExpanded ? t('common.collapse') : t('common.more')}
-                    </span>
-                )}
-            </div>
+            <ClampDescription
+                className="section-card-desc"
+                text={text}
+                expanded={isExpanded}
+                onToggle={onToggle}
+                moreLabel={t('common.more')}
+                collapseLabel={t('common.collapse')}
+            />
         );
     };
 
@@ -269,7 +264,6 @@ const DesignConfig: React.FC<DesignConfigProps> = ({ vscode }) => {
                                         {renderHeader(skill.folderName, skill.name, skill.filePath)}
                                         {renderDescription(
                                             skill.description,
-                                            index,
                                             expandedSkillDesc.has(index),
                                             () => toggleDesc(setExpandedSkillDesc, index),
                                         )}
@@ -344,7 +338,6 @@ const DesignConfig: React.FC<DesignConfigProps> = ({ vscode }) => {
                                 <>
                                     {renderDescription(
                                         system.description,
-                                        index,
                                         expandedSystemDesc.has(index),
                                         () => toggleDesc(setExpandedSystemDesc, index),
                                     )}

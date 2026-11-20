@@ -6,6 +6,7 @@ import AddAgentForm from './AddAgentForm';
 import { AgentScope, AgentConfig as AgentConfigItem } from './types/agent';
 import { uiScope } from './utils/scope';
 import { useT, I18nKey } from '../common/i18n/react';
+import ClampDescription from './ClampDescription';
 import './style/section.css';
 import './style/agent.css';
 
@@ -207,10 +208,8 @@ const AgentConfig: React.FC<AgentConfigProps> = ({ vscode }) => {
 
     // 渲染单个 agent 卡片
     const renderAgentCard = (agent: AgentConfigItem, globalIndex: number) => {
-        const LongDescValue = 150
         const description = agent.description || t('common.noDescription');
         const isDescriptionExpanded = expandedDescriptions.has(globalIndex);
-        const isLongDescription = description.length > LongDescValue;
         const isReadonly = agent.locate === 'builtin' || agent.locate === 'plugin';
 
         return (
@@ -255,20 +254,14 @@ const AgentConfig: React.FC<AgentConfigProps> = ({ vscode }) => {
                         </div>
                     )}
                 </div>
-                <div className={`section-card-desc ${isLongDescription && !isDescriptionExpanded ? 'collapsed' : ''}`}>
-                    {isLongDescription && !isDescriptionExpanded
-                        ? description.slice(0, LongDescValue) + '...'
-                        : description
-                    }
-                    {isLongDescription && (
-                        <span
-                            className="description-toggle"
-                            onClick={() => toggleDescriptionExpand(globalIndex)}
-                        >
-                            {isDescriptionExpanded ? t('common.collapse') : t('common.more')}
-                        </span>
-                    )}
-                </div>
+                <ClampDescription
+                    className="section-card-desc"
+                    text={description}
+                    expanded={isDescriptionExpanded}
+                    onToggle={() => toggleDescriptionExpand(globalIndex)}
+                    moreLabel={t('common.more')}
+                    collapseLabel={t('common.collapse')}
+                />
                 {agent.model && (
                     <div className="agent-model-row">
                         <span className="tools-label">{t('config.agent.modelLabel')}</span>

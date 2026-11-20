@@ -5,6 +5,7 @@ import { RefreshIcon, EditIcon, TrashIcon, OpenIcon, GitHubIcon } from './utils/
 import { SkillScope, SkillConfig as SkillConfigItem } from './types/skill';
 import { uiScope } from './utils/scope';
 import { useT, I18nKey } from '../common/i18n/react';
+import ClampDescription from './ClampDescription';
 import './style/section.css';
 
 interface SkillConfigProps {
@@ -233,10 +234,8 @@ const SkillConfig: React.FC<SkillConfigProps> = ({ vscode }) => {
 
     const renderSkillCard = (skill: SkillConfigItem) => {
         const skillKey = `${skill.locate}:${skill.filePath || skill.name}`;
-        const DESC_MAX = 150;
         const description = skill.description || t('common.noDescription');
         const isDescExpanded = expandedDescriptions.has(skillKey);
-        const isLongDesc = description.length > DESC_MAX;
         // 内置 / 插件 skill 不可编辑删除；插件 skill 可启停，内置 skill 无任何操作（与内置子代理一致）
         const isReadonly = skill.locate === 'builtin' || skill.locate === 'plugin';
         const isDisabled = skill.status === false;
@@ -297,20 +296,14 @@ const SkillConfig: React.FC<SkillConfigProps> = ({ vscode }) => {
                         </div>
                     )}
                 </div>
-                <div className={`section-card-desc ${isLongDesc && !isDescExpanded ? 'collapsed' : ''}`}>
-                    {isLongDesc && !isDescExpanded
-                        ? description.slice(0, DESC_MAX) + '...'
-                        : description
-                    }
-                    {isLongDesc && (
-                        <span
-                            className="description-toggle"
-                            onClick={() => toggleDescriptionExpand(skillKey)}
-                        >
-                            {isDescExpanded ? t('common.collapse') : t('common.more')}
-                        </span>
-                    )}
-                </div>
+                <ClampDescription
+                    className="section-card-desc"
+                    text={description}
+                    expanded={isDescExpanded}
+                    onToggle={() => toggleDescriptionExpand(skillKey)}
+                    moreLabel={t('common.more')}
+                    collapseLabel={t('common.collapse')}
+                />
             </div>
         );
     };
@@ -325,6 +318,8 @@ const SkillConfig: React.FC<SkillConfigProps> = ({ vscode }) => {
             item.installedProject ? t('config.skill.installedProject') : '',
         ].filter(Boolean).join(' / ');
         const description = item.description || t('common.noDescription');
+        const descKey = `market:${item.id}`;
+        const isDescExpanded = expandedDescriptions.has(descKey);
         return (
             <div key={item.id} className="skill-market-card">
                 <div className="skill-market-head">
@@ -338,7 +333,14 @@ const SkillConfig: React.FC<SkillConfigProps> = ({ vscode }) => {
                         )}
                     </div>
                 </div>
-                <div className="skill-market-desc" title={description}>{description}</div>
+                <ClampDescription
+                    className="skill-market-desc"
+                    text={description}
+                    expanded={isDescExpanded}
+                    onToggle={() => toggleDescriptionExpand(descKey)}
+                    moreLabel={t('common.more')}
+                    collapseLabel={t('common.collapse')}
+                />
                 <div className="skill-market-foot">
                     {item.repoUrl && (
                         <a

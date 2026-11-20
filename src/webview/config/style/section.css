@@ -160,23 +160,17 @@
     margin-bottom: var(--s-gap-sm);
 }
 
-.section-card-desc.collapsed {
-    display: -webkit-box;
-    -webkit-line-clamp: 3;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
-}
-
 .description-toggle {
     display: inline;
     margin-left: 4px;
-    color: var(--vscode-textLink-foreground);
+    color: inherit;
     cursor: pointer;
     font-size: 12px;
 }
 
 .description-toggle:hover {
     text-decoration: underline;
+    color: var(--vscode-foreground);
 }
 
 /* ===== 只读标签 ===== */
@@ -611,10 +605,7 @@
     font-size: 12px;
     line-height: 1.5;
     color: var(--vscode-descriptionForeground);
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
+    word-break: break-word;
 }
 
 .skill-market-foot {

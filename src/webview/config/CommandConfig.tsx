@@ -6,6 +6,7 @@ import AddCommandForm from './AddCommandForm';
 import { CommandScope, CommandConfig as CommandConfigItem } from './types/command';
 import { uiScope } from './utils/scope';
 import { useT, I18nKey } from '../common/i18n/react';
+import ClampDescription from './ClampDescription';
 import './style/section.css';
 import './style/agent.css';
 
@@ -119,10 +120,8 @@ const CommandConfig: React.FC<CommandConfigProps> = ({ vscode }) => {
     };
 
     const renderCommandCard = (cmd: CommandConfigItem, globalIndex: number) => {
-        const DESC_MAX = 150;
         const description = cmd.description || t('common.noDescription');
         const isDescExpanded = expandedDescriptions.has(globalIndex);
-        const isLongDesc = description.length > DESC_MAX;
         // 内置（宿主注入）/ 插件命令不可编辑删除
         const isReadonly = cmd.locate === 'builtin' || cmd.locate === 'plugin';
 
@@ -170,20 +169,14 @@ const CommandConfig: React.FC<CommandConfigProps> = ({ vscode }) => {
                         </div>
                     )}
                 </div>
-                <div className={`section-card-desc ${isLongDesc && !isDescExpanded ? 'collapsed' : ''}`}>
-                    {isLongDesc && !isDescExpanded
-                        ? description.slice(0, DESC_MAX) + '...'
-                        : description
-                    }
-                    {isLongDesc && (
-                        <span
-                            className="description-toggle"
-                            onClick={() => toggleDescriptionExpand(globalIndex)}
-                        >
-                            {isDescExpanded ? t('common.collapse') : t('common.more')}
-                        </span>
-                    )}
-                </div>
+                <ClampDescription
+                    className="section-card-desc"
+                    text={description}
+                    expanded={isDescExpanded}
+                    onToggle={() => toggleDescriptionExpand(globalIndex)}
+                    moreLabel={t('common.more')}
+                    collapseLabel={t('common.collapse')}
+                />
                 {cmd.argumentHint && (
                     <div className="section-card-desc">
                         <span className="tools-label">{t('config.command.argHintLabel')}</span>{' '}
