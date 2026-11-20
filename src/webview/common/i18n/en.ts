@@ -575,7 +575,7 @@ export const en: Record<keyof typeof zh, string> = {
     'config.import.cat.agent': 'Reusable subagents',
     'config.import.cat.command': 'Reusable slash commands',
     'config.import.cat.hook': 'Auto-run event actions',
-    'config.import.cat.rule': 'Project-level rule files',
+    'config.import.cat.rule': 'AGENTS.md rule files',
     'config.import.cat.memory': 'Project memory and context',
     'config.import.start': 'Start import',
     'config.import.importing': 'Importing...',

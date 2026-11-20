@@ -576,7 +576,7 @@ export const zh = {
     'config.import.cat.agent': '可复用的子代理',
     'config.import.cat.command': '可复用的斜杠命令',
     'config.import.cat.hook': '自动执行的事件操作',
-    'config.import.cat.rule': '项目级规则文件',
+    'config.import.cat.rule': 'AGENTS.md 规则文件',
     'config.import.cat.memory': '项目记忆与上下文',
     'config.import.start': '开始导入',
     'config.import.importing': '导入中...',

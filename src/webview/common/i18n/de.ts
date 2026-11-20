@@ -415,7 +415,7 @@ export const de: Partial<Record<keyof typeof zh, string>> = {
     'config.import.cat.agent': 'Wiederverwendbare Subagenten',
     'config.import.cat.command': 'Wiederverwendbare Slash-Befehle',
     'config.import.cat.hook': 'Automatisch ausgeführte Ereignisaktionen',
-    'config.import.cat.rule': 'Regeldateien auf Projektebene',
+    'config.import.cat.rule': 'AGENTS.md-Regeldateien',
     'config.import.cat.memory': 'Projektgedächtnis und Kontext',
     'config.import.start': 'Import starten',
     'config.import.importing': 'Importiere...',
