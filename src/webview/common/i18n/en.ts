@@ -154,6 +154,7 @@ export const en: Record<keyof typeof zh, string> = {
     'skill.pptx-generator.desc': 'Generate and edit slides',
     'skill.minimax-pdf.desc': 'Read, create and edit PDFs',
     'skill.tech-design-doc.desc': 'Write tech design docs from the code',
+    'skill.code-impact.desc': 'Summarize code change impact',
     'skill.visualize.desc': 'Create visual views in the chat',
     'skill.chrome-use.desc': 'Control the browser to operate web pages',
     'skill.deep-research.desc': 'Research a topic in depth and write a report',

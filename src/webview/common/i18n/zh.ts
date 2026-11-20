@@ -155,6 +155,7 @@ export const zh = {
     'skill.pptx-generator.desc': '生成和编辑幻灯片',
     'skill.minimax-pdf.desc': '阅读、生成和编辑 PDF',
     'skill.tech-design-doc.desc': '为代码编写技术设计文档',
+    'skill.code-impact.desc': '梳理代码变更影响',
     'skill.visualize.desc': '在对话里创建可视化视图',
     'skill.chrome-use.desc': '控制浏览器操作网页',
     'skill.deep-research.desc': '深度调研并生成报告',
