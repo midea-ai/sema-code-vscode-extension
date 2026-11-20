@@ -493,12 +493,19 @@ function parseTableRow(line: string): string[] {
 }
 
 /**
- * HTML转义
+ * HTML 转义：字符替换，避免每次调用都创建 DOM 节点。
+ * 比 textContent → innerHTML 多转义了引号，属性值里同样安全，文本上下文渲染结果一致。
  */
+const HTML_ESCAPE_MAP: Record<string, string> = {
+  '&': '&amp;',
+  '<': '&lt;',
+  '>': '&gt;',
+  '"': '&quot;',
+  "'": '&#39;',
+};
+
 function escapeHtml(text: string): string {
-  const div = document.createElement('div');
-  div.textContent = text;
-  return div.innerHTML;
+  return text.replace(/[&<>"']/g, ch => HTML_ESCAPE_MAP[ch]);
 }
 
 /** 只在当前行内寻找同长度的闭合反引号，避免未闭合片段吞掉后续 Markdown 块。 */

@@ -3,7 +3,7 @@ import { DiffContent, FileChange, Message, ToolContent, VscodeApi } from '../../
 import TaskDetailModal from '../../TaskDetailModal';
 import AiResponseBlock from '../AiResponseBlock';
 import { REVIEWER_AGENT_NAME } from '../../../../utils/review';
-import { SessionActiveContext, SessionContext } from '../../SessionContext';
+import { AgentDialogContext, SessionActiveContext, SessionContext } from '../../SessionContext';
 import { countDiffChanges } from '../../utils/diffParser';
 import { TOOL_NAME_EDIT_NOTEBOOK, TOOL_NAME_PATCH_FILE, TOOL_NAME_WRITE_FILE } from '../../../../utils/tool';
 import { useT } from '../../../common/i18n/react';
@@ -23,9 +23,6 @@ export interface TaskMessageContent {
 interface AgentBlockProps {
     content: TaskMessageContent;
     vscode: VscodeApi;
-    forceClose?: boolean;
-    externalOpen?: boolean;
-    onExternalClose?: () => void;
     onFileChange?: (change: FileChange) => void;
 }
 
@@ -99,12 +96,15 @@ const extractFileChange = (message: Message): FileChange | null => {
     return null;
 };
 
-const AgentBlock: React.FC<AgentBlockProps> = React.memo(({ content, vscode, forceClose, externalOpen, onExternalClose, onFileChange }) => {
+const AgentBlock: React.FC<AgentBlockProps> = React.memo(({ content, vscode, onFileChange }) => {
     const t = useT();
     const [isModalOpen, setIsModalOpen] = useState(false);
     const reportedChangeKeysRef = useRef<Set<string>>(new Set());
     const sessionId = useContext(SessionContext);
     const sessionActive = useContext(SessionActiveContext);
+    // 弹窗信号走 Context：列表不再把弹窗对象传给每条消息
+    const { forceClose, openTaskId, onClose: onExternalClose } = useContext(AgentDialogContext);
+    const externalOpen = openTaskId !== null && openTaskId === content.taskId;
 
     // 有权限请求、或会话切走（弹窗 portal 到 body 不随会话容器隐藏）时自动关闭详情弹窗
     useEffect(() => {

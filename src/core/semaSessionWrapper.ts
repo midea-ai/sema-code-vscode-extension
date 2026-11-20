@@ -117,6 +117,11 @@ export class SemaSessionWrapper {
     private streamingToolMap: Map<string, Message> = new Map();
     private taskAgentThrottleTimer: NodeJS.Timeout | null = null;
     private pendingTaskUpdates: Set<string> = new Set();
+    /** 流式增量合并：同一窗口内同一条消息只发一条 chunkUpdate（按 messageId 分桶，避免交错输出串到一起） */
+    private static readonly CHUNK_FLUSH_MS = 16;
+    private pendingTextChunks = new Map<string, { content: string; reasoning: string }>();
+    private pendingToolChunks = new Map<string, string>();
+    private chunkFlushTimer: NodeJS.Timeout | null = null;
     private _agentMode: AgentMode;
     private _permissionLevel: PermissionLevel;
     /** 本会话实际生效的主模型名；只由 core 的会话级 model:update 事件与 refreshModelInfo 赋值，不手写 */
@@ -171,6 +176,7 @@ export class SemaSessionWrapper {
 
     /** 截掉 uuid 对应用户消息及其之后的所有消息，并清理指向被删消息的 task 索引 */
     private truncateMessageHistoryBefore(messageUuid: string): void {
+        this.discardPendingChunks();
         const idx = this.messageHistory.findIndex(m => m.uuid === messageUuid);
         if (idx < 0) return;
         this.messageHistory = this.messageHistory.slice(0, idx);
@@ -330,6 +336,7 @@ export class SemaSessionWrapper {
     // ─── 消息历史 ─────────────────────────────────────────────────────────────
 
     public updateMessageHistory(message: Message[]): void {
+        this.discardPendingChunks();
         this.messageHistory = message;
         this.sendContentUpdate();
     }
@@ -339,6 +346,7 @@ export class SemaSessionWrapper {
     }
 
     public clearMessageHistory(): void {
+        this.discardPendingChunks();
         this.messageHistory = [];
         this.setTitle('');
         this.taskAgentMap.clear();
@@ -666,7 +674,8 @@ export class SemaSessionWrapper {
             this.streamingAssistantMap.set(msgId, newMessage);
             this.messageHistory.push(newMessage);
             this.sendAppendMessages([newMessage]);
-            this.sendChunkUpdate(msgId, { contentDelta: data.delta });
+            // 首条增量立即发送，由它把前端切到流式渲染
+            this.sendChunkUpdate(msgId, { contentDelta: data.delta }, true);
         });
 
         this.session.on<MessageCompleteData & { agentId?: string; id?: string }>('message:complete', (data) => {
@@ -989,16 +998,83 @@ export class SemaSessionWrapper {
 
     // ─── webview 消息发送（统一注入 sessionId）─────────────────────────────────
 
-    private post(message: any): void {
+    private emit(message: any): void {
         this.callbacks.onMessage?.({ ...message, sessionId: this.sessionId });
+    }
+
+    private post(message: any): void {
+        // 结构变化（appendMessages / completeUpdate / updateContent 等）先冲刷待发增量，
+        // 保证「已产出内容」永远先于「消息结构更新」到达前端
+        if (message.type !== 'chunkUpdate' && message.type !== 'toolChunkUpdate') {
+            this.flushPendingChunks();
+        }
+        this.emit(message);
+    }
+
+    private scheduleChunkFlush(): void {
+        if (this.chunkFlushTimer) return;
+        this.chunkFlushTimer = setTimeout(() => {
+            this.chunkFlushTimer = null;
+            this.flushPendingChunks();
+        }, SemaSessionWrapper.CHUNK_FLUSH_MS);
+    }
+
+    private flushPendingChunks(): void {
+        if (this.chunkFlushTimer) {
+            clearTimeout(this.chunkFlushTimer);
+            this.chunkFlushTimer = null;
+        }
+        if (this.pendingTextChunks.size > 0) {
+            const entries = [...this.pendingTextChunks];
+            this.pendingTextChunks.clear();
+            for (const [id, buf] of entries) {
+                if (!buf.content && !buf.reasoning) continue;
+                this.emit({
+                    type: 'chunkUpdate',
+                    id,
+                    ...(buf.content ? { contentDelta: buf.content } : {}),
+                    ...(buf.reasoning ? { reasoningDelta: buf.reasoning } : {}),
+                });
+            }
+        }
+        if (this.pendingToolChunks.size > 0) {
+            const entries = [...this.pendingToolChunks];
+            this.pendingToolChunks.clear();
+            for (const [id, delta] of entries) {
+                if (delta) this.emit({ type: 'toolChunkUpdate', id, contentDelta: delta });
+            }
+        }
+    }
+
+    /** 丢弃待发增量：历史被整体替换或清空后，属于旧内容的增量不应再送达前端 */
+    private discardPendingChunks(): void {
+        if (this.chunkFlushTimer) {
+            clearTimeout(this.chunkFlushTimer);
+            this.chunkFlushTimer = null;
+        }
+        this.pendingTextChunks.clear();
+        this.pendingToolChunks.clear();
     }
 
     private sendContentUpdate(): void {
         this.post({ type: 'updateContent', messages: [...this.messageHistory] });
     }
 
-    private sendChunkUpdate(messageId: string, update: { contentDelta?: string; reasoningDelta?: string }): void {
-        this.post({ type: 'chunkUpdate', id: messageId, ...update });
+    /**
+     * immediate 用于「本条消息的第一个增量」：它同时承担前端建立流式状态的作用，
+     * 不能等待合并窗口，否则首屏会先按非流式渲染一次再切流式。
+     */
+    private sendChunkUpdate(messageId: string, update: { contentDelta?: string; reasoningDelta?: string }, immediate: boolean = false): void {
+        if (immediate) {
+            this.flushPendingChunks();
+            this.emit({ type: 'chunkUpdate', id: messageId, ...update });
+            return;
+        }
+        const buf = this.pendingTextChunks.get(messageId) ?? { content: '', reasoning: '' };
+        buf.content += update.contentDelta ?? '';
+        buf.reasoning += update.reasoningDelta ?? '';
+        this.pendingTextChunks.set(messageId, buf);
+        this.scheduleChunkFlush();
     }
 
     private sendCompleteUpdate(messageId: string, update: { content?: any; reasoning?: string }): void {
@@ -1006,7 +1082,8 @@ export class SemaSessionWrapper {
     }
 
     private sendToolChunkUpdate(messageId: string, contentDelta: string): void {
-        this.post({ type: 'toolChunkUpdate', id: messageId, contentDelta });
+        this.pendingToolChunks.set(messageId, (this.pendingToolChunks.get(messageId) ?? '') + contentDelta);
+        this.scheduleChunkFlush();
     }
 
     private sendAppendMessages(messages: Message[]): void {
@@ -1129,6 +1206,7 @@ export class SemaSessionWrapper {
      */
     public dispose(): void {
         try {
+            this.discardPendingChunks();
             if (this.taskAgentThrottleTimer) {
                 clearTimeout(this.taskAgentThrottleTimer);
                 this.taskAgentThrottleTimer = null;

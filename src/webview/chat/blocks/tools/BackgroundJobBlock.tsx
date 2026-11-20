@@ -58,14 +58,24 @@ const BackgroundJobBlock: React.FC<BackgroundJobBlockProps> = ({ content: toolCo
     const isExpanded = manualExpanded ?? isLast;
     const streamContentRef = useRef('');
     const [streamContent, setStreamContent] = useState('');
+    // 一帧内多条增量合并成一次提交，长输出不再逐条渲染
+    const streamRafRef = useRef<number>(0);
 
     useEffect(() => {
         const unsub = streamingStore.subscribeTool(sessionId, messageId, (delta: string) => {
             streamContentRef.current += delta;
-            setStreamContent(streamContentRef.current);
+            if (streamRafRef.current) return;
+            streamRafRef.current = requestAnimationFrame(() => {
+                streamRafRef.current = 0;
+                setStreamContent(streamContentRef.current);
+            });
         });
         return () => {
             unsub();
+            if (streamRafRef.current) {
+                cancelAnimationFrame(streamRafRef.current);
+                streamRafRef.current = 0;
+            }
             streamContentRef.current = '';
         };
     }, [messageId, sessionId]);
@@ -73,6 +83,10 @@ const BackgroundJobBlock: React.FC<BackgroundJobBlockProps> = ({ content: toolCo
     // 完成后清除本地 streaming 状态，回归 props 的最终内容
     useEffect(() => {
         if (toolContent.completed !== false) {
+            if (streamRafRef.current) {
+                cancelAnimationFrame(streamRafRef.current);
+                streamRafRef.current = 0;
+            }
             streamContentRef.current = '';
             setStreamContent('');
         }

@@ -22,13 +22,10 @@ import { TOOL_NAME_WRITE_FILE, TOOL_NAME_PATCH_FILE, TOOL_NAME_EDIT_NOTEBOOK, TO
 interface MessageItemProps {
     message: Message;
     shouldReportChange: boolean;
-    toolPermissionData: any;
     vscode: any;
     onFileChange?: (change: FileChange) => void;
     streamingAssistantId?: string | null;
     streamingToolId?: string | null;
-    openAgentTaskId?: string | null;
-    onAgentModalClose?: () => void;
     showThinkingText?: boolean;
     processingState?: 'idle' | 'processing';
     onFork?: (uuid: string) => void;
@@ -43,12 +40,9 @@ interface MessageItemProps {
 const MessageItem: React.FC<MessageItemProps> = React.memo(({
     message,
     shouldReportChange,
-    toolPermissionData,
     vscode,
     onFileChange,
     streamingAssistantId,
-    openAgentTaskId,
-    onAgentModalClose,
     showThinkingText = true,
     processingState,
     onFork,
@@ -91,9 +85,6 @@ const MessageItem: React.FC<MessageItemProps> = React.memo(({
                     <AgentBlock
                         content={message.content}
                         vscode={vscode}
-                        forceClose={!!toolPermissionData}
-                        externalOpen={openAgentTaskId === message.content?.taskId}
-                        onExternalClose={onAgentModalClose}
                         onFileChange={shouldReportChange ? onFileChange : undefined}
                     />
                 );
@@ -208,8 +199,6 @@ const MessageItem: React.FC<MessageItemProps> = React.memo(({
 }, (prev, next) => {
     const baseEqual = prev.message === next.message
         && prev.shouldReportChange === next.shouldReportChange
-        && prev.toolPermissionData === next.toolPermissionData
-        && prev.openAgentTaskId === next.openAgentTaskId
         && prev.showThinkingText === next.showThinkingText
         && prev.processingState === next.processingState
         && prev.onFork === next.onFork

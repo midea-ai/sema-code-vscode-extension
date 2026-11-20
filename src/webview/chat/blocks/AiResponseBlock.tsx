@@ -6,7 +6,6 @@ import { streamingStore } from '../utils/StreamingStore';
 import { hasTextSelection } from '../utils/selection';
 import { SessionContext } from '../SessionContext';
 import { CopyIcon, CheckIcon, BranchIcon } from '../components/ui/IconButton';
-import { buildFileLabelHtml } from '../utils/fileRefDisplay';
 import { useT } from '../../common/i18n/react';
 import '../style/markdown.css';
 
@@ -35,55 +34,15 @@ const AiResponseBlock: React.FC<AiResponseBlockProps> = React.memo(({
     // 流式累积文本（ref 存最新值，state 驱动渲染）
     const streamBufferRef = useRef<string>('');
     const [streamContent, setStreamContent] = useState<string>('');
+    // 一帧内多条增量只提交一次渲染；全文解析成本随内容增长，靠帧级合并压住次数
+    const streamRafRef = useRef<number>(0);
     // 点击块时切换显示底部 actions（复制等）
     const [showActions, setShowActions] = useState(false);
 
-    // 合并文件路径验证和点击事件监听，只依赖 vscode
+    // 点击事件监听，只依赖 vscode
+    // 路径校验 / 图片解析的回包改由顶层统一分发，这里不再为每条消息挂窗口监听
     useEffect(() => {
         if (!contentRef.current || !vscode) return;
-
-        const handleFilePathVerification = (event: MessageEvent) => {
-            const message = event.data;
-            if (message.type === 'filePathVerified' && contentRef.current) {
-                const { tempId, exists, filePath, lineInfo } = message;
-                const element = contentRef.current.querySelector(`[data-temp-id="${tempId}"]`);
-
-                if (element) {
-                    if (exists) {
-                        element.classList.add('file-path-code');
-                        element.setAttribute('data-file-path', filePath);
-                        if (lineInfo) {
-                            element.setAttribute('data-line-info', lineInfo);
-                        }
-                        // 本地路径链接（.md-local-link）：内容换成统一的文件高亮结构（图标 + 原文名字，图标按文件类型上色；SVG 来自内置常量，名字已转义）。
-                        // 内联代码文件路径（`src/a.ts:10-12`）出现得密，只上链接色不放图标，避免满屏图标
-                        if (element.classList.contains('md-local-link') && !element.querySelector('.file-ref-chip')) {
-                            element.innerHTML = buildFileLabelHtml(String(filePath), false, element.textContent || '', true);
-                        }
-                    }
-                    // 不存在时两种写法都保持待验证阶段的外观：本地路径链接是正文色纯文本（title 悬停可见目标路径），内联代码是普通内联代码
-                    element.removeAttribute('data-temp-id');
-                }
-            } else if (message.type === 'imagePathResolved' && contentRef.current) {
-                const { tempId, exists, src } = message;
-                const element = contentRef.current.querySelector(`img[data-img-temp-id="${tempId}"]`);
-                if (element) {
-                    if (exists && src) {
-                        element.setAttribute('src', src);
-                        element.removeAttribute('data-img-temp-id');
-                    } else {
-                        // 本地图片不存在：退回展示原始 markdown 文本（保留 alt 与 path 信息）。
-                        // 独占一行的图片在段落组装时是块级兄弟节点（间距靠 .md-image 的 margin），
-                        // 回退文本用块级 span 独占一行，夹在段落里的图片回退后也不与前后文字挤在同一行。
-                        const original = element.getAttribute('data-md-original') || '';
-                        const fallback = document.createElement('span');
-                        fallback.style.display = 'block';
-                        fallback.textContent = original;
-                        element.parentNode?.replaceChild(fallback, element);
-                    }
-                }
-            }
-        };
 
         const handleFilePathClick = (event: Event) => {
             // 用户正在选择文字时不响应点击（打开文件/链接或切换 actions）
@@ -189,12 +148,10 @@ const AiResponseBlock: React.FC<AiResponseBlockProps> = React.memo(({
         const root = contentRef.current;
         root.addEventListener('click', handleFilePathClick);
         root.addEventListener('error', handleIconError, true);
-        window.addEventListener('message', handleFilePathVerification);
 
         return () => {
             root.removeEventListener('click', handleFilePathClick);
             root.removeEventListener('error', handleIconError, true);
-            window.removeEventListener('message', handleFilePathVerification);
         };
     }, [vscode]);
 
@@ -210,12 +167,21 @@ const AiResponseBlock: React.FC<AiResponseBlockProps> = React.memo(({
         setStreamContent('');
 
         const unsub = streamingStore.subscribeText(sessionId, messageId, (data) => {
-            if (data.contentDelta) {
-                streamBufferRef.current += data.contentDelta;
+            if (!data.contentDelta) return;
+            streamBufferRef.current += data.contentDelta;
+            if (streamRafRef.current) return;
+            streamRafRef.current = requestAnimationFrame(() => {
+                streamRafRef.current = 0;
                 setStreamContent(streamBufferRef.current);
-            }
+            });
         });
-        return unsub;
+        return () => {
+            unsub();
+            if (streamRafRef.current) {
+                cancelAnimationFrame(streamRafRef.current);
+                streamRafRef.current = 0;
+            }
+        };
     }, [isStreaming, messageId, sessionId]);
 
     // 决定当前要渲染的文本：流式阶段优先用累积的 streamContent；
@@ -223,7 +189,6 @@ const AiResponseBlock: React.FC<AiResponseBlockProps> = React.memo(({
     // 退回到 props.content 作为种子，避免只渲染出 ⏺ 而正文空白。
     const displayText = isStreaming ? (streamContent || content || '') : (content || '');
     const trimmedContent = displayText.replace(/^\n+|\n+$/g, '');
-    const needsMarkdown = hasMarkdownFormatting(trimmedContent);
 
     const [copied, setCopied] = useState(false);
     const copyTimerRef = useRef<number | null>(null);
@@ -244,11 +209,16 @@ const AiResponseBlock: React.FC<AiResponseBlockProps> = React.memo(({
         if (copyTimerRef.current) window.clearTimeout(copyTimerRef.current);
     }, []);
 
-    const htmlContent = useMemo(() => {
-        if (!needsMarkdown || !trimmedContent) return null;
+    // 判定与渲染放在一起：每次内容变化只做一次全文扫描，流式期间的重渲染不重复判定
+    const rendered = useMemo(() => {
+        if (!trimmedContent) return { needsMarkdown: false, html: null as string | null };
+        const needsMarkdown = hasMarkdownFormatting(trimmedContent);
         // 流式阶段不传 vscode，避免对未完成内容发起文件路径验证请求
-        return renderMarkdownToHtml(trimmedContent, isStreaming ? undefined : vscode);
-    }, [trimmedContent, vscode, needsMarkdown, isStreaming]);
+        return {
+            needsMarkdown,
+            html: needsMarkdown ? renderMarkdownToHtml(trimmedContent, isStreaming ? undefined : vscode) : null,
+        };
+    }, [trimmedContent, vscode, isStreaming]);
 
     // 如果内容为空且不在流式输出状态，不渲染任何内容
     if (!trimmedContent && !isStreaming) {
@@ -261,10 +231,10 @@ const AiResponseBlock: React.FC<AiResponseBlockProps> = React.memo(({
         <div className="ai-resp-block">
             <div className="output-line ai-response-content" ref={contentRef}>
                 <span className="response-indicator">{getResponseDot()}</span>
-                {needsMarkdown ? (
+                {rendered.needsMarkdown ? (
                     <div
                         className="markdown-content"
-                        dangerouslySetInnerHTML={{ __html: htmlContent! }}
+                        dangerouslySetInnerHTML={{ __html: rendered.html! }}
                     />
                 ) : (
                     // 无 markdown 标记的纯文本同样按空行分段：段落间距走 .markdown-content p 的 margin，

@@ -69,6 +69,16 @@ class StreamingStore {
         this.toolListeners.get(k)?.forEach(cb => cb(delta));
     }
 
+    /**
+     * 消息已完成：释放它的流式缓存。
+     * 只删 buffer 不动监听器（监听器由订阅方退订），避免长会话里已完成消息的全文一直挂在内存。
+     */
+    release(sessionId: string, id: string): void {
+        const k = this.key(sessionId, id);
+        this.textBuffers.delete(k);
+        this.toolBuffers.delete(k);
+    }
+
     /** 清空指定会话的所有 buffer 与监听器 */
     clear(sessionId: string): void {
         const prefix = `${sessionId}::`;

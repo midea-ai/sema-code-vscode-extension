@@ -8,7 +8,7 @@ import { parsePasteInput, type PasteAttachment } from '../common/paste';
 import GroupedToolBlock, { McpRunBlock } from './blocks/tools/GroupedToolBlock';
 import GeneratedImageBlock from './blocks/tools/GeneratedImageBlock';
 import SessionTabs from './components/SessionTabs';
-import { SessionActiveContext, SessionContext } from './SessionContext';
+import { AgentDialogContext, SessionActiveContext, SessionContext } from './SessionContext';
 
 import FileChangesPanel from './components/panels/FileChangesPanel';
 import TodosPanel from './components/panels/TodosPanel';
@@ -28,6 +28,7 @@ import ModelConfigReminder from './components/ui/ModelConfigReminder';
 import { PREVIEW_MODE, getPreviewMessages, mockDialogMap, isPreviewActive } from './utils/mockMessages';
 import { groupMessages, getToolName, getToolTitle } from './utils/groupMessages';
 import { setPathEnv } from './utils/pathDisplay';
+import { buildFileLabelHtml } from './utils/fileRefDisplay';
 import VizEmbed from './blocks/VizEmbed';
 import TurnNav, { turnNavItems, MIN_TURNS } from './components/TurnNav';
 import { isAttachmentPath, isVizPath } from '../common/viz';
@@ -70,6 +71,11 @@ const ChatSession: React.FC<ChatSessionProps> = ({ vscode: rawVscode, sessionId,
     const streamingAssistantIdRef = useRef<string | null>(null);
     const streamingToolIdRef = useRef<string | null>(null);
     const messagesRef = useRef<Message[]>([]);
+    // 非激活会话只累积数据、不提交渲染；切回时按 dirty 标记补齐。
+    // activeRef 在渲染期写，事件回调里读到的始终是当前会话的可见状态。
+    const activeRef = useRef<boolean>(active);
+    activeRef.current = active;
+    const messagesDirtyRef = useRef<boolean>(false);
     const [progressMessage, setProgressMessage] = useState<string>('');
     const [tokenInfo, setTokenInfo] = useState<TokenInfo>({ useTokens: 0, maxTokens: 0, promptTokens: 0 });
     const [inputDisabled, setInputDisabled] = useState<boolean>(true);
@@ -146,7 +152,8 @@ const ChatSession: React.FC<ChatSessionProps> = ({ vscode: rawVscode, sessionId,
     const snapTopRef = useRef<number>(0);
     const spinnerStartTimeRef = useRef<number>(0);
     const runningTasksRef = useRef(runningTasks);
-    const prevMessagesLenRef = useRef<number>(0);
+    // 代码高亮观察器：只高亮进入视口（含约一屏的预取边距）的代码块
+    const hljsObserverRef = useRef<IntersectionObserver | null>(null);
     // 历史整体灌入后待预热：让所有消息先完整布局一次，content-visibility:auto 才能记住真实高度
     const primePendingRef = useRef<boolean>(false);
     const forkReqRef = useRef<string | null>(null);
@@ -187,6 +194,28 @@ const ChatSession: React.FC<ChatSessionProps> = ({ vscode: rawVscode, sessionId,
             console.error('handleFileChange error:', error);
         }
     }, [sessionId]);
+
+    /** 消息列表的唯一提交出口：非激活会话只记 dirty，切回时统一刷新 */
+    const commitMessages = () => {
+        if (activeRef.current) {
+            messagesDirtyRef.current = false;
+            setMessages([...messagesRef.current]);
+        } else {
+            messagesDirtyRef.current = true;
+        }
+    };
+
+    const handleAgentModalClose = useCallback(() => setOpenAgentTaskId(null), []);
+
+    // 弹窗信号只给子代理块订阅：权限弹窗开合不再让整个消息列表重建
+    const agentDialogSignal = useMemo(
+        () => ({
+            forceClose: !!activeDialog,
+            openTaskId: activeDialog ? null : openAgentTaskId,
+            onClose: handleAgentModalClose,
+        }),
+        [activeDialog, openAgentTaskId, handleAgentModalClose]
+    );
 
     // 点击用户输入块的 Fork 角标：先取预览，收到 forkPreviewResult 后再开弹窗。
     // 仅 idle 时按钮可点（UserInputBlock 已用 canFork 拦截），这里只负责发起预览请求。
@@ -230,31 +259,34 @@ const ChatSession: React.FC<ChatSessionProps> = ({ vscode: rawVscode, sessionId,
                     setStreamingToolId(null);
                     messagesRef.current = (message.messages || []).slice();
                     primePendingRef.current = true;
-                    setMessages(message.messages || []);
+                    commitMessages();
                     break;
                 case 'appendMessages': {
                     const newMsgs = message.messages || [];
                     messagesRef.current = [...messagesRef.current, ...newMsgs];
-                    setMessages([...messagesRef.current]);
+                    commitMessages();
                     break;
                 }
                 case 'updateMessage': {
                     const updateIdx = messagesRef.current.findIndex(m => m.id === message.id);
                     if (updateIdx >= 0) {
                         messagesRef.current[updateIdx] = { ...messagesRef.current[updateIdx], content: message.content };
-                        setMessages([...messagesRef.current]);
+                        commitMessages();
                     }
                     if (streamingToolIdRef.current === message.id) {
                         streamingToolIdRef.current = null;
                         setStreamingToolId(null);
                     }
+                    // 工具已完成，释放它的流式缓存（最终内容已在 content 里）
+                    streamingStore.release(sessionId, message.id);
                     break;
                 }
                 case 'chunkUpdate': {
                     streamingStore.emitText(sessionId, message.id, { contentDelta: message.contentDelta, reasoningDelta: message.reasoningDelta });
                     if (message.contentDelta !== undefined && streamingAssistantIdRef.current !== message.id) {
                         streamingAssistantIdRef.current = message.id;
-                        setStreamingAssistantId(message.id);
+                        // 后台会话不切流式渲染，缓冲继续累积，切回时由 active effect 恢复
+                        if (activeRef.current) setStreamingAssistantId(message.id);
                     }
                     break;
                 }
@@ -270,14 +302,16 @@ const ChatSession: React.FC<ChatSessionProps> = ({ vscode: rawVscode, sessionId,
                     }
                     streamingAssistantIdRef.current = null;
                     setStreamingAssistantId(null);
-                    setMessages([...messagesRef.current]);
+                    // 消息已完成，最终内容走 props；释放流式缓存，避免长会话里一直挂着已完成消息的全文
+                    streamingStore.release(sessionId, message.id);
+                    commitMessages();
                     break;
                 }
                 case 'toolChunkUpdate': {
                     streamingStore.emitTool(sessionId, message.id, message.contentDelta || '');
                     if (streamingToolIdRef.current !== message.id) {
                         streamingToolIdRef.current = message.id;
-                        setStreamingToolId(message.id);
+                        if (activeRef.current) setStreamingToolId(message.id);
                     }
                     break;
                 }
@@ -435,7 +469,7 @@ const ChatSession: React.FC<ChatSessionProps> = ({ vscode: rawVscode, sessionId,
                     const removedIds = new Set<string>(Array.isArray(message.removedIds) ? message.removedIds : []);
                     if (removedIds.size > 0) {
                         messagesRef.current = messagesRef.current.filter(m => !removedIds.has(m.id));
-                        setMessages(messagesRef.current);
+                        commitMessages();
                         if (streamingAssistantIdRef.current && removedIds.has(streamingAssistantIdRef.current)) {
                             streamingAssistantIdRef.current = null;
                             setStreamingAssistantId(null);
@@ -510,9 +544,8 @@ const ChatSession: React.FC<ChatSessionProps> = ({ vscode: rawVscode, sessionId,
                         const originalContent = messagesRef.current[idx]?.content;
                         const originalAttachments = messagesRef.current[idx]?.attachments;
                         const originalPastes = messagesRef.current[idx]?.pastes;
-                        const truncated = messagesRef.current.slice(0, idx);
-                        messagesRef.current = truncated;
-                        setMessages(truncated);
+                        messagesRef.current = messagesRef.current.slice(0, idx);
+                        commitMessages();
                         // 回填原输入（文本 + 图片 + 长文粘贴附件），方便用户改了重发；纯附件无文字也要回填
                         const originalText = typeof originalContent === 'string' ? originalContent : '';
                         if (originalText || (originalAttachments && originalAttachments.length > 0) || (originalPastes && originalPastes.length > 0)) {
@@ -556,11 +589,21 @@ const ChatSession: React.FC<ChatSessionProps> = ({ vscode: rawVscode, sessionId,
 
     useEffect(() => { runningTasksRef.current = runningTasks; }, [runningTasks]);
 
-    // 会话切走（新建/切换 tab）时清掉外部触发的子代理详情，弹窗本体由 SessionActiveContext 关闭
+    // 会话切走（新建/切换 tab）时清掉外部触发的子代理详情，弹窗本体由 SessionActiveContext 关闭；
+    // 同时停掉流式正文渲染（缓冲继续累积），切回时补齐后台跳过的结构更新并恢复流式标记。
     useEffect(() => {
         if (!active) {
             setOpenAgentTaskId(null);
+            setStreamingAssistantId(null);
+            setStreamingToolId(null);
+            return;
         }
+        if (messagesDirtyRef.current) {
+            messagesDirtyRef.current = false;
+            setMessages([...messagesRef.current]);
+        }
+        if (streamingAssistantIdRef.current) setStreamingAssistantId(streamingAssistantIdRef.current);
+        if (streamingToolIdRef.current) setStreamingToolId(streamingToolIdRef.current);
     }, [active]);
 
     const isSpinnerVisible = processingState === 'processing' && !progressMessage && !activeDialog;
@@ -577,14 +620,38 @@ const ChatSession: React.FC<ChatSessionProps> = ({ vscode: rawVscode, sessionId,
         }
     }, [isSpinnerVisible]);
 
+    // 高亮观察器随容器建立一次；不可见区域（content-visibility 跳过布局）的代码块不会被回调
     useEffect(() => {
-        if (active && window.hljs && outputContainerRef.current && messages.length > prevMessagesLenRef.current) {
-            outputContainerRef.current.querySelectorAll('pre code:not(.hljs)').forEach((block) => {
-                window.hljs.highlightElement(block);
-            });
-        }
-        prevMessagesLenRef.current = messages.length;
-    }, [messages, active]);
+        const container = outputContainerRef.current;
+        if (!container || typeof IntersectionObserver === 'undefined') return;
+        const io = new IntersectionObserver((entries) => {
+            for (const entry of entries) {
+                if (!entry.isIntersecting) continue;
+                io.unobserve(entry.target);
+                const code = entry.target as HTMLElement;
+                if (window.hljs && !code.classList.contains('hljs')) {
+                    window.hljs.highlightElement(code);
+                }
+            }
+        }, { root: container, rootMargin: '800px 0px' });
+        hljsObserverRef.current = io;
+        return () => {
+            io.disconnect();
+            hljsObserverRef.current = null;
+        };
+    }, []);
+
+    // 只把新出现的代码块交给观察器：data 标记保证同一块不会重复入队；
+    // 依赖里带上流式标记，回复结束时新增的代码块能立即被纳入（不必等下一条消息）
+    useEffect(() => {
+        const container = outputContainerRef.current;
+        const io = hljsObserverRef.current;
+        if (!container || !io || !active) return;
+        container.querySelectorAll('pre code:not([data-hljs-observed])').forEach((block) => {
+            block.setAttribute('data-hljs-observed', '1');
+            io.observe(block);
+        });
+    }, [messages, streamingAssistantId, active]);
 
     useEffect(() => {
         if (PREVIEW_MODE && window.hljs && outputContainerRef.current) {
@@ -953,13 +1020,10 @@ const ChatSession: React.FC<ChatSessionProps> = ({ vscode: rawVscode, sessionId,
                             <MessageItem
                                 message={item.message}
                                 shouldReportChange={false}
-                                toolPermissionData={null}
                                 vscode={vscode}
                                 onFileChange={handleFileChange}
                                 streamingAssistantId={null}
                                 streamingToolId={null}
-                                openAgentTaskId={null}
-                                onAgentModalClose={() => {}}
                                 showThinkingText={shouldShowThinkingText}
                             />
                         </div>
@@ -1091,13 +1155,10 @@ const ChatSession: React.FC<ChatSessionProps> = ({ vscode: rawVscode, sessionId,
                             <MessageItem
                                 message={message}
                                 shouldReportChange={index > lastUserInputIndex}
-                                toolPermissionData={activeDialog}
                                 vscode={vscode}
                                 onFileChange={handleFileChange}
                                 streamingAssistantId={streamingAssistantId}
                                 streamingToolId={streamingToolId}
-                                openAgentTaskId={activeDialog ? null : openAgentTaskId}
-                                onAgentModalClose={() => setOpenAgentTaskId(null)}
                                 showThinkingText={shouldShowThinkingText}
                                 processingState={processingState}
                                 onFork={handleFork}
@@ -1112,7 +1173,7 @@ const ChatSession: React.FC<ChatSessionProps> = ({ vscode: rawVscode, sessionId,
                 {(gi < groups.length - 1 || processingState === 'idle') && renderVizEmbeds(vizPathsOf(group.items))}
             </div>
         ));
-    }, [messages, modelName, availableModels, activeDialog, processingState, streamingAssistantId, streamingToolId, openAgentTaskId, agentMode, thinkingEnabled, showThinkingText, handleFork, handleBranch, pendingInputs]);
+    }, [messages, modelName, availableModels, activeDialog, processingState, streamingAssistantId, streamingToolId, agentMode, thinkingEnabled, showThinkingText, handleFork, handleBranch, pendingInputs]);
 
     // 左缘轮次指示条的条目：输入轮数够多时才显示（预览模式的假消息不算）
     const navItems = useMemo(
@@ -1123,6 +1184,7 @@ const ChatSession: React.FC<ChatSessionProps> = ({ vscode: rawVscode, sessionId,
     return (
         <SessionContext.Provider value={sessionId}>
             <SessionActiveContext.Provider value={active}>
+            <AgentDialogContext.Provider value={agentDialogSignal}>
             <div className="chat-session" style={{ display: active ? 'flex' : 'none' }}>
                 <div className="output-scroll-wrap">
                 <div id="output-container" ref={outputContainerRef} className={overflow && !stick ? 'fade-bottom' : undefined}>
@@ -1292,6 +1354,7 @@ const ChatSession: React.FC<ChatSessionProps> = ({ vscode: rawVscode, sessionId,
                     prediction={inputPrediction}
                 />
             </div>
+            </AgentDialogContext.Provider>
             </SessionActiveContext.Provider>
         </SessionContext.Provider>
     );
@@ -1356,6 +1419,41 @@ const App: React.FC<AppProps> = ({ vscode }) => {
                             : s));
                     }
                     break;
+                // 路径校验与图片解析的回包在顶层统一处理：临时标识全局唯一，直接按标识找元素，
+                // 不必让每条回复块各挂一个窗口监听（长会话里监听器数量与消息数成正比）。
+                case 'filePathVerified': {
+                    const el = document.querySelector<HTMLElement>(`[data-temp-id="${message.tempId}"]`);
+                    if (el) {
+                        if (message.exists) {
+                            el.classList.add('file-path-code');
+                            el.setAttribute('data-file-path', message.filePath);
+                            if (message.lineInfo) el.setAttribute('data-line-info', message.lineInfo);
+                            // 本地路径链接（.md-local-link）：换成统一的文件高亮结构（图标 + 原文名字）
+                            if (el.classList.contains('md-local-link') && !el.querySelector('.file-ref-chip')) {
+                                el.innerHTML = buildFileLabelHtml(String(message.filePath), false, el.textContent || '', true);
+                            }
+                        }
+                        // 不存在时保持待验证阶段的外观：本地路径链接是正文色纯文本，内联代码是普通内联代码
+                        el.removeAttribute('data-temp-id');
+                    }
+                    break;
+                }
+                case 'imagePathResolved': {
+                    const el = document.querySelector<HTMLImageElement>(`img[data-img-temp-id="${message.tempId}"]`);
+                    if (el) {
+                        if (message.exists && message.src) {
+                            el.setAttribute('src', message.src);
+                            el.removeAttribute('data-img-temp-id');
+                        } else {
+                            // 本地图片不存在：退回展示原始 markdown 文本（保留 alt 与路径信息）
+                            const fallback = document.createElement('span');
+                            fallback.style.display = 'block';
+                            fallback.textContent = el.getAttribute('data-md-original') || '';
+                            el.parentNode?.replaceChild(fallback, el);
+                        }
+                    }
+                    break;
+                }
             }
         };
 

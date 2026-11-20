@@ -151,7 +151,6 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                     <MessageItem
                         message={message}
                         shouldReportChange={false}
-                        toolPermissionData={null}
                         vscode={vscode}
                         showThinkingText={false}
                     />
