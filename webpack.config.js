@@ -107,6 +107,11 @@ const chatWebviewConfig = {
       '__SEMA_CORE_VERSION__': JSON.stringify(semaCoreVersion)
     })
   ],
+  // 只开压缩，不切 mode：保留现有环境定义与模块行为，先看压缩后的产物与运行表现。
+  // 语言子集、React 等依赖名被 mangle 不影响运行时；若需调试堆栈，本地构建另有 sourcemap。
+  optimization: {
+    minimize: true
+  },
   devtool: 'nosources-source-map',
   infrastructureLogging: {
     level: "log"
@@ -116,6 +121,8 @@ const chatWebviewConfig = {
 /** @type WebpackConfig */
 const configWebviewConfig = {
   target: 'web',
+  // 与聊天页同样只开压缩、不切 mode
+  optimization: { minimize: true },
   mode: 'none',
   entry: './src/webview/config/index.tsx',
   output: {
@@ -159,6 +166,8 @@ const configWebviewConfig = {
 /** @type WebpackConfig */
 const sessionHistoryWebviewConfig = {
   target: 'web',
+  // 与聊天页同样只开压缩、不切 mode
+  optimization: { minimize: true },
   mode: 'none',
   entry: './src/webview/sessionHistory/index.tsx',
   output: {
