@@ -137,7 +137,13 @@ const ChatSession: React.FC<ChatSessionProps> = ({ vscode: rawVscode, sessionId,
     // 内容是否超出一屏，不可滚动时不显示回到底部按钮
     const [overflow, setOverflow] = useState<boolean>(false);
     const programmaticScrollRef = useRef<boolean>(false);
+    // 程序置底写的目标位置：scroll 事件里的实际值低于它，说明这次事件里合并了用户的上滑
+    const programmaticTargetRef = useRef<number>(-1);
     const lastScrollTopRef = useRef<number>(0);
+    // 待执行的置底帧：RO 回调只登记，真正的滚动放到下一帧做（避开与惯性滚动抢跑的那一帧）
+    const stickRafRef = useRef<number>(0);
+    // 上次程序置底落到的位置：RO 回调里 scrollTop 没变过，说明这次高度变化与用户滑动无关
+    const snapTopRef = useRef<number>(0);
     const spinnerStartTimeRef = useRef<number>(0);
     const runningTasksRef = useRef(runningTasks);
     const prevMessagesLenRef = useRef<number>(0);
@@ -617,8 +623,10 @@ const ChatSession: React.FC<ChatSessionProps> = ({ vscode: rawVscode, sessionId,
         // scrollTop 已在最底时赋值不会触发 scroll 事件,此时不能留下标志位,否则会吞掉下一次用户滚动
         if (el.scrollTop < el.scrollHeight - el.clientHeight - 1) {
             programmaticScrollRef.current = true;
+            programmaticTargetRef.current = el.scrollHeight - el.clientHeight;
         }
         el.scrollTop = el.scrollHeight;
+        snapTopRef.current = el.scrollTop;   // 读回钳位后的实际位置
     };
 
     const scrollToBottom = () => {
@@ -634,7 +642,11 @@ const ChatSession: React.FC<ChatSessionProps> = ({ vscode: rawVscode, sessionId,
     };
 
     // 置底由内容/视口尺寸变化驱动（流式 setState commit、hljs 高亮、iframe 加载、面板展开都会改高度），
-    // ResizeObserver 在 layout 之后回调，此时 scrollHeight 已是新值，不会像事件里同步置底那样慢一拍
+    // ResizeObserver 在 layout 之后回调，此时 scrollHeight 已是新值，不会像事件里同步置底那样慢一拍。
+    // 但滚轮/惯性位移由合成器先落地、主线程的 scroll 回调晚一帧，那一帧里 stick 还是旧的 true，
+    // 立刻置底就会和用户正在进行的快滑抢跑（表现为上滑后被回弹一小截）。
+    // 所以：位置还停在上次置底处（高度变化与滑动无关）时当帧置底，首帧/切会话不会闪顶部；
+    // 位置变了则推到下一帧，那时本帧的 scroll 已派发、stick 是最新的，再决定要不要贴底。
     useEffect(() => {
         const container = outputContainerRef.current;
         const content = outputContentRef.current;
@@ -643,14 +655,25 @@ const ChatSession: React.FC<ChatSessionProps> = ({ vscode: rawVscode, sessionId,
         const onResize = () => {
             const canScroll = container.scrollHeight - container.clientHeight > 1;
             setOverflow(canScroll);
-            if (stickRef.current && canScroll) {
+            if (!stickRef.current || !canScroll) return;
+            if (Math.abs(container.scrollTop - snapTopRef.current) <= 1) {
                 doScrollToBottom();
+                return;
             }
+            if (stickRafRef.current) return;
+            stickRafRef.current = requestAnimationFrame(() => {
+                stickRafRef.current = 0;
+                if (stickRef.current) doScrollToBottom();
+            });
         };
         const ro = new ResizeObserver(onResize);
         ro.observe(container);
         ro.observe(content);
-        return () => ro.disconnect();
+        return () => {
+            ro.disconnect();
+            cancelAnimationFrame(stickRafRef.current);
+            stickRafRef.current = 0;
+        };
     }, []);
 
     // 历史加载预热：.msg-wrap 是 content-visibility:auto，视口外消息只按 80px 占位，首次滚上去时逐条撑到真实高度造成跳动。
@@ -685,6 +708,12 @@ const ChatSession: React.FC<ChatSessionProps> = ({ vscode: rawVscode, sessionId,
             lastScrollTopRef.current = top;
             if (programmaticScrollRef.current) {
                 programmaticScrollRef.current = false;
+                // 程序置底和用户上滑经常合并成同一个 scroll 事件。整帧吞掉会让 stick 保持 true、
+                // 下一帧又被拽回底部；scrollTop 低于置底目标值就说明混进了用户的上滑，按上滑处理。
+                if (top < programmaticTargetRef.current - 1
+                    && container.scrollHeight - top - container.clientHeight > 1) {
+                    setStickState(false);
+                }
                 return;
             }
             const dist = container.scrollHeight - top - container.clientHeight;
