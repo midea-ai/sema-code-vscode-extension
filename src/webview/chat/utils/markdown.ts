@@ -17,6 +17,8 @@ export function renderMarkdownToHtml(content: string, vscode?: any): string {
   let processedContent = content;
   const codeBlockPlaceholders: string[] = [];
   const inlineCodePlaceholders: string[] = [];
+  // 内联代码原文：链接/图片目标被反引号整体包裹时（[text](`a/b.ts`)），要靠它把目标还原成裸地址
+  const inlineCodeRaw: string[] = [];
   const imagePlaceholders: string[] = [];
   const urlPlaceholders: string[] = [];
   const mathPlaceholders: string[] = [];
@@ -58,6 +60,7 @@ export function renderMarkdownToHtml(content: string, vscode?: any): string {
   processedContent = extractInlineCode(processedContent, (code) => {
     const placeholder = `\x00INLINE_CODE_${inlineCodePlaceholders.length}\x00`;
     inlineCodePlaceholders.push(createInlineCodeHtml(code, escapeHtml(code), vscode));
+    inlineCodeRaw.push(code);
     return placeholder;
   });
 
@@ -105,6 +108,15 @@ export function renderMarkdownToHtml(content: string, vscode?: any): string {
   //   - 图片无法走 resolveImagePath 解析、退化为 broken icon
   //   - 半截 URL 提前可点
   if (vscode) {
+    // 目标整体被内联代码包裹（[text](`/abs/a.ts`)、![alt](`/abs/a.png`)）：不符合 CommonMark，
+    // 但模型常这么写。内联代码在步骤 2 已抽成占位符，这里的占位符会让后续链接解析跳过目标，
+    // 残留 [text](...) 定界符、路径反而被单独高亮成文件引用。把目标还原成裸地址后再走正常链路。
+    // 目标内的空白按 CommonMark 约定写成 %20（createLocalLinkHtml 解码后再校验）。
+    processedContent = processedContent.replace(
+      /\]\(\s*\x00INLINE_CODE_(\d+)\x00\s*\)/g,
+      (_match, idx) => `](${inlineCodeRaw[Number(idx)].replace(/\s/g, '%20')})`
+    );
+
     // 原始 <img> 标签占位 - 收编到与 markdown 图片同一套渲染逻辑，统一点击跳转
     // 必须早于 ![]() 处理（markdown 语法不会写出 <img>，先后顺序无歧义）
     processedContent = processedContent.replace(/<img\b[^>]*?>/gi, (match) => {
