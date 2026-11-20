@@ -565,11 +565,9 @@ export class ChatWebviewProvider {
         img-src ${webview.cspSource} https: data: blob:;
         frame-src ${webview.cspSource};">
     <title>Code Assistant</title>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css">
 </head>
 <body>
     <div id="root"></div>
-    <script nonce="${nonce}" src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
     <script nonce="${nonce}" src="${scriptUri}"></script>
 </body>
 </html>`;
