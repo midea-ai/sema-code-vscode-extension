@@ -86,14 +86,3 @@ export interface MCPServerInfo {
   scope?: MCPScopeType
   filePath?: string
 }
-
-// MCP 市场相关类型
-export interface MCPMarketInfo {
-    config: MCPServerConfig;
-    description: string;
-    icon: string;
-    github?: string;
-    tools: string[];
-    tags: string[];
-    filePath?: string
-}

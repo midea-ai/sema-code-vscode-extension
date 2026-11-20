@@ -29,15 +29,16 @@
     margin-left: auto;
 }
 
-/* 内置工具图标 - 与 MCP 名称图标对齐 */
-.mcp-builtin-icon.section-card-icon {
-    color: var(--vscode-foreground);
+/* 系统工具图标 - 与 MCP 名称图标对齐，配色同导入页类别图标 */
+.mcp-system-icon.section-card-icon {
     width: 28px;
     height: 28px;
     border-radius: 50%;
+    background: color-mix(in srgb, var(--vscode-focusBorder, #4eabff) 14%, transparent);
+    color: color-mix(in srgb, var(--vscode-focusBorder, #4eabff) 70%, var(--vscode-foreground, #ccc));
 }
 
-.mcp-builtin-icon.section-card-icon svg {
+.mcp-system-icon.section-card-icon svg {
     width: 16px;
     height: 16px;
 }
@@ -236,39 +237,6 @@
     text-decoration: underline;
 }
 
-/* 必须字段提示 */
-.mcp-require-hint {
-    margin-bottom: var(--s-gap-md);
-    padding: var(--s-gap-sm) var(--s-gap-md);
-    background: var(--vscode-editor-background);
-    border: 1px solid var(--s-card-border);
-    border-radius: var(--s-radius-sm);
-    font-size: var(--s-font-base);
-    color: var(--vscode-foreground);
-    line-height: 1.6;
-}
-
-.mcp-require-hint-prefix,
-.mcp-require-hint-suffix {
-    color: var(--vscode-foreground);
-}
-
-.mcp-require-key {
-    color: var(--vscode-textLink-foreground);
-    font-weight: 500;
-}
-
-.mcp-require-desc {
-    color: var(--vscode-descriptionForeground);
-}
-
-/* MCP 市场页面 */
-.mcp-market {
-    display: flex;
-    flex-direction: column;
-    gap: 16px;
-}
-
 /* 手动添加弹窗：写入位置单选行 */
 .mcp-scope-row {
     display: flex;
@@ -294,223 +262,6 @@
 .mcp-json-editor::placeholder {
     color: var(--vscode-input-placeholderForeground);
     opacity: 0.7;
-}
-
-/* 市场列表 */
-.mcp-market-list {
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-}
-
-/* 市场卡片 */
-.mcp-market-card {
-    background: var(--s-card-bg);
-    border: 1px solid var(--s-card-border);
-    border-radius: var(--s-radius-lg);
-    padding: 14px var(--s-gap-lg);
-}
-
-.mcp-market-card-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    gap: 12px;
-}
-
-.mcp-market-card-left {
-    display: flex;
-    gap: 12px;
-    flex: 1;
-    min-width: 0;
-}
-
-.mcp-market-icon {
-    flex-shrink: 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 36px;
-    height: 36px;
-}
-
-.mcp-market-icon-svg {
-    line-height: 0;
-    width: 36px;
-    height: 36px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-
-.mcp-market-icon-svg svg {
-    width: 28px !important;
-    height: 28px !important;
-    min-width: 28px;
-    min-height: 28px;
-    max-width: 28px;
-    max-height: 28px;
-}
-
-/* 表情图标 */
-.mcp-market-icon-emoji {
-    font-size: 26px;
-    line-height: 1;
-    width: 36px;
-    height: 36px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-
-/* 首字母圆形背景 */
-.mcp-market-icon-initial {
-    color: #fff;
-    border-radius: 50%;
-    font-size: 14px;
-    font-weight: 600;
-    width: 28px;
-    height: 28px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-
-
-.mcp-market-info {
-    flex: 1;
-    min-width: 0;
-}
-
-.mcp-market-name {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    font-size: var(--s-font-lg);
-    font-weight: 600;
-    color: var(--vscode-foreground);
-    margin-bottom: 4px;
-}
-
-/* 市场辅助标签：使用低对比度中性色 */
-.mcp-command-type,
-.mcp-tag {
-    background: rgba(128, 128, 128, 0.12);
-    color: var(--vscode-descriptionForeground);
-}
-
-/* 命令类型标签 (NPX/UVX) */
-.mcp-command-type {
-    display: inline-block;
-    margin-left: 4px;
-    padding: 0px 4px;
-    border-radius: 3px;
-    font-size: 9px;
-    font-weight: 500;
-    text-transform: uppercase;
-}
-
-.mcp-market-desc {
-    font-size: 12px;
-    color: var(--vscode-descriptionForeground);
-    line-height: 1.4;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
-.mcp-market-card-right {
-    flex-shrink: 0;
-}
-
-/* 标签区域 */
-.mcp-market-card-tags {
-    display: flex;
-    flex-wrap: nowrap;
-    gap: 6px;
-    margin-top: 10px;
-    overflow: hidden;
-}
-
-.mcp-tag {
-    display: inline-block;
-    padding: 1px 6px;
-    border-radius: var(--s-radius-lg);
-    font-size: var(--s-font-xs);
-    flex-shrink: 0;
-    white-space: nowrap;
-}
-
-/* 卡片底部 */
-.mcp-market-card-footer {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-top: 10px;
-    padding-top: 10px;
-    border-top: 1px solid var(--s-card-border);
-}
-
-.mcp-market-card-footer .section-expand-btn {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    width: auto;
-    font-size: 12px;
-    color: var(--vscode-descriptionForeground);
-    white-space: nowrap;
-}
-
-.mcp-market-card-footer .section-expand-btn span {
-    color: inherit;
-}
-
-.mcp-github-link .mcp-author {
-    white-space: nowrap;
-}
-
-.mcp-github-link {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    color: var(--vscode-descriptionForeground);
-    opacity: 0.7;
-    transition: opacity 0.2s;
-    text-decoration: none;
-}
-
-.mcp-github-link:hover {
-    opacity: 1;
-}
-
-/* 作者名称 */
-.mcp-author {
-    font-size: 11px;
-    color: var(--vscode-descriptionForeground);
-}
-
-/* 工具列表展开区域 */
-.mcp-market-tools {
-    margin-top: 10px;
-    padding-top: 10px;
-}
-
-.mcp-market-tools .mcp-tools-list {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 6px;
-    max-height: 200px;
-    overflow-y: auto;
-}
-
-.mcp-tool-badge {
-    display: inline-block;
-    padding: 3px 8px;
-    background: var(--vscode-editor-background);
-    border: 1px solid var(--s-card-border);
-    border-radius: var(--s-radius-sm);
-    font-size: var(--s-font-sm);
-    color: var(--vscode-foreground);
 }
 
 /* 工具数量过多警告 */
@@ -627,15 +378,4 @@
 
 .mcp-tool-switch input:checked + .mcp-tool-switch-slider:before {
     transform: translateX(12px);
-}
-
-/* 响应式调整 */
-@media (max-width: 400px) {
-    .mcp-market-card-tags {
-        display: none;
-    }
-
-    .mcp-github-link .mcp-author {
-        display: none;
-    }
 }

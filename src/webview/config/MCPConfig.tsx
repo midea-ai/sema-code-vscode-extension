@@ -1,9 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { VscodeApi, ToolInfo, SystemToolInfo } from './types';
 import { MCPServerInfo, MCPServerConfig, MCPScopeType } from './types/mcp';
-import { ExpandArrowIcon, RefreshIcon, EditIcon, TrashIcon, CloseIcon, GearIcon, GitHubIcon, WarningCircleIcon, ChevronLeftIcon, ChevronRightIcon, PlusIcon } from './utils/svgIcons';
-import { defaultMCPMarketInfos, MCPMarketInfo } from './default/defaultMCPMarket';
-import { inlineSvgIcons } from './utils/mcpIcon';
+import { ExpandArrowIcon, RefreshIcon, EditIcon, TrashIcon, CloseIcon, TerminalIcon, WarningCircleIcon, ChevronLeftIcon, ChevronRightIcon, PlusIcon } from './utils/svgIcons';
 import { initialBgColors, hashString } from './utils/iconUtils';
 import { openFileWithRange } from './utils/fileUtils';
 import { uiScope } from './utils/scope';
@@ -12,7 +10,6 @@ import './style/section.css';
 import './style/mcp.css';
 
 
-type MCPTabType = 'installed' | 'market';
 // builtin：宿主注入（core 的 host），界面层归为内置，只读
 type MCPGroupScope = 'builtin' | 'project' | 'user' | 'plugin';
 
@@ -48,7 +45,6 @@ const TOOLS_PAGE_SIZE = 8;
 const MANUAL_ADD_PLACEHOLDER = `{
   "mcpServers": {
     "server-name": {
-      "transport": "stdio",
       "command": "npx",
       "args": ["-y", "package-name"]
     }
@@ -298,10 +294,10 @@ const SystemToolsCard: React.FC<{
                 >
                     <ExpandArrowIcon />
                 </button>
-                <div className="section-card-icon mcp-builtin-icon">
-                    <GearIcon />
+                <div className="section-card-icon mcp-system-icon">
+                    <TerminalIcon size={16} />
                 </div>
-                <span className="section-card-name">{t('config.mcp.builtinTools')}</span>
+                <span className="section-card-name">{t('config.mcp.systemTools')}</span>
                 <span className="readonly-tab">{t('common.readonly')}</span>
                 <span
                     className="mcp-status-dot"
@@ -328,7 +324,6 @@ type MCPAddScope = 'project' | 'user';
 const MCPEditModal: React.FC<{
     server: MCPServerInfo | null;
     scope: MCPGroupScope;
-    require?: Record<string, string>;
     /** add 模式：标题改为手动添加，弹窗内可切换作用域，并校验与已安装服务重名 */
     mode?: MCPEditMode;
     installedNames?: Set<string>;
@@ -336,7 +331,7 @@ const MCPEditModal: React.FC<{
     onSave: (config: MCPServerConfig, scope: MCPGroupScope) => void;
     vscode: VscodeApi;
     isSaving?: boolean;
-}> = ({ server, scope: initialScope, require, mode = 'edit', installedNames, onClose, onSave, vscode, isSaving }) => {
+}> = ({ server, scope: initialScope, mode = 'edit', installedNames, onClose, onSave, vscode, isSaving }) => {
     const t = useT();
     const [jsonText, setJsonText] = useState('');
     const [error, setError] = useState<string | null>(null);
@@ -359,17 +354,6 @@ const MCPEditModal: React.FC<{
 
     const showNpxHint = currentCommand === 'npx' || currentCommand.endsWith('/npx');
     const showUvxHint = currentCommand === 'uvx' || currentCommand.endsWith('/uvx');
-
-    const checkRequirePlaceholders = (config: MCPServerConfig, requireKeys: string[]): string[] => {
-        const unreplacedKeys: string[] = [];
-        for (const key of requireKeys) {
-            if (config.args?.some(arg => arg.includes(key))) { unreplacedKeys.push(key); continue; }
-            if (config.env) {
-                if (Object.values(config.env).some(val => val.includes(key))) unreplacedKeys.push(key);
-            }
-        }
-        return unreplacedKeys;
-    };
 
     useEffect(() => {
         if (!server) return;
@@ -399,14 +383,6 @@ const MCPEditModal: React.FC<{
             if (mode === 'add' && installedNames?.has(name)) {
                 setError(t('config.mcp.err.nameExists', { name })); return;
             }
-            if (require) {
-                const unreplacedKeys = checkRequirePlaceholders(config, Object.keys(require));
-                if (unreplacedKeys.length > 0) {
-                    setError(t('config.mcp.err.replacePlaceholders', {
-                        keys: unreplacedKeys.map(k => `'${k}'`).join(t('config.mcp.requireSeparator'))
-                    })); return;
-                }
-            }
             onSave(config, scope);
         } catch {
             setError(t('config.mcp.err.invalidJson'));
@@ -414,23 +390,6 @@ const MCPEditModal: React.FC<{
     };
 
     if (!server) return null;
-
-    const renderRequireHints = () => {
-        if (!require || Object.keys(require).length === 0) return null;
-        return (
-            <div className="mcp-require-hint">
-                <span className="mcp-require-hint-prefix">{t('config.mcp.requirePrefix')}</span>
-                {Object.entries(require).map(([key, desc], index, arr) => (
-                    <span key={key}>
-                        '<span className="mcp-require-key">{key}</span>'
-                        <span className="mcp-require-desc">{t('config.mcp.requireDesc', { desc })}</span>
-                        {index < arr.length - 1 && t('config.mcp.requireSeparator')}
-                    </span>
-                ))}
-                <span className="mcp-require-hint-suffix">{t('config.mcp.requireSuffix')}</span>
-            </div>
-        );
-    };
 
     return (
         <div className="section-modal-overlay" onClick={onClose}>
@@ -452,7 +411,6 @@ const MCPEditModal: React.FC<{
                             <a href="#" className="mcp-npx-hint-link" onClick={(e) => { e.preventDefault(); vscode.postMessage({ command: 'openExternal', url: 'https://docs.astral.sh/uv/getting-started/installation/' }); }}>{t('config.mcp.howToInstall')}</a>
                         </div>
                     )}
-                    {renderRequireHints()}
                     <textarea
                         className="mcp-json-editor"
                         value={jsonText}
@@ -495,105 +453,6 @@ const MCPEditModal: React.FC<{
     );
 };
 
-// ─── MCPIcon ──────────────────────────────────────────────────────────────────
-
-const MCPIcon: React.FC<{ name: string }> = ({ name }) => {
-    const iconContent = inlineSvgIcons[name];
-    if (iconContent) {
-        if (iconContent.includes('<svg')) {
-            return <span className="mcp-market-icon mcp-market-icon-svg" dangerouslySetInnerHTML={{ __html: iconContent }} />;
-        }
-        return <span className="mcp-market-icon mcp-market-icon-emoji">{iconContent}</span>;
-    }
-    const initial = name.charAt(0).toUpperCase();
-    const bgColor = initialBgColors[hashString(name) % initialBgColors.length];
-    return <span className="mcp-market-icon mcp-market-icon-initial" style={{ backgroundColor: bgColor }}>{initial}</span>;
-};
-
-// ─── MCPMarketCard ────────────────────────────────────────────────────────────
-
-const getCommandType = (command?: string): string => {
-    if (!command) return '';
-    const cmd = command.toLowerCase();
-    if (cmd === 'npx' || cmd.endsWith('/npx')) return 'NPX';
-    if (cmd === 'uvx' || cmd.endsWith('/uvx')) return 'UVX';
-    return '';
-};
-
-const formatMCPName = (name: string): string =>
-    name.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
-
-const getGitHubAuthor = (githubUrl?: string): string => {
-    if (!githubUrl) return '';
-    const match = githubUrl.match(/github\.com\/([^/]+)/);
-    return match ? match[1] : '';
-};
-
-const MCPMarketCard: React.FC<{
-    item: MCPMarketInfo;
-    isInstalled: boolean;
-    onInstall: (item: MCPMarketInfo, scope: MCPGroupScope) => void;
-    vscode: VscodeApi;
-}> = ({ item, isInstalled, onInstall, vscode }) => {
-    const t = useT();
-    const [expanded, setExpanded] = useState(false);
-    const commandType = getCommandType(item.config.command);
-    const author = getGitHubAuthor(item.github);
-
-    return (
-        <div className="mcp-market-card">
-            <div className="mcp-market-card-header">
-                <div className="mcp-market-card-left">
-                    <MCPIcon name={item.config.name} />
-                    <div className="mcp-market-info">
-                        <div className="mcp-market-name">
-                            {item.config.title || formatMCPName(item.config.name)}
-                            {commandType && <span className="mcp-command-type">{commandType}</span>}
-                        </div>
-                        <div className="mcp-market-desc">{item.description}</div>
-                    </div>
-                </div>
-                <div className="mcp-market-card-right">
-                    {isInstalled ? (
-                        <span className="section-installed-badge">{t('common.installed')}</span>
-                    ) : (
-                        <div className="section-install-btns">
-                            <button className="section-btn secondary small" onClick={() => onInstall(item, 'project')} title={t('common.installToProjectTip')}>{t('config.mcp.addProject')}</button>
-                            <button className="section-btn primary small" onClick={() => onInstall(item, 'user')} title={t('common.installToUserTip')}>{t('config.mcp.addUser')}</button>
-                        </div>
-                    )}
-                </div>
-            </div>
-            <div className="mcp-market-card-tags">
-                {item.tags.map((tag, index) => (
-                    <span key={index} className="mcp-tag">{tag}</span>
-                ))}
-            </div>
-            <div className="mcp-market-card-footer">
-                <button className={`section-expand-btn ${expanded ? 'expanded' : ''}`} onClick={() => setExpanded(!expanded)}>
-                    <ExpandArrowIcon />
-                    <span>{item.tools.length} Tools</span>
-                </button>
-                {item.github && (
-                    <a href="#" className="mcp-github-link" onClick={(e) => { e.preventDefault(); vscode.postMessage({ command: 'openExternal', url: item.github }); }} title={t('config.mcp.viewSource')}>
-                        <GitHubIcon />
-                        {author && <span className="mcp-author">{author}</span>}
-                    </a>
-                )}
-            </div>
-            {expanded && (
-                <div className="mcp-market-tools">
-                    <div className="mcp-tools-list">
-                        {item.tools.map((tool, index) => (
-                            <span key={index} className="mcp-tool-badge">{tool}</span>
-                        ))}
-                    </div>
-                </div>
-            )}
-        </div>
-    );
-};
-
 // ─── MCPConfig ────────────────────────────────────────────────────────────────
 
 interface MCPConfigProps {
@@ -603,7 +462,6 @@ interface MCPConfigProps {
 
 const MCPConfig: React.FC<MCPConfigProps> = ({ vscode, onOpenSystemConfig }) => {
     const t = useT();
-    const [activeTab, setActiveTab] = useState<MCPTabType>('installed');
     const [servers, setServers] = useState<MCPServerInfo[]>([]);
     const [systemTools, setSystemTools] = useState<SystemToolInfo[]>([]);
     // null = 尚未加载,不渲染告警,避免已开启工具搜索的用户看到告警闪现
@@ -612,9 +470,8 @@ const MCPConfig: React.FC<MCPConfigProps> = ({ vscode, onOpenSystemConfig }) => 
     const [loading, setLoading] = useState(true);
     const [isRefreshing, setIsRefreshing] = useState(false);
     const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set());
-    const [editingServer, setEditingServer] = useState<{ server: MCPServerInfo; scope: MCPGroupScope; require?: Record<string, string>; mode?: MCPEditMode } | null>(null);
+    const [editingServer, setEditingServer] = useState<{ server: MCPServerInfo; scope: MCPGroupScope; mode?: MCPEditMode } | null>(null);
     const [isSavingEdit, setIsSavingEdit] = useState(false);
-    const [searchQuery, setSearchQuery] = useState('');
 
     // 根据 scope 字段分组
     const groupedServers = useMemo(() => {
@@ -631,8 +488,6 @@ const MCPConfig: React.FC<MCPConfigProps> = ({ vscode, onOpenSystemConfig }) => 
         });
         return groups;
     }, [servers]);
-
-    const installedCount = servers.length;
 
     const installedNames = useMemo(() => {
         const names = new Set<string>();
@@ -651,23 +506,6 @@ const MCPConfig: React.FC<MCPConfigProps> = ({ vscode, onOpenSystemConfig }) => 
             }, 0);
         return systemCount + mcpCount;
     }, [systemTools, groupedServers]);
-
-    const filteredMarketItems = useMemo(() => {
-        let items = defaultMCPMarketInfos;
-        if (searchQuery.trim()) {
-            const q = searchQuery.toLowerCase();
-            items = items.filter(item =>
-                item.config.name.toLowerCase().includes(q) ||
-                item.description.toLowerCase().includes(q) ||
-                item.tags.some(tag => tag.toLowerCase().includes(q))
-            );
-        }
-        return [...items].sort((a, b) => {
-            const aI = installedNames.has(a.config.name) ? -1 : 1;
-            const bI = installedNames.has(b.config.name) ? -1 : 1;
-            return aI - bI;
-        });
-    }, [searchQuery, installedNames]);
 
     useEffect(() => {
         const handleMessage = (event: MessageEvent) => {
@@ -697,8 +535,6 @@ const MCPConfig: React.FC<MCPConfigProps> = ({ vscode, onOpenSystemConfig }) => 
                     setEditingServer(null);
                     if (message.success && message.data) {
                         setServers(flattenServers(message.data));
-                        // 添加成功后切到已安装页，让用户直接看到新服务与连接状态
-                        setActiveTab('installed');
                     }
                     break;
                 case 'loadSystemConfigResult':
@@ -778,16 +614,7 @@ const MCPConfig: React.FC<MCPConfigProps> = ({ vscode, onOpenSystemConfig }) => 
         vscode.postMessage({ command: 'addMCPServer', data: { ...config, scope } });
     };
 
-    const handleInstallClick = (item: MCPMarketInfo, scope: MCPGroupScope) => {
-        const serverInfo: MCPServerInfo = {
-            config: item.config as MCPServerConfig,
-            connectStatus: 'disconnected',
-            status: false,
-        };
-        setEditingServer({ server: serverInfo, scope, require: (item as any).require });
-    };
-
-    // 市场页「手动添加」：以示例配置为模板打开弹窗，默认写入用户级
+    // 「手动添加」：以示例配置为模板打开弹窗，默认写入项目级
     const handleManualAdd = () => {
         // add 模式下弹窗不预填内容，这里只是占位让弹窗渲染
         const serverInfo: MCPServerInfo = {
@@ -848,18 +675,9 @@ const MCPConfig: React.FC<MCPConfigProps> = ({ vscode, onOpenSystemConfig }) => 
         <div className="agent-config mcp-config">
             {/* Tab 导航 */}
             <div className="tab-navigation">
-                <div
-                    className={`tab-item ${activeTab === 'installed' ? 'active' : ''}`}
-                    onClick={() => setActiveTab('installed')}
-                >
+                <div className="tab-item active">
                     {t('common.installed')}
                     {totalToolCount > 0 && <span className="section-tab-count">{totalToolCount}</span>}
-                </div>
-                <div
-                    className={`tab-item ${activeTab === 'market' ? 'active' : ''}`}
-                    onClick={() => setActiveTab('market')}
-                >
-                    {t('config.mcp.tab.market')}
                 </div>
                 <div className="section-tab-actions">
                     <button
@@ -870,145 +688,118 @@ const MCPConfig: React.FC<MCPConfigProps> = ({ vscode, onOpenSystemConfig }) => 
                         <PlusIcon />
                         {t('config.mcp.manualAdd')}
                     </button>
-                    {activeTab === 'installed' && (
-                        <button
-                            className={`section-icon-btn ${isRefreshing ? 'btn-loading' : ''}`}
-                            onClick={handleRefresh}
-                            title={t('config.mcp.refresh')}
-                            disabled={isRefreshing}
-                        >
-                            {isRefreshing ? <span className="spinner" /> : <RefreshIcon size={14} />}
-                        </button>
-                    )}
+                    <button
+                        className={`section-icon-btn ${isRefreshing ? 'btn-loading' : ''}`}
+                        onClick={handleRefresh}
+                        title={t('config.mcp.refresh')}
+                        disabled={isRefreshing}
+                    >
+                        {isRefreshing ? <span className="spinner" /> : <RefreshIcon size={14} />}
+                    </button>
                 </div>
             </div>
 
             {/* Tab 内容 */}
             <div className="tab-content">
-                {activeTab === 'installed' ? (
-                    loading ? (
-                        <div className="section-loading">{t('common.loading')}</div>
-                    ) : (
-                        <div className="section-groups">
-                            {totalToolCount > MAX_TOOL_COUNT && toolSearchEnabled === false && (
-                                <div className="mcp-tool-warning">
-                                    <div className="mcp-tool-warning-icon"><WarningCircleIcon /></div>
-                                    <div className="mcp-tool-warning-content">
-                                        <div className="mcp-tool-warning-title">{t('config.mcp.tooManyTitle', { count: totalToolCount })}</div>
-                                        <div className="mcp-tool-warning-desc">
-                                            {t('config.mcp.tooManyDesc', { max: MAX_TOOL_COUNT })}
-                                            {t('config.mcp.tooManyHintBefore')}<a
-                                                href="#"
-                                                className="mcp-tool-warning-link"
-                                                onClick={(e) => { e.preventDefault(); onOpenSystemConfig?.(); }}
-                                                title={t('config.mcp.goSystemConfig')}
-                                            >{t('config.mcp.tooManyHintLink')}</a>{t('config.mcp.tooManyHintAfter')}
-                                        </div>
-                                        <div className="mcp-tool-warning-actions">
-                                            <button
-                                                className="section-btn primary small"
-                                                onClick={handleEnableToolSearch}
-                                                disabled={enablingToolSearch}
-                                            >
-                                                {enablingToolSearch ? t('config.mcp.enabling') : t('config.mcp.enableToolSearch')}
-                                            </button>
-                                        </div>
+                {loading ? (
+                    <div className="section-loading">{t('common.loading')}</div>
+                ) : (
+                    <div className="section-groups">
+                        {totalToolCount > MAX_TOOL_COUNT && toolSearchEnabled === false && (
+                            <div className="mcp-tool-warning">
+                                <div className="mcp-tool-warning-icon"><WarningCircleIcon /></div>
+                                <div className="mcp-tool-warning-content">
+                                    <div className="mcp-tool-warning-title">{t('config.mcp.tooManyTitle', { count: totalToolCount })}</div>
+                                    <div className="mcp-tool-warning-desc">
+                                        {t('config.mcp.tooManyDesc', { max: MAX_TOOL_COUNT })}
+                                        {t('config.mcp.tooManyHintBefore')}<a
+                                            href="#"
+                                            className="mcp-tool-warning-link"
+                                            onClick={(e) => { e.preventDefault(); onOpenSystemConfig?.(); }}
+                                            title={t('config.mcp.goSystemConfig')}
+                                        >{t('config.mcp.tooManyHintLink')}</a>{t('config.mcp.tooManyHintAfter')}
+                                    </div>
+                                    <div className="mcp-tool-warning-actions">
+                                        <button
+                                            className="section-btn primary small"
+                                            onClick={handleEnableToolSearch}
+                                            disabled={enablingToolSearch}
+                                        >
+                                            {enablingToolSearch ? t('config.mcp.enabling') : t('config.mcp.enableToolSearch')}
+                                        </button>
                                     </div>
                                 </div>
-                            )}
+                            </div>
+                        )}
 
-                            {/* 系统工具分组 */}
-                            {systemTools.length > 0 && (() => {
-                                const isCollapsed = collapsedSections.has('system');
-                                return (
-                                    <div className="section-group section-system">
-                                        <div
-                                            className="section-group-title section-group-title-collapsible"
-                                            style={{ cursor: 'pointer', userSelect: 'none' }}
-                                            onClick={() => toggleSection('system')}
-                                        >
-                                            {t('config.mcp.systemTools')}
-                                            <span className={`section-collapse-arrow ${isCollapsed ? 'collapsed' : ''}`} />
-                                        </div>
-                                        {!isCollapsed && (
-                                            <div className="section-list mcp-server-list">
-                                                <SystemToolsCard tools={systemTools} onToolToggle={handleSystemToolToggle} />
-                                            </div>
-                                        )}
+                        {/* 内置工具分组 */}
+                        {systemTools.length > 0 && (() => {
+                            const isCollapsed = collapsedSections.has('system');
+                            return (
+                                <div className="section-group section-system">
+                                    <div
+                                        className="section-group-title section-group-title-collapsible"
+                                        style={{ cursor: 'pointer', userSelect: 'none' }}
+                                        onClick={() => toggleSection('system')}
+                                    >
+                                        {t('config.mcp.builtinTools')}
+                                        <span className={`section-collapse-arrow ${isCollapsed ? 'collapsed' : ''}`} />
                                     </div>
-                                );
-                            })()}
-
-                            {/* MCP 分组 */}
-                            {GROUP_ORDER.map(scope => {
-                                const scopeServers = groupedServers[scope] || [];
-                                if (scopeServers.length === 0 && scope !== 'project' && scope !== 'user') return null;
-
-                                const isCollapsed = collapsedSections.has(scope);
-                                const pathHint = GROUP_PATHS[scope];
-
-                                return (
-                                    <div key={scope} className={`section-group section-${scope}`}>
-                                        <div
-                                            className="section-group-title section-group-title-collapsible"
-                                            style={{ cursor: 'pointer', userSelect: 'none' }}
-                                            onClick={() => toggleSection(scope)}
-                                        >
-                                            {t(GROUP_TITLE_KEYS[scope])}
-                                            {pathHint && <span className="section-group-count">({pathHint})</span>}
-                                            <span className={`section-collapse-arrow ${isCollapsed ? 'collapsed' : ''}`} />
+                                    {!isCollapsed && (
+                                        <div className="section-list mcp-server-list">
+                                            <SystemToolsCard tools={systemTools} onToolToggle={handleSystemToolToggle} />
                                         </div>
-                                        {!isCollapsed && (
-                                            <div className="section-list mcp-server-list">
-                                                {scopeServers.length === 0 ? (
-                                                    <div className="section-empty">{t('config.mcp.empty')}</div>
-                                                ) : (
-                                                    scopeServers.map((server, index) => (
-                                                        <MCPServerCard
-                                                            key={`${server.config.name}-${index}`}
-                                                            server={server}
-                                                            scope={scope}
-                                                            onReconnect={handleReconnect}
-                                                            onEdit={handleEdit}
-                                                            onDelete={handleDelete}
-                                                            onToggle={handleToggle}
-                                                            onToolToggle={handleMCPToolToggle}
-                                                        />
-                                                    ))
-                                                )}
-                                            </div>
-                                        )}
-                                    </div>
-                                );
-                            })}
+                                    )}
+                                </div>
+                            );
+                        })()}
 
-                            {systemTools.length === 0 && GROUP_ORDER.every(s => (groupedServers[s] || []).length === 0) && (
-                                <div className="section-empty">{t('config.mcp.empty')}</div>
-                            )}
-                        </div>
-                    )
-                ) : (
-                    <div className="mcp-market">
-                        <div className="section-search-box">
-                            <input
-                                type="text"
-                                className="section-search-input"
-                                placeholder={t('config.mcp.searchPlaceholder')}
-                                value={searchQuery}
-                                onChange={(e) => setSearchQuery(e.target.value)}
-                            />
-                        </div>
-                        <div className="mcp-market-list">
-                            {filteredMarketItems.map((item) => (
-                                <MCPMarketCard
-                                    key={item.config.name}
-                                    item={item}
-                                    isInstalled={installedNames.has(item.config.name)}
-                                    onInstall={handleInstallClick}
-                                    vscode={vscode}
-                                />
-                            ))}
-                        </div>
+                        {/* MCP 分组 */}
+                        {GROUP_ORDER.map(scope => {
+                            const scopeServers = groupedServers[scope] || [];
+                            if (scopeServers.length === 0 && scope !== 'project' && scope !== 'user') return null;
+
+                            const isCollapsed = collapsedSections.has(scope);
+                            const pathHint = GROUP_PATHS[scope];
+
+                            return (
+                                <div key={scope} className={`section-group section-${scope}`}>
+                                    <div
+                                        className="section-group-title section-group-title-collapsible"
+                                        style={{ cursor: 'pointer', userSelect: 'none' }}
+                                        onClick={() => toggleSection(scope)}
+                                    >
+                                        {t(GROUP_TITLE_KEYS[scope])}
+                                        {pathHint && <span className="section-group-count">({pathHint})</span>}
+                                        <span className={`section-collapse-arrow ${isCollapsed ? 'collapsed' : ''}`} />
+                                    </div>
+                                    {!isCollapsed && (
+                                        <div className="section-list mcp-server-list">
+                                            {scopeServers.length === 0 ? (
+                                                <div className="section-empty">{t('config.mcp.empty')}</div>
+                                            ) : (
+                                                scopeServers.map((server, index) => (
+                                                    <MCPServerCard
+                                                        key={`${server.config.name}-${index}`}
+                                                        server={server}
+                                                        scope={scope}
+                                                        onReconnect={handleReconnect}
+                                                        onEdit={handleEdit}
+                                                        onDelete={handleDelete}
+                                                        onToggle={handleToggle}
+                                                        onToolToggle={handleMCPToolToggle}
+                                                    />
+                                                ))
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
+                            );
+                        })}
+
+                        {systemTools.length === 0 && GROUP_ORDER.every(s => (groupedServers[s] || []).length === 0) && (
+                            <div className="section-empty">{t('config.mcp.empty')}</div>
+                        )}
                     </div>
                 )}
             </div>
@@ -1018,7 +809,6 @@ const MCPConfig: React.FC<MCPConfigProps> = ({ vscode, onOpenSystemConfig }) => 
                 <MCPEditModal
                     server={editingServer.server}
                     scope={editingServer.scope}
-                    require={editingServer.require}
                     mode={editingServer.mode}
                     installedNames={installedNames}
                     onClose={() => { setEditingServer(null); setIsSavingEdit(false); }}
