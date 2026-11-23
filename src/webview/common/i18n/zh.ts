@@ -229,14 +229,20 @@ export const zh = {
 
     // ── 历史会话页 ──
     'history.title': '历史会话',
-    'history.subtitle': '点击会话可加载对话记录',
     'history.empty': '暂无历史会话',
     'history.active': '活跃',
     'history.open': '打开',
+    'history.createdAt': '创建于',
+    'history.updatedAt': '更新于',
     'history.justNow': '刚刚',
     'history.minutesAgo': '{n}分钟前',
     'history.yesterday': '昨天 {time}',
     'history.daysAgo': '{n}天前',
+    'history.searchPlaceholder': '搜索会话',
+    'history.searchAction': '搜索',
+    'history.searching': '检索中…',
+    'history.noResults': '没有匹配的会话',
+    'history.bodyMatches': '正文命中 {n} 处',
 
     // ── 配置页：导航 ──
     'config.nav.group.basic': '基础',

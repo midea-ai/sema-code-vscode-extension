@@ -5,6 +5,8 @@ import * as crypto from 'crypto';
 import type { AgentMode } from 'sema-core/types';
 import type { SemaSessionWrapper } from '../core/semaSessionWrapper';
 import { CLAW_SESSION_ID } from '../claw/paths';
+import { searchSessionMessages, type SessionSearchHit } from '../webview/sessionHistory/search';
+import { turnNavItems, type TurnNavItem } from '../webview/chat/utils/turnNav';
 
 /** 附图原图的扩展名 → media_type（core 按文件头识别后落盘为这四种） */
 const ATTACHED_IMAGE_MEDIA_TYPES: Record<string, string> = {
@@ -47,6 +49,10 @@ export class SessionHistoryManager {
     private static readonly LEGACY_STORAGE_KEY = 'sema.sessionHistory';
     private static readonly LEGACY_V2_KEY = 'sema.sessionHistoryV2';
     private static readonly MAX_SESSIONS = 50;
+    /** 参与正文检索的单份存档体积上限：超大存档跳过，避免为它付一次整段解析 */
+    private static readonly MAX_SEARCH_FILE_BYTES = 2 * 1024 * 1024;
+    /** 悬浮预览展示的轮次数 */
+    private static readonly PREVIEW_TURNS = 5;
 
     private context: vscode.ExtensionContext;
     private projectPath: string;
@@ -446,6 +452,61 @@ export class SessionHistoryManager {
             content: this.restoreAttachments(content),
             projectPath: this.projectPath,
         };
+    }
+
+    /**
+     * 正文检索：逐份读会话正文并匹配，只回命中片段。
+     *
+     * 只在用户显式触发（回车）时调用，不建索引、不做缓存——检索是低频需求，
+     * 成本只落在这一次调用上，不用它的人（以及保存 / 刷新列表路径）零增量。
+     */
+    public async searchSessionBodies(query: string): Promise<SessionSearchHit[]> {
+        const needle = query.trim();
+        if (!needle) { return []; }
+        await this.ensureMigrated();
+
+        // 迁移未完成的回落数据正文就在内存里；否则只用索引里的 id，正文按需读
+        const legacy = this.legacySessions
+            ? new Map(this.legacySessions.map(s => [s.id, s.content] as [string, any[]]))
+            : null;
+        const ids = legacy
+            ? Array.from(legacy.keys())
+            : (await this.readIndex()).map(entry => entry.id);
+
+        const hits: SessionSearchHit[] = [];
+        for (const id of ids) {
+            if (id === CLAW_SESSION_ID) { continue; }
+            const content = legacy ? legacy.get(id) : await this.readSearchableSession(id);
+            if (!content) { continue; }
+            const hit = searchSessionMessages(id, content, needle);
+            if (hit) { hits.push(hit); }
+        }
+        return hits;
+    }
+
+    /**
+     * 单条会话的悬浮预览：最近 5 轮的标题与结论。
+     *
+     * 与正文检索同一套读法：悬浮时才读这一份正文，不缓存、不预读；超过体积上限的存档直接没有预览。
+     */
+    public async getSessionPreview(sessionId: string): Promise<TurnNavItem[]> {
+        await this.ensureMigrated();
+        const content = this.legacySessions
+            ? this.legacySessions.find(s => s.id === sessionId)?.content ?? null
+            : await this.readSearchableSession(sessionId);
+        if (!content) { return []; }
+        return turnNavItems(content, false).slice(-SessionHistoryManager.PREVIEW_TURNS);
+    }
+
+    /** 读一份正文用于检索/预览；体积超过上限的存档直接跳过（返回 null） */
+    private async readSearchableSession(sessionId: string): Promise<any[] | null> {
+        try {
+            const stat = await fs.promises.stat(this.sessionPath(sessionId));
+            if (stat.size > SessionHistoryManager.MAX_SEARCH_FILE_BYTES) { return null; }
+        } catch {
+            return null;
+        }
+        return this.readSessionFile(sessionId);
     }
 
     public async deleteSession(sessionId: string): Promise<void> {

@@ -78,6 +78,42 @@ export class SessionHistoryWebviewProvider {
                     }
                     await this.refreshSessionList();
                     break;
+                case 'searchSessions': {
+                    // 正文检索：低频操作，触发时才逐份读正文，不做缓存
+                    try {
+                        const results = await this.sessionHistoryManager.searchSessionBodies(String(message.query || ''));
+                        this.panel?.webview.postMessage({
+                            type: 'searchResults',
+                            requestId: message.requestId,
+                            query: message.query,
+                            results,
+                        });
+                    } catch (error) {
+                        console.error('Failed to search sessions:', error);
+                        this.panel?.webview.postMessage({
+                            type: 'searchResults',
+                            requestId: message.requestId,
+                            query: message.query,
+                            results: [],
+                            failed: true,
+                        });
+                    }
+                    break;
+                }
+                case 'sessionPreview': {
+                    // 悬浮预览：只读这一条会话的正文，不缓存
+                    try {
+                        const turns = await this.sessionHistoryManager.getSessionPreview(message.sessionId);
+                        this.panel?.webview.postMessage({
+                            type: 'sessionPreviewResult',
+                            sessionId: message.sessionId,
+                            turns,
+                        });
+                    } catch (error) {
+                        console.error('Failed to load session preview:', error);
+                    }
+                    break;
+                }
                 case 'deleteSession':
                     // 禁止删除已在 chat 中打开的会话（含活跃会话）
                     if (this.sessionHistoryManager.getOpenSessionIds().includes(message.sessionId)) {

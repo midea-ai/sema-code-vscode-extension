@@ -119,7 +119,6 @@ export const fr: Partial<Record<keyof typeof zh, string>> = {
 
     // ── history ──
     'history.title': 'Historique des sessions',
-    'history.subtitle': 'Cliquez sur une session pour la charger',
     'history.empty': 'Aucune session',
     'history.open': 'Ouvrir',
     'history.justNow': "À l'instant",

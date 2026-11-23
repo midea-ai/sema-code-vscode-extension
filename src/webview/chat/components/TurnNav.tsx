@@ -1,52 +1,16 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Message } from '../types';
+import type { TurnNavItem } from '../utils/turnNav';
 
 const MAX_TICKS = 30;
 const TICK_H = 7; // 每条短横线占的行高（线 2px + 间距 5px，与 .turn-nav-tick 一致）
 const NAV_PAD = 12; // 指示条上下内边距之和（与 .turn-nav 一致）
 const MIN_TICKS = 5;
-const MAX_CHARS = 400; // 小面板最多显示三行，取这么多字符足够截断
 /** 少于这么多轮不显示指示条 */
 export const MIN_TURNS = 2;
 
-export interface TurnNavItem {
-    /** 用户输入（或轮次开头块的文案）的纯文字 */
-    title: string;
-    /** 本轮以已完成的文字结论收尾时的结论纯文字；以工具 / 报错 / 确认等收尾或仍在运行则无 */
-    conclusion?: string;
-}
-
-/** 压成一段纯文字：去掉各行行首的标题 / 列表 / 引用标记与行内强调符号，换行并成空格 */
-const plainText = (s: string): string => (s || '').slice(0, MAX_CHARS * 2).split('\n')
-    .map(x => x.trim().replace(/^(?:[#>*\-+]|\d+\.)\s*/, ''))
-    .filter(Boolean).join(' ').replace(/[*_`]+/g, '').slice(0, MAX_CHARS);
-
-const isGoalRound = (m: Message) => m.type === 'user' && m.source === 'goal' && m.goal?.action === 'round';
-
-/** 轮末不参与「以什么收尾」判断的消息：目标达成 / 后台任务结束等系统提示 */
-const isTrailer = (m: Message) => m.type === 'system' && ['goal_achieved', 'task_end', 'file_reference'].includes(m.content?.type);
-
-/**
- * 从消息列表算出导航条目（与 App 的轮次分组一致：每条用户输入开一轮，目标自动续轮、运行中轮内注入的输入并入所在轮）。
- * 开头没有用户输入的前置消息不算一轮；最后一轮正在运行时不给结论。
- */
-export const turnNavItems = (messages: Message[], processing: boolean): TurnNavItem[] => {
-    const turns: Message[][] = [];
-    for (const m of messages) {
-        if (m.type === 'user' && !isGoalRound(m) && !m.injected) turns.push([m]);
-        else if (turns.length) turns[turns.length - 1].push(m);
-    }
-    return turns.map((turn, i) => {
-        const o = turn[0];
-        const title = plainText(o.content) || o.pastes?.[0]?.preview || (o.attachments?.length ? 'Image' : '');
-        const item: TurnNavItem = { title };
-        if (processing && i === turns.length - 1) return item;
-        const rest = turn.slice(1).filter(m => !isTrailer(m));
-        const last = rest[rest.length - 1];
-        if (last?.type === 'assistant' && last.content?.completed !== false && last.content?.content?.trim()) item.conclusion = plainText(last.content.content);
-        return item;
-    });
-};
+// 轮次分组逻辑抽到 ../utils/turnNav，历史会话的悬浮预览共用；此处转出以保持原有调用方不变
+export { turnNavItems } from '../utils/turnNav';
+export type { TurnNavItem } from '../utils/turnNav';
 
 interface TurnNavProps {
     /** 消息滚动容器（#output-container），里面每轮是带 data-turn 的 .turn-group */

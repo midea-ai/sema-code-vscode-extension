@@ -228,14 +228,20 @@ export const en: Record<keyof typeof zh, string> = {
 
     // ── history ──
     'history.title': 'Session History',
-    'history.subtitle': 'Click a session to load it',
     'history.empty': 'No sessions yet',
     'history.active': 'Active',
     'history.open': 'Open',
+    'history.createdAt': 'Created',
+    'history.updatedAt': 'Updated',
     'history.justNow': 'Just now',
     'history.minutesAgo': '{n} min ago',
     'history.yesterday': 'Yesterday {time}',
     'history.daysAgo': '{n} days ago',
+    'history.searchPlaceholder': 'Search sessions',
+    'history.searchAction': 'Search',
+    'history.searching': 'Searching…',
+    'history.noResults': 'No matching sessions',
+    'history.bodyMatches': '{n} matches in content',
 
     // ── config: nav ──
     'config.nav.group.basic': 'Basics',

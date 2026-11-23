@@ -119,7 +119,6 @@ export const de: Partial<Record<keyof typeof zh, string>> = {
 
     // ── history ──
     'history.title': 'Sitzungsverlauf',
-    'history.subtitle': 'Klicken Sie auf eine Sitzung, um sie zu laden',
     'history.empty': 'Noch keine Sitzungen',
     'history.active': 'Aktiv',
     'history.open': 'Öffnen',
