@@ -366,10 +366,9 @@ const MarketplaceSection: React.FC<{
                             }}
                             href="#"
                             title={githubUrl}
-                            style={{ width: 'fit-content' }}
                         >
                             <GitHubIcon size={14} />
-                            {sourceLabel}
+                            <span className="plugin-marketplace-source-text">{sourceLabel}</span>
                         </a>
                     ) : (
                         <span className="plugin-marketplace-source">{sourceLabel}</span>

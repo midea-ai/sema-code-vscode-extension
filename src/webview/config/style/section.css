@@ -296,8 +296,8 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 28px;
-    height: 28px;
+    width: 24px;
+    height: 24px;
     padding: 0;
     border: none;
     background: transparent;
@@ -311,11 +311,14 @@
 
 .section-icon-btn svg {
     display: block;
+    width: 14px;
+    height: 14px;
 }
 
+/* 悬浮只变色，不铺底色，按钮组内按钮才不会显得被底色分隔 */
 .section-icon-btn:hover:not(:disabled) {
     opacity: 1;
-    background: var(--vscode-list-hoverBackground);
+    color: var(--vscode-foreground);
 }
 
 .section-icon-btn:disabled {
@@ -325,7 +328,6 @@
 
 .section-icon-btn-danger:hover {
     color: var(--s-color-danger);
-    background: var(--s-color-danger-bg);
 }
 
 /* 表格操作列：多个图标按钮横排居中 */

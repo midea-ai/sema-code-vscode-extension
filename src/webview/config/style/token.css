@@ -12,8 +12,8 @@
     --s-gap-lg: 16px;
     --s-gap-xl: 24px;
 
-    /* 操作按钮组间距 */
-    --s-action-gap: 2px;
+    /* 操作按钮组间距：图标按钮自带内边距，组内不再留额外间隙 */
+    --s-action-gap: 0;
 
     /* 字号 */
     --s-font-xs: 10px;

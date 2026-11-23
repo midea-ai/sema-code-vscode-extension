@@ -144,6 +144,8 @@ body {
 /* 模型列表 */
 .model-list {
     margin-bottom: 40px;
+    /* 作为窄面板判断的容器（见下方 @container） */
+    container-type: inline-size;
 }
 
 .section-title {
@@ -243,6 +245,24 @@ body {
 
 .model-table tbody tr:hover {
     background: var(--vscode-list-hoverBackground);
+}
+
+/* 窄面板下隐藏操作列：否则整张表溢出，右侧只露出半列按钮 */
+@container (max-width: 400px) {
+    .model-table th:nth-child(3),
+    .model-table td:nth-child(3) {
+        display: none;
+    }
+}
+
+/* 不支持容器查询的环境（旧 JCEF）退化为按视口宽度判断 */
+@supports not (container-type: inline-size) {
+    @media (max-width: 600px) {
+        .model-table th:nth-child(3),
+        .model-table td:nth-child(3) {
+            display: none;
+        }
+    }
 }
 
 /* 任务配置 */
@@ -1116,6 +1136,8 @@ textarea:focus {
 /* 图像模型列表：位于任务配置之下，与上方间距对齐 */
 .image-model-list {
     margin-top: 40px;
+    /* 作为窄面板判断的容器（见 @container） */
+    container-type: inline-size;
 }
 
 /* 模型列表 / 图像模型标题右侧的添加按钮 */
