@@ -363,8 +363,9 @@ html.jb #output-container {
 /* 用户输入块组件 */
 .user-input-block {
     position: relative;
-    padding: 8px 10px 10px;
-    /* 左右往外一点（去掉 max-width 让它更宽）；顶部留白由 wrap padding-top 提供，这里只留底部空间 */
+    /* 上下等距，否则文字在气泡里会显得偏上、下方空一截 */
+    padding: 8px 10px;
+    /* 左右往外一点（去掉 max-width 让它更宽）；顶部留白另由 wrap padding-top 提供 */
     margin: 0 4px 8px;
     border-radius: var(--chat-radius-md);
     /* 细边框，让输入块更分明 */
@@ -564,6 +565,9 @@ html.jb #output-container {
     line-height: 1.3;
     margin: 0 var(--chat-spacing-xs) 0 8px;
     opacity: 0.8;
+    /* 长路径（如 @ 引用的补充行「Read src/… (99 lines)」）是一个不可按空格拆分的词，
+       不允词内断开时会整词跳到下一行，尾部的「lines)」再单独占一行；允许词内断开后按可用宽度折行 */
+    overflow-wrap: anywhere;
 }
 
 /* AI 响应 / TaskEnd：上下内边距 4 与工具行头一致，块间距统一为 14px */
