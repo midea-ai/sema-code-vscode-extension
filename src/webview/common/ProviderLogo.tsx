@@ -129,6 +129,25 @@ const ProviderLogo: React.FC<ProviderLogoProps> = ({ provider, className = 'prov
                     </g>
                 </svg>
             );
+        case 'tencent':
+            // 腾讯云官方云标：左青右蓝两个环 + 顶部拱形，右下由 45° 斜带连成一体；
+            // 配色取官方品牌渐变（顶部皇家蓝 → 右侧天蓝 → 左下青色），按几何比例手绘
+            return (
+                <svg {...svgProps} fill="none">
+                    <defs>
+                        <linearGradient id={`${uid}-tencent`} x1="12" y1="4" x2="4" y2="20" gradientUnits="userSpaceOnUse">
+                            <stop offset="0%" stopColor="#006EFF" />
+                            <stop offset="55%" stopColor="#00A3FF" />
+                            <stop offset="100%" stopColor="#05C6D8" />
+                        </linearGradient>
+                    </defs>
+                    <g stroke={`url(#${uid}-tencent)`} strokeWidth="2" strokeLinejoin="round">
+                        <circle cx="5.9" cy="15" r="4.4" />
+                        <path d="M5.85 9.77A6 6 0 0 1 17.77 10.1" />
+                        <path d="M6.9 20.1L16.5 10.9A4.4 4.4 0 1 1 18.2 19.4Z" />
+                    </g>
+                </svg>
+            );
         case 'custom':
         default:
             // 自定义 LLM 接口（含用户自定义服务商别名）：AIMP（aimp.midea.com）favicon 蓝色马赛克方块，中央圆角镂空
