@@ -298,10 +298,15 @@ export class SemaSidebarProvider implements vscode.WebviewViewProvider {
         const wrapper = this.sessions.get(sessionId);
         if (!wrapper) return;
 
-        try {
-            await this.sessionHistoryManager.saveSession(wrapper);
-        } catch (error) {
-            console.error('Error saving session before close:', error);
+        // 关闭前存档只为兜住还没落盘的改动：空闲且没有待触发的 debounce 说明内容已存过，
+        // 再存一次只会刷新 updatedAt，让「只是打开看一眼」的历史会话被打乱排序
+        const timer = this.saveSessionTimers.get(sessionId);
+        if (timer || wrapper.getCurrentState() !== 'idle') {
+            try {
+                await this.sessionHistoryManager.saveSession(wrapper);
+            } catch (error) {
+                console.error('Error saving session before close:', error);
+            }
         }
 
         wrapper.dispose();
@@ -310,7 +315,6 @@ export class SemaSidebarProvider implements vscode.WebviewViewProvider {
         // 释放该会话的快照与临时文件，避免泄漏
         this.fileStateDiffManager.createSnapshot(sessionId);
 
-        const timer = this.saveSessionTimers.get(sessionId);
         if (timer) {
             clearTimeout(timer);
             this.saveSessionTimers.delete(sessionId);

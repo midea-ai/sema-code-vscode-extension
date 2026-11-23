@@ -507,9 +507,13 @@ export class Controller {
 
     private closeSession(sid: string | undefined): void {
         if (!sid) return;
-        // 关闭前立即存档（对齐 VSCode closeSession → saveSession）
-        this.saveSession(sid);
+        // 关闭前存档只为兜住还没落盘的改动（对齐 VSCode closeSession）：空闲且没有待触发的
+        // debounce 说明内容已存过，再存一次只会刷新 updatedAt、打乱历史列表排序
+        const entry = this.sessions.get(sid);
         const timer = this.saveTimers.get(sid);
+        if (timer || (entry && entry.wrapper.getCurrentState() !== 'idle')) {
+            this.saveSession(sid);
+        }
         if (timer) { clearTimeout(timer); this.saveTimers.delete(sid); }
         this.core.closeSession(sid);
         this.sessions.delete(sid);
