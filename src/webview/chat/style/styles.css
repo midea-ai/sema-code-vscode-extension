@@ -565,9 +565,8 @@ html.jb #output-container {
     line-height: 1.3;
     margin: 0 var(--chat-spacing-xs) 0 8px;
     opacity: 0.8;
-    /* 长路径（如 @ 引用的补充行「Read src/… (99 lines)」）是一个不可按空格拆分的词，
-       不允词内断开时会整词跳到下一行，尾部的「lines)」再单独占一行；允许词内断开后按可用宽度折行 */
-    overflow-wrap: anywhere;
+    /* 路径即使能独占一行，也要从「Read」后剩余的空间开始排，避免行数被挤到第三行。 */
+    word-break: break-all;
 }
 
 /* AI 响应 / TaskEnd：上下内边距 4 与工具行头一致，块间距统一为 14px */
