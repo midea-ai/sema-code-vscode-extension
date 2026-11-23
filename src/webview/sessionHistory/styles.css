@@ -255,31 +255,8 @@ mark {
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
 }
 
-.session-preview-turn {
-    display: flex;
-    align-items: flex-start;
-    gap: 8px;
-}
-
-/* 与聊天页左缘轮次短横线同款：最新一轮（列表末条）更长更深 */
-.session-preview-tick {
-    flex: none;
-    width: 7px;
-    height: 2px;
-    margin-top: 7px;
-    border-radius: 1px;
-    background: currentColor;
-    opacity: 0.45;
-}
-
-.session-preview-turn:last-child .session-preview-tick {
-    width: 11px;
-    opacity: 1;
-}
-
 .session-preview-body {
     min-width: 0;
-    flex: 1;
 }
 
 .session-preview-title {

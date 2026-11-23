@@ -459,7 +459,6 @@ const App: React.FC<AppProps> = ({ vscode }) => {
                 >
                     {preview.turns.map((turn, i) => (
                         <div className="session-preview-turn" key={i}>
-                            <span className="session-preview-tick" />
                             <div className="session-preview-body">
                                 <div className="session-preview-title">{turn.title || ' '}</div>
                                 {turn.conclusion && (
