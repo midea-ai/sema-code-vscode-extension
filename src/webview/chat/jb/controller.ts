@@ -41,6 +41,12 @@ export class Controller {
     private eventBuffer = new Map<string, Array<{ event: string; data: any }>>();
     /** 会话历史存档防抖定时器（对齐 semaSidebarProvider.saveSessionTimers，300ms）。 */
     private saveTimers = new Map<string, ReturnType<typeof setTimeout>>();
+    /** 打开时的内容指纹（对齐 semaSidebarProvider）：条数 + 末条消息 id + 标题。 */
+    private sessionBaselines = new Map<string, string>();
+    /** 输入框有草稿的会话（对齐 semaSidebarProvider.draftSessionIds）。 */
+    private draftSessionIds = new Set<string>();
+    /** 打开后有过任务活动的会话（对齐 semaSidebarProvider.touchedSessionIds）。 */
+    private touchedSessionIds = new Set<string>();
     /**
      * 最近一次看到的全局模型数据（主模型指针 + 列表）。桥广播的 model:update 不带来源，
      * 靠它判断"全局主模型指针是否变化、是否由删模型引起"，对齐 VSCode handleModelUpdate 的 origin 分支。
@@ -134,8 +140,8 @@ export class Controller {
             },
             // 读时快照（对齐 VSCode handleFileReference）：@ 引用文件时打快照（按会话隔离）。
             onFileReference: (sid, data: any) => { for (const ref of data?.references ?? []) if (ref?.type === 'file' && ref?.name) this.addFileToSnapshotIfNew(sid, ref.name); },
-            onTaskStart: (sessionId, data) => this.postToApp({ type: 'taskStart', sessionId, data }),
-            onTaskEnd: (sessionId, data) => this.postToApp({ type: 'taskEnd', sessionId, data }),
+            onTaskStart: (sessionId, data) => { this.touchedSessionIds.add(sessionId); this.postToApp({ type: 'taskStart', sessionId, data }); },
+            onTaskEnd: (sessionId, data) => { this.touchedSessionIds.add(sessionId); this.postToApp({ type: 'taskEnd', sessionId, data }); },
             onSessionCleared: (sessionId) => { this.t.editor('resetSnapshots', { sessionId }); this.clearPanels(sessionId); },
             onOpenAgentDetail: (sessionId, taskId) => this.postToApp({ type: 'openAgentDetail', sessionId, taskId }),
             onUserResponded: () => {},
@@ -158,6 +164,8 @@ export class Controller {
             case 'loadHistorySession': await this.loadHistorySession(msg.session); break;
             case 'switchSession': if (sid) { this.activeSessionId = sid; this.core.setActiveSession(sid); this.reportState(); } break;
             case 'closeSession': this.closeSession(sid); break;
+            // 输入框有草稿：该会话不参与「打开后无变化」的自动回收
+            case 'sessionDraftActivity': if (sid && this.sessions.has(sid)) this.draftSessionIds.add(sid); break;
             case 'webviewSessionReady': this.sessions.get(sid ?? '')?.wrapper.sendInitialState(); break;
 
             case 'sendInput': this.handleUserInput(sid, msg.text, msg.files, msg.attachments, msg.pastes); break;
@@ -286,8 +294,8 @@ export class Controller {
      * 水合 LLM 上下文（可续聊）；传 historyContent → 纯客户端把历史 UI 消息灌回 React。
      */
     private async createSession(opts: { agentMode?: any; permissionLevel?: any; sessionId?: string; historyContent?: any[]; title?: string } = {}): Promise<{ ok: boolean; error?: string }> {
-        // 会话数上限（对齐 VSCode createNewSession）。已打开的历史会话走切 tab 不到这里。
-        if (this.sessions.size >= MAX_SESSIONS) {
+        // 会话数上限（对齐 VSCode createNewSession）：先回收一个打开后没有变化的会话腾位置。
+        if (!(await this.ensureSessionSlot(opts.sessionId))) {
             const error = t('host.maxSessions', { max: MAX_SESSIONS });
             this.postToApp({ type: 'sessionCreateFailed', error });
             return { ok: false, error };
@@ -328,8 +336,43 @@ export class Controller {
             if (opts.title) wrapper.updateTitle(opts.title);
             wrapper.updateMessageHistory(opts.historyContent);
         }
+        // 历史重放完再记基线：此后内容指纹一旦变化就视为「打开后有变化」
+        this.sessionBaselines.set(res.sessionId, this.sessionFingerprint(wrapper));
+        this.draftSessionIds.delete(res.sessionId);
+        this.touchedSessionIds.delete(res.sessionId);
         this.reportState();
         return { ok: true };
+    }
+
+    /**
+     * 会话数达到上限时，回收一个「打开后没有变化」的会话腾位置（对齐 semaSidebarProvider）。
+     * 返回能否继续创建；excludeId 用于排除调用方自己正在用的会话（如分支的源会话）。
+     */
+    private async ensureSessionSlot(excludeId?: string): Promise<boolean> {
+        if (this.sessions.size < MAX_SESSIONS) return true;
+        const candidate = this.findUntouchedSession(excludeId);
+        if (!candidate) return false;
+        this.closeSession(candidate);
+        return true;
+    }
+
+    /** 内容指纹仍等于打开时、空闲、无待落盘、无草稿、非活跃 tab 的会话中，取最早打开的。 */
+    private findUntouchedSession(excludeId?: string): string | null {
+        for (const [sid, entry] of this.sessions) {
+            if (sid === excludeId || sid === this.activeSessionId || this.draftSessionIds.has(sid)) continue;
+            const baseline = this.sessionBaselines.get(sid);
+            if (baseline === undefined || this.touchedSessionIds.has(sid)) continue;
+            if (this.saveTimers.has(sid) || entry.wrapper.getCurrentState() !== 'idle') continue;
+            if (this.sessionFingerprint(entry.wrapper) === baseline) return sid;
+        }
+        return null;
+    }
+
+    /** 会话当前内容的轻量指纹：消息条数 + 末条消息 id + 标题（对齐 semaSidebarProvider） */
+    private sessionFingerprint(wrapper: SemaSessionWrapper): string {
+        const messages = wrapper.getMessageHistory();
+        const last = messages[messages.length - 1];
+        return `${messages.length}:${last?.uuid ?? last?.id ?? ''}:${wrapper.title}`;
     }
 
     /**
@@ -453,8 +496,8 @@ export class Controller {
         };
         const entry = sid ? this.sessions.get(sid) : undefined;
         if (!entry) { fail(t('host.sessionUnavailable')); return; }
-        // 先于 core 检查会话数上限：core branch 会落盘新历史文件，开不出 tab 会留下孤儿会话
-        if (this.sessions.size >= MAX_SESSIONS) {
+        // 会话数上限（对齐 VSCode branchToNewChat）：先回收一个打开后没有变化的会话腾位置。
+        if (!(await this.ensureSessionSlot(sid))) {
             fail(t('host.maxSessions', { max: MAX_SESSIONS }));
             return;
         }
@@ -517,6 +560,9 @@ export class Controller {
         if (timer) { clearTimeout(timer); this.saveTimers.delete(sid); }
         this.core.closeSession(sid);
         this.sessions.delete(sid);
+        this.sessionBaselines.delete(sid);
+        this.draftSessionIds.delete(sid);
+        this.touchedSessionIds.delete(sid);
         // 释放该会话的快照与临时文件，避免泄漏。
         this.t.editor('resetSnapshots', { sessionId: sid });
         if (this.activeSessionId === sid) {

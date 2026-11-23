@@ -90,6 +90,8 @@ export class ChatWebviewProvider {
                 createSession: () => { void this.sessionController.createSession(msg.mode); },
                 switchSession: () => this.sessionController.switchSession(msg.sessionId),
                 closeSession: () => this.sessionController.closeSession(msg.sessionId),
+                // 输入框有草稿：该会话不参与「打开后无变化」的自动回收
+                sessionDraftActivity: () => { if (sid) this.sessionController.markSessionDraft(sid); },
                 webviewSessionReady: () => this.sessionController.getSessionWrapper(msg.sessionId)?.sendInitialState(),
 
                 // ── 会话级交互 ──

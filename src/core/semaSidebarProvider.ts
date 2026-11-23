@@ -34,6 +34,8 @@ export interface SessionController {
     createSession(agentMode?: AgentMode): Promise<{ ok: boolean; error?: string }>;
     switchSession(sessionId: string): void;
     closeSession(sessionId: string): Promise<void>;
+    /** 输入框有草稿：该会话不参与「打开后无变化」的自动回收 */
+    markSessionDraft(sessionId: string): void;
     /** 分支到新聊天：全量复制源会话历史到新会话并以新 tab 打开 */
     branchSession(sessionId: string, beforeMessageUuid?: string): Promise<{ ok: boolean; error?: string }>;
     /** 代码审查：在指定会话发起审查 */
@@ -53,6 +55,12 @@ export class SemaSidebarProvider implements vscode.WebviewViewProvider {
     private sessions: Map<string, SemaSessionWrapper> = new Map();
     /** 正在从历史加载中的会话 id：历史面板双击会连发两次 loadSession，第二次直接忽略 */
     private loadingSessionIds: Set<string> = new Set();
+    /** 打开时的内容指纹：条数 + 末条消息 id + 标题；指纹不变 = 打开后没有变化 */
+    private sessionBaselines: Map<string, string> = new Map();
+    /** 输入框有草稿的会话（前端首次非空输入时上报），永不作为自动回收对象 */
+    private draftSessionIds: Set<string> = new Set();
+    /** 打开后有过任务活动的会话（子代理任务开始/结束），同样不参与自动回收 */
+    private touchedSessionIds: Set<string> = new Set();
     private activeSessionId: string | null = null;
 
     private sessionHistoryManager: SessionHistoryManager;
@@ -104,6 +112,7 @@ export class SemaSidebarProvider implements vscode.WebviewViewProvider {
             createSession: (agentMode) => this.createNewSession({ agentMode }),
             switchSession: (sessionId) => this.switchActiveSession(sessionId),
             closeSession: (sessionId) => this.closeSession(sessionId),
+            markSessionDraft: (sessionId) => this.markSessionDraft(sessionId),
             branchSession: (sessionId, beforeMessageUuid) => this.branchToNewChat(sessionId, beforeMessageUuid),
             startReview: (wrapper, request) => this.startReview(wrapper, request),
         };
@@ -223,7 +232,7 @@ export class SemaSidebarProvider implements vscode.WebviewViewProvider {
         historyContent?: Message[];
         title?: string;
     } = {}): Promise<{ ok: boolean; error?: string }> {
-        if (this.sessions.size >= MAX_SESSIONS) {
+        if (!(await this.ensureSessionSlot(opts.sessionId))) {
             const error = t('host.maxSessions', { max: MAX_SESSIONS });
             this.chatWebviewProvider.postMessage({ type: 'sessionCreateFailed', error });
             return { ok: false, error };
@@ -264,6 +273,10 @@ export class SemaSidebarProvider implements vscode.WebviewViewProvider {
                 if (opts.title) wrapper.updateTitle(opts.title);
                 wrapper.updateMessageHistory(opts.historyContent);
             }
+            // 历史重放完再记基线：此后内容指纹一旦变化就视为「打开后有变化」
+            this.sessionBaselines.set(wrapper.sessionId, this.sessionFingerprint(wrapper));
+            this.draftSessionIds.delete(wrapper.sessionId);
+            this.touchedSessionIds.delete(wrapper.sessionId);
 
             this.activeSessionId = wrapper.sessionId;
             this.processWrapper.setActiveSession(wrapper.sessionId);
@@ -283,6 +296,47 @@ export class SemaSidebarProvider implements vscode.WebviewViewProvider {
             this.chatWebviewProvider.postMessage({ type: 'sessionCreateFailed', error: msg });
             return { ok: false, error: msg };
         }
+    }
+
+    /**
+     * 会话数达到上限时，回收一个「打开后没有变化」的会话腾位置。
+     * 返回能否继续创建：未满、或成功回收后为 true；没有可回收的为 false。
+     * excludeId 用于排除调用方自己正在用的会话（如分支的源会话）。
+     */
+    private async ensureSessionSlot(excludeId?: string): Promise<boolean> {
+        if (this.sessions.size < MAX_SESSIONS) return true;
+        const candidate = this.findUntouchedSession(excludeId);
+        if (!candidate) return false;
+        await this.closeSession(candidate);
+        return true;
+    }
+
+    /**
+     * 找一个打开后没有任何变化的会话：内容指纹仍等于打开时、空闲且没有待落盘的保存。
+     * 输入框有草稿、有过任务活动、当前活跃 tab、claw 远程会话都不参与回收；按打开顺序取最早的。
+     */
+    private findUntouchedSession(excludeId?: string): string | null {
+        for (const [sessionId, wrapper] of this.sessions) {
+            if (sessionId === excludeId || sessionId === this.activeSessionId || sessionId === CLAW_SESSION_ID) continue;
+            const baseline = this.sessionBaselines.get(sessionId);
+            if (baseline === undefined || this.draftSessionIds.has(sessionId)) continue;
+            if (this.touchedSessionIds.has(sessionId)) continue;
+            if (this.saveSessionTimers.has(sessionId) || wrapper.getCurrentState() !== 'idle') continue;
+            if (this.sessionFingerprint(wrapper) === baseline) return sessionId;
+        }
+        return null;
+    }
+
+    /** 会话当前内容的轻量指纹：消息条数 + 末条消息 id + 标题 */
+    private sessionFingerprint(wrapper: SemaSessionWrapper): string {
+        const messages = wrapper.getMessageHistory();
+        const last = messages[messages.length - 1];
+        return `${messages.length}:${last?.uuid ?? last?.id ?? ''}:${wrapper.title}`;
+    }
+
+    /** 输入框有草稿：标记后该会话不再参与「打开后无变化」的自动回收 */
+    public markSessionDraft(sessionId: string): void {
+        if (this.sessions.has(sessionId)) this.draftSessionIds.add(sessionId);
     }
 
     public switchActiveSession(sessionId: string): void {
@@ -312,6 +366,9 @@ export class SemaSidebarProvider implements vscode.WebviewViewProvider {
         wrapper.dispose();
         this.processWrapper.closeSession(sessionId);
         this.sessions.delete(sessionId);
+        this.sessionBaselines.delete(sessionId);
+        this.draftSessionIds.delete(sessionId);
+        this.touchedSessionIds.delete(sessionId);
         // 释放该会话的快照与临时文件，避免泄漏
         this.fileStateDiffManager.createSnapshot(sessionId);
 
@@ -380,6 +437,9 @@ export class SemaSidebarProvider implements vscode.WebviewViewProvider {
         if (!wrapper) return;
         wrapper.dispose();
         this.sessions.delete(sessionId);
+        this.sessionBaselines.delete(sessionId);
+        this.draftSessionIds.delete(sessionId);
+        this.touchedSessionIds.delete(sessionId);
         this.fileStateDiffManager.createSnapshot(sessionId);
 
         if (this.activeSessionId === sessionId) {
@@ -673,11 +733,13 @@ export class SemaSidebarProvider implements vscode.WebviewViewProvider {
     };
 
     private handleTaskStart = (sessionId: string, data: any): void => {
+        this.touchedSessionIds.add(sessionId);
         this.configWebviewProvider.pushTaskStart(data);
         this.chatWebviewProvider.postMessage({ type: 'taskStart', sessionId, data });
     };
 
     private handleTaskEnd = (sessionId: string, data: any): void => {
+        this.touchedSessionIds.add(sessionId);
         this.configWebviewProvider.pushTaskEnd(data);
         this.chatWebviewProvider.postMessage({ type: 'taskEnd', sessionId, data });
     };
@@ -746,7 +808,7 @@ export class SemaSidebarProvider implements vscode.WebviewViewProvider {
         const source = this.sessions.get(sourceId);
         if (!source) return fail(t('host.sessionUnavailable'));
         // 先于 core 检查会话数上限：core branch 会落盘新历史文件，开不出 tab 会留下孤儿会话
-        if (this.sessions.size >= MAX_SESSIONS) {
+        if (!(await this.ensureSessionSlot(sourceId))) {
             return fail(t('host.maxSessions', { max: MAX_SESSIONS }));
         }
         if (source.getCurrentState() !== 'idle') return fail(t('host.sessionBusy'));

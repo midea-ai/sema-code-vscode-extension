@@ -153,6 +153,20 @@ const InputBox = forwardRef<InputBoxHandle, InputBoxProps>(({
     // /review 范围面板：选定后按斜杠命令直接发送
     const reviewPicker = useReviewPicker(vscode, disabled, inputValue, inputBoxRef, text => sendShortcut(text), () => clearEditor(), () => reopenShortcutPanelAtReview());
 
+    // 草稿保护：文字、图片、粘贴附件、@文件芯片任一非空即算，每个会话只上报一次。
+    // 不能只看输入事件 —— 粘贴、选文件、fork/撤销回填都是程序化写 DOM，不触发 onInput。
+    // 宿主据此不再把该会话当作「打开后没有变化」的会话自动回收。
+    const draftReportedRef = useRef<boolean>(false);
+    const hasDraft = inputValue.length > 0
+        || pendingImages.images.length > 0
+        || pendingPastes.pastes.length > 0
+        || fileSelection.selectedFiles.length > 0;
+    useEffect(() => {
+        if (!hasDraft || draftReportedRef.current) return;
+        draftReportedRef.current = true;
+        vscode.postMessage({ type: 'sessionDraftActivity' });
+    }, [hasDraft, vscode]);
+
     useImperativeHandle(ref, () => ({
         focus: () => { inputBoxRef.current?.focus(); },
         // 回填输入框（如 Fork 后回填原输入），复用 completeShortcut/restoreFromHistory 的写入模式。
