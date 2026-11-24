@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { VscodeApi } from './types';
-import { initialBgColors, hashString } from './utils/iconUtils';
+import { getColorByName } from './utils/iconUtils';
 import {
     ExpandArrowIcon,
     TrashIcon,
@@ -43,7 +43,7 @@ const SCOPE_SECTION_TITLE_KEYS: Record<string, I18nKey> = {
 // 插件名称图标
 const PluginNameIcon: React.FC<{ name: string }> = ({ name }) => {
     const initial = name.charAt(0).toUpperCase();
-    const bgColor = initialBgColors[hashString(name) % initialBgColors.length];
+    const bgColor = getColorByName(name);
     return (
         <span className="plugin-name-icon" style={{ backgroundColor: bgColor }}>
             {initial}

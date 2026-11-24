@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { VscodeApi } from './types';
 import IconSelect from './IconSelect';
+import { ExpandArrowIcon } from './utils/svgIcons';
 import { defaultConfig, DEFAULT_CUSTOM_RULES, isBuiltinCustomRules } from './default/defaultConfig.ts';
 import { useT, setLang, getLang, normalizeLang, languageLabel, I18nKey, LANGS, LANGUAGES } from '../common/i18n/react';
 
@@ -57,6 +58,8 @@ const SystemConfig: React.FC<SystemConfigProps> = ({ vscode }) => {
     const showThinkingText = config.showThinkingText ?? true;
     // 浏览器控制：linux 实验性；执行中禁用开关等宿主回结果
     const [browserControlBusy, setBrowserControlBusy] = useState<false | 'enabling' | 'disabling'>(false);
+    // 权限设置的「跳过…权限检查」开关默认收起，点「详细配置」才展开（仅界面状态，不落盘）
+    const [permDetailsOpen, setPermDetailsOpen] = useState(false);
 
     // 字符计数状态
     const [systemPromptCount, setSystemPromptCount] = useState(0);
@@ -233,8 +236,12 @@ const SystemConfig: React.FC<SystemConfigProps> = ({ vscode }) => {
     };
 
     return (
-        <div className="form-card system-config">
-            <h2 className="section-title">{t('config.system.title')}</h2>
+        <div className="page-stack system-config">
+            <div className="page-head">
+                <div className="page-head-text">
+                    <h2 className="page-title">{t('config.system.title')}</h2>
+                </div>
+            </div>
 
             {/* 开关配置 */}
             <div className="config-section">
@@ -429,110 +436,128 @@ const SystemConfig: React.FC<SystemConfigProps> = ({ vscode }) => {
                         title={t('config.system.permissionsHint')}
                     >ⓘ</span>
                 </h3>
-                {/* 默认权限档位 */}
-                <div className="form-row">
-                    <div className="form-group">
-                        <div
-                            className="perm-level-field"
-                            title={t('config.system.defaultPermTip')}
-                        >
-                            <label htmlFor="defaultPermissionLevel">{t('config.system.defaultPerm')}</label>
-                            {/* 展开的下拉列表显示「档位（说明）」，收起后框内只显示档位短名 */}
-                            <div className="perm-level-select">
-                                <IconSelect
-                                    id="defaultPermissionLevel"
-                                    value={config.defaultPermissionLevel || defaultConfig.defaultPermissionLevel}
-                                    onChange={(value) => handleChange('defaultPermissionLevel', value)}
-                                    options={PERMISSION_LEVEL_OPTIONS.map(opt => ({
-                                        value: opt.value,
-                                        label: `${opt.value}（${t(opt.descKey)}）`,
-                                        selectedLabel: opt.value
-                                    }))}
-                                />
-                            </div>
+                {/* 默认权限档位 + 「详细配置」展开入口 */}
+                <div className="perm-level-row">
+                    <div
+                        className="perm-level-field"
+                        title={t('config.system.defaultPermTip')}
+                    >
+                        <label htmlFor="defaultPermissionLevel">{t('config.system.defaultPerm')}</label>
+                        {/* 展开的下拉列表显示「档位 + 说明」（值正文色、说明次级色），收起后框内只显示档位短名 */}
+                        <div className="perm-level-select">
+                            <IconSelect
+                                id="defaultPermissionLevel"
+                                value={config.defaultPermissionLevel || defaultConfig.defaultPermissionLevel}
+                                onChange={(value) => handleChange('defaultPermissionLevel', value)}
+                                options={PERMISSION_LEVEL_OPTIONS.map(opt => ({
+                                    value: opt.value,
+                                    label: `${opt.value} ${t(opt.descKey)}`,
+                                    labelNode: (
+                                        <>
+                                            <span className="perm-option-value">{opt.value}</span>
+                                            <span className="perm-option-desc">{t(opt.descKey)}</span>
+                                        </>
+                                    ),
+                                    selectedLabel: opt.value
+                                }))}
+                            />
                         </div>
                     </div>
+                    <button
+                        type="button"
+                        className={`perm-details-toggle ${permDetailsOpen ? 'expanded' : ''}`}
+                        aria-expanded={permDetailsOpen}
+                        title={t('config.system.permDetailsTip')}
+                        onClick={() => setPermDetailsOpen(!permDetailsOpen)}
+                    >
+                        {t('config.system.permDetails')}
+                        <ExpandArrowIcon size={10} />
+                    </button>
                 </div>
-                {/* 跳过权限第一行 */}
-                <div className="form-row">
-                    <div className="form-group">
-                        <label className="checkbox-label" title={t('config.system.skipReadTip')}>
-                            <input
-                                type="checkbox"
-                                checked={config.skipExternalFileReadPermission || false}
-                                onChange={(e) => handleChange('skipExternalFileReadPermission', e.target.checked)}
-                            />
-                            <span className="checkmark"></span>
-                            {t('config.system.skipRead')}
-                        </label>
-                    </div>
+                {permDetailsOpen && (
+                    <>
+                        {/* 跳过权限第一行 */}
+                        <div className="form-row">
+                            <div className="form-group">
+                                <label className="checkbox-label" title={t('config.system.skipReadTip')}>
+                                    <input
+                                        type="checkbox"
+                                        checked={config.skipExternalFileReadPermission || false}
+                                        onChange={(e) => handleChange('skipExternalFileReadPermission', e.target.checked)}
+                                    />
+                                    <span className="checkmark"></span>
+                                    {t('config.system.skipRead')}
+                                </label>
+                            </div>
 
-                    <div className="form-group">
-                        <label className="checkbox-label" title={t('config.system.skipEditTip')}>
-                            <input
-                                type="checkbox"
-                                checked={config.skipFileEditPermission || false}
-                                onChange={(e) => handleChange('skipFileEditPermission', e.target.checked)}
-                            />
-                            <span className="checkmark"></span>
-                            {t('config.system.skipEdit')}
-                        </label>
-                    </div>
-                </div>
+                            <div className="form-group">
+                                <label className="checkbox-label" title={t('config.system.skipEditTip')}>
+                                    <input
+                                        type="checkbox"
+                                        checked={config.skipFileEditPermission || false}
+                                        onChange={(e) => handleChange('skipFileEditPermission', e.target.checked)}
+                                    />
+                                    <span className="checkmark"></span>
+                                    {t('config.system.skipEdit')}
+                                </label>
+                            </div>
+                        </div>
 
-                {/* 跳过权限第二行 */}
-                <div className="form-row">
-                    <div className="form-group">
-                        <label className="checkbox-label" title={t('config.system.skipShellTip')}>
-                            <input
-                                type="checkbox"
-                                checked={config.skipShellExecPermission || false}
-                                onChange={(e) => handleChange('skipShellExecPermission', e.target.checked)}
-                            />
-                            <span className="checkmark"></span>
-                            {t('config.system.skipShell')}
-                        </label>
-                    </div>
+                        {/* 跳过权限第二行 */}
+                        <div className="form-row">
+                            <div className="form-group">
+                                <label className="checkbox-label" title={t('config.system.skipShellTip')}>
+                                    <input
+                                        type="checkbox"
+                                        checked={config.skipShellExecPermission || false}
+                                        onChange={(e) => handleChange('skipShellExecPermission', e.target.checked)}
+                                    />
+                                    <span className="checkmark"></span>
+                                    {t('config.system.skipShell')}
+                                </label>
+                            </div>
 
-                    <div className="form-group">
-                        <label className="checkbox-label" title={t('config.system.skipSkillTip')}>
-                            <input
-                                type="checkbox"
-                                checked={config.skipSkillPermission || false}
-                                onChange={(e) => handleChange('skipSkillPermission', e.target.checked)}
-                            />
-                            <span className="checkmark"></span>
-                            {t('config.system.skipSkill')}
-                        </label>
-                    </div>
-                </div>
+                            <div className="form-group">
+                                <label className="checkbox-label" title={t('config.system.skipSkillTip')}>
+                                    <input
+                                        type="checkbox"
+                                        checked={config.skipSkillPermission || false}
+                                        onChange={(e) => handleChange('skipSkillPermission', e.target.checked)}
+                                    />
+                                    <span className="checkmark"></span>
+                                    {t('config.system.skipSkill')}
+                                </label>
+                            </div>
+                        </div>
 
-                {/* 跳过权限第三行 */}
-                <div className="form-row">
-                    <div className="form-group">
-                        <label className="checkbox-label" title={t('config.system.skipMcpTip')}>
-                            <input
-                                type="checkbox"
-                                checked={config.skipMCPToolPermission || false}
-                                onChange={(e) => handleChange('skipMCPToolPermission', e.target.checked)}
-                            />
-                            <span className="checkmark"></span>
-                            {t('config.system.skipMcp')}
-                        </label>
-                    </div>
+                        {/* 跳过权限第三行 */}
+                        <div className="form-row">
+                            <div className="form-group">
+                                <label className="checkbox-label" title={t('config.system.skipMcpTip')}>
+                                    <input
+                                        type="checkbox"
+                                        checked={config.skipMCPToolPermission || false}
+                                        onChange={(e) => handleChange('skipMCPToolPermission', e.target.checked)}
+                                    />
+                                    <span className="checkmark"></span>
+                                    {t('config.system.skipMcp')}
+                                </label>
+                            </div>
 
-                    <div className="form-group">
-                        <label className="checkbox-label" title={t('config.system.skipFetchTip')}>
-                            <input
-                                type="checkbox"
-                                checked={config.skipFetchUrlPermission || false}
-                                onChange={(e) => handleChange('skipFetchUrlPermission', e.target.checked)}
-                            />
-                            <span className="checkmark"></span>
-                            {t('config.system.skipFetch')}
-                        </label>
-                    </div>
-                </div>
+                            <div className="form-group">
+                                <label className="checkbox-label" title={t('config.system.skipFetchTip')}>
+                                    <input
+                                        type="checkbox"
+                                        checked={config.skipFetchUrlPermission || false}
+                                        onChange={(e) => handleChange('skipFetchUrlPermission', e.target.checked)}
+                                    />
+                                    <span className="checkmark"></span>
+                                    {t('config.system.skipFetch')}
+                                </label>
+                            </div>
+                        </div>
+                    </>
+                )}
             </div>
 
             {/* 提示词配置 */}
@@ -604,7 +629,7 @@ const SystemConfig: React.FC<SystemConfigProps> = ({ vscode }) => {
             </div>
 
             {message && (
-                <div className={`message ${message.type}`} style={{ marginTop: '12px', display: 'flex' }}>
+                <div className={`message ${message.type}`} style={{ display: 'flex' }}>
                     {message.text}
                 </div>
             )}

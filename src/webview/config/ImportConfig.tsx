@@ -7,6 +7,7 @@ import {
 import { useT } from '../common/i18n/react';
 import type { I18nKey } from '../common/i18n/react';
 import type { CategoryPreview, ImportCategory, ImportItem, ImportPreview, ImportScope, ImportSource, SourceStatus } from './import/types';
+import SegmentedControl from './SegmentedControl';
 import './style/section.css';
 import './style/import.css';
 
@@ -228,17 +229,12 @@ const ImportConfig: React.FC<ImportConfigProps> = ({ vscode }) => {
                 {/* 范围筛选：分段控件切换 tab，两侧勾选各自独立 */}
                 <div className="import-toolbar">
                     <span className="import-toolbar-label">{t('config.import.scopeLabel')}</span>
-                    <div className="import-segmented">
-                        {scopeOptions.map(scope => (
-                            <button
-                                key={scope}
-                                className={`import-seg-btn ${scopeTab === scope ? 'active' : ''}`}
-                                onClick={() => setScopeTab(scope)}
-                            >
-                                {scopeLabel(scope)}
-                            </button>
-                        ))}
-                    </div>
+                    <SegmentedControl
+                        value={scopeTab}
+                        options={scopeOptions.map(scope => ({ value: scope, label: scopeLabel(scope) }))}
+                        onChange={setScopeTab}
+                        ariaLabel={t('config.import.scopeLabel')}
+                    />
                     <span className="import-toolbar-count">{t('config.import.selectedCount', { n: summary.n })}</span>
                 </div>
                 {previewError && <div className="section-edit-error">{previewError}</div>}
@@ -252,9 +248,13 @@ const ImportConfig: React.FC<ImportConfigProps> = ({ vscode }) => {
     const detected = (statuses ?? []).filter(s => s.detected).map(s => s.source);
 
     return (
-        <div className="import-page">
-            <h2 className="section-title">{t('config.import.title')}</h2>
-            <div className="import-subtitle">{t('config.import.subtitle')}</div>
+        <div className="page-stack import-page">
+            <div className="page-head">
+                <div className="page-head-text">
+                    <h2 className="page-title">{t('config.import.title')}</h2>
+                    <div className="page-subtitle">{t('config.import.subtitle')}</div>
+                </div>
+            </div>
             {statuses === null
                 ? <div className="section-loading">{t('config.import.detecting')}</div>
                 : detected.length === 0

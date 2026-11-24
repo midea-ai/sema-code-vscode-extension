@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { VscodeApi } from './types';
 import { useT, I18nKey } from '../common/i18n/react';
+import IconSelect from './IconSelect';
 import './style/section.css';
 
 interface ClawConfigProps {
@@ -284,16 +285,20 @@ const ClawConfig: React.FC<ClawConfigProps> = ({ vscode }) => {
     );
 
     return (
-        <div className="agent-config">
-          <div className="section-groups">
+        <div className="page-stack claw-config">
+            <div className="page-head">
+                <div className="page-head-text">
+                    <h2 className="page-title">
+                        {t('config.claw.title')}
+                        <span
+                            className="section-hint-icon"
+                            title={t('config.claw.titleTip')}
+                        >ⓘ</span>
+                    </h2>
+                </div>
+            </div>
+
             <div className="config-section">
-                <h3 className="config-section-title">
-                    {t('config.claw.title')}
-                    <span
-                        className="section-hint-icon"
-                        title={t('config.claw.titleTip')}
-                    >ⓘ</span>
-                </h3>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--s-gap-lg)' }}>
                     {SOURCES.map((src) => {
                         const open = openSource === src.id;
@@ -306,9 +311,9 @@ const ClawConfig: React.FC<ClawConfigProps> = ({ vscode }) => {
                                 <div className="section-card-header">
                                     <div className="section-card-icon" style={{ background: src.iconBg }}>{t(src.initialKey)}</div>
                                     <span className="section-card-name">{t(src.nameKey)}</span>
-                                    {src.recommended && <span className="section-installed-badge">{t('config.claw.recommended')}</span>}
+                                    {src.recommended && <span className="claw-tag claw-tag-recommend">{t('config.claw.recommended')}</span>}
                                     {statusLabel && (
-                                        <span style={{ fontSize: 12, fontWeight: 500, color: 'var(--s-color-success, #3a3)' }}>{statusLabel}</span>
+                                        <span className="claw-tag claw-tag-active">{statusLabel}</span>
                                     )}
                                     <div className="section-card-actions">
                                         <button
@@ -343,34 +348,32 @@ const ClawConfig: React.FC<ClawConfigProps> = ({ vscode }) => {
                         title={t('config.claw.displayTip')}
                     >ⓘ</span>
                 </h3>
-                <div className="form-row">
-                    {VERBOSITY_OPTIONS.map((opt) => (
-                        <div className="form-group claw-verbosity-group" key={opt.id}>
-                            <label
-                                className={`checkbox-label claw-verbosity-option ${verbosity === opt.id ? 'active' : ''}`}
-                                title={t(opt.descKey)}
-                            >
-                                <input
-                                    type="radio"
-                                    name="claw-verbosity"
-                                    value={opt.id}
-                                    checked={verbosity === opt.id}
-                                    onChange={() => changeVerbosity(opt.id)}
-                                />
-                                <span className="checkmark"></span>
-                                <span className="claw-verbosity-copy">
-                                    <span className="claw-verbosity-name">
-                                        {t(opt.nameKey)}
-                                        {opt.badgeKey && <span className="readonly-tab">{t(opt.badgeKey)}</span>}
-                                    </span>
-                                    <span className="claw-verbosity-desc">{t(opt.descKey)}</span>
-                                </span>
-                            </label>
-                        </div>
-                    ))}
+                <div className="perm-level-field" title={t('config.claw.displayTip')}>
+                    <label htmlFor="clawVerbosity">{t('config.claw.displayLevel')}</label>
+                    {/* 与系统配置页「默认权限档位」一致：面板内档位名正文色、说明次级色 */}
+                    <div className="perm-level-select">
+                        <IconSelect
+                            id="clawVerbosity"
+                            value={verbosity}
+                            onChange={(value) => changeVerbosity(value as Verbosity)}
+                            options={VERBOSITY_OPTIONS.map((opt) => ({
+                                value: opt.id,
+                                label: `${t(opt.nameKey)} ${t(opt.descKey)}`,
+                                labelNode: (
+                                    <>
+                                        <span className="perm-option-value">
+                                            {t(opt.nameKey)}
+                                            {opt.badgeKey && <span className="readonly-tab">{t(opt.badgeKey)}</span>}
+                                        </span>
+                                        <span className="perm-option-desc">{t(opt.descKey)}</span>
+                                    </>
+                                ),
+                                selectedLabel: t(opt.nameKey)
+                            }))}
+                        />
+                    </div>
                 </div>
             </div>
-          </div>
         </div>
     );
 };

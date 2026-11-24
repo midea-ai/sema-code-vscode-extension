@@ -35,6 +35,7 @@ import {
     PaletteIcon,
     MonitorIcon,
     DownloadIcon,
+    PanelLeftIcon,
 } from './utils/svgIcons';
 import { setLang, useT } from '../common/i18n/react';
 
@@ -65,6 +66,8 @@ const App: React.FC<AppProps> = ({ vscode }) => {
     const IS_JB = !!(window as any).__SEMA_JB__;
     const t = useT();
     const [currentPage, setCurrentPage] = useState<PageType>('models');
+    /** 侧栏折叠：只留图标，不持久化，每次打开配置页默认展开 */
+    const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
     const [modelTab, setModelTab] = useState<ModelTabType>('list');
     const [taskTab, setTaskTab] = useState<TaskTabType>('cron');
     const [taskRefreshTrigger, setTaskRefreshTrigger] = useState(0);
@@ -182,9 +185,10 @@ const App: React.FC<AppProps> = ({ vscode }) => {
         {
             title: t('config.nav.group.basic'),
             items: [
-                { page: 'models', label: t('config.nav.models'), icon: <LayersIcon /> },
-                { page: 'system', label: t('config.nav.system'), icon: <SettingsIcon /> },
-                { page: 'memory', label: t('config.nav.memory'), icon: <BrainIcon /> },
+                // 前三个导航图标图形较满，统一缩到 15px 与其余图标视觉齐平
+                { page: 'models', label: t('config.nav.models'), icon: <LayersIcon size={15} /> },
+                { page: 'system', label: t('config.nav.system'), icon: <SettingsIcon size={15} /> },
+                { page: 'memory', label: t('config.nav.memory'), icon: <BrainIcon size={15} strokeWidth={1.6} /> },
                 { page: 'task', label: t('config.nav.task'), icon: <ListChecksIcon /> },
                 { page: 'usage', label: t('config.nav.usage'), icon: <TrendingUpIcon /> },
             ],
@@ -192,26 +196,27 @@ const App: React.FC<AppProps> = ({ vscode }) => {
         {
             title: t('config.nav.group.extension'),
             items: [
-                { page: 'mcp', label: 'Tools & MCP', icon: <WrenchIcon /> },
-                { page: 'skill', label: 'Skills', icon: <SparklesIcon /> },
-                { page: 'agent', label: 'Agents', icon: <BotIcon /> },
+                // 与导入页共用图形，侧栏统一按细线 1.6 渲染
+                { page: 'mcp', label: 'Tools & MCP', icon: <WrenchIcon strokeWidth={1.6} /> },
+                { page: 'skill', label: 'Skills', icon: <SparklesIcon strokeWidth={1.6} /> },
+                { page: 'agent', label: 'Agents', icon: <BotIcon strokeWidth={1.6} /> },
                 { page: 'plugin', label: 'Plugins', icon: <BoxIcon /> },
-                { page: 'command', label: 'Commands', icon: <SquareSlashIcon /> },
-                { page: 'hooks', label: 'Hooks', icon: <WebhookIcon /> },
+                { page: 'command', label: 'Commands', icon: <SquareSlashIcon strokeWidth={1.6} /> },
+                { page: 'hooks', label: 'Hooks', icon: <WebhookIcon strokeWidth={1.6} /> },
             ],
         },
         {
             title: t('config.nav.group.more'),
             items: [
-                { page: 'design', label: 'Design', icon: <PaletteIcon /> },
-                ...(IS_JB ? [] : [{ page: 'claw' as PageType, label: t('config.nav.claw'), icon: <MonitorIcon /> }]),
-                { page: 'import', label: t('config.nav.import'), icon: <DownloadIcon /> },
+                { page: 'design', label: 'Design', icon: <PaletteIcon size={15} /> },
+                ...(IS_JB ? [] : [{ page: 'claw' as PageType, label: t('config.nav.claw'), icon: <MonitorIcon size={15} /> }]),
+                { page: 'import', label: t('config.nav.import'), icon: <DownloadIcon size={15} /> },
             ],
         },
     ];
 
     return (
-        <div className="app-container">
+        <div className={`app-container ${sidebarCollapsed ? 'sidebar-collapsed' : ''}`}>
             {/* 左侧导航 */}
             <div className="sidebar">
                 {navGroups.map(group => (
@@ -221,6 +226,7 @@ const App: React.FC<AppProps> = ({ vscode }) => {
                             <div
                                 key={item.page}
                                 className={`nav-item nav-main ${currentPage === item.page ? 'active' : ''}`}
+                                title={sidebarCollapsed ? item.label : undefined}
                                 onClick={() => setCurrentPage(item.page)}
                             >
                                 <span className="nav-icon" aria-hidden="true">{item.icon}</span>
@@ -229,6 +235,17 @@ const App: React.FC<AppProps> = ({ vscode }) => {
                         ))}
                     </div>
                 ))}
+                {/* 折叠按钮沉底，与导航项同一形态：展开时带文字，折叠后只剩图标 */}
+                <div className="sidebar-footer">
+                    <div
+                        className="nav-item nav-toggle"
+                        title={sidebarCollapsed ? t('config.nav.expand') : undefined}
+                        onClick={() => setSidebarCollapsed(v => !v)}
+                    >
+                        <span className="nav-icon" aria-hidden="true"><PanelLeftIcon /></span>
+                        <span className="nav-label">{t('config.nav.collapse')}</span>
+                    </div>
+                </div>
             </div>
 
             {/* 主内容区域 */}

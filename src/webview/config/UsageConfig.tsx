@@ -3,6 +3,7 @@ import { VscodeApi } from './types';
 import { LANGS, useLang, useT } from '../common/i18n/react';
 import type { I18nKey } from '../common/i18n/react';
 import type { UsageRange, UsageRangeSummary, UsageStatsData, UsageTokens } from './types/usage';
+import SegmentedControl from './SegmentedControl';
 import {
     dateKeyOf, formatCount, formatDateFull, formatDateShort, formatMonth, formatPercent,
     formatUpdatedAt, formatUsageTokens, formatWeekday, fromDateKey, toDateKey,
@@ -542,22 +543,24 @@ const UsageConfig: React.FC<UsageConfigProps> = ({ vscode }) => {
         : undefined;
 
     return (
-        <div className="usage-page" ref={pageRef}>
-            <div className="usage-header">
-                <h2 className="usage-title">
-                    {t('config.usage.title')}
+        <div className="page-stack usage-page" ref={pageRef}>
+            <div className="page-head">
+                <div className="page-head-text">
+                    <h2 className="page-title">
+                        {t('config.usage.title')}
+                        {data.since && (
+                            <span className="usage-info" tabIndex={0} aria-label={t('config.usage.info', { date: formatDateFull(data.since) })}>
+                                <InfoIcon />
+                                <span className="usage-info-bubble" role="tooltip">{t('config.usage.info', { date: formatDateFull(data.since) })}</span>
+                            </span>
+                        )}
+                    </h2>
                     {data.since && (
-                        <span className="usage-info" tabIndex={0} aria-label={t('config.usage.info', { date: formatDateFull(data.since) })}>
-                            <InfoIcon />
-                            <span className="usage-info-bubble" role="tooltip">{t('config.usage.info', { date: formatDateFull(data.since) })}</span>
-                        </span>
+                        <div className="page-subtitle">
+                            {t('config.usage.summary', { tokens: formatUsageTokens(tokenTotal(data.totals.tokens)), sessions: formatCount(data.totals.sessions), days: formatCount(data.totals.days) })}
+                        </div>
                     )}
-                </h2>
-                {data.since && (
-                    <div className="usage-totals">
-                        {t('config.usage.summary', { tokens: formatUsageTokens(tokenTotal(data.totals.tokens)), sessions: formatCount(data.totals.sessions), days: formatCount(data.totals.days) })}
-                    </div>
-                )}
+                </div>
             </div>
 
             {!data.since ? (
@@ -566,13 +569,12 @@ const UsageConfig: React.FC<UsageConfigProps> = ({ vscode }) => {
                 <>
                     <div className="usage-block">
                         <div className="usage-range-bar">
-                            <div className="usage-pills">
-                                {RANGES.map(r => (
-                                    <button type="button" key={r} className={`usage-pill${range === r ? ' active' : ''}`} onClick={() => setRange(r)}>
-                                        {t(`config.usage.range.${r}` as I18nKey)}
-                                    </button>
-                                ))}
-                            </div>
+                            <SegmentedControl
+                                value={range}
+                                options={RANGES.map(r => ({ value: r, label: t(`config.usage.range.${r}` as I18nKey) }))}
+                                onChange={setRange}
+                                ariaLabel={t('config.usage.trend')}
+                            />
                             <span className="usage-range-label">{rangeLabel}</span>
                         </div>
                         <div className="usage-cards">
@@ -580,23 +582,28 @@ const UsageConfig: React.FC<UsageConfigProps> = ({ vscode }) => {
                             <div className="usage-card"><div className="usage-card-label">{t('config.usage.card.requests')}</div><div className="usage-card-value">{t('config.usage.times', { n: formatCount(summary.requests) })}</div></div>
                             <div className="usage-card"><div className="usage-card-label">{t('config.usage.card.sessions')}</div><div className="usage-card-value">{t('config.usage.sessionsUnit', { n: formatCount(summary.sessions) })}</div></div>
                         </div>
-                        <div className="usage-section-title">{t('config.usage.trend')}</div>
+                        <div className="config-section-title">{t('config.usage.trend')}</div>
                         <div className="usage-trend">
                             {!rangeHasData ? <div className="usage-empty">{t('config.usage.emptyRange')}</div> : range === '1y' ? renderHeatmap() : renderBars()}
                         </div>
                     </div>
 
                     <div className="usage-block">
-                        <div className="usage-section-title">{t('config.usage.models')}</div>
+                        <div className="config-section-title">{t('config.usage.models')}</div>
                         {renderModels()}
                     </div>
 
                     <div className="usage-block">
-                        <div className="usage-section-title">{t('config.usage.capability')}</div>
-                        <div className="usage-pills usage-pills-sub">
-                            <button type="button" className={`usage-pill${capTab === 'tools' ? ' active' : ''}`} onClick={() => setCapTab('tools')}>{t('config.usage.tab.tools')}</button>
-                            <button type="button" className={`usage-pill${capTab === 'skills' ? ' active' : ''}`} onClick={() => setCapTab('skills')}>{t('config.usage.tab.skills')}</button>
-                        </div>
+                        <div className="config-section-title">{t('config.usage.capability')}</div>
+                        <SegmentedControl
+                            value={capTab}
+                            options={[
+                                { value: 'tools', label: t('config.usage.tab.tools') },
+                                { value: 'skills', label: t('config.usage.tab.skills') },
+                            ]}
+                            onChange={setCapTab}
+                            ariaLabel={t('config.usage.capability')}
+                        />
                         {capTab === 'tools' ? renderTools() : renderSkills()}
                     </div>
 

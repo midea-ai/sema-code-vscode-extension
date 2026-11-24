@@ -36,13 +36,7 @@
     --s-color-info: #4eabff;
     --s-color-info-bg: rgba(78, 171, 255, 0.2);
 
-    /* 状态色 */
-    --s-color-running: #4eabff;
-    --s-color-completed: #89d185;
-    --s-color-failed: #f48771;
-    --s-color-stopped: #cca700;
-
-    /* 反馈色（test-status / message） */
+    /* 反馈色（test-status / message / 后台任务状态） */
     --s-color-testing: #6496c8;
     --s-color-testing-bg: rgba(100, 150, 200, 0.12);
     --s-color-testing-border: rgba(100, 150, 200, 0.3);
@@ -64,6 +58,9 @@
     --s-btn-secondary-bg: color-mix(in srgb, var(--vscode-foreground, #ccc) 15%, transparent);
     --s-btn-secondary-fg: var(--vscode-foreground, #ccc);
     --s-btn-secondary-hover-bg: color-mix(in srgb, var(--vscode-foreground, #ccc) 22%, transparent);
+
+    /* 浅色信息块底色（定时任务「下次触发」、后台任务命令面板） */
+    --s-subtle-bg: color-mix(in srgb, var(--vscode-foreground, #ccc) 6%, transparent);
 
     /* 开关：对齐 webui Toggle（底 #d4d4d4 / 开 accent #2e83d2 / 白滑块带阴影） */
     --s-switch-bg: #d4d4d4;

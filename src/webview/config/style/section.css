@@ -198,18 +198,19 @@
     background: var(--vscode-badge-background);
     color: var(--vscode-badge-foreground);
     border-radius: 9px;
-    font-size: 10px;
+    font-size: var(--s-font-sm);
     font-weight: 600;
-    margin-left: 4px;
+    margin-left: 5px;
 }
 
 /* ===== Tab 导航右侧操作区 ===== */
+/* tab 本身已无左右内边距，右侧操作区也贴到内容边界，与下方卡片右缘对齐 */
 .section-tab-actions {
     margin-left: auto;
     display: flex;
     align-items: center;
     gap: var(--s-action-gap);
-    padding: 0 12px;
+    padding: 0;
 }
 
 .section-tab-actions .section-btn {
@@ -276,7 +277,6 @@
     text-overflow: ellipsis;
     white-space: nowrap;
     word-break: normal;
-    font-size: 15px;
 }
 
 .section-card-name-sub {
@@ -615,6 +615,54 @@
     align-items: center;
     gap: 8px;
     min-width: 0;
+}
+
+/* ===== 分段切换控件（SegmentedControl）===== */
+/* 使用情况页的范围/能力切换、导入面板的范围切换共用一套外观：独立胶囊，选中填充主题强调色 */
+.section-segmented {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+/* 覆盖 styles.css 里 button[type="button"] 的主按钮外观 */
+button[type="button"].section-seg-btn {
+    height: 26px;
+    padding: 0 12px;
+    border: 1px solid var(--s-card-border);
+    border-radius: 999px;
+    background: transparent;
+    color: var(--vscode-descriptionForeground);
+    font-size: var(--s-font-md);
+    font-weight: 400;
+    line-height: 1;
+    box-shadow: none;
+    transform: none;
+    cursor: pointer;
+    transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+/* 悬浮反馈只给未选中项，避免选中态亮度变化 */
+button[type="button"].section-seg-btn:not(.active):hover {
+    background: color-mix(in srgb, var(--vscode-foreground, #ccc) 8%, transparent);
+    border-color: var(--vscode-descriptionForeground);
+    color: var(--vscode-foreground);
+    box-shadow: none;
+    transform: none;
+}
+
+button[type="button"].section-seg-btn:active {
+    transform: none;
+    box-shadow: none;
+}
+
+button[type="button"].section-seg-btn.active,
+button[type="button"].section-seg-btn.active:hover {
+    background: var(--vscode-button-background);
+    border-color: transparent;
+    color: var(--vscode-button-foreground);
+    font-weight: 500;
+    box-shadow: none;
 }
 
 .skill-market-repo {

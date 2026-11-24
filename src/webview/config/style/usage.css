@@ -1,14 +1,9 @@
 /* 「使用情况」页：累计概览 → 范围与指标卡 → 趋势（柱 / 热力图）→ 模型使用 → 能力使用 → 页尾 */
 
-/* 页面过宽时整体限宽居中；悬浮提示定位以本容器为基准，居中后不受影响 */
+/* 页面骨架（宽度、分块间距）由 styles.css 的 .page-stack 统一提供，这里只放本页变量 */
 .usage-page {
     --s-card-bg: transparent;
     position: relative;
-    display: flex;
-    flex-direction: column;
-    gap: var(--s-gap-xl);
-    max-width: 800px;
-    margin: 0 auto;
     --usage-cell: 11px;
     /* 数据图形固定色，不跟主题强调色：避免与输出橙撞色，也避免 JB 浅色皮肤下选中色过淡 */
     --usage-accent: #2e83d2;
@@ -19,22 +14,7 @@
     --usage-line: color-mix(in srgb, var(--vscode-foreground, #ccc) 12%, transparent);
 }
 
-/* ===== 标题与累计 ===== */
-
-.usage-header {
-    display: flex;
-    flex-direction: column;
-    gap: var(--s-gap-sm);
-}
-
-.usage-title {
-    display: flex;
-    align-items: center;
-    gap: var(--s-gap-sm);
-    margin: 0;
-    font-size: var(--s-font-xl);
-    font-weight: 600;
-}
+/* ===== 标题旁的说明图标 ===== */
 
 .usage-info {
     position: relative;
@@ -74,25 +54,17 @@
     display: block;
 }
 
-.usage-totals {
-    font-size: var(--s-font-md);
-    color: var(--vscode-descriptionForeground);
-}
-
 /* ===== 区块 ===== */
 
 .usage-block {
     display: flex;
     flex-direction: column;
     gap: var(--s-gap-md);
-    padding-top: var(--s-gap-lg);
-    border-top: 1px solid var(--s-card-border);
 }
 
-.usage-section-title {
-    font-size: var(--s-font-lg);
-    font-weight: 600;
-    margin-top: var(--s-gap-sm);
+/* 区块标题与下方内容的间距由 .usage-block 的 gap 承担，不再叠加标题自身 margin */
+.usage-block > .config-section-title {
+    margin-bottom: 0;
 }
 
 .usage-empty {
@@ -125,36 +97,6 @@
     font-size: var(--s-font-sm);
     color: var(--vscode-descriptionForeground);
     font-variant-numeric: tabular-nums;
-}
-
-.usage-pills {
-    display: inline-flex;
-    gap: 4px;
-}
-
-/* 覆盖 styles.css 里 button[type="button"] 的通用主按钮样式 */
-button[type="button"].usage-pill {
-    padding: 4px 10px;
-    font-size: var(--s-font-base);
-    font-weight: 500;
-    color: var(--vscode-foreground);
-    background: transparent;
-    border: 1px solid var(--s-card-border);
-    border-radius: 999px;
-    box-shadow: none;
-    transform: none;
-}
-
-button[type="button"].usage-pill:hover {
-    background: var(--s-btn-secondary-bg);
-    box-shadow: none;
-    transform: none;
-}
-
-button[type="button"].usage-pill.active {
-    color: var(--vscode-button-foreground);
-    background: var(--vscode-button-background);
-    border-color: transparent;
 }
 
 button[type="button"].usage-link {
@@ -378,8 +320,6 @@ button[type="button"].usage-link:hover {
 }
 
 /* ===== 能力使用：横向条形行、表格 ===== */
-
-.usage-pills-sub { margin-bottom: 2px; }
 
 .usage-cap-summary {
     font-size: var(--s-font-sm);

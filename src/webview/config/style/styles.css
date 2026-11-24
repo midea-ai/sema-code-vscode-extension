@@ -50,6 +50,8 @@ body {
 
 /* 左侧导航栏 */
 .sidebar {
+    display: flex;
+    flex-direction: column;
     width: 150px;
     background: var(--vscode-sideBar-background);
     border-right: 1px solid var(--vscode-panel-border);
@@ -61,9 +63,22 @@ body {
     height: 100vh;
     z-index: 100;
     overflow-y: auto;
+    transition: width 0.2s ease;
+}
+
+/* 侧栏底部：折叠按钮沉底，与上方导航用一条分隔线隔开 */
+.sidebar-footer {
+    margin-top: auto;
+    padding-top: 8px;
+    border-top: 1px solid var(--vscode-panel-border);
+    flex-shrink: 0;
 }
 
 /* 导航分组：组名只是标题，不可点击；组与组之间 20px，第一个组顶部不留 */
+.nav-group {
+    flex-shrink: 0;
+}
+
 .nav-group + .nav-group {
     margin-top: 20px;
 }
@@ -124,6 +139,35 @@ body {
     overflow-y: auto;
     padding: 20px 24px;
     margin-left: 150px;
+    transition: margin-left 0.2s ease;
+}
+
+/* 侧栏折叠：只留图标，主内容随之左移；组名隐藏后改用分隔线分组 */
+.sidebar-collapsed .sidebar {
+    width: 52px;
+}
+
+.sidebar-collapsed .main-content {
+    margin-left: 52px;
+}
+
+.sidebar-collapsed .nav-group-title {
+    display: none;
+}
+
+.sidebar-collapsed .nav-group + .nav-group {
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px solid var(--vscode-panel-border);
+}
+
+.sidebar-collapsed .nav-item {
+    padding: 0;
+    justify-content: center;
+}
+
+.sidebar-collapsed .nav-label {
+    display: none;
 }
 
 .container {
@@ -139,6 +183,57 @@ body {
 
 .page.active {
     display: block;
+    /* 页面内容限宽居中：窗口/编辑器拉宽时不再把配置项和表格无限拉伸 */
+    max-width: 800px;
+    margin: 0 auto;
+}
+
+/*
+ * 页面骨架 —— 系统配置 / 使用情况 / Claw 远程 / 导入 共用。
+ * 这几页原先各自造了外框与标题（有的包白卡、有的自己限宽居中、有的干脆没有标题），
+ * 切换页面时宽度、留白、标题层级都在跳。统一收在这里：不包卡片、宽度交给 .page，
+ * 页面内纵向按 24px 分块。
+ */
+.page-stack {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-gap-xl);
+}
+
+/* 页面标题区：左侧标题 + 副标题，右侧操作 */
+.page-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: var(--s-gap-md);
+}
+
+.page-head-text {
+    min-width: 0;
+}
+
+.page-title {
+    display: flex;
+    align-items: center;
+    gap: var(--s-gap-sm);
+    margin: 0;
+    font-size: var(--s-font-xl);
+    font-weight: 600;
+    color: var(--vscode-foreground);
+}
+
+.page-subtitle {
+    margin-top: var(--s-gap-xs);
+    font-size: var(--s-font-sm);
+    color: var(--vscode-descriptionForeground);
+}
+
+/* 骨架内区块、按钮组、提示条之间的间距统一由 .page-stack 的 gap 控制 */
+.page-stack > .config-section,
+.page-stack > .button-group,
+.page-stack > .message {
+    margin-top: 0;
+    margin-bottom: 0;
 }
 
 /* 模型列表 */
@@ -148,8 +243,9 @@ body {
     container-type: inline-size;
 }
 
+/* 与 .config-section-title 同字号：区块标题 14px */
 .section-title {
-    font-size: 16px;
+    font-size: var(--s-font-lg);
     font-weight: 600;
     margin-bottom: 16px;
     color: var(--vscode-foreground);
@@ -247,6 +343,29 @@ body {
     background: var(--vscode-list-hoverBackground);
 }
 
+/* 拖拽排序：非 main / quick 行可拖，拖动中半透明，插入位高亮 */
+.model-table tbody tr.model-row-draggable {
+    cursor: grab;
+}
+
+/* 拖动期间禁止选中文字并显示抓取光标（用鼠标事件实现，不走浏览器原生拖拽的自动滚动） */
+body.row-dragging-active {
+    user-select: none;
+    cursor: grabbing;
+}
+
+.model-table tbody tr.model-row-dragging {
+    opacity: 0.5;
+}
+
+.model-table tbody tr.model-row-drag-before td {
+    border-top: 2px solid var(--vscode-focusBorder);
+}
+
+.model-table tbody tr.model-row-drag-after td {
+    border-bottom: 2px solid var(--vscode-focusBorder);
+}
+
 /* 窄面板下隐藏操作列：否则整张表溢出，右侧只露出半列按钮 */
 @container (max-width: 400px) {
     .model-table th:nth-child(3),
@@ -318,7 +437,6 @@ body {
 }
 
 .model-form-card,
-.system-config,
 .rule-memory-config .section-card,
 .rule-memory-config .section-empty {
     background: transparent;
@@ -817,6 +935,55 @@ button.small {
     cursor: help;
 }
 
+/* 默认权限档位行：左侧档位选择，右侧「详细配置」展开入口 */
+.perm-level-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 16px;
+}
+
+/* 「详细配置」文字按钮：点击展开/收起下方的跳过权限开关 */
+button[type="button"].perm-details-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 0;
+    border: none;
+    background: transparent;
+    box-shadow: none;
+    color: var(--vscode-descriptionForeground);
+    font-size: 12px;
+    font-weight: 400;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+button[type="button"].perm-details-toggle:hover,
+button[type="button"].perm-details-toggle:active {
+    background: transparent;
+    box-shadow: none;
+    transform: none;
+    color: var(--vscode-foreground);
+}
+
+/* 箭头默认隐藏，悬浮按钮或已展开时才出现（占位保留，避免文字左右跳动） */
+.perm-details-toggle svg {
+    opacity: 0;
+    transition: opacity 0.15s ease, transform 0.2s ease;
+}
+
+.perm-details-toggle:hover svg,
+.perm-details-toggle:focus-visible svg,
+.perm-details-toggle.expanded svg {
+    opacity: 1;
+}
+
+.perm-details-toggle.expanded svg {
+    transform: rotate(90deg);
+}
+
 /* 默认权限档位：标签与选择框同行 */
 .perm-level-field {
     display: flex;
@@ -851,8 +1018,41 @@ button.small {
     max-width: min(420px, calc(100vw - 48px));
 }
 
+/* 权限档位选项：档位名正文色，说明次级色，两者留出间距 */
+.perm-option-value {
+    margin-right: 10px;
+}
+
+/* 档位名后的徽标（如「默认」）紧跟档位名 */
+.perm-option-value .readonly-tab {
+    margin-left: 6px;
+    vertical-align: middle;
+}
+
+.perm-option-desc {
+    color: var(--vscode-descriptionForeground);
+}
+
+/* 说明文字较长，弹层内允许折行，避免被省略号截断 */
+.perm-level-field .icon-select-item-label {
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
+    line-height: 1.4;
+}
+
+/* 选中行有底色，说明文字跟随前景色以保住对比度 */
+.icon-select-item.selected .perm-option-desc {
+    color: inherit;
+    opacity: 0.8;
+}
+
 /* 窄面板时标签与选择框折成两行（断点与 .form-row 折单列一致） */
 @media (max-width: 600px) {
+    .perm-level-row {
+        align-items: flex-start;
+    }
+
     .perm-level-field {
         flex-direction: column;
         align-items: flex-start;
@@ -861,6 +1061,13 @@ button.small {
 }
 
 /* 复选框样式 */
+
+/* 勾选框 / 单选框的选中色与开关按钮保持一致，不再用浏览器默认蓝 */
+input[type="checkbox"],
+input[type="radio"] {
+    accent-color: var(--s-switch-active-bg);
+}
+
 .checkbox-label {
     display: flex;
     align-items: center;
@@ -919,57 +1126,23 @@ button.small {
     margin-bottom: 0;
 }
 
-.claw-verbosity-group {
-    margin-bottom: 0;
+/* 远程入口卡片上的小标签（推荐 / 已绑定）：共用尺寸与底色，只有文字色不同 */
+.claw-tag {
+    padding: 1px 6px;
+    background: color-mix(in srgb, var(--vscode-foreground, #ccc) 8%, transparent);
+    border-radius: var(--s-radius-sm);
+    font-size: var(--s-font-xs);
+    line-height: 16px;
 }
 
-.claw-verbosity-option {
-    align-items: flex-start;
-    width: 100%;
-    min-height: 58px;
-    padding: 10px 12px;
-    border: 1px solid var(--s-card-border);
-    border-radius: 6px;
-    background: var(--s-card-bg);
-    box-sizing: border-box;
-    transition: border-color 0.15s ease, background 0.15s ease;
-}
-
-.claw-verbosity-option:hover {
-    border-color: var(--vscode-focusBorder);
-    background: var(--vscode-list-hoverBackground);
-}
-
-.claw-verbosity-option.active {
-    border-color: var(--vscode-focusBorder);
-    background: color-mix(in srgb, var(--vscode-focusBorder) 10%, var(--s-card-bg));
-}
-
-.claw-verbosity-option input[type="radio"] {
-    margin-top: 2px;
-    flex-shrink: 0;
-}
-
-.claw-verbosity-copy {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-    min-width: 0;
-}
-
-.claw-verbosity-name {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    font-size: 12px;
-    font-weight: 600;
-    color: var(--vscode-foreground);
-}
-
-.claw-verbosity-desc {
-    font-size: 12px;
-    line-height: 1.4;
+/* 推荐：低对比点缀，不抢平台名 */
+.claw-tag-recommend {
     color: var(--vscode-descriptionForeground);
+}
+
+/* 已绑定 / 运行中：沿用成功色，仅靠文字色区分状态 */
+.claw-tag-active {
+    color: var(--s-color-success, #3a3);
 }
 
 .thinking-form-group {
@@ -1051,45 +1224,39 @@ textarea:focus {
 }
 
 /* 标签页导航样式 */
+/* 页面级 tab：选中只用文字色 + 一条下划线，不加底色。
+   底色与页内分段控件（使用情况/导入）撞语言，且主色文字压在主色块上对比度太低。
+   下划线宽度跟随文字，负 margin 盖住容器那条 1px 分隔线，不留缝。 */
 .tab-navigation {
     display: flex;
+    align-items: stretch;
+    gap: 22px;
     border-bottom: 1px solid var(--vscode-panel-border);
-    margin-bottom: 30px;
-    background: var(--vscode-editor-background);
+    margin-bottom: var(--s-gap-lg);
 }
 
 .tab-item {
-    padding: 12px 24px;
+    flex: 0 0 auto;
+    margin-bottom: -1px;
+    padding: 8px 0;
     cursor: pointer;
-    font-size: 13px;
+    /* 去掉底色后 13px 读起来发虚，提到与分组标题同级的 14px */
+    font-size: var(--s-font-lg);
     font-weight: 500;
+    white-space: nowrap;
     color: var(--vscode-descriptionForeground);
     border-bottom: 2px solid transparent;
-    transition: all 0.2s ease;
-    position: relative;
-    background: transparent;
-    border: none;
-    outline: none;
+    transition: color 0.15s ease, border-color 0.15s ease;
 }
 
 .tab-item:hover {
     color: var(--vscode-foreground);
-    background: var(--vscode-list-hoverBackground);
 }
 
 .tab-item.active {
-    color: var(--vscode-button-background);
-    border-bottom-color: var(--vscode-button-background);
-    background: var(--vscode-list-activeSelectionBackground);
+    color: var(--vscode-foreground);
     font-weight: 600;
-}
-
-.tab-item:first-child {
-    border-top-left-radius: 6px;
-}
-
-.tab-item:last-child {
-    border-top-right-radius: 6px;
+    border-bottom-color: var(--vscode-button-background);
 }
 
 /* 标签页内容容器 */

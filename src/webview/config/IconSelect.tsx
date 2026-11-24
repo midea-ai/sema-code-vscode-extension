@@ -6,6 +6,8 @@ export interface IconSelectOption {
     label: string;
     /** 收起后按钮上显示的文案，缺省用 label（用于列表带说明、收起只显示短名的场景） */
     selectedLabel?: string;
+    /** 列表中该项的自定义渲染（如值 + 次级色说明），缺省用 label；label 仍需保留纯文本用于搜索过滤 */
+    labelNode?: React.ReactNode;
     /** 选项前的图标，如 <ProviderLogo provider={key} className="icon-select-logo" /> */
     icon?: React.ReactNode;
     /** 禁用该选项（可见但不可选） */
@@ -124,7 +126,7 @@ const IconSelect: React.FC<IconSelectProps> = ({ id, value, options, onChange, d
                             onClick={() => selectOption(opt)}
                         >
                             {opt.icon}
-                            <span className="icon-select-item-label">{opt.label}</span>
+                            <span className="icon-select-item-label">{opt.labelNode ?? opt.label}</span>
                             {opt.value === value && (
                                 <svg className="icon-select-check" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
                                     <path d="M3 8.5l3.5 3.5L13 5" />

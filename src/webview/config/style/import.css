@@ -1,12 +1,5 @@
 /* 「导入」页：来源列表 + 导入面板（类别卡片 + 条目勾选） */
 
-.import-subtitle {
-    font-size: var(--s-font-sm);
-    color: var(--vscode-descriptionForeground);
-    margin-top: -8px;
-    margin-bottom: var(--s-gap-lg);
-}
-
 /* ===== 来源列表：图标 + 名称 + 导入按钮 ===== */
 
 .import-list {
@@ -71,34 +64,6 @@
 .import-toolbar-label {
     font-size: var(--s-font-base);
     color: var(--vscode-descriptionForeground);
-}
-
-.import-segmented {
-    display: inline-flex;
-    gap: 2px;
-    padding: 3px;
-    border-radius: var(--s-radius-md);
-    background: color-mix(in srgb, var(--vscode-foreground, #ccc) 10%, transparent);
-}
-
-.import-seg-btn {
-    padding: 4px 12px;
-    border: none;
-    border-radius: var(--s-radius-sm);
-    background: transparent;
-    color: var(--vscode-descriptionForeground);
-    font-size: var(--s-font-md);
-    cursor: pointer;
-}
-
-.import-seg-btn:hover {
-    color: var(--vscode-foreground);
-}
-
-.import-seg-btn.active {
-    background: var(--vscode-editor-background);
-    color: var(--vscode-foreground);
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
 }
 
 .import-toolbar-count {

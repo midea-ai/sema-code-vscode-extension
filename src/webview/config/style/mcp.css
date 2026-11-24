@@ -29,20 +29,6 @@
     margin-left: auto;
 }
 
-/* 系统工具图标 - 与 MCP 名称图标对齐，配色同导入页类别图标 */
-.mcp-system-icon.section-card-icon {
-    width: 28px;
-    height: 28px;
-    border-radius: 50%;
-    background: color-mix(in srgb, var(--vscode-focusBorder, #4eabff) 14%, transparent);
-    color: color-mix(in srgb, var(--vscode-focusBorder, #4eabff) 70%, var(--vscode-foreground, #ccc));
-}
-
-.mcp-system-icon.section-card-icon svg {
-    width: 16px;
-    height: 16px;
-}
-
 /* 状态圆点 */
 .mcp-status-dot {
     width: 8px;

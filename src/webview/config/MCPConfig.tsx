@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { VscodeApi, ToolInfo, SystemToolInfo } from './types';
 import { MCPServerInfo, MCPServerConfig, MCPScopeType } from './types/mcp';
-import { ExpandArrowIcon, RefreshIcon, EditIcon, TrashIcon, CloseIcon, TerminalIcon, WarningCircleIcon, ChevronLeftIcon, ChevronRightIcon, PlusIcon } from './utils/svgIcons';
-import { initialBgColors, hashString } from './utils/iconUtils';
+import { ExpandArrowIcon, RefreshIcon, EditIcon, TrashIcon, CloseIcon, WarningCircleIcon, ChevronLeftIcon, ChevronRightIcon, PlusIcon } from './utils/svgIcons';
+import { getColorByName } from './utils/iconUtils';
 import { openFileWithRange } from './utils/fileUtils';
 import { uiScope } from './utils/scope';
 import { useT, I18nKey } from '../common/i18n/react';
@@ -81,7 +81,7 @@ function flattenServers(data: any): MCPServerInfo[] {
 
 const MCPNameIcon: React.FC<{ name: string }> = ({ name }) => {
     const initial = name.charAt(0).toUpperCase();
-    const bgColor = initialBgColors[hashString(name) % initialBgColors.length];
+    const bgColor = getColorByName(name);
     return (
         <span className="mcp-name-icon" style={{ backgroundColor: bgColor }}>
             {initial}
@@ -294,10 +294,8 @@ const SystemToolsCard: React.FC<{
                 >
                     <ExpandArrowIcon />
                 </button>
-                <div className="section-card-icon mcp-system-icon">
-                    <TerminalIcon size={16} />
-                </div>
-                <span className="section-card-name">{t('config.mcp.systemTools')}</span>
+                <MCPNameIcon name="system" />
+                <span className="section-card-name">system</span>
                 <span className="readonly-tab">{t('common.readonly')}</span>
                 <span
                     className="mcp-status-dot"

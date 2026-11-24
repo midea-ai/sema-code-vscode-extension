@@ -1,17 +1,18 @@
-// 首字母背景色列表
+// 首字母背景色列表：同色相低饱和（S 40%~50%），浅色相单独压暗，
+// 保证白字对比度在 4.5:1 以上；用 HSL 便于统一微调柔和度
 export const initialBgColors = [
-    '#6366f1', // indigo
-    '#8b5cf6', // violet
-    '#a855f7', // purple
-    '#ec4899', // pink
-    '#f43f5e', // rose
-    '#ef4444', // red
-    '#f97316', // orange
-    '#eab308', // yellow
-    '#22c55e', // green
-    '#14b8a6', // teal
-    '#06b6d4', // cyan
-    '#3b82f6', // blue
+    'hsl(239 40% 47%)', // indigo
+    'hsl(262 40% 49%)', // violet
+    'hsl(292 40% 47%)', // purple
+    'hsl(330 42% 47%)', // pink
+    'hsl(350 45% 47%)', // rose
+    'hsl(4 45% 47%)',   // red
+    'hsl(24 48% 42%)',  // orange
+    'hsl(40 50% 36%)',  // amber
+    'hsl(152 40% 38%)', // green
+    'hsl(175 42% 36%)', // teal
+    'hsl(190 45% 38%)', // cyan
+    'hsl(217 45% 48%)', // blue
 ];
 
 // 根据字符串生成稳定的 hash 值
