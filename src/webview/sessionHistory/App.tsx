@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useLayoutEffect, useRef } from 'react';
-import { useT, useLang, setLang, LANGS } from '../common/i18n/react';
+import { useT, setLang } from '../common/i18n/react';
+import { formatDateTime, formatRelativeTime } from '../common/timeFormat';
 import type { SessionSearchHit } from './search';
 import type { TurnNavItem } from '../chat/utils/turnNav';
 
@@ -51,7 +52,12 @@ const Highlight: React.FC<{ text: string; query: string }> = ({ text, query }) =
 
 const App: React.FC<AppProps> = ({ vscode }) => {
     const t = useT();
-    const lang = useLang();
+    // 相对时间会过期：定时重渲染，保证「X 分钟前」不越看越旧
+    const [, setTimeTick] = useState(0);
+    useEffect(() => {
+        const timer = setInterval(() => setTimeTick(n => n + 1), 60_000);
+        return () => clearInterval(timer);
+    }, []);
     const [sessions, setSessions] = useState<Session[]>([]);
     const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
     const [openSessionIds, setOpenSessionIds] = useState<string[]>([]);
@@ -277,64 +283,6 @@ const App: React.FC<AppProps> = ({ vscode }) => {
         });
     };
 
-    const formatTime = (timestamp: number): string => {
-        const now = new Date();
-        const date = new Date(timestamp);
-
-        const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-        const targetDay = new Date(date.getFullYear(), date.getMonth(), date.getDate());
-
-        const diffTime = Math.abs(now.getTime() - timestamp);
-        const diffDays = Math.floor((today.getTime() - targetDay.getTime()) / (24 * 60 * 60 * 1000));
-
-        const locale = LANGS[lang].dateLocale;
-        const timeStr = date.toLocaleTimeString(locale, {
-            hour: '2-digit',
-            minute: '2-digit'
-        });
-
-        // 1分钟内：刚刚
-        if (diffTime < 60 * 1000) {
-            return t('history.justNow');
-        }
-        // 1小时内：X分钟前
-        else if (diffTime < 60 * 60 * 1000) {
-            const minutes = Math.floor(diffTime / (60 * 1000));
-            return t('history.minutesAgo', { n: minutes });
-        }
-        // 今天
-        else if (diffDays === 0) {
-            return timeStr;
-        }
-        // 昨天
-        else if (diffDays === 1) {
-            return t('history.yesterday', { time: timeStr });
-        }
-        // 7天内
-        else if (diffDays < 7) {
-            return t('history.daysAgo', { n: diffDays });
-        }
-        // 今年内
-        else if (date.getFullYear() === now.getFullYear()) {
-            return date.toLocaleDateString(locale, {
-                month: '2-digit',
-                day: '2-digit',
-                hour: '2-digit',
-                minute: '2-digit'
-            });
-        }
-        // 跨年
-        else {
-            return date.toLocaleDateString(locale, {
-                year: 'numeric',
-                month: '2-digit',
-                day: '2-digit',
-                hour: '2-digit',
-                minute: '2-digit'
-            });
-        }
-    };
-
     return (
         <div className="container">
             <div className="header">
@@ -422,13 +370,13 @@ const App: React.FC<AppProps> = ({ vscode }) => {
                                     )}
                                 </div>
                                 <div className="session-times">
-                                    <div className="session-time">
+                                    <div className="session-time" title={formatDateTime(session.createdAt)}>
                                         <span className="time-label">{t('history.createdAt')}</span>
-                                        {formatTime(session.createdAt)}
+                                        {formatRelativeTime(session.createdAt)}
                                     </div>
-                                    <div className="session-time">
+                                    <div className="session-time" title={formatDateTime(session.updatedAt)}>
                                         <span className="time-label">{t('history.updatedAt')}</span>
-                                        {formatTime(session.updatedAt)}
+                                        {formatRelativeTime(session.updatedAt)}
                                     </div>
                                 </div>
                                 {hit && (
