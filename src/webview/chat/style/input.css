@@ -262,10 +262,11 @@
     outline: none;
 }
 
-/* contentEditable 占位符：仅当编辑器为空时显示 */
+/* contentEditable 占位符：仅当编辑器为空时显示；颜色对齐配置页「创建于」的次级忽略色 */
 .input-editable[contenteditable="true"]:empty::before {
     content: attr(data-placeholder);
-    color: var(--chat-text-placeholder);
+    color: var(--chat-text-secondary);
+    opacity: 0.7;
     pointer-events: none;
 }
 
@@ -1105,10 +1106,6 @@ svg.provider-logo-openrouter {
 
 .vscode-light .input-textarea {
     background-color: var(--chat-bg-light);
-}
-
-.vscode-light .input-editable[contenteditable="true"]:empty::before {
-    color: var(--chat-color-muted);
 }
 
 /* 响应式隐藏：侧边栏变窄时依次隐藏底部左侧元素 */
