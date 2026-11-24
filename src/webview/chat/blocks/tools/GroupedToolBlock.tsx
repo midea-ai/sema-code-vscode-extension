@@ -40,6 +40,7 @@ import {
     isToolErrorMessage,
 } from '../../utils/groupMessages';
 import GeneratedImageBlock from './GeneratedImageBlock';
+import EditBlock from './EditBlock';
 import PermissionContent from '../../components/permission/PermissionContent';
 import { AskFormValues, PickOptionRequestData, formatAskFormAnswers } from '../../components/ui/AskFormDialog';
 import { isMcpToolType, parseMcpToolName } from '../../utils/permissionUtils';
@@ -273,8 +274,8 @@ const getGenImageWeight = (message: Message): number => {
 };
 
 /**
- * 非 MCP 消息的类别：提问（面板或记录）、技能、memory 写入、可视化产物与临时文件写入（编辑文件）、生成图片、非只读命令、
- * 抓网页、后台任务、定时任务，其余（Read/Search/只读命令）为探索
+ * 非 MCP 消息的类别：提问（面板或记录）、技能、memory 写入、可视化产物与临时文件写入（编辑文件）、生成图片、终端命令、
+ * 抓网页、后台任务、定时任务，其余（Read/Search 等）为探索
  */
 const getCategoryKind = (message: Message): GroupCategoryKind => {
     if (isAskFormPanelMessage(message) || isAskToolMessage(message)) {
@@ -588,6 +589,35 @@ export const McpRunBlock: React.FC<{ server: string; messages: Message[] }> = ({
             {isExpanded && (
                 <div className="chat-block-content grouped-tool-content">
                     {messages.map(message => <McpItemBlock key={message.id} message={message} />)}
+                </div>
+            )}
+        </div>
+    );
+};
+
+/**
+ * 历史轮（非最后一轮）的文件编辑合并行：「编辑 n 个文件 ›」，
+ * 展开后逐条渲染折叠的 EditBlock，文件名、增删行数、点击查看 diff 都与单条渲染一致；不做文件变更上报
+ */
+export const EditRunBlock: React.FC<{ messages: Message[]; vscode?: any }> = ({ messages, vscode }) => {
+    const t = useT();
+    const [isExpanded, setIsExpanded] = useState(false);
+    const fileCount = new Set(messages.map(message => getToolTitle(message).trim())).size;
+
+    return (
+        <div className="chat-block chat-block--borderless">
+            <ToolRowHeader
+                icon={<PencilIcon />}
+                verb={t('tool.group.edit', { count: fileCount })}
+                expandable
+                isExpanded={isExpanded}
+                onClick={() => setIsExpanded(prev => !prev)}
+            />
+            {isExpanded && (
+                <div className="chat-block-content grouped-tool-content">
+                    {messages.map(message => (
+                        <EditBlock key={message.id} content={message.content} vscode={vscode} inLastTurn={false} />
+                    ))}
                 </div>
             )}
         </div>

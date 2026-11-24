@@ -65,9 +65,16 @@ const ToolRowHeader: React.FC<ToolRowHeaderProps> = ({
         onTargetClick ? 'tool-row-target--link' : '',
     ].filter(Boolean).join(' ');
 
+    // 目标可换行时整行顶部对齐：图标、动词贴首行，不随多行目标垂直居中
+    const titleClass = [
+        'chat-block-title',
+        'tool-row-title',
+        wrap ? 'tool-row-title--wrap' : '',
+    ].filter(Boolean).join(' ');
+
     return (
         <div className={headerClass} onClick={onClick} title={title}>
-            <div className="chat-block-title tool-row-title">
+            <div className={titleClass}>
                 <span className="tool-row-icon">
                     {streaming ? <span className="tool-row-spinner" /> : icon}
                 </span>

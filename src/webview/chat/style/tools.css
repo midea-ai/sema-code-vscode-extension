@@ -55,6 +55,11 @@
     color: var(--chat-color-muted);
 }
 
+/* Read 合并行（多文件）：目标换行时整行按首行对齐，图标/动词不随多行目标垂直居中 */
+.tool-row-title--wrap {
+    align-items: flex-start;
+}
+
 .tool-row-icon {
     display: inline-flex;
     align-items: center;

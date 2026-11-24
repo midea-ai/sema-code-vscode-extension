@@ -25,13 +25,17 @@ export type RenderItem =
     /** 组外单独渲染时，相邻的多次 generate_image 调用合并成一行（对齐 core webui 的 GenImageCard） */
     | { kind: 'genImage'; id: string; messages: Message[]; originalStartIndex: number }
     /** 组外单独渲染时，相邻的同服务 MCP 调用（≥2 次）合并成「调用了 xx n 次」一项，成组门槛里只算 1 条 */
-    | { kind: 'mcpRun'; id: string; server: string; messages: Message[]; originalStartIndex: number };
+    | { kind: 'mcpRun'; id: string; server: string; messages: Message[]; originalStartIndex: number }
+    /** 非最后一轮，相邻的项目文件编辑（≥2 次，同一文件多次改动也算）合并成「编辑 n 个文件」一项 */
+    | { kind: 'editRun'; id: string; messages: Message[]; originalStartIndex: number };
 
 interface GroupMessagesOptions {
     streamingToolId?: string | null;
     showThinkingText?: boolean;
     /** 列表末尾之后是否已有其它渲染内容（如下一轮用户输入），为 true 时段尾的工具也并入组 */
     tailClosed?: boolean;
+    /** 非最后一轮：相邻的项目文件编辑合并成一行（最新一轮保持逐行，便于直接看到文件名） */
+    mergeEdits?: boolean;
 }
 
 interface RunItem {
@@ -60,90 +64,6 @@ export const getToolName = (message: Message): string => {
 
 export const getToolTitle = (message: Message): string => {
     return message.content?.title || '';
-};
-
-/** 命令段分隔符：&&、||、; 一视同仁，每一段都要单独通过只读检查 */
-export const SHELL_SEGMENT_SEPARATOR = /\s*(?:&&|\|\||;)\s*/;
-
-/** 管道右侧允许出现的纯过滤命令，出现其它命令（如 xargs、tee）即不算探索 */
-const READ_ONLY_PIPE_FILTERS = new Set([
-    'head', 'tail', 'grep', 'egrep', 'fgrep', 'wc', 'sort', 'uniq', 'cut', 'tr', 'cat', 'column', 'nl',
-]);
-
-export type ShellExploreKind = 'list' | 'find' | 'path';
-
-const isCdSegment = (segment: string): boolean => /^cd(?:\s|$)/.test(segment);
-
-const isReadOnlyPipeFilter = (segment: string): boolean => {
-    const command = segment.trim().split(/\s+/)[0] || '';
-    return READ_ONLY_PIPE_FILTERS.has(command);
-};
-
-/** 单个命令段（不含 && / || / ;）的探索类型：ls/tree → list，find → find，pwd → path；含写入副作用则为 null */
-const getShellSegmentKind = (segment: string): ShellExploreKind | null => {
-    // 输出重定向会写文件，不算只读；丢弃到 /dev/null 或合并到 stdout 的 2>&1 不写文件，先剔除再判断
-    if (/>/.test(segment.replace(/\d?>&\d|\d?>\s*\/dev\/null/g, ''))) {
-        return null;
-    }
-
-    const [head = '', ...pipes] = segment.split(/\s*\|\s*/);
-    if (!pipes.every(isReadOnlyPipeFilter)) {
-        return null;
-    }
-
-    const command = head.trim();
-    if (/^(?:ls|tree)(?:\s|$)/.test(command)) {
-        return 'list';
-    }
-    if (/^find(?:\s|$)/.test(command)) {
-        // -delete/-exec 等会执行动作或写文件，不算只读
-        return /(?:^|\s)-(?:delete|exec|execdir|ok|okdir|fprint|fprint0|fprintf|fls)(?:\s|$)/.test(command) ? null : 'find';
-    }
-    if (/^pwd(?:\s+-(?:L|P))*$/.test(command)) {
-        return 'path';
-    }
-    return null;
-};
-
-/**
- * 终端命令的探索类型。整条命令按 && / || / ; 切段，cd 段视为中性跳过，
- * 其余每一段都必须是只读的 ls/tree、find、pwd（可接只读过滤管道），否则不算探索。
- * 只有一个有效段时返回该段类型，多段返回 'explore'。
- */
-export const getShellExploreKind = (message: Message): ShellExploreKind | 'explore' | null => {
-    const segments = getToolTitle(message).trim()
-        .split(SHELL_SEGMENT_SEPARATOR)
-        .map(segment => segment.trim())
-        .filter(segment => segment && !isCdSegment(segment));
-
-    if (segments.length === 0) {
-        return null;
-    }
-
-    const kinds: (ShellExploreKind | null)[] = [];
-    for (const segment of segments) {
-        const kind = getShellSegmentKind(segment);
-        if (kind === null) {
-            return null;
-        }
-        kinds.push(kind);
-    }
-
-    return kinds.length === 1 ? kinds[0] : 'explore';
-};
-
-export const getGroupableToolKind = (message: Message): string | null => {
-    const toolName = getToolName(message);
-    if (toolName === TOOL_NAME_VIEW_FILE) {
-        return 'read';
-    }
-    if (toolName === TOOL_NAME_SEARCH_FILES || toolName === TOOL_NAME_SEARCH_CONTENT) {
-        return 'search';
-    }
-    if (toolName === TOOL_NAME_RUN_SHELL) {
-        return getShellExploreKind(message);
-    }
-    return null;
 };
 
 /** 消息所属 MCP 服务名；非 MCP 工具返回 null */
@@ -189,11 +109,9 @@ export const isSkillMessage = (message: Message): boolean => {
     return message.type === 'tool' && getToolName(message) === TOOL_NAME_SKILL;
 };
 
-/** 非探索类的终端命令（ls/find/pwd 等归探索组，不算在内） */
+/** 终端命令（统一计入「执行」，不再按只读与否细分） */
 export const isShellRunMessage = (message: Message): boolean => {
-    return message.type === 'tool'
-        && getToolName(message) === TOOL_NAME_RUN_SHELL
-        && getGroupableToolKind(message) === null;
+    return message.type === 'tool' && getToolName(message) === TOOL_NAME_RUN_SHELL;
 };
 
 /** 新增/编辑 memory 目录下 md 文件的工具消息（如 .../memory/foo.md、.../memory/MEMORY.md） */
@@ -265,7 +183,34 @@ export const isFoldedEditMessage = (message: Message): boolean => {
 };
 
 /**
- * 可并入混合工具组的消息：探索类（Read/Search/只读命令）、其余终端命令、MCP 调用，
+ * 可合并成「编辑 n 个文件」一行的项目文件写入：普通 write_file / patch_file，且 content 是 diff 结构。
+ * memory、可视化产物、临时文件已归入混合组；notebook 编辑、编辑报错（system/tool_error）不在此列。
+ */
+const isMergeableFileEditMessage = (message: Message): boolean => {
+    if (message.type !== 'tool') {
+        return false;
+    }
+
+    const toolName = getToolName(message);
+    if (toolName !== TOOL_NAME_WRITE_FILE && toolName !== TOOL_NAME_PATCH_FILE) {
+        return false;
+    }
+
+    if (isFoldedEditMessage(message) || !getToolTitle(message).trim()) {
+        return false;
+    }
+
+    const diffContent = message.content?.content;
+    if (typeof diffContent !== 'object' || diffContent === null) {
+        return false;
+    }
+
+    const type = (diffContent as { type?: string }).type;
+    return type === 'diff' || type === 'new';
+};
+
+/**
+ * 可并入混合工具组的消息：探索类（Read/Search）、终端命令、MCP 调用，
  * 抓网页、后台任务查看/停止、定时任务管理、memory 写入、可视化产物与临时文件写入、生成图片、技能、提问记录，任何工具的执行报错，
  * 以及权限拒绝/中断面板与旧会话里的用户回应表单面板。
  * 相邻的可并入消息不分种类进同一段；其余文件编辑、子代理等其它工具与可见正文一样作为段边界。
@@ -340,6 +285,24 @@ const toMcpRunItem = (run: RunItem[], server: string): RenderItem => ({
     messages: run.map(({ message }) => message),
     originalStartIndex: run[0].index,
 });
+
+/**
+ * 编辑段的输出：≥2 次编辑就合并成一行（标题按去重后的文件数计），否则逐条渲染；
+ * 同一文件连续改多次同样合并，避免一行行刷屏；
+ * 合并项 id 取首条消息 id，追加时组件实例不重建
+ */
+const toEditRunItems = (run: RunItem[]): RenderItem[] => {
+    if (run.length >= 2) {
+        return [{
+            kind: 'editRun',
+            id: `edit-run-${run[0].message.id}`,
+            messages: run.map(({ message }) => message),
+            originalStartIndex: run[0].index,
+        }];
+    }
+
+    return run.map(({ message, index }): RenderItem => ({ kind: 'message', message, originalIndex: index }));
+};
 
 /**
  * 单独渲染的消息：相邻的生成图片调用合并成一个 genImage 项（一行缩略图），
@@ -447,9 +410,27 @@ export const groupMessages = (
 ): RenderItem[] => {
     const items: RenderItem[] = [];
     let run: RunItem[] = [];
+    let editRun: RunItem[] = [];
+
+    const flushEditRun = () => {
+        if (editRun.length === 0) {
+            return;
+        }
+        items.push(...toEditRunItems(editRun));
+        editRun = [];
+    };
 
     messages.forEach((message, index) => {
+        // 编辑仍是段边界：先把前面的工具段封口，再累积编辑段（合并项与混合组并列，不混在一起）
+        if (options.mergeEdits && isMergeableFileEditMessage(message)) {
+            flushRun(items, run, true, options.streamingToolId);
+            run = [];
+            editRun.push({ message, index });
+            return;
+        }
+
         if (isGroupableToolMessage(message)) {
+            flushEditRun();
             run.push({ message, index });
             return;
         }
@@ -461,10 +442,12 @@ export const groupMessages = (
         const closed = !isPendingEmptyAssistantMessage(message, options.showThinkingText);
         flushRun(items, run, closed, options.streamingToolId);
         run = [];
+        flushEditRun();
         items.push({ kind: 'message', message, originalIndex: index });
     });
 
     flushRun(items, run, !!options.tailClosed, options.streamingToolId);
+    flushEditRun();
 
     return items;
 };

@@ -5,7 +5,7 @@ import InputBox, { InputBoxHandle } from './components/input/InputBox';
 import MessageItem from './MessageItem';
 import UserInputBlock from './blocks/UserInputBlock';
 import { parsePasteInput, type PasteAttachment } from '../common/paste';
-import GroupedToolBlock, { McpRunBlock } from './blocks/tools/GroupedToolBlock';
+import GroupedToolBlock, { EditRunBlock, McpRunBlock } from './blocks/tools/GroupedToolBlock';
 import GeneratedImageBlock from './blocks/tools/GeneratedImageBlock';
 import SessionTabs from './components/SessionTabs';
 import { AgentDialogContext, SessionActiveContext, SessionContext } from './SessionContext';
@@ -28,7 +28,6 @@ import ModelConfigReminder from './components/ui/ModelConfigReminder';
 import { PREVIEW_MODE, getPreviewMessages, mockDialogMap, isPreviewActive } from './utils/mockMessages';
 import { groupMessages, getToolName, getToolTitle } from './utils/groupMessages';
 import { setPathEnv } from './utils/pathDisplay';
-import { buildFileLabelHtml } from './utils/fileRefDisplay';
 import VizEmbed from './blocks/VizEmbed';
 import TurnNav, { turnNavItems, MIN_TURNS } from './components/TurnNav';
 import { isAttachmentPath, isVizPath } from '../common/viz';
@@ -1014,6 +1013,13 @@ const ChatSession: React.FC<ChatSessionProps> = ({ vscode: rawVscode, sessionId,
                             </div>
                         );
                     }
+                    if (item.kind === 'editRun') {
+                        return (
+                            <div key={item.id} className="msg-wrap">
+                                <EditRunBlock messages={item.messages} vscode={vscode} />
+                            </div>
+                        );
+                    }
 
                     return (
                         <div key={item.message.id} className="msg-wrap">
@@ -1107,7 +1113,13 @@ const ChatSession: React.FC<ChatSessionProps> = ({ vscode: rawVscode, sessionId,
         let navIdx = -1;
         return groups.map((group, gi) => (
             <div key={group.key} className="turn-group" data-turn={group.items[0]?.message.type === 'user' ? ++navIdx : undefined}>
-                {groupMessages(group.items.map(item => item.message), { streamingToolId, showThinkingText: shouldShowThinkingText, tailClosed: gi < groups.length - 1 }).map((item) => {
+                {groupMessages(group.items.map(item => item.message), {
+                    streamingToolId,
+                    showThinkingText: shouldShowThinkingText,
+                    tailClosed: gi < groups.length - 1,
+                    // 非最后一轮的文件编辑合并成一行；最后一轮保持逐行，改了什么文件一眼可见
+                    mergeEdits: gi < groups.length - 1,
+                }).map((item) => {
                     if (item.kind === 'group') {
                         const groupStartIndex = group.items[item.originalStartIndex].index;
                         return (
@@ -1131,6 +1143,14 @@ const ChatSession: React.FC<ChatSessionProps> = ({ vscode: rawVscode, sessionId,
                         return (
                             <div key={item.id} className="msg-wrap">
                                 <McpRunBlock server={item.server} messages={item.messages} />
+                            </div>
+                        );
+                    }
+
+                    if (item.kind === 'editRun') {
+                        return (
+                            <div key={item.id} className="msg-wrap">
+                                <EditRunBlock messages={item.messages} vscode={vscode} />
                             </div>
                         );
                     }
@@ -1428,12 +1448,8 @@ const App: React.FC<AppProps> = ({ vscode }) => {
                             el.classList.add('file-path-code');
                             el.setAttribute('data-file-path', message.filePath);
                             if (message.lineInfo) el.setAttribute('data-line-info', message.lineInfo);
-                            // 本地路径链接（.md-local-link）：换成统一的文件高亮结构（图标 + 原文名字）
-                            if (el.classList.contains('md-local-link') && !el.querySelector('.file-ref-chip')) {
-                                el.innerHTML = buildFileLabelHtml(String(message.filePath), false, el.textContent || '', true);
-                            }
                         }
-                        // 不存在时保持待验证阶段的外观：本地路径链接是正文色纯文本，内联代码是普通内联代码
+                        // 不存在时保持普通行内代码外观。
                         el.removeAttribute('data-temp-id');
                     }
                     break;
