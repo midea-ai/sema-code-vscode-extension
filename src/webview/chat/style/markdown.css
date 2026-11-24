@@ -53,21 +53,21 @@
   vertical-align: baseline;
 }
 
-/* 内联代码样式 - `代码` 正文色 + 淡背景；高亮色只留给可点的文件路径 / 链接，避免三者混淆
-   字体与正文一致（覆盖全局 code 等宽规则，与 webui 对齐），等宽只留给代码块 */
+/* 普通行内代码：正文色与淡背景；字体与正文一致，等宽只留给代码块 */
+.vscode-dark {
+  --chat-inline-code-bg: rgba(128, 128, 128, 0.13);
+}
+
 .markdown-content .inline-code {
   color: inherit;
   font-family: inherit;
-  background: var(--chat-bg-hover);
+  background: var(--chat-inline-code-bg, var(--chat-bg-hover));
   padding: 0.1em 0.35em;
   border-radius: var(--chat-radius-sm);
 }
 
-/* 文件路径内联代码 / 本地路径链接：verifyFilePath 确认后由 AiResponseBlock 加 file-path-code 变为可点。
-   - 内联代码（`src/a.ts:10-12`）：不放图标，原文直接用链接高亮色 + 500 字重（与芯片名字同观感），长路径可任意位置折行；
-   - 本地路径链接（[text](path)）：内容换成统一的文件高亮结构（.file-ref-chip，尺寸/间距/对齐见 input.css），
-     名字仍是原文，图标保持文件类型色（内联 style）。
-   这里统一去掉代码底色、换界面字体与光标；悬停下划线分别打在内联代码自身 / 芯片的 .file-ref-name 上 */
+/* 可打开的文件路径：反引号路径确认存在后加此类；显式本地文件链接始终带此类。
+   两者的文字都用主题链接色与 500 字重；显式链接的图标保留文件类型色。 */
 .markdown-content .file-path-code {
   background: none;
   padding: 0;
@@ -87,13 +87,17 @@
 }
 
 /* 正文里芯片的名字是原文全文（可能是很长的绝对路径），不能沿用 input.css 的单行省略：
-   芯片改回普通行内盒，紧跟前文并可在任意位置折行，路径完整显示 */
+   芯片改回普通行内盒，紧跟前文并可在任意位置折行，路径完整显示。
+   折行必须用 word-break: break-all：overflow-wrap: anywhere 只是「放不下时」的兜底断行，
+   图标后本来就有合法断点，浏览器会优先把整段路径挪到下一行，导致图标独占一行、右边留白；
+   break-all 让路径在任意位置按普通优先级折行，图标后面直接接文字、铺满整行 */
 .markdown-content .file-path-code .file-ref-chip {
   display: inline;
   height: auto;
   vertical-align: baseline;
   white-space: normal;
   overflow-wrap: anywhere;
+  word-break: break-all;
 }
 
 /* 行内盒下 gap 不生效，间距改用 margin；图标中心对齐文字大写高度的中线（15px 图标盒的一半为 7.5px） */
@@ -303,18 +307,11 @@
   text-decoration: underline;
 }
 
-/* 本地路径链接 - [text](wiki/foo.md) 无 scheme 路径
-   待验证阶段与正文同色、不可点（title 悬停可看真实路径），文件不存在时一直保持这个外观；
-   verifyFilePath 确认存在后加 file-path-code，需覆盖此规则恢复可点样式 */
+/* 显式本地路径链接始终可点，存在性由宿主打开文件时处理。 */
 .markdown-content .md-local-link {
-  color: inherit;
-  cursor: text;
-  text-decoration: none;
-}
-
-.markdown-content .md-local-link.file-path-code {
   color: var(--chat-text-link);
   cursor: pointer;
+  text-decoration: none;
 }
 
 /* 无序列表：与段落同用 0.5em 外边距（对齐 webui），相邻折叠后列表与前后文字间距等于一个段落间距 */

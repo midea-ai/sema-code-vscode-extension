@@ -1,6 +1,7 @@
 import DOMPurify from 'dompurify';
 import katex from 'katex';
 import { t } from '../../common/i18n/core';
+import { buildFileLabelHtml } from './fileRefDisplay';
 
 /**
  * 简化的Markdown渲染，只支持：
@@ -21,6 +22,10 @@ export function renderMarkdownToHtml(content: string, vscode?: any): string {
   const inlineCodeRaw: string[] = [];
   const imagePlaceholders: string[] = [];
   const urlPlaceholders: string[] = [];
+  // 文件图标含 SVG，先用随机占位穿过 DOMPurify，最后恢复由本地静态图标和转义文本构成的 HTML。
+  const localLinkHtml: string[] = [];
+  const localLinkSalt = Math.random().toString(36).slice(2, 10);
+  const localLinkToken = (i: number) => `__FILE_LINK_${localLinkSalt}_${i}__`;
   const mathPlaceholders: string[] = [];
   // 公式占位用纯 ASCII + 随机盐：要让占位串能"穿过" DOMPurify（不会被解析器吞掉），
   // 同时避免和用户原文里的字符串碰撞。\x00 那一套占位走的是 sanitize 之前恢复，公式不行。
@@ -111,7 +116,7 @@ export function renderMarkdownToHtml(content: string, vscode?: any): string {
     // 目标整体被内联代码包裹（[text](`/abs/a.ts`)、![alt](`/abs/a.png`)）：不符合 CommonMark，
     // 但模型常这么写。内联代码在步骤 2 已抽成占位符，这里的占位符会让后续链接解析跳过目标，
     // 残留 [text](...) 定界符、路径反而被单独高亮成文件引用。把目标还原成裸地址后再走正常链路。
-    // 目标内的空白按 CommonMark 约定写成 %20（createLocalLinkHtml 解码后再校验）。
+    // 目标内的空白按 CommonMark 约定写成 %20（createLocalLinkHtml 打开前会解码）。
     processedContent = processedContent.replace(
       /\]\(\s*\x00INLINE_CODE_(\d+)\x00\s*\)/g,
       (_match, idx) => `](${inlineCodeRaw[Number(idx)].replace(/\s/g, '%20')})`
@@ -150,8 +155,10 @@ export function renderMarkdownToHtml(content: string, vscode?: any): string {
           `<a class="md-url-link" data-url="${safeUrl}" title="${safeUrl}">${createLinkIconHtml(link.target)}${escapeHtml(link.text)}</a>`
         );
       } else {
-        // 本地路径仍由扩展端验证，AiResponseBlock 确认存在后再升级为可点击链接。
-        urlPlaceholders.push(createLocalLinkHtml(link.text, link.target, vscode));
+        // Markdown 显式文件链接直接显示并可点击；是否存在留给打开文件的宿主逻辑处理。
+        const i = localLinkHtml.length;
+        localLinkHtml.push(createLocalLinkHtml(link.text, link.target));
+        urlPlaceholders.push(localLinkToken(i));
       }
       linkEnd = link.end;
     }
@@ -245,6 +252,10 @@ export function renderMarkdownToHtml(content: string, vscode?: any): string {
       'src', 'alt', 'data-img-path', 'data-img-url', 'data-img-temp-id', 'data-md-original',
       'data-url', 'title'
     ],
+  });
+
+  localLinkHtml.forEach((html, i) => {
+    processedContent = processedContent.split(localLinkToken(i)).join(html);
   });
 
   // 步骤11: 恢复公式占位
@@ -633,30 +644,17 @@ function isPrivateHost(h: string): boolean {
 }
 
 /**
- * 创建本地路径链接 HTML - [text](wiki/foo.md) 等无 scheme 路径
- * 初始为待验证纯文本样式（title 悬停显示真实路径），verifyFilePath 确认存在后
- * 由 AiResponseBlock 加 file-path-code 变为可点；不存在时保持纯文本（只显示链接文字，与 webui 一致）
+ * 创建本地路径链接 HTML - [text](wiki/foo.md) 等无 scheme 路径。
+ * 显式链接不校验存在性，直接显示文件类型色图标与主题链接色文字；点击交给宿主打开文件。
  */
-function createLocalLinkHtml(text: string, path: string, vscode: any): string {
-  // 模型按 CommonMark 把空格写成 %20（my%20notes.md），先解码再校验，否则 stat 的是带 %20 的字面量永远不存在；非法编码保持原样
+function createLocalLinkHtml(text: string, path: string): string {
+  // 模型按 CommonMark 把空格写成 %20（my%20notes.md），打开前还原路径；非法编码保持原样。
   let decoded = path;
   try { decoded = decodeURIComponent(path); } catch { /* keep */ }
   // 剥掉锚点（wiki/foo.md#章节）后交给 parseFilePath 拆出可能的 :12 / :12-20 行号后缀
   const { filePath, lineInfo } = parseFilePath(decoded.replace(/#.*$/, ''));
-  const randomStr = Array.from(crypto.getRandomValues(new Uint8Array(5)), b => b.toString(36)).join('').slice(0, 9);
-  const tempId = `file-check-${Date.now()}-${randomStr}`;
-
-  setTimeout(() => {
-    vscode.postMessage({
-      type: 'verifyFilePath',
-      filePath: filePath,
-      tempId: tempId,
-      originalCode: decoded,
-      lineInfo: lineInfo
-    });
-  }, 0);
-
-  return `<a class="md-local-link" data-temp-id="${tempId}" title="${escapeHtml(decoded)}">${escapeHtml(text)}</a>`;
+  const lineAttr = lineInfo ? ` data-line-info="${escapeHtml(lineInfo)}"` : '';
+  return `<a class="md-local-link file-path-code" data-file-path="${escapeHtml(filePath)}"${lineAttr} title="${escapeHtml(decoded)}">${buildFileLabelHtml(filePath, false, text, true)}</a>`;
 }
 
 /**
