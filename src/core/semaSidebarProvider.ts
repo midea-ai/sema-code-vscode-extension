@@ -151,6 +151,7 @@ export class SemaSidebarProvider implements vscode.WebviewViewProvider {
             },
         );
         this.configWebviewProvider = new ConfigWebviewProvider(this.processWrapper, this.fileOperationManager, this.clawCoordinator);
+        this.configWebviewProvider.setOnModelOrderChanged(() => void this.pushModelOrder());
         this.configWebviewProvider.setOnSystemConfigChanged((key, value) => {
             if (key === 'skipFileEditPermission' || key === 'thinking' || key === 'showThinkingText' || key === 'lang') {
                 const cfg = this.processWrapper.getSystemConfig() as Record<string, any>;
@@ -673,7 +674,11 @@ export class SemaSidebarProvider implements vscode.WebviewViewProvider {
     };
 
     private handleMessage = (msg: any): void => {
-        this.chatWebviewProvider?.postMessage(msg);
+        // 聊天页模型下拉的顺序跟随配置页拖拽保存的顺序（没拖过就是 core 原顺序，不额外置顶）
+        const out = msg?.type === 'updateModelInfo' && Array.isArray(msg.availableModels)
+            ? { ...msg, availableModels: this.processWrapper.sortModelList(msg.availableModels) }
+            : msg;
+        this.chatWebviewProvider?.postMessage(out);
     };
 
     /**
@@ -684,7 +689,7 @@ export class SemaSidebarProvider implements vscode.WebviewViewProvider {
      * 2. 之后对所有打开会话重新拉取生效模型，覆盖 core 不发会话级事件的场景（未钉住会话跟随全局、首个模型加入等）。
      */
     private handleModelUpdate = (data: ModelUpdateData, origin: ModelUpdateOrigin): void => {
-        this.chatWebviewProvider.postMessage({ type: 'modelUpdate', data });
+        this.pushModelList(data);
         this.configWebviewProvider.refreshConfigPage();
 
         const active = this.activeSessionId ? this.sessions.get(this.activeSessionId) : undefined;
@@ -698,6 +703,24 @@ export class SemaSidebarProvider implements vscode.WebviewViewProvider {
             }
         });
     };
+
+    /** 下发聊天页的模型列表：统一按配置页拖拽保存的顺序排一次 */
+    private pushModelList(data: ModelUpdateData): void {
+        this.chatWebviewProvider.postMessage({
+            type: 'modelUpdate',
+            data: { ...data, modelList: this.processWrapper.sortModelList(data.modelList) },
+        });
+    }
+
+    /** 配置页拖拽换序后，把新顺序推给聊天页的模型下拉（不触发 core 的 model:update 广播） */
+    private async pushModelOrder(): Promise<void> {
+        try {
+            const data = await this.processWrapper.getModelData();
+            if (data) this.pushModelList(data);
+        } catch (error) {
+            console.error('推送模型顺序失败:', error);
+        }
+    }
 
     private handleStateChange = (sessionId: string, state: 'idle' | 'processing'): void => {
         if (state === 'idle') {

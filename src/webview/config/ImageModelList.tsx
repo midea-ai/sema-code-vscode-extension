@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useMemo, useState } from 'react';
 import { Config, VscodeApi } from './types';
 import ProviderLogo, { parseProviderKey, stripProviderSuffix } from '../common/ProviderLogo';
 import { EditIcon, TrashIcon, PlusIcon } from './utils/svgIcons';
+import { useRowDragOrder } from './utils/useRowDragOrder';
 import { useT } from '../common/i18n/react';
 import './style/section.css';
 
@@ -14,12 +15,38 @@ interface ImageModelListProps {
 
 /**
  * 图像模型列表：与对话模型各自独立，没有对话模型时也能配置。
- * 没有「main / quick」任务角标，只在当前 image 指针指向的那条上标「使用中」。
+ * 没有「main / quick」任务角标，只在当前 image 指针指向的那条上标「使用中」；该条固定置顶且不可拖动。
  */
 const ImageModelList: React.FC<ImageModelListProps> = ({ config, vscode, onAdd }) => {
     const t = useT();
-    const imageList = config?.imageModelList || [];
+    /** 拖拽换序只在 VSCode 侧生效（JB 配置页不接 saveModelOrder，保持原有展示） */
+    const canDrag = !(window as any).__SEMA_JB__;
+    /** 拖完先按本地顺序渲染，不等 host 回推 */
+    const [localOrder, setLocalOrder] = useState<string[] | null>(null);
+
+    const imageList = useMemo(() => config?.imageModelList || [], [config?.imageModelList]);
     const imageActive = config?.taskConfig?.image || '';
+
+    /** 「使用中」的图像模型固定置顶，类似对话模型里的 main */
+    const pinnedNames = useMemo(
+        () => (imageActive && imageList.includes(imageActive) ? [imageActive] : []),
+        [imageActive, imageList]
+    );
+
+    /** 展示顺序：「使用中」置顶 → 其余按拖拽保存的顺序 → 新增模型补尾 */
+    const orderedNames = useMemo(() => {
+        const head = pinnedNames.filter(name => imageList.includes(name));
+        const source = localOrder ?? imageList;
+        const tail = source.filter(name => imageList.includes(name) && !head.includes(name));
+        const added = imageList.filter(name => !head.includes(name) && !tail.includes(name));
+        return [...head, ...tail, ...added];
+    }, [imageList, pinnedNames, localOrder]);
+
+    /** 拖拽排序：只落扩展本地，不涉及 core */
+    const { tableRef, rowProps } = useRowDragOrder(orderedNames, pinnedNames, order => {
+        setLocalOrder(order);
+        vscode.postMessage({ command: 'saveModelOrder', order, kind: 'image' });
+    });
 
     const handleDelete = (modelName: string) => {
         vscode.postMessage({ command: 'deleteImageModel', modelName });
@@ -49,8 +76,8 @@ const ImageModelList: React.FC<ImageModelListProps> = ({ config, vscode, onAdd }
             {config && imageList.length === 0 && (
                 <div className="description image-model-list-desc">{t('config.imageList.desc')}</div>
             )}
-            {imageList.length > 0 && (
-                <table className="model-table">
+            {orderedNames.length > 0 && (
+                <table className="model-table" ref={tableRef}>
                     <thead>
                         <tr>
                             <th>{t('config.modelList.provider')}</th>
@@ -59,10 +86,10 @@ const ImageModelList: React.FC<ImageModelListProps> = ({ config, vscode, onAdd }
                         </tr>
                     </thead>
                     <tbody>
-                        {imageList.map(fullName => {
+                        {orderedNames.map(fullName => {
                             const provider = parseProviderKey(fullName);
                             return (
-                                <tr key={fullName}>
+                                <tr key={fullName} {...rowProps(fullName, canDrag)}>
                                     <td>
                                         <span className="provider-cell">
                                             <ProviderLogo provider={provider} className="provider-cell-logo" />

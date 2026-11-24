@@ -41,6 +41,7 @@ export class ConfigWebviewProvider {
     private pendingPage?: string;
     private pendingTaskId?: string;
     private onSystemConfigChanged?: (key: string, value: any) => void;
+    private onModelOrderChanged?: () => void;
 
     constructor(coreManager: any, fileOperationManager?: any, clawCoordinator?: ClawCoordinator) {
         this.coreManager = coreManager;
@@ -50,6 +51,11 @@ export class ConfigWebviewProvider {
 
     public setOnSystemConfigChanged(callback: (key: string, value: any) => void): void {
         this.onSystemConfigChanged = callback;
+    }
+
+    /** 模型顺序变化后通知宿主，让聊天页的模型下拉立即跟随 */
+    public setOnModelOrderChanged(callback: () => void): void {
+        this.onModelOrderChanged = callback;
     }
 
     /** 聊天页切换语言后，同步已打开的配置页及其原生面板标题；customRules 带当前落盘值，供页面在仍为默认规则时跟着切换。 */
@@ -97,6 +103,7 @@ export class ConfigWebviewProvider {
             const handlers: Record<string, () => Promise<void>> = {
                 saveConfig:                 () => this.saveConfig(m.data),
                 loadConfig:                 () => this.loadConfig(),
+                saveModelOrder:             () => this.saveModelOrder(m.order, m.kind),
                 toggleModelActive:          () => this.toggleModelActive(m.provider, m.modelName),
                 confirmTaskConfig:          () => this.confirmTaskConfig(m.data),
                 testConnection:             () => this.testConnection(m.data),
@@ -363,7 +370,7 @@ export class ConfigWebviewProvider {
         try {
             await this.ensureCoreReady();
             const modelData = await this.coreManager.getModelData();
-            this.postMessage({ command: 'loadConfig', data: modelData, showAddPage: !modelData?.modelList?.length });
+            this.postMessage({ command: 'loadConfig', data: this.withModelOrder(modelData), showAddPage: !modelData?.modelList?.length });
         } catch {
             this.postMessage({ command: 'loadConfig', data: null, showAddPage: true });
         }
@@ -372,6 +379,31 @@ export class ConfigWebviewProvider {
             this.pendingPage = undefined;
             this.pendingTaskId = undefined;
         }
+    }
+
+    /** 对话 / 图像模型列表各按拖拽保存的顺序下发（main、quick、「使用中」置顶），其余字段原样透传 */
+    private withModelOrder(modelData: any): any {
+        if (!modelData) return modelData;
+        const data = { ...modelData };
+        const { main, quick, image } = modelData.taskConfig ?? {};
+        if (Array.isArray(modelData.modelList)) {
+            data.modelList = this.coreManager.sortModelList(modelData.modelList, [main, quick]);
+        }
+        if (Array.isArray(modelData.imageModelList)) {
+            data.imageModelList = this.coreManager.sortModelList(modelData.imageModelList, [image], 'imageModelOrder');
+        }
+        return data;
+    }
+
+    /** 模型列表拖拽排序：只落扩展本地，不推 core，也不弹保存提示（拖一次就会触发） */
+    private async saveModelOrder(order: string[], kind?: 'image') {
+        if (!Array.isArray(order)) return;
+        const isImage = kind === 'image';
+        await this.coreManager.saveModelOrder(order, isImage ? 'imageModelOrder' : 'modelOrder');
+        // 只有对话模型在聊天页有下拉，图像模型的顺序不用跨页推
+        if (!isImage) this.onModelOrderChanged?.();
+        // 重推一次列表，让「任务配置」里的下拉顺序跟着变
+        await this.loadConfig();
     }
 
     private async saveConfig(data: any) {
@@ -546,11 +578,13 @@ export class ConfigWebviewProvider {
         await this.execute('resetSystemConfigResult', t('host.cfg.op.resetSystem'), async () => {
             // 重置不改界面语言：lang 保留当前值，customRules 取当前语言对应的默认规则，其余字段回默认。
             // enableBrowserControl 只允许由 BrowserControlManager 在动作成功后写入，重置时保留当前值，避免键与实际 skill/MCP 状态脱节
+            // modelOrder / imageModelOrder 是用户的展示偏好（拖拽顺序），不属于系统配置语义，整包覆盖写会丢掉，这里保留
             const current = this.coreManager.getSystemConfig() as Record<string, any>;
             const lang = normalizeLang(current.lang);
             const resetConfig = {
                 ...defaultConfig, lang, customRules: DEFAULT_CUSTOM_RULES[lang],
-                enableBrowserControl: !!current.enableBrowserControl
+                enableBrowserControl: !!current.enableBrowserControl,
+                modelOrder: current.modelOrder, imageModelOrder: current.imageModelOrder
             };
             await this.coreManager.updateSystemConfig(resetConfig);
             this.postMessage({ command: 'resetSystemConfigResult', success: true, data: resetConfig, message: t('host.cfg.systemReset') });

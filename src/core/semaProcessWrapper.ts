@@ -40,7 +40,7 @@ export type ProcessEventName = 'cron:update' | 'mcp:server:status';
 export const MAX_SESSIONS = 5;
 /** 使用统计的产品标识：传给 core 即启用采集，读取时按它过滤本产品的数据 */
 export const USAGE_PRODUCT = 'sema-code-vscode';
-const LOCAL_SYSTEM_CONFIG_KEYS = new Set(['enablePet', 'showThinkingText', 'defaultPermissionLevel', 'enableBrowserControl']);
+const LOCAL_SYSTEM_CONFIG_KEYS = new Set(['enablePet', 'showThinkingText', 'defaultPermissionLevel', 'enableBrowserControl', 'modelOrder', 'imageModelOrder']);
 
 function toCoreSystemConfig(config: Record<string, any>): UpdatableCoreConfig {
     const coreConfig = { ...config };
@@ -166,6 +166,37 @@ export class SemaProcessWrapper {
 
     public getModelData(): Promise<ModelUpdateData> {
         return this.semaCore.getModelData();
+    }
+
+    /**
+     * 按配置页拖拽保存的顺序重排模型名列表：pinned（对话模型的 main / quick、图像模型的「使用中」）固定在最前，
+     * 其余按本地记录，记录里没有的新模型按 core 原顺序补尾；没记录过顺序时输出与 core 原顺序一致（只是 pinned 置顶）。
+     * 纯展示顺序，core 的模型顺序没有语义（指针按名字匹配）
+     */
+    public sortModelList(
+        names: string[],
+        pinned: Array<string | undefined> = [],
+        orderKey: 'modelOrder' | 'imageModelOrder' = 'modelOrder'
+    ): string[] {
+        const head = pinned.filter((n, i): n is string => !!n && pinned.indexOf(n) === i && names.includes(n));
+        const stored = (this.systemConfigManager.getSystemConfig() as Record<string, any>)[orderKey];
+        const rank = new Map<string, number>();
+        if (Array.isArray(stored)) stored.forEach((n: string, i: number) => rank.set(n, i));
+        const rankOf = (name: string) => rank.get(name) ?? Number.MAX_SAFE_INTEGER;
+        const tail = names
+            .map((name, index) => ({ name, index }))
+            .filter(item => !head.includes(item.name))
+            .sort((a, b) => rankOf(a.name) - rankOf(b.name) || a.index - b.index)
+            .map(item => item.name);
+        return [...head, ...tail];
+    }
+
+    /** 保存模型展示顺序（仅扩展本地 globalState，不推 core） */
+    public async saveModelOrder(
+        order: string[],
+        orderKey: 'modelOrder' | 'imageModelOrder' = 'modelOrder'
+    ): Promise<void> {
+        await this.saveLocalSystemConfigByKey(orderKey, order);
     }
 
     public fetchAvailableModels(params: FetchModelsParams): Promise<FetchModelsResult> {

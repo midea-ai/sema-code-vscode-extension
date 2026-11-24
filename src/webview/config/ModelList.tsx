@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useMemo, useState } from 'react';
 import { Config, VscodeApi } from './types';
 import ProviderLogo from '../common/ProviderLogo';
 import { EditIcon, TrashIcon, PlusIcon } from './utils/svgIcons';
+import { useRowDragOrder } from './utils/useRowDragOrder';
 import { useT } from '../common/i18n/react';
 import './style/section.css';
 
@@ -14,6 +15,11 @@ interface ModelListProps {
 
 const ModelList: React.FC<ModelListProps> = ({ config, vscode, onAdd }) => {
     const t = useT();
+    /** 拖拽换序只在 VSCode 侧生效（JB 配置页不接 saveModelOrder，保持原有展示） */
+    const canDrag = !(window as any).__SEMA_JB__;
+    /** 拖完先按本地顺序渲染，不等 host 回推（host 只在 loadConfig 时下发排好序的列表） */
+    const [localOrder, setLocalOrder] = useState<string[] | null>(null);
+
     // 解析模型名称以提取 provider 和 model 信息
     const parseModelName = (modelName: string) => {
         // 模型名称格式例如: "Claude-Sonnet-4-20250514-v1.0[custom]"
@@ -41,19 +47,30 @@ const ModelList: React.FC<ModelListProps> = ({ config, vscode, onAdd }) => {
         return '-';
     };
 
-    // 按任务类型排序模型列表
-    const getSortedModelList = () => {
-        if (!config?.modelList) return [];
+    /** main / quick 固定置顶，不可拖动 */
+    const pinnedNames = useMemo(() => {
+        const names = [config?.taskConfig?.main, config?.taskConfig?.quick];
+        return names.filter((name, index): name is string => !!name && names.indexOf(name) === index);
+    }, [config?.taskConfig?.main, config?.taskConfig?.quick]);
 
-        return [...config.modelList].sort((a, b) => {
-            const taskA = getModelTaskType(a);
-            const taskB = getModelTaskType(b);
+    /**
+     * 展示顺序：main / quick 置顶 → 其余按拖拽保存的顺序 → 新增模型补尾。
+     * 没拖过时与原来的「任务类型排序 + core 原顺序」一致
+     */
+    const orderedNames = useMemo(() => {
+        const all = config?.modelList ?? [];
+        const head = pinnedNames.filter(name => all.includes(name));
+        const source = localOrder ?? all;
+        const tail = source.filter(name => all.includes(name) && !head.includes(name));
+        const added = all.filter(name => !head.includes(name) && !tail.includes(name));
+        return [...head, ...tail, ...added];
+    }, [config?.modelList, pinnedNames, localOrder]);
 
-            // 排序优先级: main > quick > -
-            const taskOrder = { 'main': 0, 'quick': 1, '-': 2 };
-            return taskOrder[taskA] - taskOrder[taskB];
-        });
-    };
+    /** 拖拽排序：只落扩展本地，不涉及 core */
+    const { tableRef, rowProps } = useRowDragOrder(orderedNames, pinnedNames, order => {
+        setLocalOrder(order);
+        vscode.postMessage({ command: 'saveModelOrder', order });
+    });
 
     const handleDelete = (modelName: string) => {
         const { provider } = parseModelName(modelName);
@@ -74,9 +91,7 @@ const ModelList: React.FC<ModelListProps> = ({ config, vscode, onAdd }) => {
         });
     };
 
-
-    const hasModels = config && config.modelList && config.modelList.length > 0;
-    const sortedModelList = getSortedModelList();
+    const hasModels = orderedNames.length > 0;
 
     return (
         <div className="model-list">
@@ -87,7 +102,7 @@ const ModelList: React.FC<ModelListProps> = ({ config, vscode, onAdd }) => {
                     {t('config.modelForm.addModel')}
                 </button>
             </div>
-            <table className="model-table">
+            <table className="model-table" ref={tableRef}>
                 <thead>
                     <tr>
                         <th>{t('config.modelList.provider')}</th>
@@ -101,12 +116,12 @@ const ModelList: React.FC<ModelListProps> = ({ config, vscode, onAdd }) => {
                             <td colSpan={3} className="empty-state">{t('config.modelList.empty')}</td>
                         </tr>
                     ) : (
-                        sortedModelList.map((modelName, index) => {
+                        orderedNames.map(modelName => {
                             const { provider, modelDisplayName, fullName } = parseModelName(modelName);
                             const taskType = getModelTaskType(modelName);
 
                             return (
-                                <tr key={index}>
+                                <tr key={fullName} {...rowProps(modelName, canDrag)}>
                                     <td>
                                         <span className="provider-cell">
                                             <ProviderLogo provider={provider.toLowerCase()} className="provider-cell-logo" />
