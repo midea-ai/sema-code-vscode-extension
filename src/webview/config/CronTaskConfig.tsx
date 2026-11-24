@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { VscodeApi } from './types';
-import { ExpandArrowIcon, EditIcon, TrashIcon } from './utils/svgIcons';
-import { formatDateTime } from './utils/timeUtils';
+import { EditIcon, TrashIcon, ClockIcon } from './utils/svgIcons';
+import { formatDateTime } from '../common/timeFormat';
 import { useT } from '../common/i18n/react';
 import './style/task.css';
 import './style/section.css';
@@ -28,7 +28,7 @@ interface CronTask {
     nextFireAt: number[];
 }
 
-const MAX_LINES = 2;
+const MAX_PROMPT_CHARS = 120;
 
 const CronTaskCard: React.FC<{
     task: CronTask;
@@ -39,36 +39,36 @@ const CronTaskCard: React.FC<{
     const t = useT();
     const [expanded, setExpanded] = useState(false);
 
+    // 提醒内容超长时按字符截断
+    const promptChars = Array.from(task.task);
+    const prompt = promptChars.length > MAX_PROMPT_CHARS
+        ? promptChars.slice(0, MAX_PROMPT_CHARS).join('') + '…'
+        : task.task;
+    const nextFire = task.status ? task.nextFireAt : [];
+
+    const handleOpenFile = () => {
+        if (!task.filePath) return;
+        const match = task.filePath.match(/^(.+?)(?::(\d+)(?:-(\d+))?)?$/);
+        if (match) {
+            vscode.postMessage({
+                command: 'openFile',
+                filePath: match[1],
+                ...(match[2] ? { line: Number(match[2]) } : {}),
+                ...(match[3] ? { endLine: Number(match[3]) } : {}),
+            });
+        }
+    };
+
     return (
-        <div className="section-card">
-            <div className="section-card-header" onClick={() => setExpanded(!expanded)} style={{ cursor: 'pointer' }}>
-                <button
-                    className={`section-expand-btn ${expanded ? 'expanded' : ''}`}
-                    onClick={(e) => { e.stopPropagation(); setExpanded(!expanded); }}
-                >
-                    <ExpandArrowIcon />
-                </button>
-                <div className="section-card-name-group section-card-name-group-truncate">
-                    <span className="section-card-name section-card-name-truncate" title={task.title || task.id}>{task.title || task.id}</span>
-                    <span className="section-card-name-sub">{task.describeCronExpression}</span>
+        <div className={`section-card cron-card ${task.status ? '' : 'cron-card-disabled'}`}>
+            <div className="cron-card-header">
+                <div className="cron-card-heading">
+                    <div className="cron-card-title" title={task.title || task.id}>{task.title || task.id}</div>
+                    <div className="cron-card-subtitle">{task.describeCronExpression}</div>
                 </div>
-                <div className="section-card-actions" onClick={(e) => e.stopPropagation()}>
+                <div className="section-card-actions">
                     {task.filePath && (
-                        <button
-                            className="section-icon-btn"
-                            title={t('common.edit')}
-                            onClick={() => {
-                                const match = task.filePath!.match(/^(.+?)(?::(\d+)(?:-(\d+))?)?$/);
-                                if (match) {
-                                    vscode.postMessage({
-                                        command: 'openFile',
-                                        filePath: match[1],
-                                        ...(match[2] ? { line: Number(match[2]) } : {}),
-                                        ...(match[3] ? { endLine: Number(match[3]) } : {}),
-                                    });
-                                }
-                            }}
-                        >
+                        <button className="section-icon-btn" title={t('common.edit')} onClick={handleOpenFile}>
                             <EditIcon />
                         </button>
                     )}
@@ -89,43 +89,53 @@ const CronTaskCard: React.FC<{
                     </label>
                 </div>
             </div>
+
+            {nextFire.length > 0 && (
+                <div className="cron-next-fire">
+                    <ClockIcon size={16} />
+                    <div className="cron-next-fire-text">
+                        <div className="cron-next-fire-label">{t('config.cron.nextFire')}</div>
+                        <div className="cron-next-fire-time">{formatDateTime(nextFire[0])}</div>
+                    </div>
+                </div>
+            )}
+
+            <div className="cron-section">
+                <div className="cron-section-label">{t('config.cron.prompt')}</div>
+                <div className="cron-prompt">{prompt}</div>
+            </div>
+
+            <button className="cron-detail-toggle" onClick={() => setExpanded(!expanded)}>
+                {expanded ? t('config.cron.hideDetail') : t('config.cron.viewDetail')}
+            </button>
+
             {expanded && (
-                <>
-                    <div className="task-detail-info">
-                        <div><strong>Cron:</strong> <span className="cron-expression-tag">{task.schedule.split('').map((ch, i) => ch === '*' ? ch : <span key={i} className="cron-highlight">{ch}</span>)}</span> <span className="readonly-tab">{task.repeat ? t('config.cron.repeat') : t('config.cron.once')}</span>{task.persist && <> <span className="readonly-tab">{t('config.cron.persist')}</span></>}</div>
-                        <div style={{ color: 'var(--vscode-descriptionForeground)', opacity: 0.8 }}>{task.id} · {formatDateTime(task.createdAt)}</div>
+                <div className="cron-detail">
+                    <div className="cron-detail-row">
+                        <span className="cron-detail-key">{t('config.cron.expression')}</span>
+                        <span className="cron-detail-value">
+                            <span className="cron-expression-tag">
+                                {task.schedule.split('').map((ch, i) => ch === '*' ? ch : <span key={i} className="cron-highlight">{ch}</span>)}
+                            </span>
+                        </span>
                     </div>
-                    <div className="cron-card-body">
-                        <div className="task-detail-output-label">Prompt:</div>
-                        <pre className="task-detail-output">
-                            {(() => {
-                                const lines = task.task.split('\n');
-                                if (lines.length <= MAX_LINES) return task.task;
-                                const visible = lines.slice(0, MAX_LINES).join('\n');
-                                const omitted = lines.length - MAX_LINES;
-                                return (<>
-                                    {visible}
-                                    {'\n'}
-                                    <div
-                                        className="bash-omitted-lines bash-omitted-lines-clickable"
-                                        onClick={() => vscode.postMessage({
-                                            command: 'openBashOutput',
-                                            content: task.task,
-                                            title: `${task.title || task.id} (${task.describeCronExpression})`,
-                                            toolId: task.id,
-                                        })}
-                                    >{t('chat.omittedLines', { count: omitted })}</div>
-                                </>);
-                            })()}
-                        </pre>
-                        {task.nextFireAt.length > 0 && (
-                            <div className="cron-next-fire-section">
-                                <div className="task-detail-output-label">{t('config.cron.nextFire')}</div>
-                                <pre className="task-detail-output">{task.nextFireAt.map(ts => formatDateTime(ts)).join('\n')}</pre>
-                            </div>
-                        )}
+                    {nextFire.length > 0 && (
+                        <div className="cron-detail-row">
+                            <span className="cron-detail-key">{t('config.cron.upcoming')}</span>
+                            <span className="cron-detail-value">
+                                {nextFire.map(ts => <span key={ts} className="cron-chip">{formatDateTime(ts)}</span>)}
+                            </span>
+                        </div>
+                    )}
+                    <div className="cron-detail-row">
+                        <span className="cron-detail-key">{t('config.cron.taskId')}</span>
+                        <span className="cron-detail-value">{task.id}</span>
                     </div>
-                </>
+                    <div className="cron-detail-row">
+                        <span className="cron-detail-key">{t('config.cron.createdAt')}</span>
+                        <span className="cron-detail-value">{formatDateTime(task.createdAt)}</span>
+                    </div>
+                </div>
             )}
         </div>
     );

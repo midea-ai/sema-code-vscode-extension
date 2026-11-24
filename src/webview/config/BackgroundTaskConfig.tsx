@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { CloseIcon } from './utils/svgIcons';
-import { formatDateTime } from './utils/timeUtils';
+import { formatDateTime, formatRelativeTime } from '../common/timeFormat';
 import { VscodeApi } from './types';
 import { useT, t } from '../common/i18n/react';
 import './style/task.css';
@@ -32,11 +32,18 @@ interface TaskItem {
     agentType?: string;
 }
 
-const STATUS_LABELS: Record<TaskStatus, string> = {
-    running: 'Running',
-    completed: 'Completed',
-    failed: 'Failed',
-    killed: 'Killed',
+/** 状态文案在渲染期取，模块顶层常量不能存 t() 结果 */
+const statusLabel = (status: TaskStatus): string => {
+    switch (status) {
+        case 'running':
+            return t('config.bgTask.status.running');
+        case 'completed':
+            return t('config.bgTask.status.completed');
+        case 'failed':
+            return t('config.bgTask.status.failed');
+        default:
+            return t('config.bgTask.status.killed');
+    }
 };
 
 const formatRuntime = (start: number, end?: number) => {
@@ -47,20 +54,6 @@ const formatRuntime = (start: number, end?: number) => {
     if (m < 60) return `${m}min${s > 0 ? s + 's' : ''}`;
     const h = Math.floor(m / 60);
     return `${h}h${m % 60}min`;
-};
-
-const formatStartTime = (start: number) => {
-    const now = Date.now();
-    const diff = now - start;
-    const DAY = 24 * 60 * 60 * 1000;
-    if (diff >= DAY) {
-        const days = Math.floor(diff / DAY);
-        return t('history.daysAgo', { n: days });
-    }
-    const d = new Date(start);
-    const hh = String(d.getHours()).padStart(2, '0');
-    const mm = String(d.getMinutes()).padStart(2, '0');
-    return `${hh}:${mm}`;
 };
 
 const RuntimeText: React.FC<{ start: number; end?: number; status: TaskStatus }> = ({ start, end, status }) => {
@@ -109,9 +102,9 @@ const BashOutputPanel: React.FC<{ taskId: string; command?: string; status: Task
     if (!output) {
         return (
             <div className="task-detail-output-section">
-                <div className="task-detail-output-label">Output:</div>
+                <div className="task-detail-output-label">{t('config.bgTask.output')}</div>
                 <pre className="task-detail-output">
-                    {status === 'running' ? 'Waiting for output...' : 'No output'}
+                    {status === 'running' ? t('config.bgTask.waitingOutput') : t('tool.noOutput')}
                 </pre>
             </div>
         );
@@ -124,7 +117,7 @@ const BashOutputPanel: React.FC<{ taskId: string; command?: string; status: Task
 
     return (
         <div className="task-detail-output-section">
-            <div className="task-detail-output-label">Output:</div>
+            <div className="task-detail-output-label">{t('config.bgTask.output')}</div>
             <pre className="task-detail-output">
                 {omittedCount > 0 && (
                     <div className="bash-omitted-lines bash-omitted-lines-clickable" onClick={handleViewAll}>{t('chat.omittedLines', { count: omittedCount })}</div>
@@ -141,7 +134,7 @@ const CommandPanel: React.FC<{ command: string; taskId: string; vscode: VscodeAp
         vscode.postMessage({
             command: 'openBashOutput',
             content: command,
-            title: 'Command: ' + command.split('\n')[0],
+            title: `${t('config.bgTask.command')} ${command.split('\n')[0]}`,
             toolId: taskId + '-cmd'
         });
     };
@@ -153,8 +146,8 @@ const CommandPanel: React.FC<{ command: string; taskId: string; vscode: VscodeAp
 
     return (
         <div className="task-detail-output-section">
-            <div className="task-detail-output-label">Command:</div>
-            <pre className="task-detail-output">
+            <div className="task-detail-output-label">{t('config.bgTask.command')}</div>
+            <pre className="task-detail-output task-detail-command">
                 {visibleLines.join('\n')}
                 {omittedCount > 0 && (
                     <div className="bash-omitted-lines bash-omitted-lines-clickable" onClick={handleViewAll}>{t('chat.omittedLines', { count: omittedCount })}</div>
@@ -168,7 +161,16 @@ const BackgroundTaskConfig: React.FC<BackgroundTaskConfigProps> = ({ vscode, ref
     const t = useT();
     const [tasks, setTasks] = useState<Map<string, TaskItem>>(new Map());
     const [selectedTaskId, setSelectedTaskId] = useState<string | null>(initialTaskId ?? null);
+    const [endedExpanded, setEndedExpanded] = useState(false);
     const autoOpenAppliedRef = useRef<Set<string>>(new Set());
+
+    // 相对时间会过期：定时重渲染，保证「X 分钟前」不越挂越旧
+    const [, setTimeTick] = useState(0);
+    useEffect(() => {
+        if (tasks.size === 0) return;
+        const timer = setInterval(() => setTimeTick(n => n + 1), 30_000);
+        return () => clearInterval(timer);
+    }, [tasks.size]);
 
     useEffect(() => {
         if (initialTaskId) {
@@ -277,11 +279,11 @@ const BackgroundTaskConfig: React.FC<BackgroundTaskConfigProps> = ({ vscode, ref
         onCountChange?.(Array.from(tasks.values()).filter(task => task.status === 'running').length);
     }, [tasks]);
 
-    // Auto-open detail when only 1 task total
+    // 只有一个运行中任务时自动打开详情（已结束的不自动弹，避免进页面就翻旧账）
     useEffect(() => {
-        const allTasks = Array.from(tasks.values());
-        if (allTasks.length === 1 && !selectedTaskId) {
-            const task = allTasks[0];
+        const runningTasks = Array.from(tasks.values()).filter(task => task.status === 'running');
+        if (runningTasks.length === 1 && !selectedTaskId) {
+            const task = runningTasks[0];
             if (!autoOpenAppliedRef.current.has(task.taskId)) {
                 autoOpenAppliedRef.current.add(task.taskId);
                 setSelectedTaskId(task.taskId);
@@ -293,23 +295,24 @@ const BackgroundTaskConfig: React.FC<BackgroundTaskConfigProps> = ({ vscode, ref
         vscode.postMessage({ command: 'stopTask', taskId });
     };
 
-    const allTasks = Array.from(tasks.values()).sort((a, b) => {
-        if (a.status === 'running' && b.status !== 'running') return -1;
-        if (a.status !== 'running' && b.status === 'running') return 1;
-        return b.startTime - a.startTime;
-    });
-    const bashTasks = allTasks.filter(task => task.type === TASK_TYPE_SHELL);
-    const agentTasks = allTasks.filter(task => task.type === TASK_TYPE_AGENT);
+    const allTasks = Array.from(tasks.values()).sort((a, b) => b.startTime - a.startTime);
+    // 运行中的 Shell / Agent 各自成组，已结束的（完成、失败、已停止）统一收进「已结束」按结束时间倒序
+    const runningShells = allTasks.filter(task => task.type === TASK_TYPE_SHELL && task.status === 'running');
+    const runningAgents = allTasks.filter(task => task.type === TASK_TYPE_AGENT && task.status === 'running');
+    const endedTasks = allTasks
+        .filter(task => task.status !== 'running')
+        .sort((a, b) => (b.endTime ?? b.startTime) - (a.endTime ?? a.startTime));
     const selectedTask = selectedTaskId ? tasks.get(selectedTaskId) : null;
 
     const getTaskDisplayName = (task: TaskItem) => {
         if (task.type === TASK_TYPE_AGENT && task.agentType) {
-            return `${task.agentType} > ${task.command || task.filepath}`;
+            return `${task.agentType} › ${task.command || task.filepath}`;
         }
         return task.command || task.filepath;
     };
 
-    const renderTaskRow = (task: TaskItem) => {
+    // showStatus：运行中的分组标题已写明状态，行内不再重复；已结束分组仍需要
+    const renderTaskRow = (task: TaskItem, showStatus: boolean) => {
         const isSelected = selectedTaskId === task.taskId;
         return (
             <div
@@ -318,8 +321,10 @@ const BackgroundTaskConfig: React.FC<BackgroundTaskConfigProps> = ({ vscode, ref
                 onClick={() => setSelectedTaskId(task.taskId)}
             >
                 <span className="task-row-command">
-                    <span className="task-time-tag">[{formatStartTime(task.startTime)}]</span>
-                    <span className={`task-status-tag ${task.status}`}>[{STATUS_LABELS[task.status]}]</span>
+                    <span className="task-time-tag" title={formatDateTime(task.startTime)}>{formatRelativeTime(task.startTime)}</span>
+                    {showStatus && (
+                        <span className={`task-status-tag ${task.status}`}>[{statusLabel(task.status)}]</span>
+                    )}
                     {getTaskDisplayName(task)}
                 </span>
                 {task.status === 'running' && (
@@ -334,26 +339,51 @@ const BackgroundTaskConfig: React.FC<BackgroundTaskConfigProps> = ({ vscode, ref
         );
     };
 
+    const renderDetailHeader = (title: string) => (
+        <div className="task-detail-header">
+            <span className="task-detail-title">{title}</span>
+            <button
+                className="section-icon-btn"
+                title={t('common.close')}
+                onClick={() => setSelectedTaskId(null)}
+            >
+                <CloseIcon />
+            </button>
+        </div>
+    );
+
+    // 状态 / 任务 ID / 运行时长 / 结束时间并成一行；Shell 与 Agent 详情共用。
+    // 标签弱化、值保持原对比，结束时间与其他时间一样走 common/timeFormat 的 formatDateTime
+    const renderDetailMeta = (task: TaskItem) => (
+        <div className="task-detail-status-row">
+            <span className={`task-status-pill ${task.status}`}>{statusLabel(task.status)}</span>
+            <span className="task-detail-sep" />
+            <span className="task-detail-meta-item">
+                <span className="task-detail-meta-label">{t('config.bgTask.task')}</span>
+                {/* 子代理 ID 比 Shell 长得多，统一截到 8 位，行内宽度稳定 */}
+                {task.type === TASK_TYPE_AGENT ? task.taskId.slice(0, 8) : task.taskId}
+            </span>
+            <span className="task-detail-sep" />
+            <span className="task-detail-meta-item">
+                <span className="task-detail-meta-label">{t('config.bgTask.elapsed')}</span>
+                <RuntimeText start={task.startTime} end={task.endTime} status={task.status} />
+            </span>
+            {task.status !== 'running' && task.endTime && (
+                <>
+                    <span className="task-detail-sep" />
+                    <span className="task-detail-meta-item">
+                        <span className="task-detail-meta-label">{t('config.bgTask.endedLabel')}</span>
+                        {formatDateTime(task.endTime)}
+                    </span>
+                </>
+            )}
+        </div>
+    );
+
     const renderBashDetail = (task: TaskItem) => (
         <div>
-            <div className="task-detail-header">
-                <span className="task-detail-title">{t('config.bgTask.shellDetail')}</span>
-                <button
-                    className="section-icon-btn"
-                    title={t('common.close')}
-                    onClick={() => setSelectedTaskId(null)}
-                >
-                    <CloseIcon />
-                </button>
-            </div>
-            <div className="task-detail-info">
-                <div><strong>{t('config.bgTask.task')}</strong> {task.taskId}</div>
-                <div><strong>{t('config.bgTask.status')}</strong> <span className={`task-status-text ${task.status}`}>{STATUS_LABELS[task.status]}</span></div>
-                <div><strong>{t('config.bgTask.elapsed')}</strong> <RuntimeText start={task.startTime} end={task.endTime} status={task.status} /></div>
-                {task.status !== 'running' && task.endTime && (
-                    <div style={{ color: 'var(--vscode-descriptionForeground)', fontSize: '11px', opacity: 0.8 }}>{t('config.bgTask.ended', { time: formatDateTime(task.endTime) })}</div>
-                )}
-                </div>
+            {renderDetailHeader(t('config.bgTask.shellDetail'))}
+            {renderDetailMeta(task)}
             <CommandPanel command={task.command || task.filepath} taskId={task.taskId} vscode={vscode} />
             <BashOutputPanel taskId={task.taskId} command={task.command || task.filepath} status={task.status} vscode={vscode} />
         </div>
@@ -361,25 +391,9 @@ const BackgroundTaskConfig: React.FC<BackgroundTaskConfigProps> = ({ vscode, ref
 
     const renderAgentDetail = (task: TaskItem) => (
         <div>
-            <div className="task-detail-header">
-                <span className="task-detail-title">{getTaskDisplayName(task)}</span>
-                <button
-                    className="section-icon-btn"
-                    title={t('common.close')}
-                    onClick={() => setSelectedTaskId(null)}
-                >
-                    <CloseIcon />
-                </button>
-            </div>
-            <div className="task-detail-info">
-                <div><strong>{t('config.bgTask.task')}</strong> {task.taskId}</div>
-                <div><strong>{t('config.bgTask.status')}</strong> <span className={`task-status-text ${task.status}`}>{STATUS_LABELS[task.status]}</span></div>
-                <div><strong>{t('config.bgTask.elapsed')}</strong> <RuntimeText start={task.startTime} end={task.endTime} status={task.status} /></div>
-                {task.status !== 'running' && task.endTime && (
-                    <div style={{ color: 'var(--vscode-descriptionForeground)', opacity: 0.8 }}>{t('config.bgTask.ended', { time: formatDateTime(task.endTime) })}</div>
-                )}
-            </div>
-            <div style={{ marginTop: 16, padding: '0 14px 14px' }}>
+            {renderDetailHeader(getTaskDisplayName(task))}
+            {renderDetailMeta(task)}
+            <div className="task-detail-actions">
                 <button
                     className="task-view-detail-btn"
                     onClick={() => vscode.postMessage({ command: 'openAgentDetail', taskId: task.taskId })}
@@ -406,29 +420,51 @@ const BackgroundTaskConfig: React.FC<BackgroundTaskConfigProps> = ({ vscode, ref
 
             {/* Task sections */}
             <div className="section-groups">
-                {/* Shells */}
+                {/* Shells（仅运行中） */}
                 <div className="section-group">
                     <div className="section-group-title">
-                        Shells
-                        <span className="section-group-count">({bashTasks.length})</span>
+                        Shells · {t('config.bgTask.status.running')}
+                        {runningShells.length > 0 && (
+                            <span className="section-group-count">({runningShells.length})</span>
+                        )}
                     </div>
-                    {bashTasks.length > 0
-                        ? <div>{bashTasks.map(renderTaskRow)}</div>
+                    {runningShells.length > 0
+                        ? <div>{runningShells.map(task => renderTaskRow(task, false))}</div>
                         : <div className="section-empty">{t('config.bgTask.noShell')}</div>
                     }
                 </div>
 
-                {/* SubAgents */}
+                {/* Agents（仅运行中） */}
                 <div className="section-group">
                     <div className="section-group-title">
-                        SubAgents
-                        <span className="section-group-count">({agentTasks.length})</span>
+                        Agents · {t('config.bgTask.status.running')}
+                        {runningAgents.length > 0 && (
+                            <span className="section-group-count">({runningAgents.length})</span>
+                        )}
                     </div>
-                    {agentTasks.length > 0
-                        ? <div>{agentTasks.map(renderTaskRow)}</div>
+                    {runningAgents.length > 0
+                        ? <div>{runningAgents.map(task => renderTaskRow(task, false))}</div>
                         : <div className="section-empty">{t('config.bgTask.noAgent')}</div>
                     }
                 </div>
+
+                {/* 已结束：完成 / 失败 / 已停止，按结束时间倒序，默认折叠 */}
+                {endedTasks.length > 0 && (
+                    <div className="section-group">
+                        <div
+                            className="section-group-title section-group-title-collapsible task-ended-group-title"
+                            style={{ cursor: 'pointer', userSelect: 'none' }}
+                            onClick={() => setEndedExpanded(v => !v)}
+                        >
+                            {t('config.bgTask.endedGroup')}
+                            {endedTasks.length > 0 && (
+                                <span className="section-group-count">({endedTasks.length})</span>
+                            )}
+                            <span className={`section-collapse-arrow ${endedExpanded ? '' : 'collapsed'}`} />
+                        </div>
+                        {endedExpanded && <div>{endedTasks.map(task => renderTaskRow(task, true))}</div>}
+                    </div>
+                )}
             </div>
 
         </div>

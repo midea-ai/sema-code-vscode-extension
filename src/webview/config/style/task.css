@@ -23,8 +23,8 @@
     border: 1px solid var(--s-card-border);
 }
 
+/* 选中态只靠主题高亮边框区分，不铺背景色 */
 .agent-config .task-row.selected {
-    background: var(--vscode-list-activeSelectionBackground);
     border-color: var(--vscode-focusBorder);
 }
 
@@ -38,23 +38,30 @@
 }
 
 .task-time-tag {
+    flex: none;
     color: var(--vscode-descriptionForeground, #888);
-    margin-right: 2px;
+    margin-right: 6px;
+    white-space: nowrap;
 }
 
 .task-status-tag {
     margin-right: 4px;
 }
 
-.task-status-tag.running { color: var(--s-color-running); }
-.task-status-tag.completed { color: var(--s-color-completed); }
-.task-status-tag.failed { color: var(--s-color-failed); }
-.task-status-tag.killed { color: var(--s-color-stopped); }
+/* 状态色复用测试结果的反馈色，色调比原状态色更柔和 */
+.task-status-tag.running { color: var(--s-color-testing); }
+.task-status-tag.completed { color: var(--s-color-ok); }
+.task-status-tag.failed { color: var(--s-color-err); }
+.task-status-tag.killed { color: var(--vscode-descriptionForeground); }
 
-.task-status-text.running { color: var(--s-color-running); }
-.task-status-text.completed { color: var(--s-color-completed); }
-.task-status-text.failed { color: var(--s-color-failed); }
-.task-status-text.killed { color: var(--s-color-stopped); }
+/* 「已结束」分组默认收起，折叠箭头常显，避免内容被误以为不存在 */
+.task-ended-group-title .section-collapse-arrow {
+    opacity: 0.6;
+}
+
+.task-ended-group-title:hover .section-collapse-arrow {
+    opacity: 1;
+}
 
 .task-kill-btn {
     flex: none;
@@ -89,20 +96,87 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
+    gap: var(--s-gap-sm);
     padding: var(--s-card-header-padding);
     border-bottom: 1px solid var(--s-card-border);
 }
 
 .task-detail-title {
+    flex: 1;
+    min-width: 0;
     font-weight: 600;
-    font-size: 13px;
+    font-size: var(--s-font-md);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
-/* Bash detail */
-.task-detail-info {
-    padding: 12px 14px;
-    font-size: 12px;
-    line-height: 1.8;
+/* 状态 / 任务 ID / 运行时长 / 结束时间：一行展示，竖细线分隔 */
+.task-detail-status-row {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
+    padding: 10px 14px 12px;
+    font-size: var(--s-font-base);
+    color: var(--vscode-descriptionForeground);
+}
+
+.task-detail-meta-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    white-space: nowrap;
+    /* 运行时长每秒刷新，等宽数字避免整行抖动 */
+    font-variant-numeric: tabular-nums;
+}
+
+/* 「任务 / 运行 / 结束于」等标签比取值更弱，取值颜色保持不变 */
+.task-detail-meta-label {
+    color: var(--vscode-descriptionForeground);
+    opacity: 0.7;
+}
+
+.task-detail-sep {
+    flex: none;
+    width: 1px;
+    height: 12px;
+    background: var(--s-card-border);
+}
+
+/* 状态徽标：底色取反馈色的浅色版，降低艳度 */
+.task-status-pill {
+    display: inline-flex;
+    align-items: center;
+    padding: 0 8px;
+    border-radius: var(--s-radius-sm);
+    font-size: var(--s-font-base);
+    line-height: 20px;
+}
+
+.task-status-pill.running {
+    background: var(--s-color-testing-bg);
+    color: var(--s-color-testing);
+}
+
+.task-status-pill.completed {
+    background: var(--s-color-ok-bg);
+    color: var(--s-color-ok);
+}
+
+.task-status-pill.failed {
+    background: var(--s-color-err-bg);
+    color: var(--s-color-err);
+}
+
+.task-status-pill.killed {
+    background: rgba(128, 128, 128, 0.12);
+    color: var(--vscode-descriptionForeground);
+}
+
+/* Agent 详情：任务详情按钮 */
+.task-detail-actions {
+    padding: 12px 14px 14px;
 }
 
 .task-detail-command-row {
@@ -146,6 +220,13 @@
     border-radius: var(--s-radius-sm);
 }
 
+/* Shell 详情里的命令面板：不描边，底色与定时任务「下次触发」块一致 */
+.task-detail-output.task-detail-command {
+    background: var(--s-subtle-bg);
+    border: none;
+    border-radius: var(--s-radius-md);
+}
+
 .task-detail-output .bash-omitted-lines {
     font-size: 12px;
     color: var(--vscode-descriptionForeground);
@@ -178,35 +259,176 @@
 }
 
 /* ===== Cron Task 卡片 ===== */
-.cron-card-body {
-    padding: 8px 14px 10px;
-    font-size: 12px;
-    line-height: 1.6;
+/* 与 section.css 的 .section-card（padding: 0，后加载）同组合同特异性，故组合选择器提权 */
+.section-card.cron-card {
+    padding: 14px 16px 12px;
 }
 
-.cron-meta-row {
+.cron-card-header {
     display: flex;
-    gap: 16px;
-    flex-wrap: wrap;
-    color: var(--vscode-descriptionForeground);
-    font-size: 11px;
-    margin-top: 6px;
+    align-items: flex-start;
+    gap: var(--s-gap-sm);
 }
 
+.cron-card-heading {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.cron-card-title {
+    font-size: var(--s-font-lg);
+    font-weight: 600;
+    color: var(--vscode-foreground);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.cron-card-subtitle {
+    font-size: var(--s-font-base);
+    color: var(--vscode-descriptionForeground);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* 停用后弱化内容，开关与操作按钮保持可辨识 */
+.cron-card-disabled .cron-card-heading,
+.cron-card-disabled .cron-section {
+    opacity: 0.5;
+}
+
+/* 下次触发 */
+.cron-next-fire {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-top: 12px;
+    padding: 10px 12px;
+    border-radius: var(--s-radius-md);
+    background: var(--s-subtle-bg);
+}
+
+.cron-next-fire > svg {
+    flex-shrink: 0;
+    color: var(--vscode-textLink-foreground);
+}
+
+.cron-next-fire-text {
+    min-width: 0;
+}
+
+.cron-next-fire-label {
+    font-size: var(--s-font-sm);
+    line-height: 1.4;
+    color: var(--vscode-descriptionForeground);
+}
+
+.cron-next-fire-time {
+    font-size: var(--s-font-md);
+    font-weight: 600;
+    line-height: 1.4;
+    color: var(--vscode-foreground);
+}
+
+/* 提醒内容 */
+.cron-section {
+    margin-top: 14px;
+}
+
+.cron-section-label {
+    margin-bottom: 6px;
+    font-size: var(--s-font-base);
+    color: var(--vscode-descriptionForeground);
+}
+
+.cron-prompt {
+    padding: 10px 12px;
+    border: 1px solid var(--s-card-border);
+    border-radius: var(--s-radius-md);
+    background: var(--vscode-editor-background);
+    color: var(--vscode-foreground);
+    font-size: var(--s-font-md);
+    line-height: 1.6;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+/* 详情展开 */
+.cron-detail-toggle {
+    margin-top: 10px;
+    padding: 0;
+    border: none;
+    background: none;
+    font-size: var(--s-font-base);
+    color: var(--vscode-descriptionForeground);
+    cursor: pointer;
+}
+
+.cron-detail-toggle:hover {
+    text-decoration: underline;
+}
+
+.cron-detail {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 10px;
+}
+
+.cron-detail-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    font-size: var(--s-font-base);
+    line-height: 24px;
+}
+
+/* 标签比取值更弱；取值与「收起详情」同色，整块保持次级观感 */
+.cron-detail-key {
+    flex: 0 0 auto;
+    min-width: 72px;
+    color: var(--vscode-descriptionForeground);
+    opacity: 0.7;
+    white-space: nowrap;
+}
+
+.cron-detail-value {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+    color: var(--vscode-descriptionForeground);
+}
+
+/* Cron 表达式 / 触发时间：统一 22px 高（20px 行高 + 1px 描边）；任务 ID 不铺底，用纯等宽文本 */
 .cron-expression-tag {
     display: inline-block;
     font-family: var(--vscode-editor-font-family, monospace);
-    font-size: 11px;
-    padding: 1px 6px;
-    border-radius: 3px;
+    font-size: var(--s-font-base);
+    line-height: 20px;
+    padding: 0 8px;
+    border: 1px solid transparent;
+    border-radius: var(--s-radius-sm);
     background: rgba(128, 128, 128, 0.12);
-    border: none;
+    white-space: pre;
 }
 
 .cron-highlight {
-    color: var(--s-badge-kill-color);
+    color: var(--vscode-textLink-foreground);
 }
 
-.cron-next-fire-section {
-    margin-top: 12px;
+.cron-chip {
+    padding: 0 10px;
+    border: 1px solid var(--s-card-border);
+    border-radius: var(--s-radius-md);
+    background: var(--vscode-editor-background);
+    color: var(--vscode-descriptionForeground);
+    line-height: 20px;
+    white-space: nowrap;
 }
