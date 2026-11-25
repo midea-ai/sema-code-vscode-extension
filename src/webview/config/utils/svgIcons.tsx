@@ -226,10 +226,11 @@ export const BoxIcon: React.FC<LucideProps> = ({ size = 16 }) => (
 
 export const PaletteIcon: React.FC<LucideProps> = ({ size = 16 }) => (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-        <circle cx="13.5" cy="6.5" r=".5" fill="currentColor" stroke="none" />
-        <circle cx="17.5" cy="10.5" r=".5" fill="currentColor" stroke="none" />
-        <circle cx="8.5" cy="7.5" r=".5" fill="currentColor" stroke="none" />
-        <circle cx="6.5" cy="12.5" r=".5" fill="currentColor" stroke="none" />
+        {/* 颜料点：侧栏按 15px 渲染，r=.5 会糊掉，放大成实心点才看得清 */}
+        <circle cx="13.5" cy="6.5" r="1.5" fill="currentColor" stroke="none" />
+        <circle cx="17.5" cy="10.5" r="1.5" fill="currentColor" stroke="none" />
+        <circle cx="8.5" cy="7.5" r="1.5" fill="currentColor" stroke="none" />
+        <circle cx="6.5" cy="12.5" r="1.5" fill="currentColor" stroke="none" />
         <path d="M12 2a10 10 0 1 0 0 20c.93 0 1.65-.75 1.65-1.69 0-.44-.18-.83-.44-1.12-.29-.29-.44-.65-.44-1.13a1.64 1.64 0 0 1 1.67-1.67h1.99A5.56 5.56 0 0 0 22 10.84C22 6.01 17.46 2 12 2Z" />
     </svg>
 );
