@@ -133,6 +133,16 @@ body {
     border-left-color: var(--vscode-button-background);
 }
 
+/* 折叠按钮是次要操作：文字和图标统一压暗，避免与上方导航项抢视觉。
+   选择器必须带 .nav-item，否则会被上面同优先级的 .nav-item 覆盖 */
+.nav-item.nav-toggle {
+    color: var(--vscode-descriptionForeground);
+}
+
+.nav-item.nav-toggle:hover {
+    color: var(--vscode-list-hoverForeground);
+}
+
 /* 主内容区域 */
 .main-content {
     flex: 1;

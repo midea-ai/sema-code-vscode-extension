@@ -249,7 +249,7 @@ export const zh = {
     'config.nav.task': '任务管理',
     'config.nav.memory': '规则与记忆',
     'config.nav.claw': 'Claw 远程',
-    'config.nav.collapse': '收起侧栏',
+    'config.nav.collapse': '收起',
     'config.nav.expand': '展开侧栏',
     'config.tab.modelList': '模型列表',
     'config.tab.addModel': '新增模型',

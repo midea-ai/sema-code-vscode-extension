@@ -248,7 +248,7 @@ export const en: Record<keyof typeof zh, string> = {
     'config.nav.task': 'Tasks',
     'config.nav.memory': 'Rules & Memory',
     'config.nav.claw': 'Claw Remote',
-    'config.nav.collapse': 'Collapse sidebar',
+    'config.nav.collapse': 'Collapse',
     'config.nav.expand': 'Expand sidebar',
     'config.tab.modelList': 'Model List',
     'config.tab.addModel': 'Add Model',

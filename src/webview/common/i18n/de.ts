@@ -130,7 +130,7 @@ export const de: Partial<Record<keyof typeof zh, string>> = {
     'config.nav.models': 'Modelle',
     'config.nav.task': 'Aufgaben',
     'config.nav.memory': 'Regeln & Memory',
-    'config.nav.collapse': 'Seitenleiste einklappen',
+    'config.nav.collapse': 'Einklappen',
     'config.nav.expand': 'Seitenleiste ausklappen',
     'config.tab.modelList': 'Modellliste',
     'config.tab.addModel': 'Modell hinzufügen',
