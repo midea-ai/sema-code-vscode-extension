@@ -151,6 +151,7 @@ export function renderMarkdownToHtml(content: string, vscode?: any): string {
       linkedContent += `\x00URL_${urlPlaceholders.length}\x00`;
       if (link.kind === 'url' && /^file:\/\//i.test(link.target)) {
         // file:// 绝对路径不是网页：只把前置图标换成文件类型图标，文字 / title / 点击都沿用网页链接。
+        // 点击交给系统默认程序（与工作区外的链接一致），#L261 片段不会被忽略它的系统程序用上。
         // 图标是 SVG，DOMPurify 会剥掉，与本地文件链接一样借占位符绕过。
         const safeUrl = escapeHtml(link.target);
         const fileName = link.target.replace(/[?#].*$/, '').split('/').pop() || '';
@@ -663,7 +664,9 @@ function createLocalLinkHtml(text: string, path: string): string {
   // 剥掉锚点（wiki/foo.md#章节）后交给 parseFilePath 拆出可能的 :12 / :12-20 行号后缀
   const { filePath, lineInfo } = parseFilePath(decoded.replace(/#.*$/, ''));
   const lineAttr = lineInfo ? ` data-line-info="${escapeHtml(lineInfo)}"` : '';
-  return `<a class="md-local-link file-path-code" data-file-path="${escapeHtml(filePath)}"${lineAttr} title="${escapeHtml(decoded)}">${buildFileLabelHtml(filePath, false, text, true)}</a>`;
+  // 链接不校验存在性，拿不到真实类型：尾部分隔符即视为目录（[managers/](src/managers/)），用目录图标
+  const isDirectory = /[\\/]$/.test(filePath);
+  return `<a class="md-local-link file-path-code" data-file-path="${escapeHtml(filePath)}"${lineAttr} title="${escapeHtml(decoded)}">${buildFileLabelHtml(filePath, isDirectory, text, true)}</a>`;
 }
 
 /**
