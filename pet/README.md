@@ -254,9 +254,9 @@ curl -s -X POST http://127.0.0.1:24700/session/unregister \
 
 F5 启动 Extension Development Host → 在 Sema Code 侧栏 → 配置 → 系统配置 → 基础设置勾选「启用桌宠」。
 
-- 本地已经跑了 SemaPet（macOS `./.build/release/SemaPet`，Windows `SemaPet.exe`）→ launcher `ping /health` 通，直接复用，不会触发解压
-- 本地没跑 → launcher 从扩展的 `dist/pet/sema-pet-<platform>-<arch>.zip` 解压到 `~/.sema/pet/bin/<platform>-<arch>/` → spawn
-- 想测解压路径，先 `rm -rf ~/.sema/pet/bin/` 再勾选
+- 本地已经跑了 SemaPet（macOS `./.build/release/SemaPet`，Windows `SemaPet.exe`）→ launcher `ping /health` 通，直接复用
+- 本地没跑 → 若 `dist/pet/sema-pet-<platform>-<arch>.zip` 存在（本地 `npm run pet:build` 产物）优先解压该文件；否则从 GitHub `pet-assets` Release 按需下载到 `~/.sema/pet/bin/<platform>-<arch>/` → spawn
+- 想测重新下载/解压路径，先 `rm -rf ~/.sema/pet/bin/` 再勾选
 
 > 桌宠开关状态存在 VS Code 的 globalState 里，不在 `~/.sema/pet/config.json`（旧设计已废弃，该文件现仅留 `windowPosition` 供桌宠自身记录）。
 
@@ -282,20 +282,13 @@ cargo run                        # 启动会 seed 默认资源
 
 桌宠各平台 zip 统一发布到 GitHub 的 `pet-assets` Release —— 一个固定 tag、无版本号、只保留最新一份，与扩展版本号无关。zip 命名严格对齐 `process.platform-process.arch`：`sema-pet-darwin-arm64.zip` / `sema-pet-darwin-x64.zip` / `sema-pet-win32-x64.zip` / `sema-pet-linux-x64.zip`。
 
-得到桌宠 zip 有两条路，产物落点都是 `dist/pet/`：
-
-| 命令 | 作用 | 场景 |
-|---|---|---|
-| `npm run pet:fetch` | 从 `pet-assets` Release 拉全平台最新 zip | 日常发布扩展 |
-| `npm run pet:build` | 现场编译**当前平台**桌宠 | 改了桌宠源码、需要更新 Release |
-
-`pet/build-zips.js` 按 `process.platform` 分派：macOS 走 `swift`，Windows / Linux 走 `cargo`；`pet/fetch-zips.js` 走 https 下载。两者互斥，别在同一次发布里混用。各平台具体打包命令见上文对应小节。
-
-**上传**：把 `dist/pet/` 下对应的 zip 手动拖到 `pet-assets` Release（覆盖同名旧文件）。三平台的 zip 都汇集在这一个 Release，之后任何人 `npm run pet:fetch` 就能拿到最新版。
+改动桌宠源码后，运行 `npm run pet:build` 现场编译**当前平台**桌宠（产物落 `dist/pet/`），然后将对应的 zip 手动上传到 GitHub 的 `pet-assets` Release（覆盖同名旧文件）。
 
 ### 扩展怎么消费 zip
 
-`npm run compile` 只做 webpack，不碰桌宠 zip —— zip 由 `pet:fetch` / `pet:build` 直接放进 `dist/pet/`。`.vscodeignore` 含 `!dist/pet/*.zip`，而 `package-all.sh` 打包时会清空 `dist/pet/` 只放当前平台那一份（如 `darwin-arm64` 包只含 `sema-pet-darwin-arm64.zip`，`linux-x64` 包只含 `sema-pet-linux-x64.zip`），运行时 launcher 直接取用。完整发布流程见 `src/README.md`。
+桌宠 zip **不打进 VSIX**（`.vscodeignore` 已排除 `dist/pet/**`），VS Code 扩展只发布单个全平台通用 VSIX。用户首次启用桌宠时，launcher 从 `pet-assets` Release 下载对应平台 zip 到 `~/.sema/pet/bin/<platform>-<arch>/`（支持 `SEMA_PET_BASE_URL` 环境变量覆盖镜像地址）；装过之后不再探测远端新版，一直用本地二进制。本地 F5 调试时若 `dist/pet/` 下存在 `npm run pet:build` 产物，则会优先使用本地 zip。
+
+> 换新版桌宠只对首次启用的用户生效：装过的用户要删掉 `~/.sema/pet/bin/<platform>-<arch>/` 再重新勾选「启用桌宠」才会重新下载。
 
 ## 常见问题
 

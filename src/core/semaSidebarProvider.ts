@@ -627,7 +627,11 @@ export class SemaSidebarProvider implements vscode.WebviewViewProvider {
 
     public async startPet(): Promise<void> {
         try {
-            const ok = await ensurePetRunning(this.context.extensionPath);
+            const ok = await ensurePetRunning(this.context.extensionPath, {
+                onDownloading: () => {
+                    vscode.window.setStatusBarMessage(t('host.pet.downloading'), 10000);
+                },
+            });
             if (!ok) {
                 vscode.window.setStatusBarMessage(t('host.pet.startFailed'), 5000);
                 return;

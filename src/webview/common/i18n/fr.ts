@@ -530,6 +530,7 @@ export const fr: Partial<Record<keyof typeof zh, string>> = {
     'host.cannotOpenFile': "Impossible d'ouvrir le fichier : {path}",
     'host.hookWarning': 'Avertissement de hook',
     'host.hookBlocked': 'Bloqué par un hook',
+    'host.pet.downloading': 'Sema Pet : téléchargement...',
     'host.pet.started': '✓ Sema Pet démarré',
     'host.pet.stopped': 'Sema Pet arrêté',
 

@@ -528,6 +528,7 @@ export const it: Partial<Record<keyof typeof zh, string>> = {
     'host.cannotOpenFile': 'Impossibile aprire il file: {path}',
     'host.hookWarning': 'Avviso hook',
     'host.hookBlocked': 'Bloccato da hook',
+    'host.pet.downloading': 'Sema Pet: download in corso...',
     'host.pet.started': '✓ Sema Pet avviato',
     'host.pet.stopped': 'Sema Pet arrestato',
 

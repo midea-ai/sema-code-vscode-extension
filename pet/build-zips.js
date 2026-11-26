@@ -150,4 +150,4 @@ if (process.platform === 'darwin') {
   process.exit(1);
 }
 
-console.log('✅ 完成。下一步 npm run compile（纯 webpack），再 ./package-all.sh');
+console.log('✅ 完成。本地 F5 调试会优先使用 dist/pet/ 中的 zip；发布新版桌宠请将 zip 上传至 pet-assets Release');
