@@ -8,6 +8,7 @@ import { SystemConfigManager } from './managers/SystemConfigManager';
 import { SkillCatalogManager } from './managers/SkillCatalogManager';
 import { BrowserControlManager } from './managers/BrowserControlManager';
 import { t } from './webview/common/i18n/core';
+import { ensureRipgrep } from './utils/ripgrep';
 
 /** globalState 键：已处理过的默认安装 skill id（用户卸载后不再重装） */
 const DEFAULT_SKILLS_INSTALLED_KEY = 'sema.defaultSkillsInstalled';
@@ -20,6 +21,9 @@ let sidebarProvider: SemaSidebarProvider;
 let currentWorkspacePath: string | undefined;
 
 export function activate(context: vscode.ExtensionContext) {
+    // 尽早把可用的 ripgrep（优先 VS Code 本体内置）前置进 PATH，供 sema-core 的 search_content 直接命中
+    void ensureRipgrep(vscode.env.appRoot);
+
     // 先按落盘配置确定界面语言，后续宿主文案（含默认工作区 README）都据此取值
     SystemConfigManager.initLang(context);
 
