@@ -409,9 +409,10 @@ export class ChatWebviewProvider {
         if (!sessionId || !filePath) return;
         const wrapper = this.sessionController.getSessionWrapper(sessionId);
         if (!wrapper) return;
-        // notebook 按 cell 定位，行号对 notebook 没有意义：只打开文件、不选 cell（cellIndex 传 -1 跳过选中）
+        // notebook 按 cell 定位，行号对 notebook 没有意义：编辑块给的是 cell 序号；
+        // 面板点击不带 minLine，传 -1 只打开文件、不选 cell
         if (filePath.toLowerCase().endsWith('.ipynb')) {
-            await this.fileStateDiffManager.openNotebook(filePath, -1);
+            await this.fileStateDiffManager.openNotebook(filePath, minLine ?? -1);
             return;
         }
         try {
