@@ -1,9 +1,6 @@
 import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
-import * as diff from 'diff';
-import * as crypto from 'crypto';
-import { NON_TEXT_EXTENSIONS } from '../utils/fileExcludePatterns';
 
 // 权限 diff 数据类型
 interface PermissionDiffContent {
@@ -12,100 +9,34 @@ interface PermissionDiffContent {
     diffText: string;
 }
 
-// 类型定义
-interface DiffViewInfo {
-    sessionId: string;
-    fullPath: string;
-    originalUri: vscode.Uri;
-    currentUri: vscode.Uri;
-}
-
-interface FileChangeStats {
-    additions: number;
-    removals: number;
-    minLine: number;
-}
-
-interface FileSnapshot {
-    hash: string;
-    size: number;
-    tempPath: string; // 快照内容写入临时文件，避免占用内存
-    isNew?: boolean;  // 仅 pinEmptySnapshotIfNew 打的空基线为 true：放弃即删除文件
-}
-
 /**
- * 文件状态差异管理器 - 用于VS Code扩展
- * 负责管理文件快照、显示diff、恢复更改等功能
+ * 文件 diff 视图管理：只负责「用左右文本打开原生 diff」与权限申请预览。
  *
- * 快照按 sessionId 隔离：同一文件在不同会话中各有独立基线，避免多会话共享单一基线
- * 导致的统计错乱、清空一个会话误清全部等问题。provider/tempDir 由本单例统一管理，
- * 虚拟 URI 与临时文件均按会话命名空间隔离。
+ * 会话基线不再由宿主保存：基线由 core 在写盘前捕获并持久化（SemaSession.getFileChanges /
+ * getFileDiff / revertFileChanges），增删统计与回滚也都由 core 完成，这里只做展示。
  */
 export class FileStateDiffManager {
-    // sessionId -> (fullPath -> snapshot)
-    private sessionSnapshots: Map<string, Map<string, FileSnapshot>> = new Map();
-    // diff 视图：复合 key(sessionId + fullPath) -> info
-    private diffViewURIs: Map<string, DiffViewInfo> = new Map();
-
-    // 共享 snapshot provider，避免多文件 diff 时 scheme 冲突（每文件注册同一 scheme 会导致内容错乱）
+    // 共享 snapshot provider，避免多文件 diff 时 scheme 冲突（每文件注册同一 scheme 会导致内容错乱）。
+    // 内容按 URI 常驻到扩展停用：diff 标签还开着时不能删，否则 VSCode 再取文本只会拿到空字符串。
     private sharedSnapshotProvider: MultiUriContentProvider | null = null;
     private snapshotProviderDisposable: vscode.Disposable | null = null;
+    private currentProviderDisposable: vscode.Disposable | null = null;
 
-    // permission diff provider（修复 disposable 泄漏）
+    // permission diff provider
     private sharedPermissionDiffProvider: MultiUriContentProvider | null = null;
     private sharedPermissionDiffProviderDisposable: vscode.Disposable | null = null;
-
-    // 单一全局 diff 视图关闭监听器，替代 per-file 监听器，减少事件触发开销
-    private globalDiffViewListener: vscode.Disposable | null = null;
 
     // inline diff 配置是否已写入，避免每次打开 diff 都触发配置读写
     private _inlineDiffConfigured = false;
 
-    private workingDir: string;
-    private tempBaseDir: string;
-
-    // 性能配置
-    private static readonly MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
-    /** 变更统计缓存：键含文件 mtime、大小与快照基线 hash，三者都没变才复用（恢复会话时的批量重报会合并到一次计算） */
-    private statsCache: Map<string, Promise<FileChangeStats>> = new Map();
-
     constructor(
-        workingDir: string,
+        private readonly workingDir: string,
         private readonly openFileAtLine: (filePath: string, line?: number) => Promise<void>
-    ) {
-        this.workingDir = workingDir;
-        this.tempBaseDir = this.createTempBaseDir();
-    }
-
-    private createTempBaseDir(): string {
-        const os = require('os');
-        return path.join(os.tmpdir(), 'sema-snapshots', Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 7));
-    }
-
-    /** 某会话的临时文件目录 */
-    private sessionTempDir(sessionId: string): string {
-        return path.join(this.tempBaseDir, sessionId);
-    }
-
-    /** 获取（惰性创建）某会话的快照表 */
-    private snapshotsOf(sessionId: string): Map<string, FileSnapshot> {
-        let m = this.sessionSnapshots.get(sessionId);
-        if (!m) {
-            m = new Map();
-            this.sessionSnapshots.set(sessionId, m);
-        }
-        return m;
-    }
-
-    /** diff 视图复合 key */
-    private diffKey(sessionId: string, fullPath: string): string {
-        return sessionId + '\u0000' + fullPath;
-    }
+    ) { }
 
     /**
      * 按会话隔离的虚拟 URI：sessionId 作为 path 前缀（而非 scheme 后用冒号分隔）。
-     * 用冒号分隔会在 URI 往返(toString)时被转义，导致 provider 键不匹配、diff 左侧读不到
-     * 快照内容（表现为"全是新增"）。fullPath 以 "/" 开头，拼成 /<sessionId><fullPath>。
+     * 用冒号分隔会在 URI 往返(toString)时被转义，导致 provider 键不匹配、diff 左侧读不到内容。
      */
     private namespacedUri(scheme: string, sessionId: string, fullPath: string): vscode.Uri {
         return vscode.Uri.from({ scheme, path: `/${sessionId}${fullPath}` });
@@ -115,191 +46,41 @@ export class FileStateDiffManager {
         return this.namespacedUri('snapshot', sessionId, fullPath);
     }
 
-    /**
-     * 将相对路径转换为绝对路径
-     */
+    /** 将相对路径转换为绝对路径 */
     private resolveFilePath(filePath: string): string {
         return path.isAbsolute(filePath) ? filePath : path.join(this.workingDir, filePath);
     }
 
-    /**
-     * 生成文件内容的hash
-     */
-    private generateFileHash(content: string): string {
-        return crypto.createHash('md5').update(content, 'utf8').digest('hex');
+    /** 打开文件并按 1-based 行定位（core 不给可比较内容时的兜底） */
+    public async openFile(filePath: string, line?: number): Promise<void> {
+        await this.openFileAtLine(filePath, line);
     }
 
     /**
-     * 检查文件是否应该被跳过（基于大小和类型）
+     * 用 core 给的左右文本打开原生 diff；两侧内容相同时直接打开文件。
+     * filePath 用 core 返回的绝对路径（避免相对路径在临时 URI 与当前文件之间不一致）。
+     * revealLine 是 1-based 定位行（工具编辑块给这次编辑的锚点行，面板给 core 的首个变更行）；
+     * 不给时不定位，停在文件顶部。
      */
-    private shouldSkipFile(uri: vscode.Uri, size?: number): boolean {
-        const fileName = path.basename(uri.fsPath);
-        const ext = path.extname(fileName).toLowerCase();
-
-        if (NON_TEXT_EXTENSIONS.has(ext)) {
-            return true;
-        }
-
-        if (size && size > FileStateDiffManager.MAX_FILE_SIZE) {
-            return true;
-        }
-
-        return false;
-    }
-
-    /**
-     * 统一错误处理
-     */
-    private handleError(message: string, error: unknown): void {
-        console.error(message, error);
-        if (error instanceof Error) {
-            console.error(`错误堆栈: ${error.stack}`);
-        }
-        vscode.window.showErrorMessage(message);
-    }
-
-    /**
-     * 重置指定会话的快照状态（清空该会话的快照、diff 视图与临时文件）
-     */
-    public async createSnapshot(sessionId: string): Promise<void> {
-        this.cleanupSessionDiffViews(sessionId);
-        await this.cleanupSessionTempDir(sessionId);
-        this.sessionSnapshots.delete(sessionId);
-        // 快照基线变了，该会话的统计缓存一并作废
-        for (const key of [...this.statsCache.keys()]) {
-            if (key.startsWith(sessionId + '\u0000')) this.statsCache.delete(key);
-        }
-
-        // 所有 diff 都清掉后释放全局监听器
-        if (this.diffViewURIs.size === 0) {
-            this.globalDiffViewListener?.dispose();
-            this.globalDiffViewListener = null;
-        }
-    }
-
-    private async cleanupSessionTempDir(sessionId: string): Promise<void> {
+    public async showTextDiff(sessionId: string, filePath: string, baselineText: string, currentText: string, revealLine?: number): Promise<void> {
         try {
-            await fs.promises.rm(this.sessionTempDir(sessionId), { recursive: true, force: true });
-        } catch {
-            // ignore
-        }
-    }
-
-    /**
-     * 懒加载：仅在首次访问时将文件加入该会话快照
-     * 内容写入临时文件，内存中只保留 hash 和路径
-     */
-    public async addFileToSnapshotIfNew(sessionId: string, filePath: string): Promise<void> {
-        const fullPath = this.resolveFilePath(filePath);
-        const snaps = this.snapshotsOf(sessionId);
-        if (snaps.has(fullPath)) return;
-
-        try {
-            const fileUri = vscode.Uri.file(fullPath);
-            const stat = await vscode.workspace.fs.stat(fileUri);
-            if (this.shouldSkipFile(fileUri, stat.size)) return;
-
-            const content = await fs.promises.readFile(fullPath, 'utf8');
-            const hash = this.generateFileHash(content);
-
-            const dir = this.sessionTempDir(sessionId);
-            await fs.promises.mkdir(dir, { recursive: true });
-            const tempFileName = crypto.createHash('md5').update(fullPath).digest('hex');
-            const tempPath = path.join(dir, tempFileName);
-            await fs.promises.writeFile(tempPath, content, 'utf8');
-
-            snaps.set(fullPath, { hash, size: stat.size, tempPath });
-        } catch {
-            // 文件不存在（新建文件场景），跳过
-        }
-    }
-
-    /**
-     * 新建文件时显式钉一条空基线并锁定，避免懒加载快照之后（如 fork 截断历史后重读）
-     * 把已修改内容误当基线。已在快照中则不动，避免污染真实基线。
-     */
-    public async pinEmptySnapshotIfNew(sessionId: string, filePath: string): Promise<void> {
-        const fullPath = this.resolveFilePath(filePath);
-        const snaps = this.snapshotsOf(sessionId);
-        if (snaps.has(fullPath)) return;
-
-        try {
-            const dir = this.sessionTempDir(sessionId);
-            await fs.promises.mkdir(dir, { recursive: true });
-            const tempFileName = crypto.createHash('md5').update(fullPath).digest('hex');
-            const tempPath = path.join(dir, tempFileName);
-            await fs.promises.writeFile(tempPath, '', 'utf8');
-            snaps.set(fullPath, { hash: this.generateFileHash(''), size: 0, tempPath, isNew: true });
+            const fullPath = path.isAbsolute(filePath) ? filePath : this.resolveFilePath(filePath);
+            if (baselineText === currentText) {
+                await this.openFileAtLine(filePath, revealLine);
+                return;
+            }
+            await this.createDiffView(sessionId, fullPath, baselineText, currentText, filePath, revealLine);
         } catch (error) {
-            console.warn(`[FileStateDiffManager] 钉空基线失败: ${filePath}`, error);
+            console.error('显示diff失败:', error);
+            await this.openFileAtLine(filePath, revealLine);
         }
     }
 
     /**
-     * 读取快照原始内容（从临时文件）
+     * 打开 Jupyter Notebook 文件（按 cell 定位，文本行号对 notebook 没有意义）
+     * cellIndex < 0 表示只打开文件、不选中任何 cell
      */
-    private async readSnapshotContent(sessionId: string, fullPath: string): Promise<string> {
-        const snapshot = this.snapshotsOf(sessionId).get(fullPath);
-        if (!snapshot) return '';
-        try {
-            return await fs.promises.readFile(snapshot.tempPath, 'utf8');
-        } catch {
-            return '';
-        }
-    }
-
-    /**
-     * 清理全局监听器
-     */
-    private cleanupAllListeners(): void {
-        this.globalDiffViewListener?.dispose();
-        this.globalDiffViewListener = null;
-    }
-
-    /**
-     * 清理指定会话的 diff 视图，同步清理 sharedSnapshotProvider 中的内容
-     */
-    private cleanupSessionDiffViews(sessionId: string): void {
-        for (const [key, info] of Array.from(this.diffViewURIs)) {
-            if (info.sessionId === sessionId) {
-                this.sharedSnapshotProvider?.removeContent(info.originalUri);
-                this.diffViewURIs.delete(key);
-            }
-        }
-    }
-
-    /**
-     * 清理所有diff视图，同步清理 sharedSnapshotProvider 中的内容
-     */
-    private cleanupAllDiffViews(): void {
-        if (this.sharedSnapshotProvider) {
-            for (const diffView of this.diffViewURIs.values()) {
-                this.sharedSnapshotProvider.removeContent(diffView.originalUri);
-            }
-        }
-        this.diffViewURIs.clear();
-    }
-
-    /**
-     * 显示文件diff，如果失败或内容未变化则打开对应文件
-     */
-    public async showFileDiff(sessionId: string, filePath: string, minLine?: number): Promise<void> {
-        const isIpynbFile = filePath.toLowerCase().endsWith('.ipynb');
-        const defaultMinLine = isIpynbFile ? 0 : 1;
-        const finalMinLine = minLine ?? defaultMinLine;
-
-        if (isIpynbFile) {
-            await this.openNotebookFile(filePath, finalMinLine);
-            return;
-        }
-
-        await this.showTextFileDiff(sessionId, filePath, finalMinLine);
-    }
-
-    /**
-     * 打开 Jupyter Notebook 文件
-     */
-    private async openNotebookFile(filePath: string, cellIndex: number): Promise<void> {
+    public async openNotebook(filePath: string, cellIndex: number): Promise<void> {
         try {
             const fullPath = this.resolveFilePath(filePath);
             const notebookUri = vscode.Uri.file(fullPath);
@@ -321,123 +102,82 @@ export class FileStateDiffManager {
     }
 
     /**
-     * 显示文本文件的 diff
-     */
-    private async showTextFileDiff(sessionId: string, filePath: string, minLine: number): Promise<void> {
-        try {
-            const fullPath = this.resolveFilePath(filePath);
-            const { originalContent, currentContent } = await this.getFileContents(sessionId, fullPath, 'editor');
-
-            if (originalContent === currentContent) {
-                await this.openFileAtLine(filePath, minLine);
-                return;
-            }
-
-            await this.createDiffView(sessionId, fullPath, originalContent, currentContent, filePath, minLine);
-
-        } catch (error) {
-            console.error('显示diff失败:', error);
-            await this.openFileAtLine(filePath, minLine);
-        }
-    }
-
-    /**
-     * 获取文件的原始内容（快照）和当前内容
-     * @param source 'editor' 从 vscode 编辑器缓冲区读取（含未保存修改），'disk' 从磁盘读取
-     */
-    private async getFileContents(
-        sessionId: string,
-        fullPath: string,
-        source: 'editor' | 'disk'
-    ): Promise<{ originalContent: string; currentContent: string }> {
-        const originalContent = await this.readSnapshotContent(sessionId, fullPath);
-
-        let currentContent: string;
-        try {
-            if (source === 'disk') {
-                currentContent = await fs.promises.readFile(fullPath, 'utf8');
-            } else {
-                const doc = await vscode.workspace.openTextDocument(vscode.Uri.file(fullPath));
-                currentContent = doc.getText();
-            }
-        } catch {
-            currentContent = '';
-        }
-
-        return { originalContent, currentContent };
-    }
-
-    /**
      * 创建并显示 diff 视图
-     * 使用共享 MultiUriContentProvider 替代 per-file SnapshotContentProvider，
-     * 避免多文件同时 diff 时同一 scheme 注册多次导致内容错乱
+     * 使用共享 MultiUriContentProvider，避免多文件同时 diff 时同一 scheme 注册多次导致内容错乱
      */
     private async createDiffView(
         sessionId: string,
         fullPath: string,
-        originalContent: string,
-        currentContent: string,
+        leftText: string,
+        rightText: string,
         filePath: string,
-        minLine: number
+        revealLine?: number
     ): Promise<void> {
-        const currentUri = vscode.Uri.file(fullPath);
         const originalUri = this.snapshotUri(sessionId, fullPath);
+        // 右侧也用本次查询取到的内容：真实文件 URI 会随磁盘再次变化（或展示编辑器未保存内容），
+        // 与左侧基线不是同一次比较对象；用虚拟文档保证两侧一致，要看/改真实文件从标题栏或面板点开
+        const rightUri = this.namespacedUri('snapshot-current', sessionId, fullPath);
 
         if (!this.sharedSnapshotProvider) {
             this.sharedSnapshotProvider = new MultiUriContentProvider();
             this.snapshotProviderDisposable = vscode.workspace.registerTextDocumentContentProvider('snapshot', this.sharedSnapshotProvider);
+            this.currentProviderDisposable = vscode.workspace.registerTextDocumentContentProvider('snapshot-current', this.sharedSnapshotProvider);
         }
 
-        this.sharedSnapshotProvider.setContent(originalUri, originalContent);
-        this.diffViewURIs.set(this.diffKey(sessionId, fullPath), { sessionId, fullPath, originalUri, currentUri });
+        this.sharedSnapshotProvider.setContent(originalUri, leftText);
+        this.sharedSnapshotProvider.setContent(rightUri, rightText);
+        // 先把两侧文档带着内容建出来再开 diff：否则首次打开时文档可能先于内容就绪，读到空文本（空白 diff）
+        await this.preloadDocuments(originalUri, rightUri);
 
         await this.ensureInlineDiffConfig();
+        const options: vscode.TextDocumentShowOptions = {
+            preview: false,
+            viewColumn: vscode.ViewColumn.Active
+        };
+        if (revealLine) {
+            const row = Math.max(0, revealLine - 1);
+            options.selection = new vscode.Range(row, 0, row, 0);
+        }
         await vscode.commands.executeCommand(
             'vscode.diff',
             originalUri,
-            currentUri,
+            rightUri,
             path.basename(filePath),
-            {
-                preview: false,
-                viewColumn: vscode.ViewColumn.Active,
-                selection: new vscode.Range(minLine - 1, 0, minLine - 1, 0)
-            }
+            options
         );
 
-        this.setupGlobalDiffViewListener();
+        // 复用已开过的 diff 标签时 VSCode 不会再跑「定位到首个变更」，这里显式定位一次
+        if (revealLine) this.revealLineInDiffEditor(rightUri, revealLine);
+    }
+
+    /** 预热虚拟文档：让文本在 diff 打开前就进入对应文档（失败不影响 vscode.diff 自行加载） */
+    private async preloadDocuments(...uris: vscode.Uri[]): Promise<void> {
+        for (const uri of uris) {
+            try {
+                await vscode.workspace.openTextDocument(uri);
+            } catch {
+                // 忽略：diff 打开时还会再向 provider 要一次内容
+            }
+        }
     }
 
     /**
-     * 设置单一全局 diff 视图关闭监听器
-     * 替代原来每个文件各注册一个 onDidChangeVisibleTextEditors，
-     * 所有 diff 共享一个监听器，编辑器切换时只触发一次
+     * 在 diff 编辑器里把右侧（新内容侧）定位到指定行（1-based）。
+     * 打开瞬间编辑器对象可能还取不到，稍后重试一次。
      */
-    private setupGlobalDiffViewListener(): void {
-        if (this.globalDiffViewListener) return;
-
-        this.globalDiffViewListener = vscode.window.onDidChangeVisibleTextEditors(editors => {
-            const visibleUris = new Set(editors.map(e => e.document.uri.toString()));
-
-            const toCleanup: DiffViewInfo[] = [];
-            for (const diffView of this.diffViewURIs.values()) {
-                const stillOpen =
-                    visibleUris.has(diffView.originalUri.toString()) ||
-                    visibleUris.has(diffView.currentUri.toString());
-                if (!stillOpen) {
-                    toCleanup.push(diffView);
-                }
-            }
-
-            for (const diffView of toCleanup) {
-                this.cleanupDiffView(diffView.sessionId, diffView.fullPath);
-            }
-
-            // 所有 diff 都关闭后，释放监听器本身
-            if (this.diffViewURIs.size === 0) {
-                this.globalDiffViewListener?.dispose();
-                this.globalDiffViewListener = null;
-            }
-        });
+    private revealLineInDiffEditor(rightUri: vscode.Uri, line: number): void {
+        const target = rightUri.toString();
+        const apply = (): boolean => {
+            const editor = vscode.window.visibleTextEditors.find(e => e.document.uri.toString() === target);
+            if (!editor) return false;
+            const row = Math.max(0, Math.min(line - 1, editor.document.lineCount - 1));
+            const range = new vscode.Range(row, 0, row, 0);
+            editor.selection = new vscode.Selection(row, 0, row, 0);
+            editor.revealRange(range, vscode.TextEditorRevealType.InCenter);
+            return true;
+        };
+        if (apply()) return;
+        setTimeout(apply, 80);
     }
 
     /**
@@ -458,252 +198,8 @@ export class FileStateDiffManager {
     }
 
     /**
-     * 清理diff视图相关资源
-     */
-    private cleanupDiffView(sessionId: string, fullPath: string): void {
-        const key = this.diffKey(sessionId, fullPath);
-        const diffView = this.diffViewURIs.get(key);
-        if (diffView) {
-            this.sharedSnapshotProvider?.removeContent(diffView.originalUri);
-            this.diffViewURIs.delete(key);
-        }
-    }
-
-    /**
-     * 放弃指定更改，恢复到快照状态
-     */
-    public async revertAllChanges(sessionId: string, filePaths?: string[]): Promise<void> {
-        const snaps = this.snapshotsOf(sessionId);
-        if (snaps.size === 0 && (!filePaths || filePaths.length === 0)) {
-            vscode.window.showWarningMessage('没有可恢复的快照');
-            return;
-        }
-
-        const { filesToRevert, filesToDelete } = await this.prepareRevertFiles(sessionId, filePaths);
-
-        if (filesToRevert.size === 0 && filesToDelete.length === 0) {
-            vscode.window.showWarningMessage('没有找到匹配的文件或快照');
-            return;
-        }
-
-        const results = await this.executeRevert(sessionId, filesToRevert, filesToDelete);
-        this.showRevertResults(results);
-    }
-
-    /**
-     * 准备要恢复和删除的文件列表
-     */
-    private async prepareRevertFiles(sessionId: string, filePaths?: string[]): Promise<{
-        filesToRevert: Map<string, string>;
-        filesToDelete: string[];
-    }> {
-        const filesToRevert = new Map<string, string>();
-        const filesToDelete: string[] = [];
-        const snaps = this.snapshotsOf(sessionId);
-
-        if (filePaths && filePaths.length > 0) {
-            for (const targetPath of filePaths) {
-                const fullPath = this.resolveFilePath(targetPath);
-                const snapshot = snaps.get(fullPath);
-
-                if (snapshot?.isNew) {
-                    // 新建文件的空基线：原本文件不存在，放弃即删除
-                    await this.pushDeleteIfExists(fullPath, filesToDelete, targetPath);
-                } else if (snapshot) {
-                    const content = await this.readSnapshotContent(sessionId, fullPath);
-                    // 基线本身为空（size===0，如原本就是空文件）时空串合法；否则空串意味着快照读取失败，跳过以免误清文件
-                    if (content || snapshot.size === 0) {
-                        filesToRevert.set(fullPath, content);
-                    } else {
-                        console.warn(`读取快照失败: ${targetPath}`);
-                    }
-                } else {
-                    try {
-                        await vscode.workspace.fs.stat(vscode.Uri.file(fullPath));
-                        filesToDelete.push(fullPath);
-                    } catch (error) {
-                        console.warn(`找不到文件或其快照: ${targetPath}`);
-                    }
-                }
-            }
-        } else {
-            for (const [snapPath, snapshot] of snaps) {
-                if (snapshot.isNew) {
-                    // 新建文件的空基线：放弃即删除
-                    await this.pushDeleteIfExists(snapPath, filesToDelete, snapPath);
-                    continue;
-                }
-                const content = await this.readSnapshotContent(sessionId, snapPath);
-                if (content || snapshot.size === 0) {
-                    filesToRevert.set(snapPath, content);
-                }
-            }
-        }
-
-        return { filesToRevert, filesToDelete };
-    }
-
-    /**
-     * 空基线快照对应新建文件：磁盘上仍存在则加入待删除列表，否则静默跳过
-     */
-    private async pushDeleteIfExists(fullPath: string, filesToDelete: string[], targetPath: string): Promise<void> {
-        try {
-            await vscode.workspace.fs.stat(vscode.Uri.file(fullPath));
-            filesToDelete.push(fullPath);
-        } catch {
-            console.warn(`找不到文件或其快照: ${targetPath}`);
-        }
-    }
-
-    /**
-     * 执行文件恢复操作
-     */
-    private async executeRevert(
-        sessionId: string,
-        filesToRevert: Map<string, string>,
-        filesToDelete: string[]
-    ): Promise<{ successCount: number; errorCount: number }> {
-        let successCount = 0;
-        let errorCount = 0;
-
-        for (const [filePath, content] of filesToRevert) {
-            try {
-                await fs.promises.writeFile(filePath, content, 'utf8');
-                this.cleanupDiffView(sessionId, filePath);
-                successCount++;
-            } catch (error) {
-                this.handleError(`恢复文件失败: ${filePath}`, error);
-                errorCount++;
-            }
-        }
-
-        for (const filePath of filesToDelete) {
-            try {
-                await vscode.workspace.fs.delete(vscode.Uri.file(filePath));
-                this.cleanupDiffView(sessionId, filePath);
-                successCount++;
-            } catch (error) {
-                this.handleError(`删除文件失败: ${filePath}`, error);
-                errorCount++;
-            }
-        }
-
-        return { successCount, errorCount };
-    }
-
-    /**
-     * 显示恢复操作的结果
-     */
-    private showRevertResults(results: { successCount: number; errorCount: number }): void {
-        const { successCount, errorCount } = results;
-
-        if (errorCount > 0) {
-            vscode.window.showErrorMessage(`处理了 ${successCount} 个文件，${errorCount} 个文件操作失败`);
-        } else {
-            vscode.window.showInformationMessage(`成功处理 ${successCount} 个文件`);
-        }
-    }
-
-    /**
-     * 获取文件变更统计信息
-     */
-    public async getFileChangeStats(sessionId: string, filePath: string): Promise<FileChangeStats> {
-        // 键里带磁盘文件的 mtime 与大小：文件变了就换键，没变则连跨秒的重复请求也能复用，
-        // 不必再靠时间窗近似（时间窗会让 1s 内的二次编辑拿到旧数字）。
-        // 还要带快照基线的 hash：统计结果由「基线 + 磁盘」共同决定，基线晚建（恢复会话、
-        // 先写后读）时磁盘没变，只按 mtime/size 会命中基于旧基线的旧数字。
-        const fullPath = this.resolveFilePath(filePath);
-        let key: string | null = null;
-        try {
-            const stat = await fs.promises.stat(fullPath);
-            const baseline = this.sessionSnapshots.get(sessionId)?.get(fullPath)?.hash ?? 'none';
-            key = `${sessionId}\u0000${fullPath}\u0000${stat.mtimeMs}\u0000${stat.size}\u0000${baseline}`;
-        } catch {
-            // 文件不存在或不可读：跳过缓存，交给 compute 里既有的错误分支
-        }
-        if (key) {
-            const cached = this.statsCache.get(key);
-            if (cached) {
-                return cached;
-            }
-        }
-
-        const promise = this.computeFileChangeStats(sessionId, filePath);
-        if (key) {
-            this.statsCache.set(key, promise);
-        }
-        // 简单上限：只保留最近一批文件的统计，避免长会话里无限累积
-        if (this.statsCache.size > 200) {
-            const oldest = this.statsCache.keys().next().value;
-            if (oldest !== undefined && oldest !== key) this.statsCache.delete(oldest);
-        }
-        return promise;
-    }
-
-    /** 实际计算：读快照与磁盘内容，做全文行级差异 */
-    private async computeFileChangeStats(sessionId: string, filePath: string): Promise<FileChangeStats> {
-        const isIpynbFile = filePath.toLowerCase().endsWith('.ipynb');
-        const defaultMinLine = isIpynbFile ? 0 : 1;
-
-        try {
-            const fullPath = this.resolveFilePath(filePath);
-            const { originalContent, currentContent } = await this.getFileContents(sessionId, fullPath, 'disk');
-
-            if (originalContent === currentContent) {
-                return { additions: 0, removals: 0, minLine: defaultMinLine };
-            }
-
-            return this.calculateDiffStats(originalContent, currentContent, defaultMinLine);
-        } catch (error) {
-            this.handleError(`获取文件变更统计失败: ${filePath}`, error);
-            return { additions: 0, removals: 0, minLine: defaultMinLine };
-        }
-    }
-
-    /**
-     * 计算差异统计信息
-     */
-    private calculateDiffStats(originalContent: string, currentContent: string, defaultMinLine: number): FileChangeStats {
-        try {
-            const diffResult = diff.diffLines(originalContent, currentContent);
-            let additions = 0;
-            let removals = 0;
-            let minLine = Number.MAX_SAFE_INTEGER;
-            let currentLineNum = 1;
-
-            diffResult.forEach((part) => {
-                const count = part.count || 0;
-
-                if (part.added) {
-                    additions += count;
-                    if (currentLineNum < minLine) {
-                        minLine = currentLineNum;
-                    }
-                    currentLineNum += count;
-                } else if (part.removed) {
-                    removals += count;
-                    if (currentLineNum < minLine) {
-                        minLine = currentLineNum;
-                    }
-                } else {
-                    currentLineNum += count;
-                }
-            });
-
-            return {
-                additions,
-                removals,
-                minLine: minLine === Number.MAX_SAFE_INTEGER ? defaultMinLine : minLine
-            };
-        } catch (error) {
-            console.error('Diff 计算失败:', error);
-            return { additions: 0, removals: 0, minLine: defaultMinLine };
-        }
-    }
-
-    /**
      * 显示权限申请中的 diff（inline diff 视图，有语法高亮）
-     * 不依赖快照基线，但虚拟 URI 按会话隔离，避免多会话对同一文件的 proposed 内容互相覆盖
+     * 不依赖会话基线，但虚拟 URI 按会话隔离，避免多会话对同一文件的 proposed 内容互相覆盖
      */
     public async showPermissionDiff(sessionId: string, filePath: string, diffContent: PermissionDiffContent): Promise<void> {
         try {
@@ -825,16 +321,12 @@ export class FileStateDiffManager {
         return resultLines.join('\n');
     }
 
-    /**
-     * 清理所有资源（在扩展停用时调用）
-     */
+    /** 清理所有资源（在扩展停用时调用；provider 的 dispose 会一并清掉已存的内容） */
     public dispose(): void {
-        this.cleanupAllListeners();
-        this.cleanupAllDiffViews();
-        this.sessionSnapshots.clear();
-
         this.snapshotProviderDisposable?.dispose();
         this.snapshotProviderDisposable = null;
+        this.currentProviderDisposable?.dispose();
+        this.currentProviderDisposable = null;
         this.sharedSnapshotProvider?.dispose();
         this.sharedSnapshotProvider = null;
 
@@ -842,16 +334,6 @@ export class FileStateDiffManager {
         this.sharedPermissionDiffProviderDisposable = null;
         this.sharedPermissionDiffProvider?.dispose();
         this.sharedPermissionDiffProvider = null;
-
-        this.cleanupTempBaseDir(); // fire-and-forget
-    }
-
-    private async cleanupTempBaseDir(): Promise<void> {
-        try {
-            await fs.promises.rm(this.tempBaseDir, { recursive: true, force: true });
-        } catch {
-            // ignore
-        }
     }
 }
 
@@ -864,13 +346,10 @@ class MultiUriContentProvider implements vscode.TextDocumentContentProvider {
     private _onDidChange = new vscode.EventEmitter<vscode.Uri>();
     readonly onDidChange = this._onDidChange.event;
 
+    /** 写入内容并通知 VSCode 刷新已打开的同一 URI 文档（内容一直被保留，不做删除） */
     setContent(uri: vscode.Uri, content: string): void {
         this.contentMap.set(uri.toString(), content);
         this._onDidChange.fire(uri);
-    }
-
-    removeContent(uri: vscode.Uri): void {
-        this.contentMap.delete(uri.toString());
     }
 
     provideTextDocumentContent(uri: vscode.Uri): string {

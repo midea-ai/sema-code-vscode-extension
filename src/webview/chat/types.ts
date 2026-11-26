@@ -31,14 +31,27 @@ export interface FileItem {
     isOpen?: boolean; // 是否为已打开的文件
 }
 
+/**
+ * 文件变更条目：宿主从 core 的会话基线查询拿到整表后下发，不再由工具块自行上报。
+ * 基线 = 本会话首次受控写入该文件之前的原始内容；右侧 = 查询时磁盘内容。
+ */
 export interface FileChange {
-    fileName: string;
-    fullPath: string;
-    additions: number;
-    removals: number;
-    type: 'write' | 'edit';
-    minLine: number;
-    isNotebook?: boolean;
+    /** 绝对路径 */
+    filePath: string;
+    /** 展示路径：项目内相对、项目外绝对 */
+    displayPath: string;
+    /** 相对会话基线的状态 */
+    state: 'modified' | 'added' | 'deleted' | 'unchanged' | 'unknown';
+    /** 能否做文本比较；非 'ok' 时没有增删行 */
+    status: 'ok' | 'binary' | 'tooLarge' | 'baselineUnavailable' | 'currentUnreadable';
+    /** 基线侧文件是否存在（新建文件为 false） */
+    baselineExists: boolean;
+    additions?: number;
+    removals?: number;
+    /** 1-based 首个变更行，仅用于滚动定位 */
+    line?: number;
+    /** 文本零增删但字节变了（编码 / 换行形式变化） */
+    rawChanged?: boolean;
 }
 
 export interface AppProps {

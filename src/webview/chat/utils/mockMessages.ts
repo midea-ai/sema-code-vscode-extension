@@ -1267,10 +1267,10 @@ python3 SKILL_DIR/scripts/xlsx_insert_row.py /tmp/work/ --at 6 ...  # insert row
     FileChangesPanel: [
         {
             changes: [
-                { fileName: 'config.ts', fullPath: '/Users/zhoujie195/midea-code/sema-vscode-extension/src/utils/config.ts', additions: 12, removals: 5, type: 'edit', minLine: 10 },
-                { fileName: 'configCache.ts', fullPath: 'src/utils/configCache.ts', additions: 6, removals: 0, type: 'write', minLine: 1 },
-                { fileName: 'index.ts', fullPath: 'src/app/index.ts', additions: 3, removals: 2, type: 'edit', minLine: 5 },
-                { fileName: 'analysis.ipynb', fullPath: 'notebooks/analysis.ipynb', additions: 0, removals: 0, type: 'edit', minLine: 1, isNotebook: true },
+                { filePath: '/demo/project/src/utils/config.ts', displayPath: 'src/utils/config.ts', state: 'modified', status: 'ok', baselineExists: true, additions: 12, removals: 5, line: 10 },
+                { filePath: '/demo/project/src/utils/configCache.ts', displayPath: 'src/utils/configCache.ts', state: 'added', status: 'ok', baselineExists: false, additions: 6, removals: 0, line: 1 },
+                { filePath: '/demo/project/src/app/index.ts', displayPath: 'src/app/index.ts', state: 'modified', status: 'ok', baselineExists: true, additions: 3, removals: 2, line: 5 },
+                { filePath: '/demo/project/assets/logo.png', displayPath: 'assets/logo.png', state: 'modified', status: 'binary', baselineExists: true },
             ],
         },
     ],

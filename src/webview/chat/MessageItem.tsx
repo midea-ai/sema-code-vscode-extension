@@ -1,5 +1,5 @@
 import React from 'react';
-import { Message, FileChange } from './types';
+import { Message } from './types';
 import EditBlock from './blocks/tools/EditBlock';
 import NotebookEditBlock from './blocks/tools/NotebookEditBlock';
 import ReadBlock from './blocks/tools/ReadBlock';
@@ -21,9 +21,7 @@ import { TOOL_NAME_WRITE_FILE, TOOL_NAME_PATCH_FILE, TOOL_NAME_EDIT_NOTEBOOK, TO
 
 interface MessageItemProps {
     message: Message;
-    shouldReportChange: boolean;
     vscode: any;
-    onFileChange?: (change: FileChange) => void;
     streamingAssistantId?: string | null;
     streamingToolId?: string | null;
     showThinkingText?: boolean;
@@ -39,9 +37,7 @@ interface MessageItemProps {
 
 const MessageItem: React.FC<MessageItemProps> = React.memo(({
     message,
-    shouldReportChange,
     vscode,
-    onFileChange,
     streamingAssistantId,
     showThinkingText = true,
     processingState,
@@ -59,7 +55,6 @@ const MessageItem: React.FC<MessageItemProps> = React.memo(({
                     <EditBlock
                         content={message.content}
                         vscode={vscode}
-                        onFileChange={shouldReportChange ? onFileChange : undefined}
                         inLastTurn={inLastTurn}
                     />
                 );
@@ -68,7 +63,6 @@ const MessageItem: React.FC<MessageItemProps> = React.memo(({
                     <NotebookEditBlock
                         content={message.content}
                         vscode={vscode}
-                        onFileChange={shouldReportChange ? onFileChange : undefined}
                         inLastTurn={inLastTurn}
                     />
                 );
@@ -85,7 +79,6 @@ const MessageItem: React.FC<MessageItemProps> = React.memo(({
                     <AgentBlock
                         content={message.content}
                         vscode={vscode}
-                        onFileChange={shouldReportChange ? onFileChange : undefined}
                     />
                 );
             default:
@@ -198,7 +191,6 @@ const MessageItem: React.FC<MessageItemProps> = React.memo(({
     }
 }, (prev, next) => {
     const baseEqual = prev.message === next.message
-        && prev.shouldReportChange === next.shouldReportChange
         && prev.showThinkingText === next.showThinkingText
         && prev.processingState === next.processingState
         && prev.onFork === next.onFork

@@ -53,6 +53,10 @@ export class RemoteSession {
     fork(messageUuid: string, options?: any): Promise<any> { return this.t.call('fork', { messageUuid, options }, this.sessionId); }
     // 分支到新聊天：core 新建会话并复制截断历史（源会话与工作区不动），ack 回 BranchResult{ok,sessionId}。
     branch(beforeMessageUuid?: string): Promise<any> { return this.t.call('branch', { beforeMessageUuid }, this.sessionId); }
+    // 会话基线 diff：清单 / 单文件详情 / 放弃修改（基线由 core 在写盘前捕获，宿主只展示）
+    getFileChanges(): Promise<any> { return this.t.call('getFileChanges', undefined, this.sessionId); }
+    getFileDiff(filePath: string): Promise<any> { return this.t.call('getFileDiff', { filePath }, this.sessionId); }
+    revertFileChanges(filePaths?: string[]): Promise<any> { return this.t.call('revertFileChanges', { filePaths }, this.sessionId); }
     // Stop 时停后台子 agent（D3）；fire-and-forget（对齐 VSCode 丢弃返回值）。
     stopAllTasks(): Promise<number> { return this.t.call('stopAllTasks', undefined, this.sessionId); }
     // 子 agent 转后台（D4，会话级）。

@@ -1,6 +1,7 @@
 import { SemaSessionWrapper, SessionWrapperCallbacks, PermissionLevel } from '../../../core/semaSessionWrapper';
 import { transformCommandToPrompt } from '../../../utils/prompt';
-import { TOOL_NAME_VIEW_FILE, TOOL_NAME_WRITE_FILE, TOOL_NAME_PATCH_FILE } from '../../../utils/tool';
+import { TOOL_NAME_WRITE_FILE, TOOL_NAME_PATCH_FILE, TOOL_NAME_EDIT_NOTEBOOK, TOOL_NAME_GENERATE_IMAGE } from '../../../utils/tool';
+import { isAttachmentPath } from '../../common/viz';
 import { DEFAULT_CUSTOM_RULES, isBuiltinCustomRules, normalizePermissionLevel } from '../../config/default/defaultConfig';
 import { Transport } from './transport';
 import { RemoteCore, RemoteSession } from './remote';
@@ -9,6 +10,14 @@ import { buildPasteInput, type PasteAttachment } from '../../common/paste';
 
 /** 同时打开的会话上限（对齐 semaProcessWrapper.MAX_SESSIONS = 5，本地常量避免拽入 node 依赖）。 */
 const MAX_SESSIONS = 5;
+
+/** 会写项目文件的工具：写完后刷新文件变更面板（对齐 semaSidebarProvider.FILE_EDIT_TOOL_NAMES） */
+const FILE_EDIT_TOOL_NAMES = new Set<string>([
+    TOOL_NAME_WRITE_FILE,
+    TOOL_NAME_PATCH_FILE,
+    TOOL_NAME_EDIT_NOTEBOOK,
+    TOOL_NAME_GENERATE_IMAGE,
+]);
 /** 浏览器控制的用户级 chrome MCP 名（对齐 config-controller / Kotlin BuiltinResourcesSync）。 */
 const BROWSER_MCP_NAME = 'chrome';
 
@@ -41,6 +50,8 @@ export class Controller {
     private eventBuffer = new Map<string, Array<{ event: string; data: any }>>();
     /** 会话历史存档防抖定时器（对齐 semaSidebarProvider.saveSessionTimers，300ms）。 */
     private saveTimers = new Map<string, ReturnType<typeof setTimeout>>();
+    /** 文件变更整表刷新定时器（连续写盘合并成一次查询，对齐 semaSidebarProvider.fileChangeTimers）。 */
+    private fileChangeTimers = new Map<string, ReturnType<typeof setTimeout>>();
     /** 打开时的内容指纹（对齐 semaSidebarProvider）：条数 + 末条消息 id + 标题。 */
     private sessionBaselines = new Map<string, string>();
     /** 输入框有草稿的会话（对齐 semaSidebarProvider.draftSessionIds）。 */
@@ -56,7 +67,7 @@ export class Controller {
     constructor(private t: Transport, private postToApp: (msg: any) => void) {
         this.core = new RemoteCore(t);
         t.setEventHandler((event, data, sessionId) => this.onGrpcEvent(event, data, sessionId));
-        // Kotlin 编辑器侧回推的 UI 消息（如 fileChangeStats）直接灌回 app
+        // Kotlin 编辑器侧回推的 UI 消息（如 filePathVerified）直接灌回 app
         t.setAppMessageHandler((m) => this.postToApp(m));
         // 宿主主动下发的入站命令（标题栏「新建会话」Action / 历史面板「加载会话」）→ 当作 web 消息处理
         t.setHostCommandHandler((m) => { void this.handleWebMessage(m); });
@@ -113,36 +124,23 @@ export class Controller {
     private get callbacks(): SessionWrapperCallbacks {
         return {
             onMessage: (m) => this.postToApp(m),
-            // 读时快照（对齐 VSCode handleSessionReady）：按历史读过的文件补快照（按会话隔离）。
-            onSessionReady: (sid, data: any) => {
+            onSessionReady: (_sid, _data: any) => {
                 // core 建会话会重扫插件并级联刷新 skills/agents/commands/MCP/hooks，配置页长开时列表会过期。
                 // 配置页那条 gRPC 连接收不到本会话的 session:ready，只能经宿主总线转一手
                 // （对齐 VSCode handleSessionReady → configWebviewProvider.notifySessionCreated）。
+                // 会话基线在 core 侧，恢复会话后前端挂载时会主动拉一次整表，这里不再补读文件基线
                 this.t.editor('notifySessionCreated', {});
-                const ts = data?.readFileTimestamps;
-                if (ts && typeof ts === 'object') for (const filePath of Object.keys(ts)) this.addFileToSnapshotIfNew(sid, filePath);
             },
             // 存档触发点（对齐 semaSidebarProvider）：状态回 idle、话题更新时防抖存历史。
             onStateChange: (sid, state) => { if (state === 'idle') this.debouncedSaveSession(sid); },
             onTopicUpdate: (sid) => this.debouncedSaveSession(sid),
-            // 读时快照（对齐 VSCode handleToolExecutionComplete）：view_file 首次读文件时打快照；
-            // 新建文件（write/patch 且 type==='new'）钉空基线，避免 fork 后重读把已改内容误当基线。
+            // 文件写完：core 已在写盘前捕获基线，这里只触发面板整表刷新（连续写完合并到一次）
             onToolExecutionComplete: (sid, data: any) => {
-                if (data?.toolName === TOOL_NAME_VIEW_FILE) {
-                    // 部分读取的 title 带 `:起始-结束` 行号后缀，去掉才是路径
-                    this.addFileToSnapshotIfNew(sid, String(data.title || '').replace(/:\d+-\d+$/, ''));
-                } else if (
-                    (data?.toolName === TOOL_NAME_WRITE_FILE || data?.toolName === TOOL_NAME_PATCH_FILE) &&
-                    data?.content && typeof data.content === 'object' && data.content.type === 'new'
-                ) {
-                    this.pinEmptySnapshotIfNew(sid, data.title);
-                }
+                if (FILE_EDIT_TOOL_NAMES.has(data?.toolName)) this.scheduleFileChangesRefresh(sid);
             },
-            // 读时快照（对齐 VSCode handleFileReference）：@ 引用文件时打快照（按会话隔离）。
-            onFileReference: (sid, data: any) => { for (const ref of data?.references ?? []) if (ref?.type === 'file' && ref?.name) this.addFileToSnapshotIfNew(sid, ref.name); },
             onTaskStart: (sessionId, data) => { this.touchedSessionIds.add(sessionId); this.postToApp({ type: 'taskStart', sessionId, data }); },
             onTaskEnd: (sessionId, data) => { this.touchedSessionIds.add(sessionId); this.postToApp({ type: 'taskEnd', sessionId, data }); },
-            onSessionCleared: (sessionId) => { this.t.editor('resetSnapshots', { sessionId }); this.clearPanels(sessionId); },
+            onSessionCleared: (sessionId) => { this.clearPanels(sessionId); },
             onOpenAgentDetail: (sessionId, taskId) => this.postToApp({ type: 'openAgentDetail', sessionId, taskId }),
             onUserResponded: () => {},
             onTitleUpdate: (sessionId, title) => this.postToApp({ type: 'sessionTitleUpdate', sessionId, title }),
@@ -166,7 +164,11 @@ export class Controller {
             case 'closeSession': this.closeSession(sid); break;
             // 输入框有草稿：该会话不参与「打开后无变化」的自动回收
             case 'sessionDraftActivity': if (sid && this.sessions.has(sid)) this.draftSessionIds.add(sid); break;
-            case 'webviewSessionReady': this.sessions.get(sid ?? '')?.wrapper.sendInitialState(); break;
+            case 'webviewSessionReady':
+                this.sessions.get(sid ?? '')?.wrapper.sendInitialState();
+                // 文件变更面板以 core 的会话基线为准：挂载即拉一次整表
+                void this.pushFileChanges(sid);
+                break;
 
             case 'sendInput': this.handleUserInput(sid, msg.text, msg.files, msg.attachments, msg.pastes); break;
             case 'interrupt': this.interrupt(sid); break;
@@ -210,18 +212,16 @@ export class Controller {
             // 文件校验 / 图片解析：Kotlin 原生处理后经 editor 通路回推 filePathVerified / imagePathResolved（对齐 VSCode，fire-and-forget）
             case 'verifyFilePath': this.t.editor('verifyFilePath', { filePath: msg.filePath, tempId: msg.tempId, originalCode: msg.originalCode, lineInfo: msg.lineInfo }); break;
             case 'resolveImagePath': this.t.editor('resolveImagePath', { filePath: msg.filePath, tempId: msg.tempId }); break;
-            case 'showFileDiff': this.t.editor('showFileDiff', { filePath: msg.filePath, minLine: msg.minLine, sessionId: sid }); break;
+            case 'showFileDiff': await this.handleShowFileDiff(sid, msg.filePath, msg.minLine); break;
             case 'showPermissionDiff': this.t.editor('showPermissionDiff', { filePath: msg.filePath, diffContent: msg.diffContent, sessionId: sid }); break;
-            case 'getFileChangeStats': this.t.editor('getFileChangeStats', { filePath: msg.filePath, sessionId: sid }); break;
+            case 'requestFileChanges': await this.pushFileChanges(sid); break;
 
-            // 拒绝/回滚：转发 Kotlin 用快照写回或删除，并同步清理 UI 面板（对齐 chatWebview）
+            // 放弃修改：由 core 按会话基线恢复 / 删除文件，Kotlin 只负责刷新 VFS
             case 'restoreFromSnapshots':
-                this.t.editor('revertFiles', { filePaths: msg.filePaths, sessionId: sid });
-                this.postToApp({ type: 'clearFileChanges', sessionId: sid });
+                await this.handleRevertFiles(sid, msg.filePaths);
                 break;
             case 'restoreFromSnapshot':
-                this.t.editor('revertFile', { filePath: msg.filePath, sessionId: sid });
-                this.postToApp({ type: 'removeFileChange', sessionId: sid, filePath: msg.filePath });
+                await this.handleRevertFiles(sid, msg.filePath ? [msg.filePath] : []);
                 break;
 
             // 工作区文件 / 内容搜索 / 剪贴板：Kotlin 原生处理后经 editor 通路回推（对齐 VSCode，fire-and-forget；reqId 原样回带）
@@ -320,8 +320,6 @@ export class Controller {
         this.sessions.set(res.sessionId, { wrapper, remote });
         this.activeSessionId = res.sessionId;
         this.core.setActiveSession(res.sessionId); // 对齐 VSCode：建会话即标记 core 活跃会话（cron 通知定位用）
-        // 为该会话建立独立的快照作用域（清掉可能残留的同 id 旧状态）。
-        this.t.editor('resetSnapshots', { sessionId: res.sessionId });
 
         // 回放缓冲事件（如 session:ready）
         const buf = this.eventBuffer.get(res.sessionId);
@@ -477,6 +475,8 @@ export class Controller {
             const restored = Array.isArray(result?.restoredFiles) ? result.restoredFiles : [];
             if (restored.length > 0) this.t.editor('refreshFiles', { filePaths: restored });
             this.postToApp({ type: 'forkResult', sessionId: sid, reqId, uuid, result });
+            // 回退会截断基线与文件，面板按 core 的最新清单整表刷新（restoreFiles=false 时也刷新）
+            if (result?.ok !== false) void this.pushFileChanges(sid);
         } catch (e: any) {
             this.postToApp({ type: 'forkResult', sessionId: sid, reqId, uuid, result: { ok: false, error: e?.message || t('host.forkFailed', { error: t('common.unknownError') }) } });
         }
@@ -558,13 +558,13 @@ export class Controller {
             this.saveSession(sid);
         }
         if (timer) { clearTimeout(timer); this.saveTimers.delete(sid); }
+        const changeTimer = this.fileChangeTimers.get(sid);
+        if (changeTimer) { clearTimeout(changeTimer); this.fileChangeTimers.delete(sid); }
         this.core.closeSession(sid);
         this.sessions.delete(sid);
         this.sessionBaselines.delete(sid);
         this.draftSessionIds.delete(sid);
         this.touchedSessionIds.delete(sid);
-        // 释放该会话的快照与临时文件，避免泄漏。
-        this.t.editor('resetSnapshots', { sessionId: sid });
         if (this.activeSessionId === sid) {
             this.activeSessionId = this.sessions.keys().next().value ?? null;
             if (this.activeSessionId) this.core.setActiveSession(this.activeSessionId); // 对齐 VSCode：关闭后活跃权交给下一个会话
@@ -661,14 +661,96 @@ export class Controller {
         catch { this.postToApp({ type: 'agentsLoaded', agents: [] }); }
     }
 
-    /** 读文件时打快照（对齐 VSCode addFileToSnapshotIfNew）：传路径给 Kotlin 回读磁盘存原版，按会话隔离、幂等。 */
-    private addFileToSnapshotIfNew(sessionId: string, filePath: any): void {
-        if (sessionId && typeof filePath === 'string' && filePath) this.t.editor('addFileToSnapshotIfNew', { sessionId, filePath });
+    /**
+     * 把 core 的会话基线清单整表推给前端。attachments/<uuid>/ 下的文件是宿主自己的落盘目录，
+     * 不算「编辑了项目文件」，在宿主侧过滤掉（对齐 VSCode chatWebview.pushFileChanges）。
+     */
+    private async pushFileChanges(sessionId: string | undefined): Promise<void> {
+        const entry = sessionId ? this.sessions.get(sessionId) : undefined;
+        if (!entry) return;
+        try {
+            const changes = (await entry.remote.getFileChanges() as any[])
+                .filter(item => !isAttachmentPath(item.filePath));
+            this.postToApp({ type: 'fileChanges', sessionId, changes });
+        } catch (e: any) {
+            console.error('Failed to load file changes:', e);
+        }
     }
 
-    /** 新建文件时钉一条空基线（对齐 VSCode pinEmptySnapshotIfNew）：避免 fork 后重读把已改内容误当基线。 */
-    private pinEmptySnapshotIfNew(sessionId: string, filePath: any): void {
-        if (sessionId && typeof filePath === 'string' && filePath) this.t.editor('pinEmptySnapshotIfNew', { sessionId, filePath });
+    /** 文件变更整表刷新：短时间内的连续写盘合并成一次查询 */
+    private scheduleFileChangesRefresh(sessionId: string | undefined): void {
+        if (!sessionId) return;
+        const existing = this.fileChangeTimers.get(sessionId);
+        if (existing) clearTimeout(existing);
+        this.fileChangeTimers.set(sessionId, setTimeout(() => {
+            this.fileChangeTimers.delete(sessionId);
+            void this.pushFileChanges(sessionId);
+        }, 150));
+    }
+
+    /**
+     * 打开单文件 diff：用 core 给的会话基线 + 查询时磁盘内容，让 Kotlin 用左右文本开原生 diff。
+     * minLine 由工具编辑块给（这次编辑的锚点行）；面板点击不给，改用 core 返回的首个变更行，
+     * 保证复用已打开的 diff 标签时也能定位到变更处。
+     * 二进制 / 超出文本上限 / 基线不可用等不可比较的情况退回打开文件，不伪造空基线。
+     */
+    private async handleShowFileDiff(sessionId: string | undefined, filePath: string, minLine?: number): Promise<void> {
+        const entry = sessionId ? this.sessions.get(sessionId) : undefined;
+        if (!entry || !filePath) return;
+        // notebook 按 cell 定位，行号对 notebook 没有意义：只打开文件、不跳行
+        if (filePath.toLowerCase().endsWith('.ipynb')) {
+            this.t.editor('openFile', { filePath });
+            return;
+        }
+        try {
+            const diff = await entry.remote.getFileDiff(filePath);
+            if (diff?.status !== 'ok') {
+                this.t.editor('openFile', { filePath: diff?.filePath || filePath, line: minLine ?? diff?.line ?? 1 });
+                return;
+            }
+            this.t.editor('showFileDiffText', {
+                filePath: diff.filePath,
+                leftText: diff.baselineText ?? '',
+                rightText: diff.currentText ?? '',
+                minLine: minLine ?? diff.line,
+                fileName: diff.displayPath ? String(diff.displayPath).split(/[\\/]/).pop() : undefined,
+            });
+        } catch (e: any) {
+            console.error('显示diff失败:', e);
+            this.t.editor('openFile', { filePath, line: minLine ?? 1 });
+        }
+    }
+
+    /** 放弃修改：core 写盘 / 删文件，成功的文件让 Kotlin 刷新 VFS，最后整表刷新面板 */
+    private async handleRevertFiles(sessionId: string | undefined, filePaths?: string[]): Promise<void> {
+        const entry = sessionId ? this.sessions.get(sessionId) : undefined;
+        if (!entry) return;
+        try {
+            const results = await entry.remote.revertFileChanges(filePaths) as any[];
+            const touched = results
+                .filter(r => r.action === 'restored' || r.action === 'deleted')
+                .map(r => r.filePath);
+            if (touched.length > 0) this.t.editor('refreshFiles', { filePaths: touched });
+            const failed = results.filter(r => r.action === 'failed');
+            if (failed.length > 0) {
+                this.postToApp({
+                    type: 'error',
+                    message: t('host.revertFilesFailed', {
+                        files: failed.map(f => f.displayPath).join(', '),
+                        error: failed[0].error || t('common.unknownError'),
+                    }),
+                });
+            }
+            await this.pushFileChanges(sessionId);
+        } catch (e: any) {
+            this.postToApp({
+                type: 'error',
+                message: t('host.revertFilesFailed', {
+                    files: String(filePaths?.length ?? ''),
+                    error: e?.message || t('common.unknownError'),
+                }),
+            });
+        }
     }
 
     // ─── 会话历史存档（对齐 SessionHistoryManager，存盘在 Kotlin）──────────────

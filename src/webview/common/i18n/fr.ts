@@ -89,7 +89,6 @@ export const fr: Partial<Record<keyof typeof zh, string>> = {
     'chat.modelMenu.manage': 'Gérer les modèles',
     'chat.tokens.usedPercent': 'Contexte utilisé : {percent}',
     'chat.fileChanges.discardAll': 'Tout ignorer',
-    'chat.fileChanges.markAdopted': 'Marquer comme adopté',
     'chat.fileChanges.discardFile': 'Ignorer les modifications de ce fichier',
     'chat.fileChanges.discard': 'Ignorer',
     'chat.askForm.otherRequired': 'Veuillez remplir le champ « Other »',

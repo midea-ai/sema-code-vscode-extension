@@ -2,7 +2,7 @@ import React, { useEffect, useCallback, useMemo, useRef, useState } from 'react'
 import ReactDOM from 'react-dom';
 import { Message, VscodeApi } from './types';
 import MessageItem from './MessageItem';
-import GroupedToolBlock, { EditRunBlock, McpRunBlock } from './blocks/tools/GroupedToolBlock';
+import GroupedToolBlock, { McpRunBlock } from './blocks/tools/GroupedToolBlock';
 import GeneratedImageBlock from './blocks/tools/GeneratedImageBlock';
 import { groupMessages } from './utils/groupMessages';
 import { useT } from '../common/i18n/react';
@@ -122,8 +122,8 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
             );
         }
 
-        // 任务详情里的消息全是历史，文件编辑一律合并成一行
-        return groupMessages(taskMessages, { showThinkingText: false, mergeEdits: true }).map((item) => {
+        // 任务详情里的消息全是历史，文件编辑一律并入混合工具组
+        return groupMessages(taskMessages, { showThinkingText: false, groupEdits: true }).map((item) => {
             if (item.kind === 'group') {
                 return (
                     <div key={item.id} className="msg-wrap">
@@ -145,20 +145,12 @@ const TaskDetailModal: React.FC<TaskDetailModalProps> = ({
                     </div>
                 );
             }
-            if (item.kind === 'editRun') {
-                return (
-                    <div key={item.id} className="msg-wrap">
-                        <EditRunBlock messages={item.messages} vscode={vscode} />
-                    </div>
-                );
-            }
 
             const { message } = item;
             return (
                 <div key={message.id} className="msg-wrap">
                     <MessageItem
                         message={message}
-                        shouldReportChange={false}
                         vscode={vscode}
                         showThinkingText={false}
                     />

@@ -101,7 +101,7 @@ jetbrains-plugin/
     │   ├── jcef/              # ChatPanel / ConfigPanel / HistoryPanel / HtmlShell / Theme
     │   ├── bridge/            # MessageBridge(grpc/editor/systemConfig/history 转发)+ SemaPanelBus(跨面板总线)
     │   ├── sidecar/           # SidecarService:SDK SidecarManager/BridgeConnection 薄封装
-    │   ├── editor/            # EditorOps(快照/diff/回滚/统计/openConfig)
+    │   ├── editor/            # EditorOps(diff/刷新/openConfig)
     │   └── config/            # SystemConfigManager + SessionHistoryManager + 配置页/历史页 FileEditor
     └── resources/META-INF/plugin.xml
 ```

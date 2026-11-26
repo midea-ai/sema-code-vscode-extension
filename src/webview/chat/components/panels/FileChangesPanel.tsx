@@ -1,43 +1,43 @@
 import React, { useState, useEffect } from 'react';
 import { VscodeApi, FileChange } from '../../types';
-import { CheckIcon, ToggleIcon, CancelCircleIcon } from '../ui/IconButton';
+import { ToggleIcon, CancelCircleIcon } from '../ui/IconButton';
 import { FileLabel } from '../../utils/fileRefDisplay';
 import { hasTextSelection } from '../../utils/selection';
+import { baseName, displayPath } from '../../utils/pathDisplay';
 import { useT } from '../../../common/i18n/react';
 
 interface FileChangesPanelProps {
     changes: FileChange[];
     vscode: VscodeApi;
-    onDiscardAll?: () => void;
-    onMarkAdopted?: () => void;
-    fileStateManager?: any;
     onScrollToBottom?: () => void;
 }
 
-const FileChangesPanel: React.FC<FileChangesPanelProps> = ({ changes, vscode, onDiscardAll, onMarkAdopted, fileStateManager, onScrollToBottom }) => {
+/** 不可文本比较时的状态文案；可比较但只是编码/换行变了时给「格式变化」 */
+const statusKey = (change: FileChange) => {
+    if (change.status === 'binary') return 'chat.fileChanges.status.binary' as const;
+    if (change.status === 'tooLarge') return 'chat.fileChanges.status.tooLarge' as const;
+    if (change.status === 'baselineUnavailable') return 'chat.fileChanges.status.baselineUnavailable' as const;
+    if (change.status === 'currentUnreadable') return 'chat.fileChanges.status.currentUnreadable' as const;
+    if (change.rawChanged) return 'chat.fileChanges.formatChanged' as const;
+    return null;
+};
+
+/**
+ * 文件变更面板：条目来自宿主下发的 core 会话基线清单（已按绝对路径去重、已过滤无差异项），
+ * 这里只负责展示与转发「打开 diff / 放弃修改」，不再自己统计或保存快照。
+ */
+const FileChangesPanel: React.FC<FileChangesPanelProps> = ({ changes, vscode, onScrollToBottom }) => {
     const t = useT();
     const [isExpanded, setIsExpanded] = useState(true);
-
-    // 按完整路径对文件进行去重，保留最新的文件变更
-    const uniqueChanges = changes.reduce((acc: FileChange[], current: FileChange) => {
-        const existingIndex = acc.findIndex(item => item.fullPath === current.fullPath);
-        if (existingIndex >= 0) {
-            // 如果已存在相同路径的文件，用最新的替换旧的
-            acc[existingIndex] = current;
-        } else {
-            acc.push(current);
-        }
-        return acc;
-    }, []);
 
     useEffect(() => {
         if (isExpanded && onScrollToBottom) {
             const timer = setTimeout(onScrollToBottom, 50);
             return () => clearTimeout(timer);
         }
-    }, [uniqueChanges.length]);
+    }, [changes.length]);
 
-    if (uniqueChanges.length === 0) {
+    if (changes.length === 0) {
         return null;
     }
 
@@ -45,34 +45,22 @@ const FileChangesPanel: React.FC<FileChangesPanelProps> = ({ changes, vscode, on
         setIsExpanded(!isExpanded);
     };
 
-    const handleFileClick = async (fullPath: string, minLine: number) => {
+    // 不带行号：diff 打开后的首个变更定位由宿主 / 编辑器自带行为决定
+    const handleFileClick = (change: FileChange) => {
         if (hasTextSelection()) {
             return;
         }
-        // 使用vscode.postMessage直接调用后端的showFileDiff方法
         vscode.postMessage({
             type: 'showFileDiff',
-            filePath: fullPath,
-            minLine: minLine
+            filePath: change.filePath
         });
     };
 
-    // 处理全部放弃按钮点击
     const handleDiscardAll = () => {
-        // 收集所有要放弃的文件路径
-        const filePaths = uniqueChanges.map(change => change.fullPath);
-
-        // 调用后端方法恢复文件
-       // console.log('FileChangesPanel handleDiscardAll called with file paths:', filePaths);
         vscode.postMessage({
             type: 'restoreFromSnapshots',
-            filePaths: filePaths
+            filePaths: changes.map(change => change.filePath)
         });
-
-        // 调用父组件传入的回调函数（如果有）
-        if (onDiscardAll) {
-            onDiscardAll();
-        }
     };
 
     return (
@@ -80,7 +68,7 @@ const FileChangesPanel: React.FC<FileChangesPanelProps> = ({ changes, vscode, on
             <div className="file-changes-header">
                 <div className="file-changes-header-left" onClick={handleToggle}>
                     <ToggleIcon isExpanded={isExpanded} />
-                    <span className="file-changes-title">{uniqueChanges.length} Files</span>
+                    <span className="file-changes-title">{changes.length} Files</span>
                 </div>
                 <div className="file-changes-header-right">
                     <button
@@ -94,74 +82,70 @@ const FileChangesPanel: React.FC<FileChangesPanelProps> = ({ changes, vscode, on
                         <CancelCircleIcon />
                         {t('chat.fileChanges.discardAll')}
                     </button>
-                    <button
-                        className="file-changes-action-btn adopted-btn"
-                        onClick={(e) => {
-                            e.stopPropagation();
-                            onMarkAdopted?.();
-                        }}
-                        title={t('chat.fileChanges.markAdopted')}
-                    >
-                        <CheckIcon />
-                        {t('chat.fileChanges.markAdopted')}
-                    </button>
                 </div>
             </div>
             {isExpanded && (
                 <div className="file-changes-content">
-                    {uniqueChanges.map((change, index) => (
-                        <div
-                            key={index}
-                            className="file-change-item"
-                            onClick={() => handleFileClick(change.fullPath, change.minLine)}
-                        >
-                            <div className="file-change-left">
-                                {/* 统一的文件高亮外形（plain：正常字重，颜色与最大宽度由 .file-change-name 给） */}
-                                <FileLabel path={change.fileName} label={change.fileName} plain className="file-change-name" />
-                                {(() => {
-                                    // 路径只保留目录部分（去掉结尾重复的文件名）；目录为空则不显示
-                                    const dir = change.fullPath.endsWith(change.fileName)
-                                        ? change.fullPath.slice(0, -change.fileName.length)
-                                        : change.fullPath;
-                                    return dir ? (
+                    {changes.map((change, index) => {
+                        const label = baseName(change.displayPath);
+                        const shownPath = displayPath(change.displayPath);
+                        // 目录只保留目录部分（去掉结尾重复的文件名）；目录为空则不显示
+                        const dir = shownPath.endsWith(label)
+                            ? shownPath.slice(0, -label.length)
+                            : shownPath;
+                        const status = statusKey(change);
+                        const showStats = change.status === 'ok' && !status
+                            && ((change.additions ?? 0) > 0 || (change.removals ?? 0) > 0);
+                        return (
+                            <div
+                                key={`${change.filePath}:${index}`}
+                                className="file-change-item"
+                                onClick={() => handleFileClick(change)}
+                            >
+                                <div className="file-change-left">
+                                    {/* 统一的文件高亮外形（plain：正常字重，颜色与最大宽度由 .file-change-name 给） */}
+                                    <FileLabel path={label} label={label} plain className="file-change-name" />
+                                    {dir ? (
                                         <span
                                             className="file-change-fullpath"
-                                            title={change.fullPath}
+                                            title={change.displayPath}
                                         >
                                             {/* 首尾包裹 LRM 锚定为 LTR，避免 direction:rtl 下路径首/尾的 "/" 被 bidi 移位 */}
                                             {'‎' + dir + '‎'}
                                         </span>
-                                    ) : null;
-                                })()}
+                                    ) : null}
+                                </div>
+                                <div className="file-change-right">
+                                    {status ? (
+                                        <span className="file-change-status" title={t(status)}>{t(status)}</span>
+                                    ) : showStats ? (
+                                        <div className="file-change-stats">
+                                            {(change.additions ?? 0) > 0 && (
+                                                <span className="additions">+{change.additions}</span>
+                                            )}
+                                            {(change.removals ?? 0) > 0 && (
+                                                <span className="removals">-{change.removals}</span>
+                                            )}
+                                        </div>
+                                    ) : null}
+                                    <span
+                                        className="file-change-discard-btn"
+                                        title={t('chat.fileChanges.discardFile')}
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            vscode.postMessage({
+                                                type: 'restoreFromSnapshot',
+                                                filePath: change.filePath
+                                            });
+                                        }}
+                                    >
+                                        <CancelCircleIcon />
+                                        {t('chat.fileChanges.discard')}
+                                    </span>
+                                </div>
                             </div>
-                            <div className="file-change-right">
-                                {!change.isNotebook && (
-                                    <div className="file-change-stats">
-                                        {change.additions > 0 && (
-                                            <span className="additions">+{change.additions}</span>
-                                        )}
-                                        {change.removals > 0 && (
-                                            <span className="removals">-{change.removals}</span>
-                                        )}
-                                    </div>
-                                )}
-                                <span
-                                    className="file-change-discard-btn"
-                                    title={t('chat.fileChanges.discardFile')}
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        vscode.postMessage({
-                                            type: 'restoreFromSnapshot',
-                                            filePath: change.fullPath
-                                        });
-                                    }}
-                                >
-                                    <CancelCircleIcon />
-                                    {t('chat.fileChanges.discard')}
-                                </span>
-                            </div>
-                        </div>
-                    ))}
+                        );
+                    })}
                 </div>
             )}
         </div>
@@ -169,4 +153,3 @@ const FileChangesPanel: React.FC<FileChangesPanelProps> = ({ changes, vscode, on
 };
 
 export default FileChangesPanel;
-

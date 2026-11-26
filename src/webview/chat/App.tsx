@@ -5,7 +5,7 @@ import InputBox, { InputBoxHandle } from './components/input/InputBox';
 import MessageItem from './MessageItem';
 import UserInputBlock from './blocks/UserInputBlock';
 import { parsePasteInput, type PasteAttachment } from '../common/paste';
-import GroupedToolBlock, { EditRunBlock, McpRunBlock } from './blocks/tools/GroupedToolBlock';
+import GroupedToolBlock, { McpRunBlock } from './blocks/tools/GroupedToolBlock';
 import GeneratedImageBlock from './blocks/tools/GeneratedImageBlock';
 import SessionTabs from './components/SessionTabs';
 import { AgentDialogContext, SessionActiveContext, SessionContext } from './SessionContext';
@@ -30,7 +30,7 @@ import { groupMessages, getToolName, getToolTitle } from './utils/groupMessages'
 import { setPathEnv } from './utils/pathDisplay';
 import VizEmbed from './blocks/VizEmbed';
 import TurnNav, { turnNavItems, MIN_TURNS } from './components/TurnNav';
-import { isAttachmentPath, isVizPath } from '../common/viz';
+import { isVizPath } from '../common/viz';
 import { TOOL_NAME_RUN_SHELL, TOOL_NAME_WRITE_FILE, TOOL_NAME_PATCH_FILE } from '../../utils/tool';
 import { TASK_TYPE_SHELL, TASK_TYPE_AGENT } from '../config/BackgroundTaskConfig';
 import PreviewDialogs from './utils/PreviewDialogs';
@@ -157,42 +157,6 @@ const ChatSession: React.FC<ChatSessionProps> = ({ vscode: rawVscode, sessionId,
     const primePendingRef = useRef<boolean>(false);
     const forkReqRef = useRef<string | null>(null);
     const branchReqRef = useRef<string | null>(null);
-
-    const handleFileChange = useCallback(async (change: FileChange) => {
-        // attachments/<uuid>/ 下的文件（可视化产物、粘贴转存）是宿主自己的落盘目录，不算「编辑了项目文件」
-        if (isAttachmentPath(change.fullPath)) return;
-        try {
-            setFileChanges(prev => {
-                const existingIndex = prev.findIndex(c => c.fullPath === change.fullPath);
-                if (existingIndex >= 0) {
-                    const updated = [...prev];
-                    updated[existingIndex] = {
-                        ...updated[existingIndex],
-                        isNotebook: change.isNotebook,
-                        type: change.type
-                    };
-                    return updated;
-                } else {
-                    return [...prev, {
-                        ...change,
-                        additions: 0,
-                        removals: 0,
-                        minLine: change.minLine || 1
-                    }];
-                }
-            });
-
-            if (change.fullPath) {
-                vscode.postMessage({
-                    type: 'getFileChangeStats',
-                    sessionId,
-                    filePath: change.fullPath
-                });
-            }
-        } catch (error) {
-            console.error('handleFileChange error:', error);
-        }
-    }, [sessionId]);
 
     /** 消息列表的唯一提交出口：非激活会话只记 dirty，切回时统一刷新 */
     const commitMessages = () => {
@@ -332,34 +296,12 @@ const ChatSession: React.FC<ChatSessionProps> = ({ vscode: rawVscode, sessionId,
                     setInputDisabled(true);
                     setInputPlaceholderMsg(message.message || null);
                     break;
-                case 'fileChange':
-                    handleFileChange(message.change);
-                    break;
-                case 'fileChangeStats':
-                    if (message.fullPath && message.stats) {
-                        setFileChanges(prev => {
-                            const existingIndex = prev.findIndex(c => c.fullPath === message.fullPath);
-                            if (existingIndex >= 0) {
-                                const updated = [...prev];
-                                updated[existingIndex] = {
-                                    ...updated[existingIndex],
-                                    additions: message.stats.additions,
-                                    removals: message.stats.removals,
-                                    minLine: message.stats.minLine
-                                };
-                                return updated;
-                            }
-                            return prev;
-                        });
-                    }
+                // 文件变更整表来自宿主（core 会话基线查询），前端不再自行拼条目
+                case 'fileChanges':
+                    setFileChanges(Array.isArray(message.changes) ? message.changes : []);
                     break;
                 case 'clearFileChanges':
                     setFileChanges([]);
-                    break;
-                case 'removeFileChange':
-                    if (message.filePath) {
-                        setFileChanges(prev => prev.filter(c => c.fullPath !== message.filePath));
-                    }
                     break;
                 case 'todosUpdate':
                     if (Array.isArray(message.todos)) {
@@ -551,15 +493,8 @@ const ChatSession: React.FC<ChatSessionProps> = ({ vscode: rawVscode, sessionId,
                             inputBoxRef.current?.setText(originalText, originalAttachments, originalPastes);
                         }
                     }
-                    // 2) 文件回滚：移除已回滚的变更条目（restoreFiles=false 时 restoredFiles 为空，不动面板）。
-                    //    core 回滚的是绝对路径，而面板 fullPath 取决于工具调用入参（可能是相对路径/文件名），
-                    //    故按"绝对路径相等，或绝对路径以 /相对路径 结尾"判断等价（带 / 边界避免误配同名后缀）。
-                    const restoredFiles: string[] = Array.isArray(result.restoredFiles) ? result.restoredFiles : [];
-                    if (restoredFiles.length > 0) {
-                        const isRestored = (fullPath: string) =>
-                            restoredFiles.some(rf => rf === fullPath || rf.endsWith('/' + fullPath));
-                        setFileChanges(prev => prev.filter(c => !isRestored(c.fullPath)));
-                    }
+                    // 2) 文件回滚：core 已按截断后的记录更新基线，面板重新拉整表（restoreFiles=false 也刷新）
+                    vscode.postMessage({ type: 'requestFileChanges', sessionId });
                     // 3) todos：core 回档后会重发 todos:update，前端 todosUpdate 已整体替换，无需处理
                     break;
                 }
@@ -578,6 +513,8 @@ const ChatSession: React.FC<ChatSessionProps> = ({ vscode: rawVscode, sessionId,
 
         // 消息监听器就位后，通知后端本会话视图已挂载，回放当前状态
         vscode.postMessage({ type: 'webviewSessionReady', sessionId });
+        // 文件变更面板以 core 的会话基线为准：挂载即拉一次整表，不依赖历史工具块重放
+        vscode.postMessage({ type: 'requestFileChanges', sessionId });
         vscode.postMessage({ type: 'requestModelInfo' });
         vscode.postMessage({ type: 'requestSystemConfig' });
 
@@ -972,9 +909,9 @@ const ChatSession: React.FC<ChatSessionProps> = ({ vscode: rawVscode, sessionId,
         const shouldShowThinkingText = thinkingEnabled && showThinkingText;
 
         // 本轮新建/修改的可视化产物（attachments/<uuid>/*.html）：轮次结束后在消息末尾内联嵌入（避免半成品页面）
-        const vizPathsOf = (items: Array<{ message: Message }>): string[] => {
+        const vizPathsOf = (items: Message[]): string[] => {
             const out: string[] = [];
-            for (const { message } of items) {
+            for (const message of items) {
                 if (message.type !== 'tool') continue;
                 const name = getToolName(message);
                 if (name !== TOOL_NAME_WRITE_FILE && name !== TOOL_NAME_PATCH_FILE) continue;
@@ -1013,21 +950,12 @@ const ChatSession: React.FC<ChatSessionProps> = ({ vscode: rawVscode, sessionId,
                             </div>
                         );
                     }
-                    if (item.kind === 'editRun') {
-                        return (
-                            <div key={item.id} className="msg-wrap">
-                                <EditRunBlock messages={item.messages} vscode={vscode} />
-                            </div>
-                        );
-                    }
 
                     return (
                         <div key={item.message.id} className="msg-wrap">
                             <MessageItem
                                 message={item.message}
-                                shouldReportChange={false}
                                 vscode={vscode}
-                                onFileChange={handleFileChange}
                                 streamingAssistantId={null}
                                 streamingToolId={null}
                                 showThinkingText={shouldShowThinkingText}
@@ -1059,26 +987,17 @@ const ChatSession: React.FC<ChatSessionProps> = ({ vscode: rawVscode, sessionId,
             break;
         }
 
-        // 最后一轮的开头：运行中轮内注入的气泡不是轮次边界，跳过
-        let lastUserInputIndex = -1;
-        for (let i = messages.length - 1; i >= 0; i--) {
-            if (messages[i].type === 'user' && !messages[i].injected) {
-                lastUserInputIndex = i;
-                break;
-            }
-        }
-
         // 按「轮次」分组：每条用户输入开启一组，后续消息归入同组。
         // 用户输入在组内 position:sticky 吸顶，被下一组顶替。
         // 目标自动续轮没有气泡本体，不单开一轮：并入上一组，上一条用户 / 定时任务输入的吸顶在续轮期间继续有效。
         // 运行中轮内注入的输入同样不开新轮（模型在同一轮里接着跑）：气泡留在注入位置并入所在组，本轮开头的输入继续吸顶
         const isGoalRound = (m: Message) => m.type === 'user' && m.source === 'goal' && m.goal?.action === 'round';
-        const groups: Array<{ key: string; items: Array<{ message: Message; index: number }> }> = [];
-        messages.forEach((message, index) => {
+        const groups: Array<{ key: string; items: Message[] }> = [];
+        messages.forEach((message) => {
             if ((message.type === 'user' && !isGoalRound(message) && !message.injected) || groups.length === 0) {
                 groups.push({ key: message.id, items: [] });
             }
-            groups[groups.length - 1].items.push({ message, index });
+            groups[groups.length - 1].items.push(message);
         });
 
         // 「分支到新聊天」挂在每一轮最后一条有正文的 assistant 消息上，且会话 idle
@@ -1092,13 +1011,13 @@ const ChatSession: React.FC<ChatSessionProps> = ({ vscode: rawVscode, sessionId,
         if (canBranchNow) {
             for (let gi = 0; gi < groups.length; gi++) {
                 const group = groups[gi];
-                if (group.items[0]?.message.type !== 'user') continue;
+                if (group.items[0]?.type !== 'user') continue;
                 // 中间轮次需要下一轮用户输入的 uuid 作为 core 截断锚点；
                 // 旧历史恢复的消息无 uuid，无法截断，则该轮不显示按钮（最后一轮全量分支不受影响）
                 const nextGroup = groups[gi + 1];
-                if (nextGroup && !nextGroup.items[0]?.message.uuid) continue;
+                if (nextGroup && !nextGroup.items[0]?.uuid) continue;
                 for (let i = group.items.length - 1; i >= 0; i--) {
-                    const m = group.items[i].message;
+                    const m = group.items[i];
                     if (m.type === 'assistant' && m.content?.completed !== false
                         && !!(m.content?.content && m.content.content.trim())) {
                         branchMessageIds.add(m.id);
@@ -1112,22 +1031,20 @@ const ChatSession: React.FC<ChatSessionProps> = ({ vscode: rawVscode, sessionId,
         // data-turn：左缘轮次指示条按它定位与计算当前轮（以用户输入开头的轮次才编号，与 turnNavItems 的条目一一对应）
         let navIdx = -1;
         return groups.map((group, gi) => (
-            <div key={group.key} className="turn-group" data-turn={group.items[0]?.message.type === 'user' ? ++navIdx : undefined}>
-                {groupMessages(group.items.map(item => item.message), {
+            <div key={group.key} className="turn-group" data-turn={group.items[0]?.type === 'user' ? ++navIdx : undefined}>
+                {groupMessages(group.items, {
                     streamingToolId,
                     showThinkingText: shouldShowThinkingText,
                     tailClosed: gi < groups.length - 1,
-                    // 非最后一轮的文件编辑合并成一行；最后一轮保持逐行，改了什么文件一眼可见
-                    mergeEdits: gi < groups.length - 1,
+                    // 非最后一轮的文件编辑并入混合工具组（组头计「编辑 n 个文件」）；最后一轮保持逐条，改了什么文件一眼可见
+                    groupEdits: gi < groups.length - 1,
                 }).map((item) => {
                     if (item.kind === 'group') {
-                        const groupStartIndex = group.items[item.originalStartIndex].index;
                         return (
                             <div key={item.id} className="msg-wrap">
                                 <GroupedToolBlock
                                     messages={item.messages}
                                     vscode={vscode}
-                                    onFileChange={groupStartIndex > lastUserInputIndex ? handleFileChange : undefined}
                                 />
                             </div>
                         );
@@ -1147,15 +1064,7 @@ const ChatSession: React.FC<ChatSessionProps> = ({ vscode: rawVscode, sessionId,
                         );
                     }
 
-                    if (item.kind === 'editRun') {
-                        return (
-                            <div key={item.id} className="msg-wrap">
-                                <EditRunBlock messages={item.messages} vscode={vscode} />
-                            </div>
-                        );
-                    }
-
-                    const { message, index } = group.items[item.originalIndex];
+                    const message = group.items[item.originalIndex];
 
                     // 思考阶段（无正文、未进入流式、且思考文本不展示）的 assistant 消息会渲染为空，
                     // 不输出空的 .msg-wrap，避免其 content-visibility 占位高度把下方 Spinner 顶下去再回弹。
@@ -1174,9 +1083,7 @@ const ChatSession: React.FC<ChatSessionProps> = ({ vscode: rawVscode, sessionId,
                         >
                             <MessageItem
                                 message={message}
-                                shouldReportChange={index > lastUserInputIndex}
                                 vscode={vscode}
-                                onFileChange={handleFileChange}
                                 streamingAssistantId={streamingAssistantId}
                                 streamingToolId={streamingToolId}
                                 showThinkingText={shouldShowThinkingText}

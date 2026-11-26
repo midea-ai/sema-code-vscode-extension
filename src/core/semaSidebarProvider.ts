@@ -15,7 +15,7 @@ import { SemaProcessWrapper, MAX_SESSIONS, ModelUpdateOrigin } from './semaProce
 import { SemaSessionWrapper, SessionWrapperCallbacks, Message, PermissionLevel } from './semaSessionWrapper';
 import { ClawCoordinator } from '../claw/coordinator';
 import { CLAW_SESSION_ID } from '../claw/paths';
-import { TOOL_NAME_VIEW_FILE, TOOL_NAME_WRITE_FILE, TOOL_NAME_PATCH_FILE } from '../utils/tool';
+import { TOOL_NAME_WRITE_FILE, TOOL_NAME_PATCH_FILE, TOOL_NAME_EDIT_NOTEBOOK, TOOL_NAME_GENERATE_IMAGE } from '../utils/tool';
 import { pet } from '../pet/pet-client';
 import { ensurePetRunning, killPet } from '../pet/pet-launcher';
 import { wirePetEvents, setPetSessionState } from '../pet/pet-events';
@@ -26,6 +26,14 @@ import { ReviewRequest, buildReviewInstruction, reviewDisplayText } from '../uti
 
 /** 等会话就绪的上限：首次唤出侧边栏要等 webview 加载并建好首个会话 */
 const SESSION_READY_TIMEOUT_MS = 10000;
+
+/** 会写项目文件的工具：写完后触发文件变更面板整表刷新（core 在写盘前已捕获基线） */
+const FILE_EDIT_TOOL_NAMES = new Set<string>([
+    TOOL_NAME_WRITE_FILE,
+    TOOL_NAME_PATCH_FILE,
+    TOOL_NAME_EDIT_NOTEBOOK,
+    TOOL_NAME_GENERATE_IMAGE,
+]);
 
 /** chatWebview 用于驱动会话生命周期的控制接口 */
 export interface SessionController {
@@ -70,6 +78,8 @@ export class SemaSidebarProvider implements vscode.WebviewViewProvider {
     private gitReviewManager: GitReviewManager;
 
     private saveSessionTimers: Map<string, NodeJS.Timeout> = new Map();
+    /** 文件变更整表刷新定时器（连续写盘合并成一次查询） */
+    private fileChangeTimers: Map<string, NodeJS.Timeout> = new Map();
     /** 每个会话的桌宠事件解绑函数。桌宠监听所有会话，而非仅当前活跃会话。 */
     private petUnwires: Map<string, () => void> = new Map();
 
@@ -198,7 +208,6 @@ export class SemaSidebarProvider implements vscode.WebviewViewProvider {
             onStateChange: this.handleStateChange,
             onTopicUpdate: this.handleTopicUpdate,
             onToolExecutionComplete: this.handleToolExecutionComplete,
-            onFileReference: this.handleFileReference,
             onTaskStart: this.handleTaskStart,
             onTaskEnd: this.handleTaskEnd,
             onSessionCleared: this.handleSessionCleared,
@@ -267,8 +276,6 @@ export class SemaSidebarProvider implements vscode.WebviewViewProvider {
                 permissionLevel
             );
             this.sessions.set(wrapper.sessionId, wrapper);
-            // 为该会话建立独立的快照作用域（清掉可能残留的同 id 旧状态）
-            await this.fileStateDiffManager.createSnapshot(wrapper.sessionId);
 
             if (opts.historyContent && opts.historyContent.length > 0) {
                 if (opts.title) wrapper.updateTitle(opts.title);
@@ -370,12 +377,15 @@ export class SemaSidebarProvider implements vscode.WebviewViewProvider {
         this.sessionBaselines.delete(sessionId);
         this.draftSessionIds.delete(sessionId);
         this.touchedSessionIds.delete(sessionId);
-        // 释放该会话的快照与临时文件，避免泄漏
-        this.fileStateDiffManager.createSnapshot(sessionId);
 
         if (timer) {
             clearTimeout(timer);
             this.saveSessionTimers.delete(sessionId);
+        }
+        const changeTimer = this.fileChangeTimers.get(sessionId);
+        if (changeTimer) {
+            clearTimeout(changeTimer);
+            this.fileChangeTimers.delete(sessionId);
         }
 
         if (this.activeSessionId === sessionId) {
@@ -406,7 +416,6 @@ export class SemaSidebarProvider implements vscode.WebviewViewProvider {
         if (this.sessions.has(session.sessionId)) return;
         const wrapper = new SemaSessionWrapper(session, this.sessionCallbacks, 'Agent');
         this.sessions.set(wrapper.sessionId, wrapper);
-        await this.fileStateDiffManager.createSnapshot(wrapper.sessionId);
 
         // 复用插件侧历史，让 chat 页打开 claw 会话时能看到之前的对话（与普通会话一致）。
         try {
@@ -441,7 +450,6 @@ export class SemaSidebarProvider implements vscode.WebviewViewProvider {
         this.sessionBaselines.delete(sessionId);
         this.draftSessionIds.delete(sessionId);
         this.touchedSessionIds.delete(sessionId);
-        this.fileStateDiffManager.createSnapshot(sessionId);
 
         if (this.activeSessionId === sessionId) {
             const next = this.sessions.keys().next().value ?? null;
@@ -656,21 +664,13 @@ export class SemaSidebarProvider implements vscode.WebviewViewProvider {
 
     // ─── 会话事件 handlers ────────────────────────────────────────────────────
 
-    private handleSessionReady = async (sessionId: string, data: any): Promise<void> => {
+    private handleSessionReady = async (_sessionId: string, _data: any): Promise<void> => {
         // core 建会话会重扫插件并级联刷新 skills / agents / commands / MCP / hooks，
         // 通知配置页：停在扩展的那几个子页时自行重拉（面板没开则空转）。
         // 放在 session:ready 而非 createSession 返回处：级联刷新是 core 内部 setImmediate 起的，
         // ready 比 createSession 的返回晚一拍，命中刷新后数据的概率更高。
+        // 会话基线在 core 侧，恢复会话后前端挂载时会主动拉一次整表，这里不再补读文件基线
         this.configWebviewProvider.notifySessionCreated();
-        try {
-            if (data.readFileTimestamps && typeof data.readFileTimestamps === 'object') {
-                for (const filePath of Object.keys(data.readFileTimestamps)) {
-                    await this.fileStateDiffManager.addFileToSnapshotIfNew(sessionId, filePath);
-                }
-            }
-        } catch (error) {
-            console.error('Error handling session ready:', error);
-        }
     };
 
     private handleMessage = (msg: any): void => {
@@ -733,26 +733,18 @@ export class SemaSidebarProvider implements vscode.WebviewViewProvider {
     };
 
     private handleToolExecutionComplete = (sessionId: string, data: any): void => {
-        if (data.toolName === TOOL_NAME_VIEW_FILE) {
-            // 部分读取的 title 带 `:起始-结束` 行号后缀，去掉才是路径
-            this.fileStateDiffManager.addFileToSnapshotIfNew(sessionId, String(data.title || '').replace(/:\d+-\d+$/, ''));
-        } else if (
-            (data.toolName === TOOL_NAME_WRITE_FILE || data.toolName === TOOL_NAME_PATCH_FILE) &&
-            data.content && typeof data.content === 'object' && (data.content as any).type === 'new'
-        ) {
-            // 新建文件：钉空基线，避免 fork 后重读把已修改内容误当基线
-            this.fileStateDiffManager.pinEmptySnapshotIfNew(sessionId, data.title);
-        }
+        // 文件写完：core 已在写盘前捕获基线，这里只触发面板整表刷新（连续写完合并到一次）
+        if (FILE_EDIT_TOOL_NAMES.has(data.toolName)) this.scheduleFileChangesRefresh(sessionId);
     };
 
-    private handleFileReference = (sessionId: string, data: any): void => {
-        if (data.references && Array.isArray(data.references)) {
-            for (const ref of data.references) {
-                if (ref.type === 'file' && ref.name) {
-                    this.fileStateDiffManager.addFileToSnapshotIfNew(sessionId, ref.name);
-                }
-            }
-        }
+    /** 文件变更整表刷新：短时间内的连续写盘合并成一次查询 */
+    private scheduleFileChangesRefresh = (sessionId: string): void => {
+        const existing = this.fileChangeTimers.get(sessionId);
+        if (existing) clearTimeout(existing);
+        this.fileChangeTimers.set(sessionId, setTimeout(() => {
+            this.fileChangeTimers.delete(sessionId);
+            void this.chatWebviewProvider.pushFileChanges(sessionId);
+        }, 150));
     };
 
     private handleTaskStart = (sessionId: string, data: any): void => {
@@ -768,7 +760,6 @@ export class SemaSidebarProvider implements vscode.WebviewViewProvider {
     };
 
     private handleSessionCleared = (sessionId: string): void => {
-        this.fileStateDiffManager.createSnapshot(sessionId);
         this.chatWebviewProvider.clearSessionPanels(sessionId);
     };
 
@@ -894,6 +885,11 @@ export class SemaSidebarProvider implements vscode.WebviewViewProvider {
             clearTimeout(timer);
         }
         this.saveSessionTimers.clear();
+        for (const timer of this.fileChangeTimers.values()) {
+            clearTimeout(timer);
+        }
+        this.fileChangeTimers.clear();
+        this.fileStateDiffManager.dispose();
         for (const unwire of this.petUnwires.values()) unwire();
         this.petUnwires.clear();
         for (const wrapper of this.sessions.values()) {

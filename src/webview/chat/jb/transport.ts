@@ -38,7 +38,7 @@ export class Transport {
         this.hostCommandHandler = h;
     }
 
-    /** 编辑器侧（Kotlin）回推的 UI 消息（如 fileChangeStats）直接灌给 app。 */
+    /** 编辑器侧（Kotlin）回推的 UI 消息（如 filePathVerified）直接灌给 app。 */
     setAppMessageHandler(h: AppMessageHandler): void {
         this.appMessageHandler = h;
     }

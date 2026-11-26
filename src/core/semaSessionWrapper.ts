@@ -1,5 +1,5 @@
 import { SemaSession } from 'sema-core';
-import type { ForkOptions, ForkPreview, ForkResult, BranchResult } from 'sema-core';
+import type { ForkOptions, ForkPreview, ForkResult, BranchResult, FileChangeItem, FileDiffResult, RevertFileResult } from 'sema-core';
 import { t } from '../webview/common/i18n/core';
 import { parsePasteInput, type PasteAttachment } from '../webview/common/paste';
 import { isAttachmentPath } from '../webview/common/viz';
@@ -88,7 +88,6 @@ export interface SessionWrapperCallbacks {
     onMessage?: (message: any) => void;
     onTopicUpdate?: (sessionId: string, topic: TopicUpdateData) => void;
     onToolExecutionComplete?: (sessionId: string, data: ToolExecutionCompleteData & { agentId?: string }) => void;
-    onFileReference?: (sessionId: string, data: FileReferenceData) => void;
     onTaskStart?: (sessionId: string, data: TaskStartData) => void;
     onTaskEnd?: (sessionId: string, data: TaskEndData) => void;
     onSessionCleared?: (sessionId: string) => void;
@@ -194,6 +193,21 @@ export class SemaSessionWrapper {
      */
     public async branch(beforeMessageUuid?: string): Promise<BranchResult> {
         return this.session.branch(beforeMessageUuid);
+    }
+
+    /** 会话相关文件清单：本会话受控写入过的文件，已过滤与基线一致的文件（core 会话基线查询） */
+    public getFileChanges(): Promise<FileChangeItem[]> {
+        return this.session.getFileChanges();
+    }
+
+    /** 单文件 diff：会话基线 → 查询时磁盘内容 */
+    public getFileDiff(filePath: string): Promise<FileDiffResult> {
+        return this.session.getFileDiff(filePath);
+    }
+
+    /** 放弃修改：把文件恢复到会话基线；不传 filePaths 则处理全部相关文件 */
+    public revertFileChanges(filePaths?: string[]): Promise<RevertFileResult[]> {
+        return this.session.revertFileChanges(filePaths);
     }
 
     public interruptSession(): void {
@@ -457,7 +471,6 @@ export class SemaSessionWrapper {
                     this.messageHistory.push(msg);
                     this.sendAppendMessages([msg]);
                 }
-                this.callbacks.onFileReference?.(this.sessionId, data);
             }
         });
 

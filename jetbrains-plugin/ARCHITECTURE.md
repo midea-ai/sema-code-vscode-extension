@@ -87,7 +87,7 @@ jetbrains-plugin/
     │   ├── jcef/                     #    三个浏览器面板 + HtmlShell/Theme/Tooltips
     │   ├── bridge/                   #    MessageBridge（转发）+ SemaPanelBus（跨面板总线）
     │   ├── sidecar/                  #    SidecarService：SDK SidecarManager/BridgeConnection 薄封装
-    │   ├── editor/                   #    EditorOps：diff / 快照 / 统计 / 回滚
+    │   ├── editor/                   #    EditorOps：diff / 打开 / 刷新
     │   └── config/                   #    系统配置·会话历史持久化 + 配置/历史页 FileEditor
     └── resources/META-INF/plugin.xml #    扩展点注册（工具窗口 / 服务 / FileEditorProvider）
 
@@ -137,10 +137,10 @@ React App  ──postMessage──►  createJbBridge (vscode shim)
 | channel | 方向 | 用途 | 处理者 |
 |---|---|---|---|
 | **`grpc`** | 双向 | 转发给 sidecar，sema-core 的透明镜像，桥不解释内容 | `MessageBridge` → `BridgeConnection`（SDK） |
-| **`editor`** | 双向 | 编辑器本地操作（开文件、diff、快照、系统配置、历史读写），**不进 sidecar** | `EditorOps` / `SystemConfigManager` / `SessionHistoryManager` |
+| **`editor`** | 双向 | 编辑器本地操作（开文件、diff、VFS 刷新、系统配置、历史读写），**不进 sidecar** | `EditorOps` / `SystemConfigManager` / `SessionHistoryManager` |
 | **`host`** | 宿主→web | 标题栏按钮 / 历史面板主动向聊天页下发的入站命令（`createSession` / `loadHistorySession`） | `SemaPanelBus` → `Controller` |
 
-`editor` 通道内又分两种语义：**即发即忘**（`openFile`、`revertFile`…）和**请求/应答**（带 `reqId`，如 `systemConfig` 的 get/save、`history` 的 list）。
+`editor` 通道内又分两种语义：**即发即忘**（`openFile`、`showFileDiffText`…）和**请求/应答**（带 `reqId`，如 `systemConfig` 的 get/save、`history` 的 list）。
 
 ### 2.2 跨进程边界带来的三条约束
 
@@ -224,7 +224,7 @@ init（首次建 Core）─► addModel ─► applyTaskModel ─► createSessi
 React 界面整体复用，JB 端只做两件事：**提供一个假的 `vscode` 通信对象**，以及**把 VSCode 宿主的编排逻辑搬到浏览器里**。
 
 - **通信 shim**：VSCode 里 UI 靠 `acquireVsCodeApi().postMessage` 与宿主对话。JB 端伪造一个同形对象，让 `App` 无差别调用——消息背后改走 gRPC。因此 React 代码一行不改（唯一例外是输入框对 JCEF 输入法的兜底，用 `window.__SEMA_JB__` 标记隔离，VSCode 无感）。
-- **编排层下沉**：VSCode 的会话编排原本在扩展宿主（`semaSidebarProvider`/`chatWebview`）。JB 端把这套逻辑（会话池、事件按标签路由、读时快照触发、历史存档、@file 编码等）**复刻进浏览器里的一个 Controller**，因为跨进程后宿主只剩「哑转发」，编排没地方放。
+- **编排层下沉**：VSCode 的会话编排原本在扩展宿主（`semaSidebarProvider`/`chatWebview`）。JB 端把这套逻辑（会话池、事件按标签路由、历史存档、@file 编码等）**复刻进浏览器里的一个 Controller**，因为跨进程后宿主只剩「哑转发」，编排没地方放。
 - **翻译层零改动**：原始 core 事件 → UI 消息的翻译（`SemaSessionWrapper`）是纯逻辑、无编辑器依赖，两端**原样复用**。它原本拿进程内的会话对象，现在拿一个**接口 1:1 复刻、背后走 gRPC 的会话代理**（`RemoteSession`）——对它而言毫无区别。这就是「JB 调桥 ≡ VSCode 调 core」能成立的关键。
 
 > 代码位置：`src/webview/**/jb/`（`controller.ts` 编排、`remote.ts` 代理、`transport.ts` 帧收发、`bridge.ts` shim）。
@@ -242,12 +242,12 @@ Kotlin 侧只做「搬运 + 编辑器集成」，不含任何 Agent/协议逻辑
 **③ 界面承载与主题**——三个面板各是一个 JCEF 浏览器，加载复用的 React bundle。两处非显然设计：bundle 必须作为外部 `file://` 脚本加载（内联会白屏）；以及**主题跟随 IDE 明暗色热更新**——把 IDE 颜色映射成 React 认识的 `--vscode-*` 变量注入，并订阅 IDE 换肤事件，换肤时只替换那段样式的内容、不重载页面。配置页与历史页不是工具窗口，而是**编辑器区的 Tab**（用轻量虚拟文件 + 自定义 FileEditor 承载，对齐 VSCode 的 webview panel）。
 *地标：`ChatPanel`/`ConfigPanel`/`HistoryPanel`、`HtmlShell`、`Theme`。*
 
-**④ 编辑器集成与持久化**——diff 预览、接受/拒绝、改动统计、文件快照，以及系统配置与会话历史的落盘。这里是跨进程差异最大的地方，两个核心坑：
-  - **VFS 陈旧**：sema-core 在独立进程直接写盘，IDE 的虚拟文件缓存还是旧的，所以凡读「当前内容」一律直读磁盘、绕开 VFS。
-  - **快照竞态**：权限预览时改动尚未落盘，无法靠「读磁盘」拿到提议内容，改为**从 patch 反推**出目标内容，避免与写盘时序赛跑。
+**④ 编辑器集成与持久化**——diff 预览、放弃修改后的 VFS 刷新，以及系统配置与会话历史的落盘。文件改动基线（列表、左右文本、统计、回滚）由 sema-core 维护，宿主不再存快照。这里是跨进程差异最大的地方，两个核心坑：
+  - **VFS 陈旧**：sema-core 在独立进程直接写盘，IDE 的虚拟文件缓存还是旧的，所以 core 改动文件后要按路径刷新 VFS。
+  - **权限预览竞态**：权限预览时改动尚未落盘，无法靠「读磁盘」拿到提议内容，改为**从 patch 反推**出目标内容，避免与写盘时序赛跑。
 
   持久化沿用 IDE 原生机制：系统配置存应用级（跨 project），会话历史存项目级（进 `workspace.xml`）——正好对齐 VSCode 的 globalState / workspaceState 语义。
-  *地标：`EditorOps`（diff/快照/统计）、`SystemConfigManager`、`SessionHistoryManager`。*
+  *地标：`EditorOps`（diff/刷新）、`SystemConfigManager`、`SessionHistoryManager`。*
 
 ---
 

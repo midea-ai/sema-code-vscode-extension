@@ -7,7 +7,8 @@ import type { GitReviewManager } from '../../managers/GitReviewManager';
 import { SemaProcessWrapper } from '../../core/semaProcessWrapper';
 import type { SessionController } from '../../core/semaSidebarProvider';
 import { transformCommandToPrompt } from '../../utils/prompt';
-import type { InputImageAttachment } from 'sema-core';
+import type { InputImageAttachment, FileChangeItem } from 'sema-core';
+import { isAttachmentPath } from '../common/viz';
 import { DEFAULT_CUSTOM_RULES, isBuiltinCustomRules } from '../config/default/defaultConfig';
 import { t, getLang, normalizeLang, type Language } from '../common/i18n/core';
 import { buildPasteInput, type PasteAttachment } from '../common/paste';
@@ -116,14 +117,15 @@ export class ChatWebviewProvider {
                 openFile: () => this.fileOperationManager.openFileAtLine(msg.filePath, msg.line, msg.endLine),
                 requestWorkspaceFiles: () => this.sendWorkspaceFiles(msg.reqId),
                 searchWorkspaceFiles: () => this.searchWorkspaceFiles(msg.query || '', msg.reqId),
-                restoreFromSnapshots: () => this.restoreFromSnapshots(sid, msg.filePaths),
-                restoreFromSnapshot: () => this.restoreFromSnapshot(sid, msg.filePath),
+                restoreFromSnapshots: () => this.handleRevertFiles(sid, msg.filePaths),
+                restoreFromSnapshot: () => this.handleRevertFiles(sid, msg.filePath ? [msg.filePath] : []),
                 getForkPreview: () => this.handleGetForkPreview(sid, msg.uuid, msg.reqId),
                 forkSession: () => this.handleForkSession(sid, msg.uuid, msg.restoreFiles, msg.reqId),
                 branchSession: () => this.handleBranchSession(sid, msg.reqId, msg.beforeMessageUuid),
-                showFileDiff: () => this.fileStateDiffManager.showFileDiff(sid!, msg.filePath, msg.minLine),
+                // 文件变更：清单整表下发、单文件按 core 左右文本开 diff、放弃修改走 core 恢复基线
+                requestFileChanges: () => this.pushFileChanges(sid),
+                showFileDiff: () => this.handleShowFileDiff(sid, msg.filePath, msg.minLine),
                 showPermissionDiff: () => this.fileStateDiffManager.showPermissionDiff(sid!, msg.filePath, msg.diffContent),
-                getFileChangeStats: () => this.getFileChangeStats(sid, msg.filePath),
                 searchContentInFiles: () => this.searchContentInFiles(msg.content),
                 requestClipboardFiles: () => this.requestClipboardFiles(),
                 verifyFilePath: () => this.verifyFilePath(msg.filePath, msg.tempId, msg.originalCode, msg.lineInfo),
@@ -353,16 +355,82 @@ export class ChatWebviewProvider {
         }
     }
 
-    private async restoreFromSnapshots(sessionId: string | undefined, filePaths: string[]): Promise<void> {
-        if (!sessionId) return;
-        await this.fileStateDiffManager.revertAllChanges(sessionId, filePaths);
-        this.postMessage({ type: 'clearFileChanges', sessionId });
+    /**
+     * 把 core 的会话基线清单整表推给前端。attachments/<uuid>/ 下的文件（可视化产物、粘贴转存）
+     * 是宿主自己的落盘目录，不算「编辑了项目文件」，在宿主侧过滤掉。
+     */
+    public async pushFileChanges(sessionId: string | undefined): Promise<void> {
+        const wrapper = sessionId ? this.sessionController.getSessionWrapper(sessionId) : undefined;
+        if (!wrapper) return;
+        try {
+            const changes: FileChangeItem[] = (await wrapper.getFileChanges())
+                .filter(item => !isAttachmentPath(item.filePath));
+            this.postMessage({ type: 'fileChanges', sessionId, changes });
+        } catch (error) {
+            console.error('Failed to load file changes:', error);
+        }
     }
 
-    private async restoreFromSnapshot(sessionId: string | undefined, filePath: string): Promise<void> {
+    /** 放弃修改：由 core 按会话基线恢复 / 删除文件，完成后整表刷新（失败项提示出来） */
+    private async handleRevertFiles(sessionId: string | undefined, filePaths?: string[]): Promise<void> {
+        const wrapper = sessionId ? this.sessionController.getSessionWrapper(sessionId) : undefined;
+        if (!wrapper) return;
+        try {
+            const results = await wrapper.revertFileChanges(filePaths);
+            const failed = results.filter(r => r.action === 'failed');
+            if (failed.length > 0) {
+                this.postMessage({
+                    type: 'error',
+                    message: t('host.revertFilesFailed', {
+                        files: failed.map(f => f.displayPath).join(', '),
+                        error: failed[0].error || t('common.unknownError')
+                    })
+                });
+            }
+            await this.pushFileChanges(sessionId);
+        } catch (error) {
+            this.postMessage({
+                type: 'error',
+                message: t('host.revertFilesFailed', {
+                    files: String(filePaths?.length ?? ''),
+                    error: error instanceof Error ? error.message : t('common.unknownError')
+                })
+            });
+        }
+    }
+
+    /**
+     * 打开单文件 diff：用 core 给的会话基线 + 查询时磁盘内容开原生 diff。
+     * minLine 由工具编辑块给（这次编辑的锚点行）；面板点击不给，改用 core 返回的首个变更行，
+     * 保证复用已打开的 diff 标签时也能定位到变更处。
+     * 二进制 / 超出文本上限 / 基线不可用等不可比较的情况退回打开文件，不伪造空基线。
+     */
+    private async handleShowFileDiff(sessionId: string | undefined, filePath: string, minLine?: number): Promise<void> {
         if (!sessionId || !filePath) return;
-        await this.fileStateDiffManager.revertAllChanges(sessionId, [filePath]);
-        this.postMessage({ type: 'removeFileChange', sessionId, filePath });
+        const wrapper = this.sessionController.getSessionWrapper(sessionId);
+        if (!wrapper) return;
+        // notebook 按 cell 定位，行号对 notebook 没有意义：只打开文件、不选 cell（cellIndex 传 -1 跳过选中）
+        if (filePath.toLowerCase().endsWith('.ipynb')) {
+            await this.fileStateDiffManager.openNotebook(filePath, -1);
+            return;
+        }
+        try {
+            const diff = await wrapper.getFileDiff(filePath);
+            if (diff.status !== 'ok') {
+                await this.fileStateDiffManager.openFile(diff.filePath, minLine ?? diff.line ?? 1);
+                return;
+            }
+            await this.fileStateDiffManager.showTextDiff(
+                sessionId,
+                diff.filePath,
+                diff.baselineText ?? '',
+                diff.currentText ?? '',
+                minLine ?? diff.line
+            );
+        } catch (error) {
+            console.error('显示diff失败:', error);
+            await this.fileStateDiffManager.openFile(filePath, minLine ?? 1);
+        }
     }
 
     private handleGetForkPreview(sessionId: string | undefined, uuid: string, reqId: string): void {
@@ -391,6 +459,8 @@ export class ChatWebviewProvider {
         try {
             const result = await wrapper.fork(uuid, { restoreFiles: !!restoreFiles });
             this.postMessage({ type: 'forkResult', sessionId, reqId, uuid, result });
+            // 回退会截断基线与文件，面板按 core 的最新清单整表刷新（restoreFiles=false 时也刷新）
+            if (result.ok !== false) await this.pushFileChanges(sessionId);
         } catch (error) {
             this.postMessage({
                 type: 'forkResult', sessionId, reqId, uuid,
@@ -405,16 +475,6 @@ export class ChatWebviewProvider {
         if (!sessionId) return;
         const result = await this.sessionController.branchSession(sessionId, beforeMessageUuid);
         this.postMessage({ type: 'branchResult', sessionId, reqId, ok: result.ok, error: result.error });
-    }
-
-    private async getFileChangeStats(sessionId: string | undefined, filePath: string): Promise<void> {
-        if (!sessionId || !filePath) return;
-        try {
-            const stats = await this.fileStateDiffManager.getFileChangeStats(sessionId, filePath);
-            this.postMessage({ type: 'fileChangeStats', sessionId, fullPath: filePath, stats });
-        } catch (error) {
-            console.error('Failed to get file change stats:', error);
-        }
     }
 
     private async searchContentInFiles(content: string): Promise<void> {

@@ -1255,6 +1255,13 @@ html.jb #output-container {
     color: var(--chat-color-diff-del);
 }
 
+/* 不可文本比较时的状态标记（二进制 / 过大 / 无基线 / 无法读取 / 格式变化）：不显示增删行，只给一句状态 */
+.file-change-status {
+    font-size: var(--chat-font-base);
+    color: var(--vscode-descriptionForeground);
+    font-weight: 400;
+}
+
 .file-info {
     display: flex;
     justify-content: space-between;

@@ -1,11 +1,9 @@
 import React, { useState, useCallback, useEffect, useMemo, useRef, useContext } from 'react';
-import { DiffContent, FileChange, Message, ToolContent, VscodeApi } from '../../types';
+import { Message, VscodeApi } from '../../types';
 import TaskDetailModal from '../../TaskDetailModal';
 import AiResponseBlock from '../AiResponseBlock';
 import { REVIEWER_AGENT_NAME } from '../../../../utils/review';
 import { AgentDialogContext, SessionActiveContext, SessionContext } from '../../SessionContext';
-import { countDiffChanges } from '../../utils/diffParser';
-import { TOOL_NAME_EDIT_NOTEBOOK, TOOL_NAME_PATCH_FILE, TOOL_NAME_WRITE_FILE } from '../../../../utils/tool';
 import { useT } from '../../../common/i18n/react';
 
 // Task 消息内容类型
@@ -23,83 +21,11 @@ export interface TaskMessageContent {
 interface AgentBlockProps {
     content: TaskMessageContent;
     vscode: VscodeApi;
-    onFileChange?: (change: FileChange) => void;
 }
 
-const isDiffContent = (content: unknown): content is DiffContent => {
-    return typeof content === 'object'
-        && content !== null
-        && ((content as any).type === 'diff' || (content as any).type === 'new');
-};
-
-const getDisplayFileName = (fileName: string): string => {
-    return fileName.split(/[\\/]/).pop() || fileName;
-};
-
-const getNotebookCell = (title: string, summary?: string): { fileName: string; cellNum: number } => {
-    const titleCellMatch = (title || '').match(/^(.*?)\s+cell:(\d+)$/);
-    const fileName = titleCellMatch ? titleCellMatch[1] : (title || '');
-    let cellNum = titleCellMatch ? parseInt(titleCellMatch[2], 10) : 0;
-
-    if (!titleCellMatch) {
-        const summaryCellMatch = (summary || '').match(/cell[:\s]+(\d+)/);
-        if (summaryCellMatch) {
-            cellNum = parseInt(summaryCellMatch[1], 10);
-        }
-    }
-
-    return { fileName, cellNum };
-};
-
-const extractFileChange = (message: Message): FileChange | null => {
-    if (message.type !== 'tool') return null;
-
-    const toolContent = message.content as ToolContent | undefined;
-    if (!toolContent || typeof toolContent !== 'object') return null;
-
-    if (message.toolName === TOOL_NAME_WRITE_FILE || message.toolName === TOOL_NAME_PATCH_FILE) {
-        const fileName = toolContent.title || '';
-        if (!fileName || !isDiffContent(toolContent.content)) return null;
-
-        const diffContent = toolContent.content as any;
-        const { addedCount, removedCount } = countDiffChanges(diffContent);
-        const firstHunk = diffContent.patch?.[0];
-
-        return {
-            fileName: getDisplayFileName(fileName),
-            fullPath: fileName,
-            type: message.toolName === TOOL_NAME_WRITE_FILE ? 'write' : 'edit',
-            isNotebook: false,
-            additions: addedCount,
-            removals: removedCount,
-            minLine: firstHunk?.oldStart || 1
-        };
-    }
-
-    if (message.toolName === TOOL_NAME_EDIT_NOTEBOOK) {
-        const { fileName, cellNum } = getNotebookCell(toolContent.title || '', toolContent.summary);
-        const hasDiffContent = isDiffContent(toolContent.content)
-            || (typeof toolContent.content === 'string' && toolContent.content.trim().length > 0);
-        if (!fileName || !hasDiffContent) return null;
-
-        return {
-            fileName,
-            fullPath: fileName,
-            type: 'edit',
-            isNotebook: true,
-            additions: cellNum,
-            removals: 0,
-            minLine: cellNum
-        };
-    }
-
-    return null;
-};
-
-const AgentBlock: React.FC<AgentBlockProps> = React.memo(({ content, vscode, onFileChange }) => {
+const AgentBlock: React.FC<AgentBlockProps> = React.memo(({ content, vscode }) => {
     const t = useT();
     const [isModalOpen, setIsModalOpen] = useState(false);
-    const reportedChangeKeysRef = useRef<Set<string>>(new Set());
     const sessionId = useContext(SessionContext);
     const sessionActive = useContext(SessionActiveContext);
     // 弹窗信号走 Context：列表不再把弹窗对象传给每条消息
@@ -119,29 +45,6 @@ const AgentBlock: React.FC<AgentBlockProps> = React.memo(({ content, vscode, onF
             setIsModalOpen(true);
         }
     }, [externalOpen]);
-
-    useEffect(() => {
-        if (!onFileChange) return;
-
-        for (const message of content.taskMessages || []) {
-            const change = extractFileChange(message);
-            if (!change) continue;
-
-            const changeKey = [
-                message.id,
-                change.fullPath,
-                change.type,
-                change.isNotebook ? 'notebook' : 'file',
-                change.additions,
-                change.removals,
-                change.minLine
-            ].join(':');
-
-            if (reportedChangeKeysRef.current.has(changeKey)) continue;
-            reportedChangeKeysRef.current.add(changeKey);
-            onFileChange(change);
-        }
-    }, [content.taskMessages, onFileChange]);
 
     const { agent_type, title: agentTitle, status, summary, taskMessages, background } = content;
 

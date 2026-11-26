@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { VscodeApi, FileChange, DiffContent } from '../../types';
+import React, { useState, useCallback, useMemo } from 'react';
+import { VscodeApi, DiffContent } from '../../types';
 import { PencilIcon } from '../../components/ui/IconButton';
 import { FileLabel } from '../../utils/fileRefDisplay';
 import ToolRowHeader from './ToolRowHeader';
@@ -8,12 +8,11 @@ import CollapsibleDiff from '../../components/ui/CollapsibleDiff';
 import { countDiffChanges } from '../../utils/diffParser';
 import { hasTextSelection } from '../../utils/selection';
 import { useT } from '../../../common/i18n/react';
-import { baseName, displayPath } from '../../utils/pathDisplay';
+import { displayPath } from '../../utils/pathDisplay';
 
 interface NotebookEditBlockProps {
     content: ToolContent;
     vscode: VscodeApi;
-    onFileChange?: (change: FileChange) => void;
     language?: string;
     /** 是否位于最后一轮；出现下一条用户输入后自动折叠 */
     inLastTurn?: boolean;
@@ -22,7 +21,6 @@ interface NotebookEditBlockProps {
 const NotebookEditBlock: React.FC<NotebookEditBlockProps> = React.memo(({
     content: toolContent,
     vscode,
-    onFileChange,
     language = 'python',
     inLastTurn = true
 }) => {
@@ -90,26 +88,6 @@ const NotebookEditBlock: React.FC<NotebookEditBlockProps> = React.memo(({
 
     const { fileName, cellNum, diffContent, additions, removals } = parsedContent;
 
-    const displayFileName = useMemo(() => baseName(fileName), [fileName]);
-
-    const reportFileChange = useCallback(() => {
-        if (onFileChange && fileName) {
-            onFileChange({
-                fileName: displayFileName,
-                fullPath: fileName,
-                type: 'edit',
-                isNotebook: true,
-                additions: cellNum,
-                removals: 0,
-                minLine: cellNum
-            });
-        }
-    }, [onFileChange, fileName, displayFileName, cellNum]);
-
-    useEffect(() => {
-        reportFileChange();
-    }, [reportFileChange]);
-
     const handleToggle = useCallback(() => {
         setManualExpanded(!isExpanded);
     }, [isExpanded]);
@@ -123,10 +101,9 @@ const NotebookEditBlock: React.FC<NotebookEditBlockProps> = React.memo(({
             vscode.postMessage({
                 type: 'showFileDiff',
                 filePath: fileName,
-                minLine: cellNum
             });
         }
-    }, [fileName, cellNum, vscode]);
+    }, [fileName, vscode]);
 
     const handleHeaderClick = useCallback(() => {
         // 拖拽选中标题文本时不折叠/展开

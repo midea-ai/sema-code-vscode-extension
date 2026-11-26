@@ -90,7 +90,6 @@ export const it: Partial<Record<keyof typeof zh, string>> = {
     'chat.modelMenu.manage': 'Gestisci modelli',
     'chat.tokens.usedPercent': 'Contesto utilizzato: {percent}',
     'chat.fileChanges.discardAll': 'Scarta tutto',
-    'chat.fileChanges.markAdopted': 'Segna come adottato',
     'chat.fileChanges.discardFile': 'Scarta le modifiche a questo file',
     'chat.fileChanges.discard': 'Scarta',
     'chat.askForm.otherRequired': 'Compilare il campo "Altro"',

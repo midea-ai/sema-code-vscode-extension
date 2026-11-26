@@ -25,17 +25,18 @@ export type RenderItem =
     /** 组外单独渲染时，相邻的多次 generate_image 调用合并成一行（对齐 core webui 的 GenImageCard） */
     | { kind: 'genImage'; id: string; messages: Message[]; originalStartIndex: number }
     /** 组外单独渲染时，相邻的同服务 MCP 调用（≥2 次）合并成「调用了 xx n 次」一项，成组门槛里只算 1 条 */
-    | { kind: 'mcpRun'; id: string; server: string; messages: Message[]; originalStartIndex: number }
-    /** 非最后一轮，相邻的项目文件编辑（≥2 次，同一文件多次改动也算）合并成「编辑 n 个文件」一项 */
-    | { kind: 'editRun'; id: string; messages: Message[]; originalStartIndex: number };
+    | { kind: 'mcpRun'; id: string; server: string; messages: Message[]; originalStartIndex: number };
 
 interface GroupMessagesOptions {
     streamingToolId?: string | null;
     showThinkingText?: boolean;
     /** 列表末尾之后是否已有其它渲染内容（如下一轮用户输入），为 true 时段尾的工具也并入组 */
     tailClosed?: boolean;
-    /** 非最后一轮：相邻的项目文件编辑合并成一行（最新一轮保持逐行，便于直接看到文件名） */
-    mergeEdits?: boolean;
+    /**
+     * 非最后一轮：项目文件编辑与其它工具一样并入混合工具组（组头按文件数计「编辑 n 个文件」），不再单独成行；
+     * 最新一轮保持逐条渲染，改了什么文件一眼可见
+     */
+    groupEdits?: boolean;
 }
 
 interface RunItem {
@@ -183,10 +184,10 @@ export const isFoldedEditMessage = (message: Message): boolean => {
 };
 
 /**
- * 可合并成「编辑 n 个文件」一行的项目文件写入：普通 write_file / patch_file，且 content 是 diff 结构。
- * memory、可视化产物、临时文件已归入混合组；notebook 编辑、编辑报错（system/tool_error）不在此列。
+ * 可并入组的项目文件写入：普通 write_file / patch_file，且 content 是 diff 结构。
+ * memory、可视化产物、临时文件已归入混合组（见 isFoldedEditMessage）；notebook 编辑、编辑报错（system/tool_error）不在此列。
  */
-const isMergeableFileEditMessage = (message: Message): boolean => {
+export const isProjectFileEditMessage = (message: Message): boolean => {
     if (message.type !== 'tool') {
         return false;
     }
@@ -213,7 +214,7 @@ const isMergeableFileEditMessage = (message: Message): boolean => {
  * 可并入混合工具组的消息：探索类（Read/Search）、终端命令、MCP 调用，
  * 抓网页、后台任务查看/停止、定时任务管理、memory 写入、可视化产物与临时文件写入、生成图片、技能、提问记录，任何工具的执行报错，
  * 以及权限拒绝/中断面板与旧会话里的用户回应表单面板。
- * 相邻的可并入消息不分种类进同一段；其余文件编辑、子代理等其它工具与可见正文一样作为段边界。
+ * 相邻的可并入消息不分种类进同一段；子代理等其它工具与可见正文一样作为段边界（最后一轮的项目文件编辑也是边界）。
  */
 export const isGroupableToolMessage = (message: Message): boolean => {
     if (isToolErrorMessage(message) || isFoldedEditMessage(message) || isGenImageMessage(message)
@@ -285,24 +286,6 @@ const toMcpRunItem = (run: RunItem[], server: string): RenderItem => ({
     messages: run.map(({ message }) => message),
     originalStartIndex: run[0].index,
 });
-
-/**
- * 编辑段的输出：≥2 次编辑就合并成一行（标题按去重后的文件数计），否则逐条渲染；
- * 同一文件连续改多次同样合并，避免一行行刷屏；
- * 合并项 id 取首条消息 id，追加时组件实例不重建
- */
-const toEditRunItems = (run: RunItem[]): RenderItem[] => {
-    if (run.length >= 2) {
-        return [{
-            kind: 'editRun',
-            id: `edit-run-${run[0].message.id}`,
-            messages: run.map(({ message }) => message),
-            originalStartIndex: run[0].index,
-        }];
-    }
-
-    return run.map(({ message, index }): RenderItem => ({ kind: 'message', message, originalIndex: index }));
-};
 
 /**
  * 单独渲染的消息：相邻的生成图片调用合并成一个 genImage 项（一行缩略图），
@@ -410,27 +393,10 @@ export const groupMessages = (
 ): RenderItem[] => {
     const items: RenderItem[] = [];
     let run: RunItem[] = [];
-    let editRun: RunItem[] = [];
-
-    const flushEditRun = () => {
-        if (editRun.length === 0) {
-            return;
-        }
-        items.push(...toEditRunItems(editRun));
-        editRun = [];
-    };
 
     messages.forEach((message, index) => {
-        // 编辑仍是段边界：先把前面的工具段封口，再累积编辑段（合并项与混合组并列，不混在一起）
-        if (options.mergeEdits && isMergeableFileEditMessage(message)) {
-            flushRun(items, run, true, options.streamingToolId);
-            run = [];
-            editRun.push({ message, index });
-            return;
-        }
-
-        if (isGroupableToolMessage(message)) {
-            flushEditRun();
+        // 非最后一轮的项目文件编辑与其它工具一样并入同一段；最后一轮它仍是段边界，逐条渲染
+        if (isGroupableToolMessage(message) || (options.groupEdits && isProjectFileEditMessage(message))) {
             run.push({ message, index });
             return;
         }
@@ -442,12 +408,10 @@ export const groupMessages = (
         const closed = !isPendingEmptyAssistantMessage(message, options.showThinkingText);
         flushRun(items, run, closed, options.streamingToolId);
         run = [];
-        flushEditRun();
         items.push({ kind: 'message', message, originalIndex: index });
     });
 
     flushRun(items, run, !!options.tailClosed, options.streamingToolId);
-    flushEditRun();
 
     return items;
 };

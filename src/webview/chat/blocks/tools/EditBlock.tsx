@@ -1,21 +1,20 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { VscodeApi, FileChange } from '../../types';
+import React, { useState, useCallback, useMemo } from 'react';
+import { VscodeApi } from '../../types';
 import { PencilIcon } from '../../components/ui/IconButton';
 import { FileLabel } from '../../utils/fileRefDisplay';
 import ToolRowHeader from './ToolRowHeader';
 import { ToolContent } from '../../types';
 import CollapsibleDiff from '../../components/ui/CollapsibleDiff';
 import { langMap } from '../../utils/fileLangTypeMap';
-import { countDiffChanges } from '../../utils/diffParser';
+import { countDiffChanges, firstHunkLine } from '../../utils/diffParser';
 import { TOOL_NAME_WRITE_FILE } from '../../../../utils/tool';
 import { hasTextSelection } from '../../utils/selection';
 import { useT } from '../../../common/i18n/react';
-import { baseName, displayPath } from '../../utils/pathDisplay';
+import { displayPath } from '../../utils/pathDisplay';
 
 interface EditBlockProps {
     content: ToolContent;
     vscode: VscodeApi;
-    onFileChange?: (change: FileChange) => void;
     /** 是否位于最后一轮；出现下一条用户输入后自动折叠 */
     inLastTurn?: boolean;
 }
@@ -23,7 +22,6 @@ interface EditBlockProps {
 const EditBlock: React.FC<EditBlockProps> = React.memo(({
     content: toolContent,
     vscode,
-    onFileChange,
     inLastTurn = true
 }) => {
     const t = useT();
@@ -36,14 +34,9 @@ const EditBlock: React.FC<EditBlockProps> = React.memo(({
     const parsedContent = useMemo(() => {
         let fileName = title || '';
         let diffContent: any = null;
-        let minLine = 1;
 
         if (typeof content === 'object' && content !== null && ((content as any).type === 'diff' || (content as any).type === 'new')) {
             diffContent = content;
-
-            if (diffContent.patch && diffContent.patch.length > 0) {
-                minLine = diffContent.patch[0].oldStart || 1;
-            }
         }
 
         // 通过 diffParser 计算增减行数
@@ -70,31 +63,11 @@ const EditBlock: React.FC<EditBlockProps> = React.memo(({
             removals,
             diffContent,
             language,
-            minLine
+            minLine: diffContent ? firstHunkLine(diffContent) : 1
         };
     }, [title, content]);
 
     const { fileName, additions, removals, diffContent, language, minLine } = parsedContent;
-
-    const displayFileName = useMemo(() => baseName(fileName), [fileName]);
-
-    const reportFileChange = useCallback(() => {
-        if (onFileChange && fileName) {
-            onFileChange({
-                fileName: displayFileName,
-                fullPath: fileName,
-                type: toolName === TOOL_NAME_WRITE_FILE ? 'write' : 'edit',
-                isNotebook: false,
-                additions: additions,
-                removals: removals,
-                minLine: minLine
-            });
-        }
-    }, [onFileChange, fileName, displayFileName, toolName, additions, removals, minLine]);
-
-    useEffect(() => {
-        reportFileChange();
-    }, [reportFileChange]);
 
     const handleToggle = useCallback(() => {
         setManualExpanded(!isExpanded);

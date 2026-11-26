@@ -17,6 +17,16 @@ interface DiffContent {
 }
 
 /**
+ * 首个 hunk 在右侧（新内容）的锚点行，1-based，用于打开 diff 时定位到这次编辑。
+ * 左右两侧在 unified diff 里是同一条可视行，取右侧是因为宿主 API（VSCode diff 的 selection、
+ * JB 的 SCROLL_TO_LINE）只作用在右侧；无 patch 时退回第 1 行。
+ */
+export function firstHunkLine(diffContent: DiffContent): number {
+  const newStart = diffContent.patch?.[0]?.newStart;
+  return newStart && newStart > 0 ? newStart : 1;
+}
+
+/**
  * 统计 diff 中添加和删除的行数
  * 当 type 为 "new" 时，直接使用 hunk.newLines（因为 lines 内容可能被省略）
  */
