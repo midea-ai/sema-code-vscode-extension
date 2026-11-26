@@ -108,14 +108,19 @@ export function FileRefChip({ seg, onOpen }: { seg: RefSegment; onOpen?: (seg: R
 
 const escapeHtml = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
+/** 文件图标（HTML 字符串版）：只有图标、没有名字，给「链接文字自己当标签」的场景用（如 file:// 链接） */
+export function buildFileIconHtml(path: string, isDirectory = false, typeColor = true): string {
+    const icon = refIcon(path, isDirectory);
+    const style = typeColor ? ` style="color:${icon.color}"` : '';
+    return `<span class="${icon.className}"${style}>${icon.svg}</span>`;
+}
+
 /**
  * 文件高亮的统一外形（HTML 字符串版，给非 React DOM 用：输入框 mention span、Markdown 验证后的文件链接）。
  * 结构与类名与 FileLabel 完全一致；label 已转义。
  */
 export function buildFileLabelHtml(path: string, isDirectory: boolean, label: string, typeColor: boolean): string {
-    const icon = refIcon(path, isDirectory);
-    const style = typeColor ? ` style="color:${icon.color}"` : '';
-    return `<span class="file-ref-chip"><span class="${icon.className}"${style}>${icon.svg}</span><span class="file-ref-name">${escapeHtml(label)}</span></span>`;
+    return `<span class="file-ref-chip">${buildFileIconHtml(path, isDirectory, typeColor)}<span class="file-ref-name">${escapeHtml(label)}</span></span>`;
 }
 
 /** 输入框 mention span 的内部 HTML：图标不设类型色、随文字用链接色 */

@@ -100,8 +100,10 @@
   word-break: break-all;
 }
 
-/* 行内盒下 gap 不生效，间距改用 margin；图标中心对齐文字大写高度的中线（15px 图标盒的一半为 7.5px） */
-.markdown-content .file-path-code .file-ref-icon {
+/* 行内盒下 gap 不生效，间距改用 margin；图标中心对齐文字大写高度的中线（15px 图标盒的一半为 7.5px）。
+   md-file-url-link 是 file:// 链接，图标同文件链接用文件类型图标，对齐规则共用 */
+.markdown-content .file-path-code .file-ref-icon,
+.markdown-content .md-file-url-link .file-ref-icon {
   margin-right: 4px;
   vertical-align: calc(0.35em - 7.5px);
 }

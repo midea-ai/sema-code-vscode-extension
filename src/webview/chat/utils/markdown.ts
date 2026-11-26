@@ -1,7 +1,7 @@
 import DOMPurify from 'dompurify';
 import katex from 'katex';
 import { t } from '../../common/i18n/core';
-import { buildFileLabelHtml } from './fileRefDisplay';
+import { buildFileIconHtml, buildFileLabelHtml } from './fileRefDisplay';
 
 /**
  * 简化的Markdown渲染，只支持：
@@ -149,7 +149,16 @@ export function renderMarkdownToHtml(content: string, vscode?: any): string {
     for (const link of parseMarkdownLinks(processedContent)) {
       linkedContent += processedContent.slice(linkEnd, link.start);
       linkedContent += `\x00URL_${urlPlaceholders.length}\x00`;
-      if (link.kind === 'url') {
+      if (link.kind === 'url' && /^file:\/\//i.test(link.target)) {
+        // file:// 绝对路径不是网页：只把前置图标换成文件类型图标，文字 / title / 点击都沿用网页链接。
+        // 图标是 SVG，DOMPurify 会剥掉，与本地文件链接一样借占位符绕过。
+        const safeUrl = escapeHtml(link.target);
+        const fileName = link.target.replace(/[?#].*$/, '').split('/').pop() || '';
+        localLinkHtml.push(
+          `<a class="md-url-link md-file-url-link" data-url="${safeUrl}" title="${safeUrl}">${buildFileIconHtml(fileName)}${escapeHtml(link.text)}</a>`
+        );
+        urlPlaceholders.push(localLinkToken(localLinkHtml.length - 1));
+      } else if (link.kind === 'url') {
         const safeUrl = escapeHtml(link.target);
         urlPlaceholders.push(
           `<a class="md-url-link" data-url="${safeUrl}" title="${safeUrl}">${createLinkIconHtml(link.target)}${escapeHtml(link.text)}</a>`
