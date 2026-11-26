@@ -2,7 +2,7 @@ import { getBuiltinShortcutCommands, ShortcutCommand } from '../../../../../util
 import { CommandConfig } from '../../../../config/types/command';
 import { SkillConfig } from '../../../../config/types/skill';
 import { AgentConfig } from '../../../../config/types/agent';
-import { commandDisplayOf, displayDesc, displayName, skillDisplayOf, skillDisplayOrder } from '../../../utils/skillDisplay';
+import { commandDisplayOf, defaultDisplayOf, displayDesc, displayName, displayOf, skillDisplayOf, skillDisplayOrder, type SkillDisplay } from '../../../utils/skillDisplay';
 import { uiScope } from '../../../../config/utils/scope';
 
 // 存储自定义命令（由后端推送更新）
@@ -77,17 +77,14 @@ const getAllCommands = (): ShortcutCommand[] => {
 };
 
 /**
- * 取输入开头的快捷指令 token（如 "/review-pr"）。
- * 仅当 "/" 后到首个空白为止的词「恰好」命中某个已知命令时返回，
- * 否则返回 null（"/clearx" 不会命中 "/clear"）。
+ * 斜杠名 → 显示映射：登记过的走 SKILL_DISPLAY / COMMAND_DISPLAY；其余已知命令（未登记技能 / 子代理 / 自定义命令）
+ * 按分类图标兜底；不认识的斜杠词返回 undefined（避免把 `/usr/bin` 这类路径文本当成命令）。
  */
-export const getLeadingCommand = (text: string): { text: string; length: number } | null => {
-    if (!text.startsWith('/')) return null;
-    const match = text.match(/^\/(\S+)/);
-    if (!match) return null;
-    const name = match[1];
-    const known = getAllCommands().some(cmd => cmd.text === name);
-    return known ? { text: '/' + name, length: name.length + 1 } : null;
+export const resolveCommandDisplay = (name: string): SkillDisplay | undefined => {
+    const display = displayOf(name);
+    if (display) return display;
+    const known = getAllCommands().find(cmd => cmd.text === name);
+    return known ? defaultDisplayOf(name, known.category ?? 'command') : undefined;
 };
 
 /**

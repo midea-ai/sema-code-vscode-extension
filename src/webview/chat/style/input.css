@@ -126,15 +126,7 @@
     background-color: var(--chat-bg-list-selected);
 }
 
-/* / 符号：浅色不加粗，与命令名留间距 */
-.shortcut-slash {
-    flex-shrink: 0;
-    font-size: var(--chat-font-base);
-    color: var(--chat-text-secondary);
-    margin-right: 6px;
-}
-
-/* 命令名称正常颜色 */
+/* 命令名称正常颜色（斜杠面板行已改用 .shortcut-skill 标签，这里剩 /review 范围面板在用） */
 .shortcut-command {
     flex-shrink: 0;
     font-size: var(--chat-font-base);
@@ -316,20 +308,7 @@
     white-space: nowrap;
 }
 
-/* 快捷指令高亮块 */
-.command-mention {
-    background-color: var(--chat-bg-button);
-    color: var(--chat-text-button);
-    border-radius: 3px;
-    padding: 0 3px;
-    margin: 0 1px;
-    font-weight: 500;
-    /* 让内部字符可被光标命中，但视觉上是一整块 */
-    white-space: nowrap;
-}
-
-.file-mention:focus,
-.command-mention:focus {
+.file-mention:focus {
     outline: none;
 }
 
@@ -466,7 +445,7 @@
     margin-right: 6px;
 }
 
-/* 面板行里的技能标签：沿用 .shortcut-command 的字号与右间距 */
+/* 面板行里的标签（技能 / 子代理 / 命令）：沿用 .shortcut-command 的字号与右间距 */
 .shortcut-skill {
     display: inline-flex;
     align-items: center;

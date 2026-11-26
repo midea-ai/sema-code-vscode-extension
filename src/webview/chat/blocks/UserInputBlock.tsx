@@ -7,6 +7,7 @@ import ImagePreviewModal from '../components/ImagePreviewModal';
 import { FileRefChip, refPaths, refStatPath, splitFileRefs } from '../utils/fileRefDisplay';
 import { usePathExists } from '../utils/usePathExists';
 import { SkillLabel, matchSkillPrefix } from '../utils/skillDisplay';
+import { resolveCommandDisplay } from '../components/input/utils/commandUtils';
 import { TargetIcon } from '../components/panels/GoalBar';
 import { useT, I18nKey } from '../../common/i18n/react';
 
@@ -115,8 +116,8 @@ const UserInputBlock: React.FC<UserInputBlockProps> = React.memo(({ content, att
     // @ 文件引用经宿主确认存在后显示为「文件图标 + 文件名」芯片（与输入框一致），点击打开；不存在的保持原文。
     // 复制/fork 仍用 content 原文
     const text = typeof content === 'string' ? content : '';
-    // 以映射技能开头的消息：`/<技能名>` 显示为图标 + 名字（排队中的气泡同样处理），复制仍是原文
-    const skill = matchSkillPrefix(text);
+    // 以已知斜杠命令开头的消息（技能 / 子代理 / 内置命令 / 自定义命令）：`/<名字>` 显示为图标 + 名字（排队中的气泡同样处理），复制仍是原文
+    const skill = matchSkillPrefix(text, false, resolveCommandDisplay);
     const bodyText = skill ? skill.rest : text;
     const refKeys = useMemo(() => refPaths(bodyText), [bodyText]);
     const stat = usePathExists(vscode, refKeys);
