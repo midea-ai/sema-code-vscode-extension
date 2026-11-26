@@ -36,8 +36,9 @@ const NotebookEditBlock: React.FC<NotebookEditBlockProps> = React.memo(({
         const titleCellMatch = (title || '').match(/^(.*?)\s+cell:(\d+)$/);
         const fileName = titleCellMatch ? titleCellMatch[1] : (title || '');
 
-        // 从 title 中提取 cell 信息，title 中没有则从 summary 中提取
-        let cellNum = 0;
+        // 从 title 中提取 cell 信息，title 中没有则从 summary 中提取；
+        // 两处都没有时为 undefined：行头仍显示 cell:0，但不拿它去定位（避免跳到第 1 个 cell）
+        let cellNum: number | undefined;
         if (titleCellMatch) {
             cellNum = parseInt(titleCellMatch[2]);
         } else {
@@ -101,9 +102,11 @@ const NotebookEditBlock: React.FC<NotebookEditBlockProps> = React.memo(({
             vscode.postMessage({
                 type: 'showFileDiff',
                 filePath: fileName,
+                // 宿主对 .ipynb 把这个值当 cell 序号用（不是文本行号）
+                minLine: cellNum
             });
         }
-    }, [fileName, vscode]);
+    }, [fileName, cellNum, vscode]);
 
     const handleHeaderClick = useCallback(() => {
         // 拖拽选中标题文本时不折叠/展开
@@ -130,7 +133,7 @@ const NotebookEditBlock: React.FC<NotebookEditBlockProps> = React.memo(({
                 extra={(
                     <>
                         {/* cell:n 只作文字，不参与链接悬浮与点击 */}
-                        <span className="cell-info">cell:{cellNum}</span>
+                        <span className="cell-info">cell:{cellNum ?? 0}</span>
                         {(additions > 0 || removals > 0) && (
                             <span className="edit-stats">
                                 {additions > 0 && <span className="additions">+{additions}</span>}
