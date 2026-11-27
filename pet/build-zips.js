@@ -9,7 +9,7 @@
 // macOS：swift toolchain 自带 x86_64 target，一台 Apple Silicon 即可出两架构。
 // Windows：'all' 仅打 x64；arm64 需显式指定。
 // Linux：仅 x64；GTK 动态链接系统库，走 host glibc target，不能 musl 静态编译。
-// 跨平台拉取全部平台 zip 用 pet/fetch-zips.js（npm run pet:fetch）。
+// 从 pet-assets Release 拉全部平台 zip 到本地用 node pet/fetch-zips.js。
 
 const { spawnSync } = require('child_process');
 const fs = require('fs');

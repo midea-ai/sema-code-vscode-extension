@@ -1,9 +1,10 @@
 #!/usr/bin/env node
 //
 // 从 GitHub 的 pet-assets Release 拉取全部平台桌宠 zip，直接落 dist/pet/。
-// 用法：node pet/fetch-zips.js（npm run pet:fetch）
+// 用法：node pet/fetch-zips.js
 //
-// pet-assets 是固定 tag、无版本号、只保留最新一份。发布扩展时用本脚本拉远程，
+// pet-assets 是固定 tag、无版本号、只保留最新一份。zip 不打进 VSIX，本脚本只服务本地调试：
+// 拉下来后 launcher 会优先解压 dist/pet/ 的本地 zip，省掉首次启用的按需下载。
 // 改了桌宠源码要重新构建则用 pet/build-zips.js（npm run pet:build）。二者落点一致。
 
 const fs = require('fs');

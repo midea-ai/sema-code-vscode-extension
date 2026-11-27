@@ -255,7 +255,7 @@ curl -s -X POST http://127.0.0.1:24700/session/unregister \
 F5 启动 Extension Development Host → 在 Sema Code 侧栏 → 配置 → 系统配置 → 基础设置勾选「启用桌宠」。
 
 - 本地已经跑了 SemaPet（macOS `./.build/release/SemaPet`，Windows `SemaPet.exe`）→ launcher `ping /health` 通，直接复用
-- 本地没跑 → 若 `dist/pet/sema-pet-<platform>-<arch>.zip` 存在（本地 `npm run pet:build` 产物）优先解压该文件；否则从 GitHub `pet-assets` Release 按需下载到 `~/.sema/pet/bin/<platform>-<arch>/` → spawn
+- 本地没跑 → 若 `dist/pet/sema-pet-<platform>-<arch>.zip` 存在（本地 `npm run pet:build` 或 `node pet/fetch-zips.js` 产物）优先解压该文件；否则从 GitHub `pet-assets` Release 按需下载到 `~/.sema/pet/bin/<platform>-<arch>/` → spawn
 - 想测重新下载/解压路径，先 `rm -rf ~/.sema/pet/bin/` 再勾选
 
 > 桌宠开关状态存在 VS Code 的 globalState 里，不在 `~/.sema/pet/config.json`（旧设计已废弃，该文件现仅留 `windowPosition` 供桌宠自身记录）。
@@ -283,6 +283,8 @@ cargo run                        # 启动会 seed 默认资源
 桌宠各平台 zip 统一发布到 GitHub 的 `pet-assets` Release —— 一个固定 tag、无版本号、只保留最新一份，与扩展版本号无关。zip 命名严格对齐 `process.platform-process.arch`：`sema-pet-darwin-arm64.zip` / `sema-pet-darwin-x64.zip` / `sema-pet-win32-x64.zip` / `sema-pet-linux-x64.zip`。
 
 改动桌宠源码后，运行 `npm run pet:build` 现场编译**当前平台**桌宠（产物落 `dist/pet/`），然后将对应的 zip 手动上传到 GitHub 的 `pet-assets` Release（覆盖同名旧文件）。
+
+只想在本地复现远端 zip（例如验证按需下载 / 解压路径）时，运行 `node pet/fetch-zips.js` 把全部平台 zip 拉到 `dist/pet/`；它只服务本地调试，不参与打包。
 
 ### 扩展怎么消费 zip
 
