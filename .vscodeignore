@@ -10,8 +10,10 @@ pet/**
 jetbrains-plugin/**
 
 # JetBrains 专用 webview 产物（仅供 JB 插件加载，VSCode 运行时不引用）
-dist/webview/jb-*.js
-dist/webview/jb-*.js.map
+dist/webview/jb-*
+
+# 本地调试构建的桌宠 zip（生产运行时从 pet-assets Release 按需下载，不打进通用 vsix）
+dist/pet/**
 
 # sourcemap 不参与运行时，本地 dist/ 保留即可，无需进 vsix
 dist/**/*.map
@@ -28,10 +30,8 @@ webpack.config.js
 .eslintrc*
 .prettierrc*
 
-# 开发依赖和构建文件
-# 排除所有 node_modules，但保留运行时必需的二进制（bin 目录）
+# 开发依赖和构建文件（全部代码已由 webpack 打进 dist/，ripgrep 运行时优先复用 VS Code 内置）
 node_modules/**
-!node_modules/@vscode/ripgrep/bin/
 .vscode/**
 .git/**
 .gitignore
@@ -69,5 +69,4 @@ scripts/**
 
 *.vsix
 *.zip
-!dist/pet/*.zip
 *.tar.gz

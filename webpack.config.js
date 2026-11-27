@@ -21,10 +21,19 @@ const extensionConfig = {
   output: {
     path: path.resolve(__dirname, 'dist'),
     filename: 'extension.js',
-    libraryTarget: 'commonjs2'
+    libraryTarget: 'commonjs2',
+    // 清理 dist/ 顶层旧构建残留 chunk（保留 webview/ 与本地调试用的 pet/）
+    clean: {
+      keep: (asset) => {
+        const normalized = asset.replace(/\\/g, '/');
+        return normalized === 'webview' || normalized.startsWith('webview/')
+          || normalized === 'pet' || normalized.startsWith('pet/');
+      }
+    }
   },
   externals: {
     vscode: 'commonjs vscode',
+    // sema-core 内 try/catch 动态解析 @vscode/ripgrep，保持 external 避免编译期报错；运行时由 src/utils/ripgrep.ts 注入 PATH
     '@vscode/ripgrep': 'commonjs @vscode/ripgrep'
   },
   resolve: {

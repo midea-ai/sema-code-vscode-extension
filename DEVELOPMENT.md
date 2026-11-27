@@ -18,41 +18,27 @@ cd sema-code-vscode-extension
 # 2. 安装依赖
 npm install
 
-# 3. 准备桌宠 zip（→ dist/pet/）—— 二选一
-npm run pet:fetch     # 从 pet-assets Release 拉全平台最新 zip（发布扩展用）
-npm run pet:build     # 现场编译当前平台桌宠（改了桌宠源码 / F5 调试用）
-#   详细说明见 pet/README.md
-#   准备好的 zip 落在 dist/pet/，各平台对应：
-#     dist/pet/sema-pet-darwin-arm64.zip   # macOS Apple Silicon
-#     dist/pet/sema-pet-darwin-x64.zip     # macOS Intel
-#     dist/pet/sema-pet-win32-x64.zip      # Windows x64
-#   （pet:build 只产出当前平台那一份；pet:fetch 三份齐全）
-
-# 4. 编译项目
+# 3. 编译项目
 npm run compile
 
-# 5. 在 VSCode 中按 F5 启动调试
+# 4. 在 VSCode 中按 F5 启动调试
 #    这将打开一个新的 Extension Development Host 窗口
 ```
 
-> 发布扩展走 `npm run pet:fetch`：桌宠 zip 以 `pet-assets` Release 上的为准，三平台齐全。
-> `npm run pet:build` 只编译当前平台（Mac 上出不了 Windows 桌宠），用于改桌宠源码后本地验证。
+> 桌宠二进制与 ripgrep 不再打进扩展包：
+> - **ripgrep**：运行时优先复用 VS Code 本体内置的 `rg`，其次使用系统 `PATH` 或 `~/.sema/rg/` 缓存，全部缺失时按需下载。
+> - **桌宠**：启用桌宠时自动从 GitHub `pet-assets` Release 按需下载到 `~/.sema/pet/bin/`；若改了桌宠源码需本地验证，可运行 `npm run pet:build`（产物落 `dist/pet/`，F5 调试时 launcher 会优先使用本地 zip，打包 VSIX 时会被 `.vscodeignore` 排除）。
 
 ## 构建系统
-### 多平台打包
+### 打包（全平台通用 VSIX）
 
 ```bash
-# 使用脚本打包所有平台
-./package-all.sh
+npm run compile
+npm run package   # 或 ./package-all.sh
 
-# 产出文件格式：
-# sema-vscode-extension-darwin-x64-<version>.vsix
-# sema-vscode-extension-darwin-arm64-<version>.vsix
-# sema-vscode-extension-linux-x64-<version>.vsix
-# sema-vscode-extension-win32-x64-<version>.vsix
+# 产出单个全平台通用包：
+# sema-vscode-extension-<version>.vsix
 ```
-
-> package-all.sh 给每个平台 vsix 只塞它自己那一份桌宠 zip（linux 无桌宠），`dist/pet/` 在打包结束后恢复成全部 zip。
 
 ### .vscodeignore
 
