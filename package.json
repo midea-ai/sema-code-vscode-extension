@@ -131,8 +131,8 @@
   },
   "scripts": {
     "compile": "webpack",
-    "pet:build": "node pet/build-zips.js",
-    "pet:fetch": "node pet/fetch-zips.js"
+    "package": "vsce package",
+    "pet:build": "node pet/build-zips.js"
   },
   "devDependencies": {
     "@babel/core": "^7.28.5",
@@ -159,7 +159,6 @@
   "dependencies": {
     "@larksuiteoapi/node-sdk": "^1.66.0",
     "@types/dompurify": "^3.0.5",
-    "@vscode/ripgrep": "^1.17.0",
     "adm-zip": "^0.5.16",
     "diff": "^8.0.2",
     "dompurify": "^3.3.1",
