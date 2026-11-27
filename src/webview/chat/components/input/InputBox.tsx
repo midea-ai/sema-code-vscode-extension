@@ -1030,6 +1030,12 @@ const InputBox = forwardRef<InputBoxHandle, InputBoxProps>(({
             return;
         }
 
+        // 未命中任何面板/预测时拦截 Tab，避免焦点静默跳到底部工具栏按钮（如 Agent 模式按钮）导致后续回车/空格误触菜单
+        if (e.key === 'Tab' && !e.ctrlKey && !e.metaKey && !e.altKey) {
+            e.preventDefault();
+            return;
+        }
+
         // Ctrl+W：删除前一个词（终端 kill-word-backward 行为，按中文习惯切词）
         // VSCode 在 webview 外层也绑了 Ctrl+W（关闭编辑器），需 stopPropagation 阻止事件外泄
         if ((e.key === 'w' || e.key === 'W') && e.ctrlKey && !e.metaKey && !e.altKey) {
@@ -1283,6 +1289,7 @@ const InputBox = forwardRef<InputBoxHandle, InputBoxProps>(({
                                 className={`agent-mode-btn mode-${agentMode.toLowerCase()}${agentModeLocked ? ' agent-mode-locked' : ''}`}
                                 onClick={agentModeLocked ? undefined : agentModeMenu.handleToggleAgentModeMenu}
                                 disabled={disabled}
+                                tabIndex={-1}
                             >
                                 <span>{agentMode}</span>
                                 {!agentModeLocked && <ChevronDownIcon />}
@@ -1305,6 +1312,7 @@ const InputBox = forwardRef<InputBoxHandle, InputBoxProps>(({
                                 className="model-info-btn"
                                 onClick={modelMenu.handleToggleModelMenu}
                                 disabled={disabled || modelMenu.isModelLoading}
+                                tabIndex={-1}
                             >
                                 {!modelMenu.isModelLoading && modelMenu.currentModel && (
                                     <ProviderLogo provider={parseProviderKey(modelMenu.currentModel)} className="model-btn-logo" />
@@ -1334,6 +1342,7 @@ const InputBox = forwardRef<InputBoxHandle, InputBoxProps>(({
                                 className={`permission-level-btn level-${permissionLevel.toLowerCase()}`}
                                 onClick={permissionLevelMenu.handleTogglePermissionLevelMenu}
                                 disabled={disabled}
+                                tabIndex={-1}
                             >
                                 <span>{permissionLevel}</span>
                                 <ChevronDownIcon />
@@ -1357,6 +1366,7 @@ const InputBox = forwardRef<InputBoxHandle, InputBoxProps>(({
                             className={`send-btn ${canSend || isGenerating ? 'active' : ''}`}
                             onClick={handleButtonClick}
                             disabled={!canSend && !isGenerating}
+                            tabIndex={-1}
                         >
                             {isGenerating && !canSend ? <StopIcon /> : <SendIcon />}
                         </button>
