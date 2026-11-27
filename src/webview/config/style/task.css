@@ -375,8 +375,8 @@
 .cron-detail {
     display: flex;
     flex-direction: column;
-    gap: 8px;
-    margin-top: 10px;
+    gap: 6px;
+    margin-top: 8px;
 }
 
 .cron-detail-row {
@@ -384,7 +384,7 @@
     align-items: flex-start;
     gap: 12px;
     font-size: var(--s-font-base);
-    line-height: 24px;
+    line-height: 22px;
 }
 
 /* 标签比取值更弱；取值与「收起详情」同色，整块保持次级观感 */

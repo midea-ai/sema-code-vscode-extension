@@ -111,14 +111,6 @@ const CronTaskCard: React.FC<{
 
             {expanded && (
                 <div className="cron-detail">
-                    <div className="cron-detail-row">
-                        <span className="cron-detail-key">{t('config.cron.expression')}</span>
-                        <span className="cron-detail-value">
-                            <span className="cron-expression-tag">
-                                {task.schedule.split('').map((ch, i) => ch === '*' ? ch : <span key={i} className="cron-highlight">{ch}</span>)}
-                            </span>
-                        </span>
-                    </div>
                     {nextFire.length > 0 && (
                         <div className="cron-detail-row">
                             <span className="cron-detail-key">{t('config.cron.upcoming')}</span>
@@ -127,6 +119,14 @@ const CronTaskCard: React.FC<{
                             </span>
                         </div>
                     )}
+                    <div className="cron-detail-row">
+                        <span className="cron-detail-key">{t('config.cron.expression')}</span>
+                        <span className="cron-detail-value">
+                            <span className="cron-expression-tag">
+                                {task.schedule.split('').map((ch, i) => ch === '*' ? ch : <span key={i} className="cron-highlight">{ch}</span>)}
+                            </span>
+                        </span>
+                    </div>
                     <div className="cron-detail-row">
                         <span className="cron-detail-key">{t('config.cron.taskId')}</span>
                         <span className="cron-detail-value">{task.id}</span>
