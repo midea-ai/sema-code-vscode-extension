@@ -1,6 +1,6 @@
 {
   "name": "代码变更影响",
-  "description": "按功能梳理 Git 改动的影响：谁受影响、行为怎么变、得到什么、失去什么、哪里可能出问题。",
+  "description": "按功能梳理 Git 改动的影响面：谁受影响、行为怎么变、收益与代价、隐性风险及回归重点。",
   "category": "insight",
   "order": 80,
   "defaultInstall": true
