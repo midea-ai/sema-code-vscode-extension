@@ -121,13 +121,6 @@ object Theme {
     fun chatPageBgOverrideCss(): String =
         "html:root{--chat-bg-primary:var(--vscode-sema-chatPageBg);--chat-page-bg:var(--vscode-sema-chatPageBg);}"
 
-    /**
-     * config 页覆盖 CSS：选中标签（.tab-item.active）文字原用 button-background，JB 下它与
-     * 背景 list-activeSelectionBackground 同色而看不见；改用配套的 list-activeSelectionForeground。
-     */
-    fun configPageOverrideCss(): String =
-        "html:root .tab-item.active{color:var(--vscode-list-activeSelectionForeground);}"
-
     /** 订阅 IDE 换肤/配色变化，重算变量写回 <style id="sema-theme">，面板无需重载即随主题刷新（绑 parent，随面板注销）。 */
     fun installLiveUpdate(browser: JBCefBrowser, parent: Disposable) {
         val conn = ApplicationManager.getApplication().messageBus.connect(parent)
