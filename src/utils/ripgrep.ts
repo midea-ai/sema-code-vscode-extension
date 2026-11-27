@@ -5,6 +5,7 @@ import * as os from 'os';
 import * as path from 'path';
 import { spawnSync } from 'child_process';
 import AdmZip = require('adm-zip');
+import { SemaProcessWrapper } from '../core/semaProcessWrapper';
 
 /**
  * ripgrep 供应器：使扩展摆脱打包各平台 rg 二进制，达成单包全平台通用 VSIX。
@@ -213,7 +214,7 @@ export function ensureRipgrep(appRoot?: string): Promise<void> {
         console.warn(`[ripgrep] unsupported platform/arch: ${process.platform}/${process.arch}`);
         return Promise.resolve();
     }
-    const cacheDir = path.join(os.homedir(), '.sema', 'rg', RG_VERSION, asset.triple);
+    const cacheDir = path.join(SemaProcessWrapper.getSemaRootDir(), 'rg', RG_VERSION, asset.triple);
     if (canExecute(path.join(cacheDir, RG_NAME))) {
         prependPath(cacheDir);
         return Promise.resolve();

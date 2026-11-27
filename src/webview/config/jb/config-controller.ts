@@ -641,7 +641,12 @@ export class ConfigController {
     private importRootsPromise: Promise<ImportRoots> | null = null;
     private importRoots(): Promise<ImportRoots> {
         this.importRootsPromise ??= this.fileOps({ op: 'roots' }).then(
-            r => ({ home: String(r?.home ?? ''), project: r?.project ? String(r.project) : undefined, sep: r?.sep === '\\' ? '\\' : '/' }),
+            r => ({
+                home: String(r?.home ?? ''),
+                semaRoot: String(r?.semaRoot ?? ''),
+                project: r?.project ? String(r.project) : undefined,
+                sep: r?.sep === '\\' ? '\\' : '/',
+            }),
             e => { this.importRootsPromise = null; throw e; },
         );
         return this.importRootsPromise;

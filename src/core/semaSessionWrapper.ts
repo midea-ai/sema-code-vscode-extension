@@ -1,5 +1,4 @@
 import { SemaSession } from 'sema-core';
-import type { ForkOptions, ForkPreview, ForkResult, BranchResult, FileChangeItem, FileDiffResult, RevertFileResult } from 'sema-core';
 import { t } from '../webview/common/i18n/core';
 import { parsePasteInput, type PasteAttachment } from '../webview/common/paste';
 import { isAttachmentPath } from '../webview/common/viz';
@@ -35,8 +34,22 @@ import {
     Usage
 } from 'sema-core/event';
 import { MAIN_AGENT_ID } from 'sema-core/types';
-import type { TaskListItem, AgentMode, PermissionLevel, ModelUpdateData, GoalState, GoalInputMark } from 'sema-core/types';
-import type { InputImageAttachment } from 'sema-core';
+import type {
+    TaskListItem,
+    AgentMode,
+    PermissionLevel,
+    ModelUpdateData,
+    GoalState,
+    GoalInputMark,
+    ForkOptions,
+    ForkPreview,
+    ForkResult,
+    BranchResult,
+    FileChangeItem,
+    FileDiffResult,
+    RevertFileResult,
+    InputImageAttachment,
+} from 'sema-core/types';
 
 // core 未顶层导出 InputSource，从事件数据类型推导
 type InputSource = NonNullable<InputProcessingData['source']>;

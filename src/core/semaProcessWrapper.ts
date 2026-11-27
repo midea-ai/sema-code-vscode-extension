@@ -1,4 +1,4 @@
-import { SemaCore, SemaSession, UsageStatsData } from 'sema-core';
+import { SemaCore, SemaSession } from 'sema-core';
 import {
     CreateSessionOptions,
     CreateSessionResult,
@@ -27,7 +27,8 @@ import {
     HooksInfo,
     HookConfig,
     TaskListItem,
-    CronTask
+    CronTask,
+    UsageStatsData
 } from 'sema-core/types';
 
 import { SystemConfigManager } from '../managers/SystemConfigManager';
@@ -68,6 +69,11 @@ export interface ProcessWrapperCallbacks {
 export class SemaProcessWrapper {
     private semaCore: SemaCore;
     private systemConfigManager: SystemConfigManager;
+
+    /** Sema 用户级根目录（SEMA_ROOT 环境变量优先，默认 ~/.sema）；静态暴露，供 SemaCore 实例化前与无实例工具模块统一使用 */
+    public static getSemaRootDir(): string {
+        return SemaCore.getSemaRootDir();
+    }
 
     constructor(
         private readonly workingDir: string,

@@ -25,9 +25,10 @@ export interface ImportFs {
     copyDir(src: string, dst: string): Promise<void>;
 }
 
-/** 路径根：home 必有；project 无工作区时为空；sep 为宿主路径分隔符 */
+/** 路径根：home 必有；semaRoot 为用户级 Sema 根目录（由宿主取自 sema-core 的 getSemaRootDir）；project 无工作区时为空；sep 为宿主路径分隔符 */
 export interface ImportRoots {
     home: string;
+    semaRoot: string;
     project?: string;
     sep: string;
 }

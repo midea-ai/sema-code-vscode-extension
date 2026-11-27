@@ -15,6 +15,7 @@ import com.sema.config.SkillCatalogManager
 import com.sema.config.SystemConfigManager
 import com.sema.editor.EditorOps
 import com.sema.sidecar.SidecarService
+import semacore.SemaCore
 import semacore.transport.BridgeConnection
 import semacore.transport.SemaEvent
 
@@ -216,6 +217,7 @@ class MessageBridge(
                 val data: Any = when (val op = payload.str("op")) {
                     "roots" -> mapOf(
                         "home" to System.getProperty("user.home"),
+                        "semaRoot" to SemaCore.getSemaRootDir(),
                         "project" to (project.basePath ?: ""),
                         "sep" to java.io.File.separator,
                     )

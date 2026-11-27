@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
+import { SemaProcessWrapper } from '../../core/semaProcessWrapper';
 import { defaultConfig, DEFAULT_CUSTOM_RULES } from './default/defaultConfig';
 import { SkillCatalogManager, CatalogScope } from '../../managers/SkillCatalogManager';
 import { AgentConfig } from './types/agent';
@@ -1007,7 +1008,12 @@ export class ConfigWebviewProvider {
     // 读三家配置用 Node fs；写入走 core 公开 API 或直接落盘，逻辑全在 import/importer.ts（与 JB 共用）。
 
     private importRoots(): ImportRoots {
-        return { home: os.homedir(), project: vscode.workspace.workspaceFolders?.[0]?.uri.fsPath, sep: path.sep };
+        return {
+            home: os.homedir(),
+            semaRoot: SemaProcessWrapper.getSemaRootDir(),
+            project: vscode.workspace.workspaceFolders?.[0]?.uri.fsPath,
+            sep: path.sep,
+        };
     }
 
     private async importDetectSources() {

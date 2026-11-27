@@ -55,9 +55,10 @@ function findClaudeProject(projects: unknown, roots: ImportRoots): any {
     return key === undefined ? undefined : map[key];
 }
 
-/** Sema 落盘根：用户级 ~/.sema，项目级 <项目>/.sema */
+/** Sema 落盘根：用户级取宿主下发的 <semaRoot>（即 sema-core getSemaRootDir），项目级 <项目>/.sema */
 function semaRoot(roots: ImportRoots, scope: ImportScope): string {
-    return join(roots.sep, scope === 'user' ? roots.home : roots.project!, '.sema');
+    if (scope === 'user') return roots.semaRoot;
+    return join(roots.sep, roots.project!, '.sema');
 }
 
 /** 来源根目录，任一存在即视为「已检测到」 */

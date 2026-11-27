@@ -12,6 +12,7 @@ import * as path from 'path';
 import * as https from 'https';
 import * as http from 'http';
 import AdmZip from 'adm-zip';
+import { SemaProcessWrapper } from '../core/semaProcessWrapper';
 
 export type CatalogScope = 'project' | 'user';
 
@@ -122,7 +123,7 @@ export class SkillCatalogManager {
             if (!workspaceRoot) throw new Error('No workspace folder is open');
             return path.join(workspaceRoot, '.sema', 'skills', id);
         }
-        return path.join(os.homedir(), '.sema', 'skills', id);
+        return path.join(SemaProcessWrapper.getSemaRootDir(), 'skills', id);
     }
 
     /** 扫描内置资源。id 取子目录名 / 文件名（无路径分隔符），install/uninstall 按 id 在扫描结果中找回，天然白名单 */

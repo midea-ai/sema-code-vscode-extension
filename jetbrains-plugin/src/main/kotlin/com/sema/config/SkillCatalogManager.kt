@@ -6,6 +6,7 @@ import com.google.gson.reflect.TypeToken
 import com.intellij.ide.util.PropertiesComponent
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.diagnostic.logger
+import semacore.SemaCore
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.net.HttpURLConnection
@@ -157,7 +158,7 @@ class SkillCatalogManager {
             if (projectRoot.isNullOrEmpty()) throw IllegalStateException("No workspace folder is open")
             return File(projectRoot, ".sema/skills/$id")
         }
-        return File(System.getProperty("user.home"), ".sema/skills/$id")
+        return File(SemaCore.getSemaRootDir(), "skills/$id")
     }
 
     fun listCatalog(projectRoot: String?): List<Map<String, Any?>> = resources.map { r ->

@@ -24,6 +24,7 @@ import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.Pair
 import com.intellij.openapi.vfs.LocalFileSystem
 import com.sema.config.SemaBundle
+import semacore.SemaCore
 import java.io.File
 
 /**
@@ -572,11 +573,7 @@ class EditorOps(
     private val pasteFileName = "pasted-text.txt"
     private val uuidRe = Regex("^[0-9a-f-]{36}$", RegexOption.IGNORE_CASE)
 
-    private fun attachmentsRoot(): File {
-        val custom = System.getenv("SEMA_ROOT")?.takeIf { it.isNotBlank() }
-        val semaRoot = if (custom != null) File(custom).absoluteFile else File(System.getProperty("user.home"), ".sema")
-        return File(semaRoot, "attachments")
-    }
+    private fun attachmentsRoot(): File = File(SemaCore.getSemaRootDir(), "attachments")
 
     /** 落盘一段粘贴文本并回推 pastedTextSaved{reqId, path}；失败 path 为 null。 */
     private fun savePastedText(text: String?, reqId: com.google.gson.JsonElement?) {

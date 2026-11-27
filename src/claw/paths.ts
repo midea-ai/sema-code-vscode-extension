@@ -1,33 +1,21 @@
 /**
  * Filesystem paths for the claw module's own state under ~/.sema/claw.
  *
- * We honor the SEMA_ROOT env override the same way sema-core does, so claw's
- * state sits next to sema-core's. We do NOT replicate sema-core's history file
- * naming: loading the claw session is done by passing the bare sessionId
- * ('__claw__') to createSession, and /clear is a native core command — core
- * resolves the actual (date-prefixed) history file itself.
+ * We resolve the root via sema-core's getSemaRootDir, so claw's state sits next
+ * to sema-core's (honoring the SEMA_ROOT env override). We do NOT replicate
+ * sema-core's history file naming: loading the claw session is done by passing
+ * the bare sessionId ('__claw__') to createSession, and /clear is a native core
+ * command — core resolves the actual (date-prefixed) history file itself.
  */
-import os from "node:os";
 import path from "node:path";
+import { SemaProcessWrapper } from "../core/semaProcessWrapper";
 
 /** Fixed sessionId for the single claw agent session. */
 export const CLAW_SESSION_ID = "__claw__";
 
-function expandHome(p: string): string {
-  if (p === "~") return os.homedir();
-  if (p.startsWith("~/")) return path.join(os.homedir(), p.slice(2));
-  return path.resolve(p);
-}
-
-/** ~/.sema (or $SEMA_ROOT). Mirrors sema-core getSemaRootDir(). */
-export function getSemaRootDir(): string {
-  const custom = process.env.SEMA_ROOT;
-  return custom ? path.resolve(custom) : expandHome("~/.sema");
-}
-
 /** ~/.sema/claw — claw's own state dir (lock, credentials, cursors). */
 export function clawDir(): string {
-  return path.join(getSemaRootDir(), "claw");
+  return path.join(SemaProcessWrapper.getSemaRootDir(), "claw");
 }
 
 export function ownerLockPath(): string {

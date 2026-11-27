@@ -4,17 +4,16 @@
  * 退场由 core 负责：发送后登记到会话名下随会话删除，没发送的由 core 的期限兜底回收，这里不做清理
  */
 import * as fs from 'fs';
-import * as os from 'os';
 import * as path from 'path';
 import { randomUUID } from 'crypto';
+import { SemaProcessWrapper } from '../core/semaProcessWrapper';
 
 const FILE_NAME = 'pasted-text.txt';
 const UUID_RE = /^[0-9a-f-]{36}$/i;
 
-/** 与 core getSemaRootDir 一致：SEMA_ROOT 环境变量优先，默认 ~/.sema */
+/** 与 core 同根（SEMA_ROOT 环境变量优先，默认 ~/.sema）；不同根时 core 不会把附件目录视为受信路径 */
 function attachmentsRoot(): string {
-    const semaRoot = process.env.SEMA_ROOT ? path.resolve(process.env.SEMA_ROOT) : path.join(os.homedir(), '.sema');
-    return path.join(semaRoot, 'attachments');
+    return path.join(SemaProcessWrapper.getSemaRootDir(), 'attachments');
 }
 
 /** 落盘一段粘贴文本，返回绝对路径 */

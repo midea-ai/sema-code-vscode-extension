@@ -1,8 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import * as os from 'os';
 import type { MCPServerConfig, MCPServerInfo, SkillConfig } from 'sema-core/types';
-import type { SemaProcessWrapper } from '../core/semaProcessWrapper';
+import { SemaProcessWrapper } from '../core/semaProcessWrapper';
 
 const SKILL_NAME = 'chrome-use';
 const MCP_NAME = 'chrome';
@@ -39,7 +38,7 @@ export class BrowserControlManager {
     }
 
     private get userSkillDir(): string {
-        return path.join(os.homedir(), '.sema', 'skills', SKILL_NAME);
+        return path.join(SemaProcessWrapper.getSemaRootDir(), 'skills', SKILL_NAME);
     }
 
     /**

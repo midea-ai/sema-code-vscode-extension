@@ -8,6 +8,7 @@ import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.diagnostic.logger
 import com.intellij.openapi.extensions.PluginId
+import semacore.SemaCore
 import java.io.File
 import java.util.concurrent.atomic.AtomicBoolean
 
@@ -62,7 +63,7 @@ class BuiltinResourcesSync {
     }
 
     /** 用户级 chrome-use skill 目录 */
-    val userBrowserSkillDir: File get() = File(System.getProperty("user.home"), ".sema/skills/$BROWSER_SKILL_NAME")
+    val userBrowserSkillDir: File get() = File(SemaCore.getSemaRootDir(), "skills/$BROWSER_SKILL_NAME")
 
     /** 从插件资源整拷 chrome-use 到用户级（先删后拷，不留旧文件） */
     fun copyBrowserSkill() {
