@@ -520,6 +520,14 @@ html.jb #output-container {
     font-weight: 400;
 }
 
+/* 运行中轮内注入的输入：靠右，短内容收窄成气泡，与轮次开头的满宽输入区分。
+   最宽比满宽少 32px（右侧 margin 4px + 左侧留白 28px），长文本右边缘仍与普通气泡对齐 */
+.user-input-block.injected {
+    width: fit-content;
+    max-width: calc(100% - 32px);
+    margin-left: auto;
+}
+
 /* 后台任务运行状态条 */
 .running-tasks-bar {
     display: flex;

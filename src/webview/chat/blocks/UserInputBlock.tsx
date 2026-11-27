@@ -22,6 +22,8 @@ interface UserInputBlockProps {
     onFork?: (uuid: string) => void;
     /** 排队中（core 处理上一条时收到的输入）：虚线淡化样式，无复制/fork 按钮 */
     pending?: boolean;
+    /** 运行中轮内注入：靠右、短内容收窄，与普通轮次开头的输入区分 */
+    injected?: boolean;
     vscode?: VscodeApi;
 }
 
@@ -102,7 +104,7 @@ const PastePill: React.FC<{ preview: string; onOpen: () => void }> = ({ preview,
 // 当前为 line-height 1.5 * 字号 12px * 3 行 = 54px
 const COLLAPSED_MAX_PX = 54;
 
-const UserInputBlock: React.FC<UserInputBlockProps> = React.memo(({ content, attachments, pastes, source, goal, uuid, canFork, onFork, pending, vscode }) => {
+const UserInputBlock: React.FC<UserInputBlockProps> = React.memo(({ content, attachments, pastes, source, goal, uuid, canFork, onFork, pending, injected, vscode }) => {
     const t = useT();
 
     const [isExpanded, setIsExpanded] = useState<boolean>(false);
@@ -179,7 +181,7 @@ const UserInputBlock: React.FC<UserInputBlockProps> = React.memo(({ content, att
     const showText = !!text || !!pending;
 
     const bubble = (
-        <div className={`user-input-block${pending ? ' pending' : ''}`}>
+        <div className={`user-input-block${pending ? ' pending' : ''}${injected && !pending ? ' injected' : ''}`}>
             {attachments && attachments.length > 0 && (
                 <div className="user-input-images">
                     {attachments.map((att, i) => (

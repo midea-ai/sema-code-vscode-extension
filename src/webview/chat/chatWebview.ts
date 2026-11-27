@@ -7,7 +7,7 @@ import type { GitReviewManager } from '../../managers/GitReviewManager';
 import { SemaProcessWrapper } from '../../core/semaProcessWrapper';
 import type { SessionController } from '../../core/semaSidebarProvider';
 import { transformCommandToPrompt } from '../../utils/prompt';
-import type { InputImageAttachment, FileChangeItem } from 'sema-core';
+import type { InputImageAttachment, FileChangeItem } from 'sema-core/types';
 import { isAttachmentPath } from '../common/viz';
 import { DEFAULT_CUSTOM_RULES, isBuiltinCustomRules } from '../config/default/defaultConfig';
 import { t, getLang, normalizeLang, type Language } from '../common/i18n/core';

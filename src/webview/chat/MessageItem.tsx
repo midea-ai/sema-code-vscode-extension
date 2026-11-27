@@ -96,6 +96,7 @@ const MessageItem: React.FC<MessageItemProps> = React.memo(({
                     source={message.source}
                     goal={message.goal}
                     vscode={vscode}
+                    injected={message.injected}
                     // 轮内注入的输入在 core 历史里不是独立消息，回退会报消息未找到：不给锚点即不显示回退角标
                     uuid={message.injected ? undefined : message.uuid}
                     canFork={processingState === 'idle'}
